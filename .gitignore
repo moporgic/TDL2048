@@ -1,0 +1,6 @@
+/bin/
+/Release/
+/Debug/
+
+[Tt]humbs.db
+*.DS_Store
