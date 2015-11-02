@@ -151,8 +151,8 @@ public:
 			if (tmp != 0) row[top] = tmp;
 		}
 		struct tiles<u32> calempty(u32 V[]) {
-			register u32 tile = 0;
-			register u32 size = 0;
+			u32 tile = 0;
+			u32 size = 0;
 			for (int i = 0; i < 4; i++)
 				if (V[i] == 0) tile |= (i << ((size++) << 2));
 			return tiles<u32>(tile, size);
@@ -235,28 +235,28 @@ public:
 		ext = 0;
 	}
 	tiles<u64> spaces() const {
-		register u64 e = 0;
-		register u32 s = 0;
+		register u64 tile = 0;
+		register u32 size = 0;
 
-		const tiles<u32> e0 = look[fetch(0)].empty;
-		const tiles<u32> e1 = look[fetch(1)].empty;
-		const tiles<u32> e2 = look[fetch(2)].empty;
-		const tiles<u32> e3 = look[fetch(3)].empty;
+		const tiles<u32>& e0 = look[fetch(0)].empty;
+		const tiles<u32>& e1 = look[fetch(1)].empty;
+		const tiles<u32>& e2 = look[fetch(2)].empty;
+		const tiles<u32>& e3 = look[fetch(3)].empty;
 
-		const u32 mask[] = { 0x0000, 0x000f, 0x00ff, 0x0fff, 0xffff };
-		e |= u64((e0.tile + 0x0000) & mask[e0.size]) << (s << 2);
-		s += e0.size;
-		e |= u64((e1.tile + 0x4444) & mask[e1.size]) << (s << 2);
-		s += e1.size;
-		e |= u64((e2.tile + 0x8888) & mask[e2.size]) << (s << 2);
-		s += e2.size;
-		e |= u64((e3.tile + 0xcccc) & mask[e3.size]) << (s << 2);
-		s += e3.size;
+		register u32 mask[] = { 0x0000, 0x000f, 0x00ff, 0x0fff, 0xffff };
+		tile |= u64((e0.tile + 0x0000) & mask[e0.size]) << (size << 2);
+		size += e0.size;
+		tile |= u64((e1.tile + 0x4444) & mask[e1.size]) << (size << 2);
+		size += e1.size;
+		tile |= u64((e2.tile + 0x8888) & mask[e2.size]) << (size << 2);
+		size += e2.size;
+		tile |= u64((e3.tile + 0xcccc) & mask[e3.size]) << (size << 2);
+		size += e3.size;
 
-		return tiles<u64>(e, s);
+		return tiles<u64>(tile, size);
 	}
 	inline bool next() {
-		const tiles<u64> empty = spaces();
+		tiles<u64> empty = spaces();
 		if (empty.size == 0) return false;
 		u32 p = ((empty.tile >> ((rand() % empty.size) << 2)) & 0x0f) << 2;
 		raw |= u64(rand() % 10 ? 1 : 2) << p;
@@ -372,8 +372,8 @@ public:
 		}
 	}
 	tiles<u64> find(const u32& t) const {
-		register u64 tile = 0;
-		register u32 size = 0;
+		u64 tile = 0;
+		u32 size = 0;
 		for (u32 i = 0; i < 16; i++)
 			if (at(i) == t) {
 				tile |= (u64(i) << (size << 2));
