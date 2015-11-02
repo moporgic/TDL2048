@@ -427,7 +427,7 @@ int main(int argc, const char* argv[]) {
 //	return 0;
 
 	u32 train = 100;
-	u32 test = 100;
+	u32 test = 10;
 	time_t seed = std::time(nullptr);
 	std::string weightin;
 	std::string weightout;
@@ -673,6 +673,9 @@ int main(int argc, const char* argv[]) {
 		stats.update(score, b.max(), opers);
 	}
 
+	weight::save(weightout);
+	feature::save(featureout);
+
 	std::cout << std::endl;
 	std::cout << "start testing..." << std::endl;
 	for (stats.init(test); stats; stats++) {
@@ -688,9 +691,6 @@ int main(int argc, const char* argv[]) {
 
 		stats.update(score, b.max(), opers);
 	}
-
-	weight::save(weightout);
-	feature::save(featureout);
 
 	return 0;
 }
