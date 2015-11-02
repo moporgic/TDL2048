@@ -13,28 +13,15 @@
 #include <cmath>
 
 #ifndef DEBUG
-
-#define DLOG(msg,...)
 #define __constexpr constexpr
-
 #else /* DEBUG */
-
-#define DLOG(msg,...) printf(msg, ##__VA_ARGS__)
 #define __constexpr
-
 #endif /* DEBUG */
 
 namespace moporgic {
 
-template<typename T>
-inline void swap(T& v1, T& v2) {
-	T t = v1;
-	v1 = v2;
-	v2 = t;
-}
-
 namespace math {
-// ref:  The Aggregate Magic Algorithms
+// reference:  The Aggregate Magic Algorithms
 
 /**
  * Bit Reversal

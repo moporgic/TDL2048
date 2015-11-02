@@ -106,6 +106,7 @@ union r32 {
 	u8c v_u8c[4];
 	u8 v_u8[4];
 	inline r32(const u32& v = 0);
+	inline r32(const f32& v);
 	inline r32(const r32& v);
 	inline r32(const r16* v, const int& e = 0);
 	inline r32(const u8* b, const int& e = 0);
@@ -133,6 +134,7 @@ union r64 {
 	u8c v_u8c[8];
 	u8 v_u8[8];
 	inline r64(const u64& v = 0);
+	inline r64(const f64& v);
 	inline r64(const r64& v);
 	inline r64(const r16* v, const int& e = 0);
 	inline r64(const r32* v, const int& e = 0);
@@ -235,6 +237,7 @@ inline r16 r16::le() const { return moporgic::endian::to_le(v_u16); }
 inline r16 r16::be() const { return moporgic::endian::to_be(v_u16); }
 
 inline r32::r32(const u32& v) : v_u32(v) {}
+inline r32::r32(const f32& v) : v_f32(v) {}
 inline r32::r32(const r32& r) : v_u32(r.v_u32) {}
 inline r32::r32(const r16* v, const int& e) {
 	const int* endian = moporgic::endian::b2endian[e];
@@ -264,6 +267,7 @@ inline r32 r32::le() const { return moporgic::endian::to_le(v_u32); }
 inline r32 r32::be() const { return moporgic::endian::to_be(v_u32); }
 
 inline r64::r64(const u64& v) : v_u64(v) {}
+inline r64::r64(const f64& v) : v_f64(v) {}
 inline r64::r64(const r64& r) : v_u64(r.v_u64) {}
 inline r64::r64(const r16* v, const int& e) {
 	const int* endian = moporgic::endian::b4endian[e];
