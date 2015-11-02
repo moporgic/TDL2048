@@ -7,7 +7,9 @@
  *      Author: moporgic
  */
 
-// #include"mopodef.h"
+#include <cstdio>
+#include <iostream>
+#include <functional>
 
 namespace moporgic {
 
