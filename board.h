@@ -151,12 +151,11 @@ public:
 			if (tmp != 0) row[top] = tmp;
 		}
 		struct tiles<u32> calempty(u32 V[]) {
-			tiles<u32> empty;
-			empty.tile = 0;
-			empty.size = 0;
+			register u32 tile = 0;
+			register u32 size = 0;
 			for (int i = 0; i < 4; i++)
-				if (V[i] == 0) empty.tile |= (i << ((empty.size++) << 2));
-			return empty;
+				if (V[i] == 0) tile |= (i << ((size++) << 2));
+			return tiles<u32>(tile, size);
 		}
 	};
 	static lookup look[1 << 20];
@@ -254,13 +253,10 @@ public:
 		e |= u64((e3.tile + 0xcccc) & mask[e3.size]) << (s << 2);
 		s += e3.size;
 
-		tiles<u64> spaces;
-		spaces.tile = e;
-		spaces.size = s;
-		return spaces;
+		return tiles<u64>(e, s);
 	}
 	inline bool next() {
-		tiles<u64> empty = spaces();
+		const tiles<u64> empty = spaces();
 		if (empty.size == 0) return false;
 		u32 p = ((empty.tile >> ((rand() % empty.size) << 2)) & 0x0f) << 2;
 		raw |= u64(rand() % 10 ? 1 : 2) << p;
@@ -376,15 +372,14 @@ public:
 		}
 	}
 	tiles<u64> find(const u32& t) const {
-		tiles<u64> res;
-		res.tile = 0;
-		res.size = 0;
+		register u64 tile = 0;
+		register u32 size = 0;
 		for (u32 i = 0; i < 16; i++)
 			if (at(i) == t) {
-				res.tile |= (u64(i) << (res.size << 2));
-				res.size++;
+				tile |= (u64(i) << (size << 2));
+				size++;
 			}
-		return res;
+		return tiles<u64>(tile, size);
 	}
 
 	static void initialize() {
