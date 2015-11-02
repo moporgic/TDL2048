@@ -12,6 +12,7 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
+#include "moporgic/io.h"
 #include "board.h"
 #include <vector>
 #include <functional>
@@ -39,6 +40,19 @@ public:
 	numeric& operator [](const u64& i) { return value.get()[i]; }
 	size_t length() const { return size; }
 
+	template<typename rxx> void write(std::ostream& out) {
+		numeric *v = value.get();
+		for (u64 i = 0; i < size; i++)
+			out.write(rxx(v[i]).le(), sizeof(rxx));
+	}
+	template<typename rxx> void read(std::istream& in) {
+		char buf[8];
+		auto load = moporgic::make_load(in, buf);
+		numeric *v = value.get();
+		for (u64 i = 0; i < size; i++)
+			v[i] = rxx(load(sizeof(rxx))).le();
+	}
+
 	void operator >>(std::ostream& out) {
 		const int LE = moporgic::endian::le;
 		const char serial = 0;
@@ -50,19 +64,26 @@ public:
 			for (u64 i = 0; i < size; i++)
 				out.write(r32(value.get()[i]).endian(LE), 4);
 			break;
+		case 1:
+			out.write(r32(sign).le(), 4);
+			out.write(r64(size).le(), 8);
+			switch (sizeof(numeric)) {
+			case 2: write<r16>(out);
+				break;
+			case 4: write<r32>(out);
+				break;
+			case 8: write<r64>(out);
+				break;
+			}
+			break;
 		default:
+			std::cerr << "unknown serial at weight::>>" << std::endl;
 			break;
 		}
 	}
 	void operator <<(std::istream& in) {
 		char buf[8];
-		auto load = [&](u32 len) -> char* {
-			if (!in.read(buf, len)) {
-				std::cerr << "load failure" << std::endl;
-				std::exit(2);
-			}
-			return buf;
-		};
+		auto load = moporgic::make_load(in, buf);
 		const int LE = moporgic::endian::le;
 		switch (*load(1)) {
 		case 0:
@@ -72,7 +93,21 @@ public:
 			for (u64 i = 0; i < size; i++)
 				value.get()[i] = r32(load(4), LE);
 			break;
+		case 1:
+			sign = r32(load(4)).le();
+			size = r64(load(8)).le();
+			value = std::shared_ptr<numeric>(new numeric[size]());
+			switch (sizeof(numeric)) {
+			case 2: read<r16>(in);
+				break;
+			case 4: read<r32>(in);
+				break;
+			case 8: read<r64>(in);
+				break;
+			}
+			break;
 		default:
+			std::cerr << "unknown serial at weight::<<" << std::endl;
 			break;
 		}
 	}
