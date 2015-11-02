@@ -96,8 +96,8 @@ union r16 {
 	inline operator i8() const;
 	inline operator bool() const;
 	inline r16 endian(const int& e = 0) const;
-	inline r16 to_le() const;
-	inline r16 to_be() const;
+	inline r16 le() const;
+	inline r16 be() const;
 };
 union r32 {
 	u32 v_u32;
@@ -122,8 +122,8 @@ union r32 {
 	inline operator i8() const;
 	inline operator bool() const;
 	inline r32 endian(const int& e = 0) const;
-	inline r32 to_le() const;
-	inline r32 to_be() const;
+	inline r32 le() const;
+	inline r32 be() const;
 };
 union r64 {
 	u64 v_u64;
@@ -153,8 +153,8 @@ union r64 {
 	inline operator i8() const;
 	inline operator bool() const;
 	inline r64 endian(const int& e = 0) const;
-	inline r64 to_le() const;
-	inline r64 to_be() const;
+	inline r64 le() const;
+	inline r64 be() const;
 };
 
 namespace moporgic {
@@ -231,8 +231,8 @@ inline r16::operator u8() const { return v_u8[0]; }
 inline r16::operator i8() const { return v_u8[0]; }
 inline r16::operator bool() const { return static_cast<bool>(v_u16); }
 inline r16 r16::endian(const int& e) const { return r16(operator u8*(), e); }
-inline r16 r16::to_le() const { return moporgic::endian::to_le(v_u16); }
-inline r16 r16::to_be() const { return moporgic::endian::to_be(v_u16); }
+inline r16 r16::le() const { return moporgic::endian::to_le(v_u16); }
+inline r16 r16::be() const { return moporgic::endian::to_be(v_u16); }
 
 inline r32::r32(const u32& v) : v_u32(v) {}
 inline r32::r32(const r32& r) : v_u32(r.v_u32) {}
@@ -260,8 +260,8 @@ inline r32::operator u8() const { return v_u8[0]; }
 inline r32::operator i8() const { return v_u8[0]; }
 inline r32::operator bool() const { return static_cast<bool>(v_u32); }
 inline r32 r32::endian(const int& e) const { return r32(operator u8*(), e); }
-inline r32 r32::to_le() const { return moporgic::endian::to_le(v_u32); }
-inline r32 r32::to_be() const { return moporgic::endian::to_be(v_u32); }
+inline r32 r32::le() const { return moporgic::endian::to_le(v_u32); }
+inline r32 r32::be() const { return moporgic::endian::to_be(v_u32); }
 
 inline r64::r64(const u64& v) : v_u64(v) {}
 inline r64::r64(const r64& r) : v_u64(r.v_u64) {}
@@ -296,8 +296,8 @@ inline r64::operator u8() const { return v_u8[0]; }
 inline r64::operator i8() const { return v_u8[0]; }
 inline r64::operator bool() const { return static_cast<bool>(v_u64); }
 inline r64 r64::endian(const int& e) const { return r64(operator u8*(), e); }
-inline r64 r64::to_le() const { return moporgic::endian::to_le(v_u64); }
-inline r64 r64::to_be() const { return moporgic::endian::to_le(v_u64); }
+inline r64 r64::le() const { return moporgic::endian::to_le(v_u64); }
+inline r64 r64::be() const { return moporgic::endian::to_le(v_u64); }
 
 #ifdef MOPORGIC_MACRO
 #define DECLARE_OP_TCMP(T, op, v) inline bool operator op(const T& t) const { return v op t.v; }
