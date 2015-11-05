@@ -608,20 +608,32 @@ int main(int argc, const char* argv[]) {
 		vert += board::look[d.fetch(3)].merged << 6;
 		return hori | (vert << 8);
 	};
-	auto indexnum = [](const board& b) -> u64 { // 25-bit
+	auto indexnum0 = [](const board& b) -> u64 { // 12-bit
 		static u16 num[32];
-		u64 index = 0;
 		b.numof(num);
-		index += (std::accumulate(num, num + 8, 0) & 0x0f);// tile 0 ~ 7: 4-bit total
-		index += (std::accumulate(num + 8, num + 12, 0) & 0x07) << 4;// tile 8 ~ 11: 3-bit total
-		index += (std::accumulate(num + 12, num + 14, 0) & 0x07) << 7;// tile 12 ~ 13: 3-bit total
-		index += (std::accumulate(num + 14, num + 16, 0) & 0x07) << 10;// tile 14 ~ 15: 3-bit total
-		index += (num[16] & 0x03) << 13;// tile 16 ~ 21: 2-bit each (12-bit total)
-		index += (num[17] & 0x03) << 15;
-		index += (num[18] & 0x03) << 17;
-		index += (num[19] & 0x03) << 19;
-		index += (num[20] & 0x03) << 21;
-		index += (num[21] & 0x03) << 23;
+		u64 index = 0;
+		index += (num[10] & 0x03) << 0; // 1k ~ 32k, 2-bit ea.
+		index += (num[11] & 0x03) << 2;
+		index += (num[12] & 0x03) << 4;
+		index += (num[13] & 0x03) << 6;
+		index += (num[14] & 0x03) << 8;
+		index += (num[15] & 0x03) << 10;
+		return index;
+	};
+	auto indexnum1 = [](const board& b) -> u64 { // 25-bit
+		static u16 num[32];
+		b.numof(num);
+		u64 index = 0;
+		index += ((num[5] + num[6]) & 0x0f) << 0; // 32 & 64, 4-bit
+		index += (num[7] & 0x07) << 4; // 128, 3-bit
+		index += (num[8] & 0x07) << 7; // 256, 3-bit
+		index += (num[9] & 0x07) << 10; // 512, 3-bit
+		index += (num[10] & 0x03) << 13; // 1k ~ 32k, 2-bit ea.
+		index += (num[11] & 0x03) << 15;
+		index += (num[12] & 0x03) << 17;
+		index += (num[13] & 0x03) << 19;
+		index += (num[14] & 0x03) << 21;
+		index += (num[15] & 0x03) << 23;
 		return index;
 	};
 
@@ -638,7 +650,8 @@ int main(int argc, const char* argv[]) {
 			std::for_each(p.begin(), p.end(), fx);
 		}
 	}
-	indexer::make(0xfe000000, indexnum);
+	indexer::make(0xfe000000, indexnum0);
+	indexer::make(0xfe000001, indexnum1);
 	indexer::make(0xff000000, indexmerge);
 
 	if (weight::load(weightin) == false) {
