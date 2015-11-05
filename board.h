@@ -362,6 +362,13 @@ public:
 			std::max(look[fetch(0)].maxtile, look[fetch(1)].maxtile),
 			std::max(look[fetch(2)].maxtile, look[fetch(3)].maxtile));
 	}
+	inline u32 numof(const u32& t) const {
+		const u16* numof0 = look[fetch(0)].numof;
+		const u16* numof1 = look[fetch(1)].numof;
+		const u16* numof2 = look[fetch(2)].numof;
+		const u16* numof3 = look[fetch(3)].numof;
+		return numof0[t] + numof1[t] + numof2[t] + numof3[t];
+	}
 	void numof(u16 num[32]) const {
 		const u16* numof0 = look[fetch(0)].numof;
 		const u16* numof1 = look[fetch(1)].numof;
