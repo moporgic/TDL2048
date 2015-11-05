@@ -55,7 +55,7 @@ public:
 
 	void operator >>(std::ostream& out) {
 		const int LE = moporgic::endian::le;
-		const char serial = 0;
+		const char serial = 1;
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
@@ -68,8 +68,6 @@ public:
 			out.write(r32(sign).le(), 4);
 			out.write(r64(size).le(), 8);
 			switch (sizeof(numeric)) {
-			case 2: write<r16>(out);
-				break;
 			case 4: write<r32>(out);
 				break;
 			case 8: write<r64>(out);
@@ -98,8 +96,6 @@ public:
 			size = r64(load(8)).le();
 			value = std::shared_ptr<numeric>(new numeric[size]());
 			switch (sizeof(numeric)) {
-			case 2: read<r16>(in);
-				break;
 			case 4: read<r32>(in);
 				break;
 			case 8: read<r64>(in);
@@ -459,7 +455,8 @@ int main(int argc, const char* argv[]) {
 //		bb.set(rand() % 16, rand() % 22);
 //	}
 //	std::cout << (moporgic::millisec() - start) ;
-//	return 0;
+
+//	weight::make(0, 10);
 
 	u32 train = 100;
 	u32 test = 10;
@@ -675,7 +672,7 @@ int main(int argc, const char* argv[]) {
 				feats.push_back(feature(*ft).signature());
 		}
 		if (feats.size()) {
-			std::cout << " |";
+			std::cout << " :";
 			for (auto f : feats) printf(" %08x", f);
 		}
 		std::cout << std::endl;
