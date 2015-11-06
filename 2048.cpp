@@ -659,6 +659,7 @@ int main(int argc, const char* argv[]) {
 			weight::make(hash(p), std::pow(base, 6));
 		}
 //		weight::make(0xfe000000, 1 << 25);
+		weight::make(0xfe000001, 1 << 25);
 		weight::make(0xff000000, 1 << 16);
 	}
 
@@ -671,6 +672,7 @@ int main(int argc, const char* argv[]) {
 			}
 		}
 	//	feature::make(0xfe000000, 0xfe000000);
+		feature::make(0xfe000001, 0xfe000001);
 		feature::make(0xff000000, 0xff000000);
 	}
 
