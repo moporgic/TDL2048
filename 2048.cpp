@@ -338,6 +338,18 @@ struct state {
 	state(i32 (board::*oper)()) : oper(oper), score(-1), esti(0) {}
 	state(const state& s)
 		: move(s.move), oper(s.oper), score(s.score), esti(s.esti) {}
+	void assign(board& b, const i32& s) {
+		move = b;
+		score = s;
+		if (score >= 0) {
+			esti = score;
+			for (auto f = feature::begin(); f != feature::end(); f++)
+				esti += (*f)[move];
+		} else {
+			esti = -std::numeric_limits<numeric>::max();
+		}
+		b.reset();
+	}
 	void operator <<(const board& b) {
 		move = b;
 		score = (move.*oper)();
@@ -375,11 +387,19 @@ struct select {
 		if (move[3] > *best) best = move + 3;
 		return *this;
 	}
-	inline select& operator <<(const board& b) {
-		move[0] << b;
-		move[1] << b;
-		move[2] << b;
-		move[3] << b;
+//	inline select& operator <<(const board& b) {
+//		move[0] << b;
+//		move[1] << b;
+//		move[2] << b;
+//		move[3] << b;
+//		return operator <<(move);
+//	}
+	inline select& operator <<(board& b) {
+		b.mark();
+		move[0].assign(b, b.up());
+		move[1].assign(b, b.right());
+		move[2].assign(b, b.down());
+		move[3].assign(b, b.left());
 		return operator <<(move);
 	}
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
