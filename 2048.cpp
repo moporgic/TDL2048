@@ -643,6 +643,7 @@ int main(int argc, const char* argv[]) {
 //		indexer::make(hash,
 //			std::bind(index6t, std::placeholders::_1, p[0], p[1], p[2], p[3], p[4], p[5]));
 //	}
+
 	for (auto& p : patt6t) {
 		for (auto fx : mapfx) {
 			indexer::make(hash(p),
