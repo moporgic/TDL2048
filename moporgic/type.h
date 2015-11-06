@@ -82,7 +82,14 @@ union r16 {
 	u8c v_u8c[2];
 	u8 v_u8[2];
 	inline r16(const u16& v = 0);
-	inline r16(const r16& r);
+	inline r16(const i16& v);
+	inline r16(const u32& v);
+	inline r16(const i32& v);
+	inline r16(const u64& v);
+	inline r16(const i64& v);
+	inline r16(const r16& v);
+	inline r16(const u8& v);
+	inline r16(const i8& v);
 	inline r16(const u8* b, const int& e = 0);
 	inline r16(const i8* b, const int& e = 0);
 	inline u8c& operator[](const int& i);
@@ -106,8 +113,16 @@ union r32 {
 	u8c v_u8c[4];
 	u8 v_u8[4];
 	inline r32(const u32& v = 0);
+	inline r32(const i32& v);
+	inline r32(const u16& v);
+	inline r32(const i16& v);
+	inline r32(const u64& v);
+	inline r32(const i64& v);
 	inline r32(const f32& v);
+	inline r32(const f64& v);
 	inline r32(const r32& v);
+	inline r32(const u8& v);
+	inline r32(const i8& v);
 	inline r32(const r16* v, const int& e = 0);
 	inline r32(const u8* b, const int& e = 0);
 	inline r32(const i8* b, const int& e = 0);
@@ -134,8 +149,16 @@ union r64 {
 	u8c v_u8c[8];
 	u8 v_u8[8];
 	inline r64(const u64& v = 0);
+	inline r64(const i64& v);
+	inline r64(const u32& v);
+	inline r64(const i32& v);
+	inline r64(const u16& v);
+	inline r64(const i16& v);
+	inline r64(const f32& v);
 	inline r64(const f64& v);
 	inline r64(const r64& v);
+	inline r64(const u8& v);
+	inline r64(const i8& v);
 	inline r64(const r16* v, const int& e = 0);
 	inline r64(const r32* v, const int& e = 0);
 	inline r64(const u8* b, const int& e = 0);
@@ -213,7 +236,14 @@ inline u8c::operator u8*() const { return (u8*) &v; }
 inline u8c::operator i8*() const { return (i8*) &v; }
 
 inline r16::r16(const u16& v) : v_u16(v) {}
-inline r16::r16(const r16& r) : v_u16(r.v_u16) {}
+inline r16::r16(const i16& v) : v_u16(v) {}
+inline r16::r16(const u32& v) : v_u16(v) {}
+inline r16::r16(const i32& v) : v_u16(v) {}
+inline r16::r16(const u64& v) : v_u16(v) {}
+inline r16::r16(const i64& v) : v_u16(v) {}
+inline r16::r16(const r16& v) : v_u16(v) {}
+inline r16::r16(const u8& v)  : v_u16(v) {}
+inline r16::r16(const i8& v)  : v_u16(v) {}
 inline r16::r16(const u8* b, const int& e) {
 	const int* endian = moporgic::endian::b2endian[e];
 	for (int i = 0; i < 2; i++) v_u8c[i] = b[endian[i]];
@@ -237,8 +267,16 @@ inline r16 r16::le() const { return moporgic::endian::to_le(v_u16); }
 inline r16 r16::be() const { return moporgic::endian::to_be(v_u16); }
 
 inline r32::r32(const u32& v) : v_u32(v) {}
+inline r32::r32(const i32& v) : v_u32(v) {}
+inline r32::r32(const u16& v) : v_u32(v) {}
+inline r32::r32(const i16& v) : v_u32(v) {}
+inline r32::r32(const u64& v) : v_u32(v) {}
+inline r32::r32(const i64& v) : v_u32(v) {}
 inline r32::r32(const f32& v) : v_f32(v) {}
-inline r32::r32(const r32& r) : v_u32(r.v_u32) {}
+inline r32::r32(const f64& v) : v_f32(v) {}
+inline r32::r32(const r32& v) : v_u32(v) {}
+inline r32::r32(const u8& v)  : v_u32(v) {}
+inline r32::r32(const i8& v)  : v_u32(v) {}
 inline r32::r32(const r16* v, const int& e) {
 	const int* endian = moporgic::endian::b2endian[e];
 	for (int i = 0; i < 2; i++) v_r16[i] = v[endian[i]];
@@ -267,8 +305,16 @@ inline r32 r32::le() const { return moporgic::endian::to_le(v_u32); }
 inline r32 r32::be() const { return moporgic::endian::to_be(v_u32); }
 
 inline r64::r64(const u64& v) : v_u64(v) {}
+inline r64::r64(const i64& v) : v_u64(v) {}
+inline r64::r64(const u32& v) : v_u64(v) {}
+inline r64::r64(const i32& v) : v_u64(v) {}
+inline r64::r64(const u16& v) : v_u64(v) {}
+inline r64::r64(const i16& v) : v_u64(v) {}
+inline r64::r64(const f32& v) : v_f64(v) {}
 inline r64::r64(const f64& v) : v_f64(v) {}
-inline r64::r64(const r64& r) : v_u64(r.v_u64) {}
+inline r64::r64(const r64& v) : v_u64(v) {}
+inline r64::r64(const u8& v)  : v_u64(v) {}
+inline r64::r64(const i8& v)  : v_u64(v) {}
 inline r64::r64(const r16* v, const int& e) {
 	const int* endian = moporgic::endian::b4endian[e];
 	for (int i = 0; i < 4; i++) v_r16[i] = v[endian[i]];
