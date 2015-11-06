@@ -25,15 +25,12 @@ public:
 			u32 moveHraw; // horizontal move (16-bit raw)
 			u32 moveHext; // horizontal move (4-bit extra)
 			u64 moveVraw; // vertical move (64-bit raw)
-			u64 rotraw; // rotating move (64-bit raw)
 			u32 moveVext; // vertical move (16-bit extra)
-			u32 rotext; // rotating move (16-bit extra)
 			u32 score; // merge score
 			i32 moved; // moved or not (moved: 0, otherwise -1)
 
 			inline void moveH(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) { moveH64(raw, ext, sc, mv, i); }
 			inline void moveV(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) { moveV64(raw, ext, sc, mv, i); }
-			inline void rotate(u64& raw, u32& ext, const int& i) { rotate64(raw, ext, i); }
 
 			inline void moveH64(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
 				raw |= u64(moveHraw) << (i << 4);
@@ -52,13 +49,6 @@ public:
 			inline void moveV80(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
 				moveV64(raw, ext, sc, mv, i);
 				ext |= moveVext << i;
-			}
-			inline void rotate64(u64& raw, u32& ext, const int& i) const {
-				raw |= rotraw << (i << 2);
-			}
-			inline void rotate80(u64& raw, u32& ext, const int& i) const {
-				rotate64(raw, ext, i);
-				ext |= rotext << i;
 			}
 		};
 		u32 rowraw; // base row (16-bit raw)
@@ -97,16 +87,15 @@ public:
 			maxtile = *std::max_element(V, V + 4);
 			for (int i = 0; i < 4; i++) numof[V[i]]++;
 
-			map(left.rotraw, left.rotext, Ll, Lh, 12, 8, 4, 0);
-			map(right.rotraw, right.rotext, Ll, Lh, 0, 4, 8, 12);
-
 			mvleft(L, left.score, merged);
 			u32 mvL = assign(L, Ll, Lh, left.moveHraw, left.moveHext);
+			std::reverse(Ll, Ll + 4); std::reverse(Lh, Lh + 4);
 			left.moved = mvL == r ? -1 : 0;
 			map(left.moveVraw, left.moveVext, Ll, Lh, 12, 8, 4, 0);
 
 			mvleft(R, right.score, merged); std::reverse(R, R + 4);
 			u32 mvR = assign(R, Rl, Rh, right.moveHraw, right.moveHext);
+			std::reverse(Rl, Rl + 4); std::reverse(Rh, Rh + 4);
 			right.moved = mvR == r ? -1 : 0;
 			map(right.moveVraw, right.moveVext, Rl, Rh, 12, 8, 4, 0);
 		}
@@ -180,6 +169,7 @@ public:
 	inline void set(const u32& i, const u32& t) { set4(i, t); }
 	inline void mirror() { mirror64(); }
 	inline void flip() { flip64(); }
+	inline void transpose() { transpose64(); }
 
 	inline u32 fetch16(const u32& i) const {
 		return ((raw >> (i << 4)) & 0xffff);
@@ -221,6 +211,16 @@ public:
 		flip64();
 		ext = ((ext & 0x000f0000) << 12) | ((ext & 0x00f00000) << 4)
 			| ((ext & 0x0f000000) >> 4) | ((ext & 0xf0000000) >> 12);
+	}
+
+	inline void transpose64() {
+		raw = (raw & 0xf0f00f0ff0f00f0fULL) | ((raw & 0x0000f0f00000f0f0ULL) << 12) | ((raw & 0x0f0f00000f0f0000ULL) >> 12);
+		raw = (raw & 0xff00ff0000ff00ffULL) | ((raw & 0x00000000ff00ff00ULL) << 24) | ((raw & 0x00ff00ff00000000ULL) >> 24);
+	}
+	inline void transpose80() {
+		transpose64();
+		ext = (ext & 0xa5a50000) | ((ext & 0x0a0a0000) << 3) | ((ext & 0x50500000) >> 3);
+		ext = (ext & 0xcc330000) | ((ext & 0x00cc0000) << 6) | ((ext & 0x33000000) >> 6);
 	}
 
 	inline void reverse() {
@@ -272,25 +272,13 @@ public:
 		case 3: rotleft(); break;
 		}
 	}
-	void rotright() {
-		register u64 nraw = 0;
-		register u32 next = 0;
-		look[fetch(3)].right.rotate(nraw, next, 0);
-		look[fetch(2)].right.rotate(nraw, next, 1);
-		look[fetch(1)].right.rotate(nraw, next, 2);
-		look[fetch(0)].right.rotate(nraw, next, 3);
-		raw = nraw;
-		ext = next;
+	inline void rotright() {
+		transpose();
+		mirror();
 	}
-	void rotleft() {
-		register u64 nraw = 0;
-		register u32 next = 0;
-		look[fetch(0)].left.rotate(nraw, next, 0);
-		look[fetch(1)].left.rotate(nraw, next, 1);
-		look[fetch(2)].left.rotate(nraw, next, 2);
-		look[fetch(3)].left.rotate(nraw, next, 3);
-		raw = nraw;
-		ext = next;
+	inline void rotleft() {
+		transpose();
+		flip();
 	}
 
 	i32 left() {
@@ -320,21 +308,7 @@ public:
 		return score | moved;
 	}
 	i32 up() {
-		rotright();
-		register u64 nraw = 0;
-		register u32 next = 0;
-		register u32 score = 0;
-		register i32 moved = -1;
-		look[fetch(0)].right.moveV(nraw, next, score, moved, 0);
-		look[fetch(1)].right.moveV(nraw, next, score, moved, 1);
-		look[fetch(2)].right.moveV(nraw, next, score, moved, 2);
-		look[fetch(3)].right.moveV(nraw, next, score, moved, 3);
-		raw = nraw;
-		ext = next;
-		return score | moved;
-	}
-	i32 down() {
-		rotright();
+		transpose();
 		register u64 nraw = 0;
 		register u32 next = 0;
 		register u32 score = 0;
@@ -343,6 +317,20 @@ public:
 		look[fetch(1)].left.moveV(nraw, next, score, moved, 1);
 		look[fetch(2)].left.moveV(nraw, next, score, moved, 2);
 		look[fetch(3)].left.moveV(nraw, next, score, moved, 3);
+		raw = nraw;
+		ext = next;
+		return score | moved;
+	}
+	i32 down() {
+		transpose();
+		register u64 nraw = 0;
+		register u32 next = 0;
+		register u32 score = 0;
+		register i32 moved = -1;
+		look[fetch(0)].right.moveV(nraw, next, score, moved, 0);
+		look[fetch(1)].right.moveV(nraw, next, score, moved, 1);
+		look[fetch(2)].right.moveV(nraw, next, score, moved, 2);
+		look[fetch(3)].right.moveV(nraw, next, score, moved, 3);
 		raw = nraw;
 		ext = next;
 		return score | moved;
@@ -369,12 +357,12 @@ public:
 		const u16* numof3 = look[fetch(3)].numof;
 		return numof0[t] + numof1[t] + numof2[t] + numof3[t];
 	}
-	void numof(u16 num[32]) const {
+	void numof(u16 num[32], const u32& min = 0, const u32& max = 32) const {
 		const u16* numof0 = look[fetch(0)].numof;
 		const u16* numof1 = look[fetch(1)].numof;
 		const u16* numof2 = look[fetch(2)].numof;
 		const u16* numof3 = look[fetch(3)].numof;
-		for (u32 i = 0; i < 32; i++) {
+		for (u32 i = min; i < max; i++) {
 			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 		}
 	}
