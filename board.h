@@ -10,12 +10,12 @@ namespace moporgic {
 
 class board {
 public:
-	template<typename Ts>
+	template<typename Tis>
 	struct tiles {
-		Ts tile;
+		Tis tile;
 		u32 size;
-		tiles(const Ts& t, const u32& s) : tile(t), size(s) {}
-		tiles(const tiles<Ts>& t) : tile(t.tile), size(t.size) {}
+		tiles(const Tis& t, const u32& s) : tile(t), size(s) {}
+		tiles(const tiles<Tis>& t) : tile(t.tile), size(t.size) {}
 		tiles() : tile(0), size(0) {}
 	};
 	class lookup {
@@ -55,11 +55,11 @@ public:
 		u32 rowext; // base row (4-bit extra)
 		u32 maxtile; // max tile
 		u32 merged; // number of merged tiles
+		oper left; // left operation
+		oper right; // right operation
 		u16 numof[32]; // number of each tile-type
 		u16 mask[32]; // mask of each tile-type
 		tiles<u64> layout; // layout of board-type
-		oper left; // left operation
-		oper right; // right operation
 	private:
 		~lookup() {}
 		lookup() : rowraw(0), rowext(0), maxtile(0), merged(0), numof(), mask() {}
@@ -77,10 +77,8 @@ public:
 				numof[V[i]]++;
 				mask[V[i]] |= (1 << i);
 			}
-			for (u64 i = 0; i < 16; i++) {
-				if ((r >> i) & 1) {
-					layout.tile |= (i << ((layout.size++) << 2));
-				}
+			for (int i = 0; i < 16; i++) {
+				if ((r >> i) & 1) layout.tile |= (u64(i) << ((layout.size++) << 2));
 			}
 
 			mvleft(L, left.score, merged);
@@ -339,25 +337,6 @@ public:
 	}
 
 	tiles<u64> find(const u32& t) const {
-//		register u64 tile = 0;
-//		register u32 size = 0;
-//
-//		const tiles<u32> t0 = look[fetch(0)].tile[t];
-//		const tiles<u32> t1 = look[fetch(1)].tile[t];
-//		const tiles<u32> t2 = look[fetch(2)].tile[t];
-//		const tiles<u32> t3 = look[fetch(3)].tile[t];
-//
-//		register u32 mask[] = { 0x0000, 0x000f, 0x00ff, 0x0fff, 0xffff };
-//		tile |= u64((t0.tile + 0x0000) & mask[t0.size]) << (size << 2);
-//		size += t0.size;
-//		tile |= u64((t1.tile + 0x4444) & mask[t1.size]) << (size << 2);
-//		size += t1.size;
-//		tile |= u64((t2.tile + 0x8888) & mask[t2.size]) << (size << 2);
-//		size += t2.size;
-//		tile |= u64((t3.tile + 0xcccc) & mask[t3.size]) << (size << 2);
-//		size += t3.size;
-//
-//		return tiles<u64>(tile, size);
 		u32 mask = (look[fetch(0)].mask[t] << 0) | (look[fetch(1)].mask[t] << 4)
 				 | (look[fetch(2)].mask[t] << 8) | (look[fetch(3)].mask[t] << 12);
 		return look[mask].layout;
