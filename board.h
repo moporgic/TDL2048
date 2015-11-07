@@ -346,9 +346,8 @@ public:
 	}
 
 	inline u32 max() const {
-		return std::max(
-			std::max(look[fetch(0)].maxtile, look[fetch(1)].maxtile),
-			std::max(look[fetch(2)].maxtile, look[fetch(3)].maxtile));
+		return math::log2((1 << look[fetch(0)].maxtile) | (1 << look[fetch(1)].maxtile)
+						| (1 << look[fetch(2)].maxtile) | (1 << look[fetch(3)].maxtile));
 	}
 	inline u32 numof(const u32& t) const {
 		const u16* numof0 = look[fetch(0)].numof;
