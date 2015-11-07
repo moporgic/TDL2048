@@ -29,8 +29,8 @@ public:
 			u32 score; // merge score
 			i32 moved; // moved or not (moved: 0, otherwise -1)
 
-			inline void moveH(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) { moveH64(raw, ext, sc, mv, i); }
-			inline void moveV(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) { moveV64(raw, ext, sc, mv, i); }
+			inline void moveH(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { moveH64(raw, ext, sc, mv, i); }
+			inline void moveV(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { moveV64(raw, ext, sc, mv, i); }
 
 			inline void moveH64(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
 				raw |= u64(moveHraw) << (i << 4);
@@ -316,13 +316,11 @@ public:
 	}
 
 	inline u32 max() const {
-		return math::log2(lookup(0).maxtile | lookup(1).maxtile
-						| lookup(2).maxtile | lookup(3).maxtile);
+		return math::log2(lookup(0).maxtile | lookup(1).maxtile | lookup(2).maxtile | lookup(3).maxtile);
 	}
 
 	inline u32 count(const u32& t) const {
-		return lookup(0).count[t] + lookup(1).count[t]
-			 + lookup(2).count[t] + lookup(3).count[t];
+		return lookup(0).count[t] + lookup(1).count[t] + lookup(2).count[t] + lookup(3).count[t];
 	}
 	inline void count(u16 num[32], const u32& min = 0, const u32& max = 32) const {
 		const u16* count0 = lookup(0).count;
