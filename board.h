@@ -55,7 +55,9 @@ public:
 		u32 rowext; // base row (4-bit extra)
 		u32 maxtile; // max tile
 		u32 merged; // number of merged tiles
-		tiles<u32> tile[32]; // details of each tile
+		u16 numof[32]; // number of each tile-type
+		u16 mask[32]; // mask of each tile-type
+		tiles<u64> layout; // layout of board-type
 		oper left; // left operation
 		oper right; // right operation
 	private:
@@ -71,9 +73,15 @@ public:
 
 			assign(L, Ll, Lh, rowraw, rowext);
 			maxtile = *std::max_element(V, V + 4);
+			std::fill(mask, mask + 32, 0);
 			for (int i = 0; i < 4; i++) {
-				tiles<u32>& t = tile[V[i]];
-				t.tile |= (i << ((t.size++) << 2));
+				numof[V[i]]++;
+				mask[V[i]] |= (1 << i);
+			}
+			for (u64 i = 0; i < 16; i++) {
+				if ((r >> i) & 1) {
+					layout.tile |= (i << ((layout.size++) << 2));
+				}
 			}
 
 			mvleft(L, left.score, merged);
@@ -212,13 +220,15 @@ public:
 
 	inline void init() {
 		const u32 r = rand();
-		const u32 i = r & 0x0f;
+		const u32 i = (r) & 0x0f;
 		const u32 j = (i + 1 + (r >> 4) % 15) & 0x0f;
 		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
 		ext = 0;
 	}
 	inline tiles<u64> spaces() const {
-		return find(0);
+		u32 mask = (look[fetch(0)].mask[0] << 0) | (look[fetch(1)].mask[0] << 4)
+				 | (look[fetch(2)].mask[0] << 8) | (look[fetch(3)].mask[0] << 12);
+		return look[mask].layout;
 	}
 	inline bool next() {
 		tiles<u64> empty = spaces();
@@ -316,39 +326,48 @@ public:
 	}
 
 	inline u32 numof(const u32& t) const {
-		return look[fetch(0)].tile[t].size + look[fetch(1)].tile[t].size
-			 + look[fetch(2)].tile[t].size + look[fetch(3)].tile[t].size;
+		return look[fetch(0)].numof[t] + look[fetch(1)].numof[t] + look[fetch(2)].numof[t] + look[fetch(3)].numof[t];
+//		return look[fetch(0)].tile[t].size + look[fetch(1)].tile[t].size
+//			 + look[fetch(2)].tile[t].size + look[fetch(3)].tile[t].size;
 	}
 	void numof(u16 num[32], const u32& min = 0, const u32& max = 32) const {
-		const tiles<u32>* t0 = look[fetch(0)].tile;
-		const tiles<u32>* t1 = look[fetch(1)].tile;
-		const tiles<u32>* t2 = look[fetch(2)].tile;
-		const tiles<u32>* t3 = look[fetch(3)].tile;
+		const u16* numof0 = look[fetch(0)].numof;
+		const u16* numof1 = look[fetch(1)].numof;
+		const u16* numof2 = look[fetch(2)].numof;
+		const u16* numof3 = look[fetch(3)].numof;
+//		const tiles<u32>* t0 = look[fetch(0)].tile;
+//		const tiles<u32>* t1 = look[fetch(1)].tile;
+//		const tiles<u32>* t2 = look[fetch(2)].tile;
+//		const tiles<u32>* t3 = look[fetch(3)].tile;
 		for (u32 i = min; i < max; i++) {
-			num[i] = t0[i].size + t1[i].size + t2[i].size + t3[i].size;
+//			num[i] = t0[i].size + t1[i].size + t2[i].size + t3[i].size;
+			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 		}
 	}
 
 	tiles<u64> find(const u32& t) const {
-		register u64 tile = 0;
-		register u32 size = 0;
-
-		const tiles<u32> t0 = look[fetch(0)].tile[t];
-		const tiles<u32> t1 = look[fetch(1)].tile[t];
-		const tiles<u32> t2 = look[fetch(2)].tile[t];
-		const tiles<u32> t3 = look[fetch(3)].tile[t];
-
-		register u32 mask[] = { 0x0000, 0x000f, 0x00ff, 0x0fff, 0xffff };
-		tile |= u64((t0.tile + 0x0000) & mask[t0.size]) << (size << 2);
-		size += t0.size;
-		tile |= u64((t1.tile + 0x4444) & mask[t1.size]) << (size << 2);
-		size += t1.size;
-		tile |= u64((t2.tile + 0x8888) & mask[t2.size]) << (size << 2);
-		size += t2.size;
-		tile |= u64((t3.tile + 0xcccc) & mask[t3.size]) << (size << 2);
-		size += t3.size;
-
-		return tiles<u64>(tile, size);
+//		register u64 tile = 0;
+//		register u32 size = 0;
+//
+//		const tiles<u32> t0 = look[fetch(0)].tile[t];
+//		const tiles<u32> t1 = look[fetch(1)].tile[t];
+//		const tiles<u32> t2 = look[fetch(2)].tile[t];
+//		const tiles<u32> t3 = look[fetch(3)].tile[t];
+//
+//		register u32 mask[] = { 0x0000, 0x000f, 0x00ff, 0x0fff, 0xffff };
+//		tile |= u64((t0.tile + 0x0000) & mask[t0.size]) << (size << 2);
+//		size += t0.size;
+//		tile |= u64((t1.tile + 0x4444) & mask[t1.size]) << (size << 2);
+//		size += t1.size;
+//		tile |= u64((t2.tile + 0x8888) & mask[t2.size]) << (size << 2);
+//		size += t2.size;
+//		tile |= u64((t3.tile + 0xcccc) & mask[t3.size]) << (size << 2);
+//		size += t3.size;
+//
+//		return tiles<u64>(tile, size);
+		u32 mask = (look[fetch(0)].mask[t] << 0) | (look[fetch(1)].mask[t] << 4)
+				 | (look[fetch(2)].mask[t] << 8) | (look[fetch(3)].mask[t] << 12);
+		return look[mask].layout;
 	}
 
 	static void initialize() {
