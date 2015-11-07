@@ -144,12 +144,12 @@ public:
 public:
 	board(const u64& raw = 0) : raw(raw), cacheraw(0), ext(0), cacheext(0) {}
 	board(const board& b) : raw(b.raw), cacheraw(b.cacheraw), ext(b.ext), cacheext(b.cacheext) {}
-	board& operator =(const u64& raw) { this->raw = raw; return *this; }
-	board& operator =(const board& b) { raw = b.raw, ext = b.ext; cacheraw = b.cacheraw, cacheext = b.cacheext; return *this; }
-	bool operator==(const board& b) const { return raw == b.raw && ext == b.ext; }
-	bool operator!=(const board& b) const { return raw != b.raw || ext != b.ext; }
-	bool operator==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
-	bool operator!=(const u64& raw) const { return this->raw != raw || this->ext != 0; }
+	inline board& operator =(const u64& raw) { this->raw = raw; return *this; }
+	inline board& operator =(const board& b) { raw = b.raw, ext = b.ext; cacheraw = b.cacheraw, cacheext = b.cacheext; return *this; }
+	inline bool operator==(const board& b) const { return raw == b.raw && ext == b.ext; }
+	inline bool operator!=(const board& b) const { return raw != b.raw || ext != b.ext; }
+	inline bool operator==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
+	inline bool operator!=(const u64& raw) const { return this->raw != raw || this->ext != 0; }
 
 	inline u32 fetch(const u32& i) const { return fetch16(i); }
 	inline u32 at(const u32& i) const { return at4(i); }
@@ -251,7 +251,7 @@ public:
 		flip();
 	}
 
-	i32 left() {
+	inline i32 left() {
 		register u64 nraw = 0;
 		register u32 next = 0;
 		register u32 score = 0;
@@ -264,7 +264,7 @@ public:
 		ext = next;
 		return score | moved;
 	}
-	i32 right() {
+	inline i32 right() {
 		register u64 nraw = 0;
 		register u32 next = 0;
 		register u32 score = 0;
@@ -277,7 +277,7 @@ public:
 		ext = next;
 		return score | moved;
 	}
-	i32 up() {
+	inline i32 up() {
 		transpose();
 		register u64 nraw = 0;
 		register u32 next = 0;
@@ -291,7 +291,7 @@ public:
 		ext = next;
 		return score | moved;
 	}
-	i32 down() {
+	inline i32 down() {
 		transpose();
 		register u64 nraw = 0;
 		register u32 next = 0;
