@@ -211,8 +211,9 @@ public:
 	}
 
 	inline void init() {
-		register u32 i = rand() % 16;
-		register u32 j = (i + 1 + rand() % 15) % 16;
+		const u32 r = rand();
+		const u32 i = r & 0x0f;
+		const u32 j = (i + 1 + (r >> 4) % 15) & 0x0f;
 		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
 		ext = 0;
 	}
