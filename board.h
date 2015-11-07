@@ -62,8 +62,8 @@ public:
 		oper right; // right operation
 	private:
 		~lookup() {}
-		lookup() : rowraw(0), rowext(0), maxtile(0), merged(0) {}
-		lookup(const u32& r) {
+		lookup() : rowraw(0), rowext(0), maxtile(0), merged(0), numof(), mask() {}
+		lookup(const u32& r) : numof(), mask() {
 			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
 
 			u32 V[4] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
@@ -73,7 +73,6 @@ public:
 
 			assign(L, Ll, Lh, rowraw, rowext);
 			maxtile = *std::max_element(V, V + 4);
-			std::fill(mask, mask + 32, 0);
 			for (int i = 0; i < 4; i++) {
 				numof[V[i]]++;
 				mask[V[i]] |= (1 << i);
@@ -326,21 +325,15 @@ public:
 	}
 
 	inline u32 numof(const u32& t) const {
-		return look[fetch(0)].numof[t] + look[fetch(1)].numof[t] + look[fetch(2)].numof[t] + look[fetch(3)].numof[t];
-//		return look[fetch(0)].tile[t].size + look[fetch(1)].tile[t].size
-//			 + look[fetch(2)].tile[t].size + look[fetch(3)].tile[t].size;
+		return look[fetch(0)].numof[t] + look[fetch(1)].numof[t]
+			 + look[fetch(2)].numof[t] + look[fetch(3)].numof[t];
 	}
 	void numof(u16 num[32], const u32& min = 0, const u32& max = 32) const {
 		const u16* numof0 = look[fetch(0)].numof;
 		const u16* numof1 = look[fetch(1)].numof;
 		const u16* numof2 = look[fetch(2)].numof;
 		const u16* numof3 = look[fetch(3)].numof;
-//		const tiles<u32>* t0 = look[fetch(0)].tile;
-//		const tiles<u32>* t1 = look[fetch(1)].tile;
-//		const tiles<u32>* t2 = look[fetch(2)].tile;
-//		const tiles<u32>* t3 = look[fetch(3)].tile;
 		for (u32 i = min; i < max; i++) {
-//			num[i] = t0[i].size + t1[i].size + t2[i].size + t3[i].size;
 			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 		}
 	}
