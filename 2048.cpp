@@ -20,6 +20,7 @@
 #include <map>
 #include <cmath>
 #include <ctime>
+#include <string>
 #include <numeric>
 #include <string>
 #include <thread>
@@ -275,7 +276,6 @@ public:
 		}
 		out.flush();
 	}
-
 	static void load(std::istream& in) {
 		const int LE = moporgic::endian::le;
 		char buf[4];
@@ -312,8 +312,8 @@ public:
 		return true;
 	}
 
-	static feature make(const u32& idx, const u32& wgt) {
-		feats().push_back(feature(indexer::find(idx), weight::find(wgt)));
+	static feature make(const u32& wgt, const u32& idx) {
+		feats().push_back(feature(weight::find(wgt), indexer::find(idx)));
 		return feats().back();
 	}
 
@@ -322,7 +322,7 @@ public:
 	static inline u64 size() { return feats().size(); }
 
 private:
-	feature(const indexer& index, const weight& value) : index(index), value(value) {}
+	feature(const weight& value, const indexer& index) : index(index), value(value) {}
 	static inline std::vector<feature>& feats() { static std::vector<feature> f; return f; }
 
 	indexer index;
@@ -338,19 +338,19 @@ struct state {
 	state(i32 (board::*oper)()) : oper(oper), score(-1), esti(0) {}
 	state(const state& s)
 		: move(s.move), oper(s.oper), score(s.score), esti(s.esti) {}
-	void assign(board& b, const i32& s) {
-		move = b;
-		score = s;
-		if (score >= 0) {
-			esti = score;
-			for (auto f = feature::begin(); f != feature::end(); f++)
-				esti += (*f)[move];
-		} else {
-			esti = -std::numeric_limits<numeric>::max();
-		}
-		b.reset();
-	}
-	void operator <<(const board& b) {
+//	inline void assign(board& b, const i32& s) {
+//		move = b;
+//		score = s;
+//		if (score >= 0) {
+//			esti = score;
+//			for (auto f = feature::begin(); f != feature::end(); f++)
+//				esti += (*f)[move];
+//		} else {
+//			esti = -std::numeric_limits<numeric>::max();
+//		}
+//		b.reset();
+//	}
+	inline void operator <<(const board& b) {
 		move = b;
 		score = (move.*oper)();
 		if (score >= 0) {
@@ -361,15 +361,15 @@ struct state {
 			esti = -std::numeric_limits<numeric>::max();
 		}
 	}
-	numeric operator +=(const numeric& v) {
+	inline numeric operator +=(const numeric& v) {
 		const numeric update = alpha * (v - (esti - score));
 		esti = score;
 		for (auto f = feature::begin(); f != feature::end(); f++)
 			esti += ((*f)[move] += update);
 		return esti;
 	}
-	void operator >>(board& b) const { b = move; }
-	bool operator >(const state& s) const { return esti > s.esti; }
+	inline void operator >>(board& b) const { b = move; }
+	inline bool operator >(const state& s) const { return esti > s.esti; }
 };
 struct select {
 	state move[4];
@@ -387,21 +387,21 @@ struct select {
 		if (move[3] > *best) best = move + 3;
 		return *this;
 	}
-//	inline select& operator <<(const board& b) {
-//		move[0] << b;
-//		move[1] << b;
-//		move[2] << b;
-//		move[3] << b;
-//		return operator <<(move);
-//	}
-	inline select& operator <<(board& b) {
-		b.mark();
-		move[0].assign(b, b.up());
-		move[1].assign(b, b.right());
-		move[2].assign(b, b.down());
-		move[3].assign(b, b.left());
+	inline select& operator <<(const board& b) {
+		move[0] << b;
+		move[1] << b;
+		move[2] << b;
+		move[3] << b;
 		return operator <<(move);
 	}
+//	inline select& operator <<(board& b) {
+//		b.mark();
+//		move[0].assign(b, b.up());
+//		move[1].assign(b, b.right());
+//		move[2].assign(b, b.down());
+//		move[3].assign(b, b.left());
+//		return operator <<(move);
+//	}
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(board& b) const { *best >> b; }
 	inline operator bool() const { return score() != -1; }
@@ -409,64 +409,81 @@ struct select {
 	inline numeric esti() const { return best->esti; }
 };
 struct statistic {
-	u64 maxloop;
+	u64 limit;
 	u64 loop;
 	u64 check;
 
-	u64 totalscore;
-	u64 totalwin;
-	u64 localscore;
-	u64 localwin;
-	u32 maxscore;
-	u32 maxtile;
-	u64 timestart;
-	u64 operations;
+	struct record {
+		u64 score;
+		u64 win;
+		u64 time;
+		u64 opers;
+		u32 maxscore;
+		u32 maxtile;
+	} total = {}, local = {};
 
 	void init(const u64& max, const u64& chk = 1000) {
-		maxloop = max * chk;
+		limit = max * chk;
 		loop = 1;
 		check = chk;
-		totalscore = localscore = 0;
-		totalwin = localwin = 0;
-		maxscore = maxtile = 0;
-		timestart = moporgic::millisec();
-		operations = 0;
+
+		local.time = moporgic::millisec();
 	}
 	u64 operator++(int) { return (++loop) - 1; }
-	operator bool() { return loop <= maxloop; }
+	u64 operator++() { return (++loop); }
+	operator bool() { return loop <= limit; }
+
 	void update(const u32& score, const u32& max, const u32& opers) {
-		operations += opers;
-		localscore += score;
-		if ((1 << max) >= 2048) localwin++;
-		maxscore = std::max(maxscore, score);
-		maxtile = std::max(maxtile, max);
-		if ((loop % check) == 0) {
-			u64 timenow = moporgic::millisec();
-			totalscore += localscore;
-			totalwin += localwin;
-			std::cout << std::endl;
-			printf("%03llu/%03llu %llums %.2fops", loop / check,
-					maxloop / check, timenow - timestart,
-					operations * 1000.0 / (timenow - timestart));
-			std::cout << std::endl;
-			printf("local:  avg=%llu win=%.2f%%", localscore / check,
-					localwin * 100.0 / check);
-			std::cout << std::endl;
-			printf("total:  avg=%llu max=%u tile=%u win=%.2f%%",
-					totalscore / loop, maxscore, (1 << maxtile),
-					totalwin * 100.0 / loop);
-			std::cout << std::endl;
-			localscore = 0;
-			localwin = 0;
-			timestart = timenow;
-			operations = 0;
-		}
+		local.score += score;
+		local.maxtile |= (1 << max);
+		local.opers += opers;
+		if (max >= 11 /* 2048 */) local.win++;
+		local.maxscore = std::max(local.maxscore, score);
+
+		if ((loop % check) != 0) return;
+
+		u64 currtimept = moporgic::millisec();
+		u64 elapsedtime = currtimept - local.time;
+		total.score += local.score;
+		total.win += local.win;
+		total.time += elapsedtime;
+		total.opers += local.opers;
+		total.maxtile |= local.maxtile;
+		total.maxscore = std::max(total.maxscore, local.maxscore);
+
+		std::cout << std::endl;
+		char buf[64];
+		snprintf(buf, sizeof(buf), "%03llu/%03llu %llums %.2fops",
+				loop / check,
+				limit / check,
+				elapsedtime,
+				local.opers * 1000.0 / elapsedtime);
+		std::cout << buf << std::endl;
+		snprintf(buf, sizeof(buf), "local:  avg=%llu max=%u tile=%u win=%.2f%%",
+				local.score / check,
+				local.maxscore,
+				math::msb32(local.maxtile),
+				local.win * 100.0 / check);
+		std::cout << buf << std::endl;
+		snprintf(buf, sizeof(buf), "total:  avg=%llu max=%u tile=%u win=%.2f%%",
+				total.score / loop,
+				total.maxscore,
+				math::msb32(total.maxtile),
+				total.win * 100.0 / loop);
+		std::cout << buf << std::endl;
+
+		local.score = 0;
+		local.win = 0;
+		local.time = currtimept;
+		local.opers = 0;
+		local.maxtile = 0;
+		local.maxscore = 0;
 	}
 };
 
 int main(int argc, const char* argv[]) {
 	moporgic::board::initialize();
-//	board bb; bb.init();
+//	board bb;	bb.init();
 //	for (int i = 0; i < 16; i++) bb.set(i, rand() % 22);
 //	time_t start = moporgic::millisec();
 //	for (int i = 0; i < 10000000; i++) {
@@ -475,8 +492,11 @@ int main(int argc, const char* argv[]) {
 //		bb.set(rand() % 16, rand() % 22);
 //	}
 //	std::cout << (moporgic::millisec() - start) ;
-
-//	weight::make(0, 10);
+//	board::print(bb);
+//	for (int i = 0; i < 16; i++) {
+//		std::cout << i << "\t" << bb.find(i).size << std::endl;
+//	}
+//	return 0;
 
 	u32 train = 100;
 	u32 test = 10;
@@ -630,7 +650,7 @@ int main(int argc, const char* argv[]) {
 	};
 	auto indexnum0 = [](const board& b) -> u64 { // 12-bit
 		static u16 num[32];
-		b.numof(num);
+		b.numof(num, 10, 16);
 		u64 index = 0;
 		index += (num[10] & 0x03) << 0; // 1k ~ 32k, 2-bit ea.
 		index += (num[11] & 0x03) << 2;
@@ -642,7 +662,7 @@ int main(int argc, const char* argv[]) {
 	};
 	auto indexnum1 = [](const board& b) -> u64 { // 25-bit
 		static u16 num[32];
-		b.numof(num);
+		b.numof(num, 5, 16);
 		u64 index = 0;
 		index += ((num[5] + num[6]) & 0x0f) << 0; // 32 & 64, 4-bit
 		index += (num[7] & 0x07) << 4; // 128, 3-bit
@@ -688,7 +708,7 @@ int main(int argc, const char* argv[]) {
 		for (auto& p : patt6t) {
 			const u32 wsign = hash(p);
 			for (auto fx : mapfx) {
-				feature::make(hash(p), wsign); // FIXME
+				feature::make(wsign, hash(p)); // FIXME
 				std::for_each(p.begin(), p.end(), fx);
 			}
 		}
