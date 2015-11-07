@@ -252,57 +252,57 @@ public:
 	}
 
 	inline i32 left() {
-		register u64 nraw = 0;
-		register u32 next = 0;
+		register u64 rawn = 0;
+		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		look[fetch(0)].left.moveH(nraw, next, score, moved, 0);
-		look[fetch(1)].left.moveH(nraw, next, score, moved, 1);
-		look[fetch(2)].left.moveH(nraw, next, score, moved, 2);
-		look[fetch(3)].left.moveH(nraw, next, score, moved, 3);
-		raw = nraw;
-		ext = next;
+		look[fetch(0)].left.moveH(rawn, extn, score, moved, 0);
+		look[fetch(1)].left.moveH(rawn, extn, score, moved, 1);
+		look[fetch(2)].left.moveH(rawn, extn, score, moved, 2);
+		look[fetch(3)].left.moveH(rawn, extn, score, moved, 3);
+		raw = rawn;
+		ext = extn;
 		return score | moved;
 	}
 	inline i32 right() {
-		register u64 nraw = 0;
-		register u32 next = 0;
+		register u64 rawn = 0;
+		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		look[fetch(0)].right.moveH(nraw, next, score, moved, 0);
-		look[fetch(1)].right.moveH(nraw, next, score, moved, 1);
-		look[fetch(2)].right.moveH(nraw, next, score, moved, 2);
-		look[fetch(3)].right.moveH(nraw, next, score, moved, 3);
-		raw = nraw;
-		ext = next;
+		look[fetch(0)].right.moveH(rawn, extn, score, moved, 0);
+		look[fetch(1)].right.moveH(rawn, extn, score, moved, 1);
+		look[fetch(2)].right.moveH(rawn, extn, score, moved, 2);
+		look[fetch(3)].right.moveH(rawn, extn, score, moved, 3);
+		raw = rawn;
+		ext = extn;
 		return score | moved;
 	}
 	inline i32 up() {
 		transpose();
-		register u64 nraw = 0;
-		register u32 next = 0;
+		register u64 rawn = 0;
+		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		look[fetch(0)].left.moveV(nraw, next, score, moved, 0);
-		look[fetch(1)].left.moveV(nraw, next, score, moved, 1);
-		look[fetch(2)].left.moveV(nraw, next, score, moved, 2);
-		look[fetch(3)].left.moveV(nraw, next, score, moved, 3);
-		raw = nraw;
-		ext = next;
+		look[fetch(0)].left.moveV(rawn, extn, score, moved, 0);
+		look[fetch(1)].left.moveV(rawn, extn, score, moved, 1);
+		look[fetch(2)].left.moveV(rawn, extn, score, moved, 2);
+		look[fetch(3)].left.moveV(rawn, extn, score, moved, 3);
+		raw = rawn;
+		ext = extn;
 		return score | moved;
 	}
 	inline i32 down() {
 		transpose();
-		register u64 nraw = 0;
-		register u32 next = 0;
+		register u64 rawn = 0;
+		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		look[fetch(0)].right.moveV(nraw, next, score, moved, 0);
-		look[fetch(1)].right.moveV(nraw, next, score, moved, 1);
-		look[fetch(2)].right.moveV(nraw, next, score, moved, 2);
-		look[fetch(3)].right.moveV(nraw, next, score, moved, 3);
-		raw = nraw;
-		ext = next;
+		look[fetch(0)].right.moveV(rawn, extn, score, moved, 0);
+		look[fetch(1)].right.moveV(rawn, extn, score, moved, 1);
+		look[fetch(2)].right.moveV(rawn, extn, score, moved, 2);
+		look[fetch(3)].right.moveV(rawn, extn, score, moved, 3);
+		raw = rawn;
+		ext = extn;
 		return score | moved;
 	}
 
