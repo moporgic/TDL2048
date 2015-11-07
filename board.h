@@ -137,15 +137,15 @@ public:
 	static lookup look[1 << 20];
 
 	u64 raw;
-	u64 cacheraw;
+	u64 rawc;
 	u32 ext;
-	u32 cacheext;
+	u32 extc;
 
 public:
-	board(const u64& raw = 0) : raw(raw), cacheraw(0), ext(0), cacheext(0) {}
-	board(const board& b) : raw(b.raw), cacheraw(b.cacheraw), ext(b.ext), cacheext(b.cacheext) {}
+	board(const u64& raw = 0) : raw(raw), rawc(0), ext(0), extc(0) {}
+	board(const board& b) : raw(b.raw), rawc(b.rawc), ext(b.ext), extc(b.extc) {}
 	inline board& operator =(const u64& raw) { this->raw = raw; return *this; }
-	inline board& operator =(const board& b) { raw = b.raw, ext = b.ext; cacheraw = b.cacheraw, cacheext = b.cacheext; return *this; }
+	inline board& operator =(const board& b) { raw = b.raw, ext = b.ext; rawc = b.rawc, extc = b.extc; return *this; }
 	inline bool operator==(const board& b) const { return raw == b.raw && ext == b.ext; }
 	inline bool operator!=(const board& b) const { return raw != b.raw || ext != b.ext; }
 	inline bool operator==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
@@ -307,12 +307,12 @@ public:
 	}
 
 	inline void mark() {
-		cacheraw = raw;
-		cacheext = ext;
+		rawc = raw;
+		extc = ext;
 	}
 	inline void reset() {
-		raw = cacheraw;
-		ext = cacheext;
+		raw = rawc;
+		ext = extc;
 	}
 
 	inline u32 max() const {
