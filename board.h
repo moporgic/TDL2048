@@ -18,7 +18,7 @@ public:
 		tiles(const tiles<Tis>& t) : tile(t.tile), size(t.size) {}
 		tiles() : tile(0), size(0) {}
 	};
-	class lookup {
+	class cache {
 	friend class board;
 	public:
 		struct oper {
@@ -61,9 +61,9 @@ public:
 		u16 mask[32]; // mask of each tile-type
 		tiles<u64> layout; // layout of board-type
 	private:
-		~lookup() {}
-		lookup() : rowraw(0), rowext(0), maxtile(0), merged(0), count(), mask() {}
-		lookup(const u32& r) : count(), mask() {
+		~cache() {}
+		cache() : rowraw(0), rowext(0), maxtile(0), merged(0), count(), mask() {}
+		cache(const u32& r) : count(), mask() {
 			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
 
 			u32 V[4] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
@@ -134,7 +134,7 @@ public:
 			if (tmp != 0) row[top] = tmp;
 		}
 	};
-	static lookup look[1 << 20];
+	static cache look[1 << 20];
 
 	u64 raw;
 	u64 rawc;
@@ -256,10 +256,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		look[fetch(0)].left.moveH(rawn, extn, score, moved, 0);
-		look[fetch(1)].left.moveH(rawn, extn, score, moved, 1);
-		look[fetch(2)].left.moveH(rawn, extn, score, moved, 2);
-		look[fetch(3)].left.moveH(rawn, extn, score, moved, 3);
+		lookup(0).left.moveH(rawn, extn, score, moved, 0);
+		lookup(1).left.moveH(rawn, extn, score, moved, 1);
+		lookup(2).left.moveH(rawn, extn, score, moved, 2);
+		lookup(3).left.moveH(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -269,10 +269,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		look[fetch(0)].right.moveH(rawn, extn, score, moved, 0);
-		look[fetch(1)].right.moveH(rawn, extn, score, moved, 1);
-		look[fetch(2)].right.moveH(rawn, extn, score, moved, 2);
-		look[fetch(3)].right.moveH(rawn, extn, score, moved, 3);
+		lookup(0).right.moveH(rawn, extn, score, moved, 0);
+		lookup(1).right.moveH(rawn, extn, score, moved, 1);
+		lookup(2).right.moveH(rawn, extn, score, moved, 2);
+		lookup(3).right.moveH(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -283,10 +283,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		look[fetch(0)].left.moveV(rawn, extn, score, moved, 0);
-		look[fetch(1)].left.moveV(rawn, extn, score, moved, 1);
-		look[fetch(2)].left.moveV(rawn, extn, score, moved, 2);
-		look[fetch(3)].left.moveV(rawn, extn, score, moved, 3);
+		lookup(0).left.moveV(rawn, extn, score, moved, 0);
+		lookup(1).left.moveV(rawn, extn, score, moved, 1);
+		lookup(2).left.moveV(rawn, extn, score, moved, 2);
+		lookup(3).left.moveV(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -297,10 +297,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		look[fetch(0)].right.moveV(rawn, extn, score, moved, 0);
-		look[fetch(1)].right.moveV(rawn, extn, score, moved, 1);
-		look[fetch(2)].right.moveV(rawn, extn, score, moved, 2);
-		look[fetch(3)].right.moveV(rawn, extn, score, moved, 3);
+		lookup(0).right.moveV(rawn, extn, score, moved, 0);
+		lookup(1).right.moveV(rawn, extn, score, moved, 1);
+		lookup(2).right.moveV(rawn, extn, score, moved, 2);
+		lookup(3).right.moveV(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -316,33 +316,37 @@ public:
 	}
 
 	inline u32 max() const {
-		return math::log2(look[fetch(0)].maxtile | look[fetch(1)].maxtile
-						| look[fetch(2)].maxtile | look[fetch(3)].maxtile);
+		return math::log2(lookup(0).maxtile | lookup(1).maxtile
+						| lookup(2).maxtile | lookup(3).maxtile);
 	}
 
 	inline u32 count(const u32& t) const {
-		return look[fetch(0)].count[t] + look[fetch(1)].count[t]
-			 + look[fetch(2)].count[t] + look[fetch(3)].count[t];
+		return lookup(0).count[t] + lookup(1).count[t]
+			 + lookup(2).count[t] + lookup(3).count[t];
 	}
 	inline void count(u16 num[32], const u32& min = 0, const u32& max = 32) const {
-		const u16* count0 = look[fetch(0)].count;
-		const u16* count1 = look[fetch(1)].count;
-		const u16* count2 = look[fetch(2)].count;
-		const u16* count3 = look[fetch(3)].count;
+		const u16* count0 = lookup(0).count;
+		const u16* count1 = lookup(1).count;
+		const u16* count2 = lookup(2).count;
+		const u16* count3 = lookup(3).count;
 		for (u32 i = min; i < max; i++) {
 			num[i] = count0[i] + count1[i] + count2[i] + count3[i];
 		}
 	}
 
 	inline tiles<u64> find(const u32& t) const {
-		u32 mask = (look[fetch(0)].mask[t] << 0) | (look[fetch(1)].mask[t] << 4)
-				 | (look[fetch(2)].mask[t] << 8) | (look[fetch(3)].mask[t] << 12);
+		u32 mask = (lookup(0).mask[t] << 0) | (lookup(1).mask[t] << 4)
+				 | (lookup(2).mask[t] << 8) | (lookup(3).mask[t] << 12);
 		return look[mask].layout;
+	}
+
+	inline cache& lookup(const u32& r) const {
+		return board::look[fetch(r)];
 	}
 
 	static void initialize() {
 		for (u32 i = 0; i < (1 << 20); i++)
-			board::look[i] = lookup(i);
+			board::look[i] = cache(i);
 	}
 	static void print(const board& b, const bool& fib = false) {
 		static u32 T[16];
@@ -370,6 +374,6 @@ public:
 		return opers;
 	}
 };
-board::lookup board::look[1 << 20];
+board::cache board::look[1 << 20];
 
 } // namespace moporgic
