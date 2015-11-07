@@ -57,13 +57,13 @@ public:
 		u32 merged; // number of merged tiles
 		oper left; // left operation
 		oper right; // right operation
-		u16 numof[32]; // number of each tile-type
+		u16 count[32]; // number of each tile-type
 		u16 mask[32]; // mask of each tile-type
 		tiles<u64> layout; // layout of board-type
 	private:
 		~lookup() {}
-		lookup() : rowraw(0), rowext(0), maxtile(0), merged(0), numof(), mask() {}
-		lookup(const u32& r) : numof(), mask() {
+		lookup() : rowraw(0), rowext(0), maxtile(0), merged(0), count(), mask() {}
+		lookup(const u32& r) : count(), mask() {
 			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
 
 			u32 V[4] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
@@ -74,7 +74,7 @@ public:
 			assign(L, Ll, Lh, rowraw, rowext);
 			maxtile = (1 << *std::max_element(V, V + 4)) & 0xfffffffeU;
 			for (int i = 0; i < 4; i++) {
-				numof[V[i]]++;
+				count[V[i]]++;
 				mask[V[i]] |= (1 << i);
 			}
 			for (int i = 0; i < 16; i++) {
@@ -223,9 +223,7 @@ public:
 		ext = 0;
 	}
 	inline tiles<u64> spaces() const {
-		u32 mask = (look[fetch(0)].mask[0] << 0) | (look[fetch(1)].mask[0] << 4)
-				 | (look[fetch(2)].mask[0] << 8) | (look[fetch(3)].mask[0] << 12);
-		return look[mask].layout;
+		return find(0);
 	}
 	inline bool next() {
 		tiles<u64> empty = spaces();
@@ -322,21 +320,21 @@ public:
 						| look[fetch(2)].maxtile | look[fetch(3)].maxtile);
 	}
 
-	inline u32 numof(const u32& t) const {
-		return look[fetch(0)].numof[t] + look[fetch(1)].numof[t]
-			 + look[fetch(2)].numof[t] + look[fetch(3)].numof[t];
+	inline u32 count(const u32& t) const {
+		return look[fetch(0)].count[t] + look[fetch(1)].count[t]
+			 + look[fetch(2)].count[t] + look[fetch(3)].count[t];
 	}
-	void numof(u16 num[32], const u32& min = 0, const u32& max = 32) const {
-		const u16* numof0 = look[fetch(0)].numof;
-		const u16* numof1 = look[fetch(1)].numof;
-		const u16* numof2 = look[fetch(2)].numof;
-		const u16* numof3 = look[fetch(3)].numof;
+	inline void count(u16 num[32], const u32& min = 0, const u32& max = 32) const {
+		const u16* count0 = look[fetch(0)].count;
+		const u16* count1 = look[fetch(1)].count;
+		const u16* count2 = look[fetch(2)].count;
+		const u16* count3 = look[fetch(3)].count;
 		for (u32 i = min; i < max; i++) {
-			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
+			num[i] = count0[i] + count1[i] + count2[i] + count3[i];
 		}
 	}
 
-	tiles<u64> find(const u32& t) const {
+	inline tiles<u64> find(const u32& t) const {
 		u32 mask = (look[fetch(0)].mask[t] << 0) | (look[fetch(1)].mask[t] << 4)
 				 | (look[fetch(2)].mask[t] << 8) | (look[fetch(3)].mask[t] << 12);
 		return look[mask].layout;
