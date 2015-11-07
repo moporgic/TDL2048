@@ -53,26 +53,15 @@ public:
 		};
 		u32 rowraw; // base row (16-bit raw)
 		u32 rowext; // base row (4-bit extra)
-		u32 mirraw; // mirrored row (16-bit raw)
-		u32 mirext; // mirrored row (4-bit extra)
 		tiles<u32> empty; // empty tiles (4-bit each, 16-bit size)
 		u32 maxtile; // max tile
 		u32 merged; // number of merged tiles
 		u16 numof[32]; // number of each tile
 		oper left;
 		oper right;
-
-		inline void mirror(u64& raw, u32& ext, const int& i) { mirror64(raw, ext, i); }
-		inline void mirror64(u64& raw, u32& ext, const int& i) {
-			raw |= mirraw << (i << 4);
-		}
-		inline void mirror80(u64& raw, u32& ext, const int& i) {
-			mirror64(raw, ext, i);
-			ext |= mirext << (i << 2);
-		}
 	private:
 		~lookup() {}
-		lookup() : rowraw(0), rowext(0), mirraw(0), mirext(0), maxtile(0), merged(0) {}
+		lookup() : rowraw(0), rowext(0), maxtile(0), merged(0) {}
 		lookup(const u32& r) {
 			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
 
@@ -82,7 +71,6 @@ public:
 			u32 R[4] = { V[3], V[2], V[1], V[0] }, Rl[4], Rh[4]; // mirrored
 
 			assign(L, Ll, Lh, rowraw, rowext);
-			assign(R, Rl, Rh, mirraw, mirext);
 			empty = calempty(V);
 			maxtile = *std::max_element(V, V + 4);
 			for (int i = 0; i < 4; i++) numof[V[i]]++;
