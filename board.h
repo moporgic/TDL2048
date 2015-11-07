@@ -72,7 +72,7 @@ public:
 			u32 R[4] = { V[3], V[2], V[1], V[0] }, Rl[4], Rh[4]; // mirrored
 
 			assign(L, Ll, Lh, rowraw, rowext);
-			maxtile = *std::max_element(V, V + 4);
+			maxtile = (1 << *std::max_element(V, V + 4)) & 0xfffffffeU;
 			for (int i = 0; i < 4; i++) {
 				numof[V[i]]++;
 				mask[V[i]] |= (1 << i);
@@ -318,8 +318,8 @@ public:
 	}
 
 	inline u32 max() const {
-		return math::log2((1 << look[fetch(0)].maxtile) | (1 << look[fetch(1)].maxtile)
-						| (1 << look[fetch(2)].maxtile) | (1 << look[fetch(3)].maxtile));
+		return math::log2(look[fetch(0)].maxtile | look[fetch(1)].maxtile
+						| look[fetch(2)].maxtile | look[fetch(3)].maxtile);
 	}
 
 	inline u32 numof(const u32& t) const {
