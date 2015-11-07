@@ -53,12 +53,11 @@ public:
 		};
 		u32 rowraw; // base row (16-bit raw)
 		u32 rowext; // base row (4-bit extra)
-		tiles<u32> empty; // empty tiles (4-bit each, 16-bit size)
 		u32 maxtile; // max tile
 		u32 merged; // number of merged tiles
-		u16 numof[32]; // number of each tile
-		oper left;
-		oper right;
+		tiles<u32> tile[32]; // details of each tile
+		oper left; // left operation
+		oper right; // right operation
 	private:
 		~lookup() {}
 		lookup() : rowraw(0), rowext(0), maxtile(0), merged(0) {}
@@ -71,9 +70,11 @@ public:
 			u32 R[4] = { V[3], V[2], V[1], V[0] }, Rl[4], Rh[4]; // mirrored
 
 			assign(L, Ll, Lh, rowraw, rowext);
-			empty = calempty(V);
 			maxtile = *std::max_element(V, V + 4);
-			for (int i = 0; i < 4; i++) numof[V[i]]++;
+			for (int i = 0; i < 4; i++) {
+				tiles<u32>& t = tile[V[i]];
+				t.tile |= (i << ((t.size++) << 2));
+			}
 
 			mvleft(L, left.score, merged);
 			u32 mvL = assign(L, Ll, Lh, left.moveHraw, left.moveHext);
@@ -126,13 +127,6 @@ public:
 				}
 			}
 			if (tmp != 0) row[top] = tmp;
-		}
-		struct tiles<u32> calempty(u32 V[]) {
-			u32 tile = 0;
-			u32 size = 0;
-			for (int i = 0; i < 4; i++)
-				if (V[i] == 0) tile |= (i << ((size++) << 2));
-			return tiles<u32>(tile, size);
 		}
 	};
 	static lookup look[1 << 20];
@@ -222,26 +216,8 @@ public:
 		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
 		ext = 0;
 	}
-	tiles<u64> spaces() const {
-		register u64 tile = 0;
-		register u32 size = 0;
-
-		const tiles<u32>& e0 = look[fetch(0)].empty;
-		const tiles<u32>& e1 = look[fetch(1)].empty;
-		const tiles<u32>& e2 = look[fetch(2)].empty;
-		const tiles<u32>& e3 = look[fetch(3)].empty;
-
-		register u32 mask[] = { 0x0000, 0x000f, 0x00ff, 0x0fff, 0xffff };
-		tile |= u64((e0.tile + 0x0000) & mask[e0.size]) << (size << 2);
-		size += e0.size;
-		tile |= u64((e1.tile + 0x4444) & mask[e1.size]) << (size << 2);
-		size += e1.size;
-		tile |= u64((e2.tile + 0x8888) & mask[e2.size]) << (size << 2);
-		size += e2.size;
-		tile |= u64((e3.tile + 0xcccc) & mask[e3.size]) << (size << 2);
-		size += e3.size;
-
-		return tiles<u64>(tile, size);
+	inline tiles<u64> spaces() const {
+		return find(0);
 	}
 	inline bool next() {
 		tiles<u64> empty = spaces();
@@ -337,30 +313,40 @@ public:
 		return math::log2((1 << look[fetch(0)].maxtile) | (1 << look[fetch(1)].maxtile)
 						| (1 << look[fetch(2)].maxtile) | (1 << look[fetch(3)].maxtile));
 	}
+
 	inline u32 numof(const u32& t) const {
-		const u16* numof0 = look[fetch(0)].numof;
-		const u16* numof1 = look[fetch(1)].numof;
-		const u16* numof2 = look[fetch(2)].numof;
-		const u16* numof3 = look[fetch(3)].numof;
-		return numof0[t] + numof1[t] + numof2[t] + numof3[t];
+		return look[fetch(0)].tile[t].size + look[fetch(1)].tile[t].size
+			 + look[fetch(2)].tile[t].size + look[fetch(3)].tile[t].size;
 	}
 	void numof(u16 num[32], const u32& min = 0, const u32& max = 32) const {
-		const u16* numof0 = look[fetch(0)].numof;
-		const u16* numof1 = look[fetch(1)].numof;
-		const u16* numof2 = look[fetch(2)].numof;
-		const u16* numof3 = look[fetch(3)].numof;
+		const tiles<u32>* t0 = look[fetch(0)].tile;
+		const tiles<u32>* t1 = look[fetch(1)].tile;
+		const tiles<u32>* t2 = look[fetch(2)].tile;
+		const tiles<u32>* t3 = look[fetch(3)].tile;
 		for (u32 i = min; i < max; i++) {
-			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
+			num[i] = t0[i].size + t1[i].size + t2[i].size + t3[i].size;
 		}
 	}
+
 	tiles<u64> find(const u32& t) const {
-		u64 tile = 0;
-		u32 size = 0;
-		for (u32 i = 0; i < 16; i++)
-			if (at(i) == t) {
-				tile |= (u64(i) << (size << 2));
-				size++;
-			}
+		register u64 tile = 0;
+		register u32 size = 0;
+
+		const tiles<u32> t0 = look[fetch(0)].tile[t];
+		const tiles<u32> t1 = look[fetch(1)].tile[t];
+		const tiles<u32> t2 = look[fetch(2)].tile[t];
+		const tiles<u32> t3 = look[fetch(3)].tile[t];
+
+		register u32 mask[] = { 0x0000, 0x000f, 0x00ff, 0x0fff, 0xffff };
+		tile |= u64((t0.tile + 0x0000) & mask[t0.size]) << (size << 2);
+		size += t0.size;
+		tile |= u64((t1.tile + 0x4444) & mask[t1.size]) << (size << 2);
+		size += t1.size;
+		tile |= u64((t2.tile + 0x8888) & mask[t2.size]) << (size << 2);
+		size += t2.size;
+		tile |= u64((t3.tile + 0xcccc) & mask[t3.size]) << (size << 2);
+		size += t3.size;
+
 		return tiles<u64>(tile, size);
 	}
 
