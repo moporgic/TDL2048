@@ -418,7 +418,7 @@ struct statistic {
 		u64 win;
 		u64 time;
 		u64 opers;
-		u32 maxscore;
+		u32 max;
 		u32 hash;
 	} total = {}, local = {};
 
@@ -438,7 +438,7 @@ struct statistic {
 		local.hash |= hash;
 		local.opers += opers;
 		if (hash >= 2048) local.win++;
-		local.maxscore = std::max(local.maxscore, score);
+		local.max = std::max(local.max, score);
 
 		if ((loop % check) != 0) return;
 
@@ -449,7 +449,7 @@ struct statistic {
 		total.time += elapsedtime;
 		total.opers += local.opers;
 		total.hash |= local.hash;
-		total.maxscore = std::max(total.maxscore, local.maxscore);
+		total.max = std::max(total.max, local.max);
 
 		std::cout << std::endl;
 		char buf[64];
@@ -461,13 +461,13 @@ struct statistic {
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / check,
-				local.maxscore,
+				local.max,
 				math::msb32(local.hash),
 				local.win * 100.0 / check);
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / loop,
-				total.maxscore,
+				total.max,
 				math::msb32(total.hash),
 				total.win * 100.0 / loop);
 		std::cout << buf << std::endl;
@@ -477,7 +477,7 @@ struct statistic {
 		local.time = currtimept;
 		local.opers = 0;
 		local.hash = 0;
-		local.maxscore = 0;
+		local.max = 0;
 	}
 };
 
