@@ -606,7 +606,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "TDL 2048" << std::endl;
 	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
-	printf("board::look[%d] = %lluM", (1 << 20), (sizeof(moporgic::board::look) >> 20));
+	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
 	auto rotfx = [](int& i) {i = (3 - (i >> 2)) + ((i % 4) << 2);};
@@ -639,14 +639,14 @@ int main(int argc, const char* argv[]) {
 	auto indexmerge = [](const board& b) -> u64 { // 16-bit
 		board q = b; q.rotright();
 		u32 hori = 0, vert = 0;
-		hori += b.lookup(0).merge << 0;
-		hori += b.lookup(1).merge << 2;
-		hori += b.lookup(2).merge << 4;
-		hori += b.lookup(3).merge << 6;
-		vert += q.lookup(0).merge << 0;
-		vert += q.lookup(1).merge << 2;
-		vert += q.lookup(2).merge << 4;
-		vert += q.lookup(3).merge << 6;
+		hori += b.query(0).merge << 0;
+		hori += b.query(1).merge << 2;
+		hori += b.query(2).merge << 4;
+		hori += b.query(3).merge << 6;
+		vert += q.query(0).merge << 0;
+		vert += q.query(1).merge << 2;
+		vert += q.query(2).merge << 4;
+		vert += q.query(3).merge << 6;
 		return hori | (vert << 8);
 	};
 	auto indexnum0 = [](const board& b) -> u64 { // 12-bit

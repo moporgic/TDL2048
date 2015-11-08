@@ -175,7 +175,11 @@ public:
 			if (tmp != 0) row[top] = tmp;
 		}
 	};
-	static cache look[1 << 20];
+
+	inline static const cache& lookup(const u32& i) {
+		static cache look[1 << 20](cache::make(seq32_static()));
+		return look[i];
+	}
 
 	u64 raw;
 	u64 rawc;
@@ -379,16 +383,11 @@ public:
 	inline tiles<u64> find(const u32& t) const {
 		u32 mask = (query(0).mask[t] << 0) | (query(1).mask[t] << 4)
 				 | (query(2).mask[t] << 8) | (query(3).mask[t] << 12);
-		return look[mask].pos;
+		return board::lookup(mask).pos;
 	}
 
 	inline const cache& query(const u32& r) const {
-		return board::look[fetch(r)];
-	}
-
-	inline static const cache& LUT(const u32& i) const {
-		static cache caches[1 << 20](cache::make(seq32_static()));
-		return caches[i];
+		return board::lookup(fetch(r));
 	}
 
 	static void print(const board& b, const bool& fib = false) {
@@ -410,6 +409,5 @@ public:
 		std::cout << edge << std::endl;
 	}
 };
-board::cache board::look[1 << 20](board::cache::make(seq32_static()));
 
 } // namespace moporgic
