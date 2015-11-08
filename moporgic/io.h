@@ -180,8 +180,8 @@ load_t make_load(std::istream& in, char* buf, int on_fail = 0x3) {
 #endif
 
 template<typename type> inline
-std::ostream& write(std::ostream& out, type& v) {
-	return out.write(reinterpret_cast<char*>(&v), sizeof(v));
+std::ostream& write(std::ostream& out, const type& v) {
+	return out.write(reinterpret_cast<char*>(&const_cast<type&>(v)), sizeof(v));
 }
 
 template<typename type> inline
