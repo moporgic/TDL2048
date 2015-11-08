@@ -412,12 +412,12 @@ public:
 
 	inline void operator >>(std::ostream& out) const {
 		moporgic::write(out, raw);
-		moporgic::write(out, ext);
+//		moporgic::write(out, ext);
 	}
 
 	inline void operator <<(std::istream& in) {
 		moporgic::read(in, raw);
-		moporgic::read(in, ext);
+//		moporgic::read(in, ext);
 	}
 
 	void print(const bool& raw = true, std::ostream& out = std::cout) const {
