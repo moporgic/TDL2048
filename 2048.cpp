@@ -172,8 +172,9 @@ public:
 		return weights().back();
 	}
 	static weight find(const u32& sign) { return cache().at(sign); }
-	static std::vector<weight>::iterator begin() { return weights().begin(); }
-	static std::vector<weight>::iterator end() { return weights().end(); }
+	typedef std::vector<weight>::iterator iter;
+	static iter begin() { return weights().begin(); }
+	static iter end() { return weights().end(); }
 private:
 	weight(const u32& sign, const u64& size)
 			: sign(sign), value(new numeric[size]()), size(size) {}
@@ -201,8 +202,9 @@ public:
 		return indexers().back();
 	}
 	static indexer find(const u32& sign) { return cache().at(sign); }
-	static inline std::vector<indexer>::iterator begin() { return indexers().begin(); }
-	static inline std::vector<indexer>::iterator end() { return indexers().end(); }
+	typedef std::vector<indexer>::iterator iter;
+	static inline iter begin() { return indexers().begin(); }
+	static inline iter end() { return indexers().end(); }
 	static inline u64 size() { return indexers().size(); }
 private:
 	indexer(const u32& sign, mapper map) : sign(sign), map(map) {}
@@ -317,8 +319,9 @@ public:
 		return feats().back();
 	}
 
-	static inline std::vector<feature>::iterator begin() { return feats().begin(); }
-	static inline std::vector<feature>::iterator end() { return feats().end(); }
+	typedef std::vector<feature>::iterator iter;
+	static inline iter begin() { return feats().begin(); }
+	static inline iter end() { return feats().end(); }
 	static inline u64 size() { return feats().size(); }
 
 private:
@@ -336,8 +339,7 @@ struct state {
 	numeric esti;
 	state() : state(nullptr) {}
 	state(i32 (board::*oper)()) : oper(oper), score(-1), esti(0) {}
-	state(const state& s)
-		: move(s.move), oper(s.oper), score(s.score), esti(s.esti) {}
+	state(const state& s) = default;
 //	inline void assign(board& b, const i32& s) {
 //		move = b;
 //		score = s;
@@ -350,6 +352,12 @@ struct state {
 //		}
 //		b.reset();
 //	}
+	inline void apply(const board& b) {
+
+	}
+	inline numeric update(const numeric& v) {
+
+	}
 	inline void operator <<(const board& b) {
 		move = b;
 		score = (move.*oper)();
