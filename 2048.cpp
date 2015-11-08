@@ -494,8 +494,8 @@ struct statistic {
 
 int main(int argc, const char* argv[]) {
 //	randinit();
-	board bb;	bb.init();
-	for (int i = 0; i < 16; i++) bb.set(i, rand() % 22);
+//	board bb;	bb.init();
+//	for (int i = 0; i < 16; i++) bb.set(i, rand() % 22);
 //	time_t start = moporgic::millisec();
 //	for (int i = 0; i < 10000000; i++) {
 ////		bb.rotate(rand() % 4);
@@ -508,7 +508,7 @@ int main(int argc, const char* argv[]) {
 //	in.open("X:\\bb.bin", std::ios::in | std::ios::binary);
 //	bb << in;
 //	board::print(bb);
-	bb.print();
+//	bb.print();
 
 //	std::ofstream out;
 //	out.open("X:\\bb.bin", std::ios::out | std::ios::binary | std::ios::trunc);
@@ -516,7 +516,7 @@ int main(int argc, const char* argv[]) {
 //	out.flush();
 //	out.close();
 
-	return 0;
+//	return 0;
 
 	u32 train = 100;
 	u32 test = 10;
