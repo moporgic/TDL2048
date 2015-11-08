@@ -483,6 +483,7 @@ struct statistic {
 
 int main(int argc, const char* argv[]) {
 	moporgic::board::initialize();
+//	randinit();
 //	board bb;	bb.init();
 //	for (int i = 0; i < 16; i++) bb.set(i, rand() % 22);
 //	time_t start = moporgic::millisec();
@@ -496,6 +497,7 @@ int main(int argc, const char* argv[]) {
 //	for (int i = 0; i < 16; i++) {
 //		std::cout << i << "\t" << bb.find(i).size << std::endl;
 //	}
+//	std::cout << bb.max() << std::endl;
 //	return 0;
 
 	u32 train = 100;
@@ -636,21 +638,21 @@ int main(int argc, const char* argv[]) {
 		return index;
 	};
 	auto indexmerge = [](const board& b) -> u64 { // 16-bit
-		board d = b; d.rotright();
+		board q = b; q.rotright();
 		u32 hori = 0, vert = 0;
-		hori += board::look[b.fetch(0)].merged << 0;
-		hori += board::look[b.fetch(1)].merged << 2;
-		hori += board::look[b.fetch(2)].merged << 4;
-		hori += board::look[b.fetch(3)].merged << 6;
-		vert += board::look[d.fetch(0)].merged << 0;
-		vert += board::look[d.fetch(1)].merged << 2;
-		vert += board::look[d.fetch(2)].merged << 4;
-		vert += board::look[d.fetch(3)].merged << 6;
+		hori += b.lookup(0).merged << 0;
+		hori += b.lookup(1).merged << 2;
+		hori += b.lookup(2).merged << 4;
+		hori += b.lookup(3).merged << 6;
+		vert += q.lookup(0).merged << 0;
+		vert += q.lookup(1).merged << 2;
+		vert += q.lookup(2).merged << 4;
+		vert += q.lookup(3).merged << 6;
 		return hori | (vert << 8);
 	};
 	auto indexnum0 = [](const board& b) -> u64 { // 12-bit
 		static u16 num[32];
-		b.numof(num, 10, 16);
+		b.count(num, 10, 16);
 		u64 index = 0;
 		index += (num[10] & 0x03) << 0; // 1k ~ 32k, 2-bit ea.
 		index += (num[11] & 0x03) << 2;
@@ -662,7 +664,7 @@ int main(int argc, const char* argv[]) {
 	};
 	auto indexnum1 = [](const board& b) -> u64 { // 25-bit
 		static u16 num[32];
-		b.numof(num, 5, 16);
+		b.count(num, 5, 16);
 		u64 index = 0;
 		index += ((num[5] + num[6]) & 0x0f) << 0; // 32 & 64, 4-bit
 		index += (num[7] & 0x07) << 4; // 128, 3-bit
