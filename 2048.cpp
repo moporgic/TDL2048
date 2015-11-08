@@ -340,42 +340,33 @@ struct state {
 	state() : state(nullptr) {}
 	state(i32 (board::*oper)()) : oper(oper), score(-1), esti(0) {}
 	state(const state& s) = default;
-//	inline void assign(board& b, const i32& s) {
-//		move = b;
-//		score = s;
-//		if (score >= 0) {
-//			esti = score;
-//			for (auto f = feature::begin(); f != feature::end(); f++)
-//				esti += (*f)[move];
-//		} else {
-//			esti = -std::numeric_limits<numeric>::max();
-//		}
-//		b.reset();
-//	}
-	inline void apply(const board& b) {
 
-	}
-	inline numeric update(const numeric& v) {
-
-	}
-	inline void operator <<(const board& b) {
+	inline void assign(const board& b, feature::iter begin, feature::iter end) {
 		move = b;
 		score = (move.*oper)();
 		if (score >= 0) {
 			esti = score;
-			for (auto f = feature::begin(); f != feature::end(); f++)
+			for (auto f = begin; f != end; f++)
 				esti += (*f)[move];
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
 	}
-	inline numeric operator +=(const numeric& v) {
-		const numeric update = alpha * (v - (esti - score));
+	inline numeric update(const numeric& v, feature::iter begin, feature::iter end) {
+		const numeric upd = alpha * (v - (esti - score));
 		esti = score;
-		for (auto f = feature::begin(); f != feature::end(); f++)
-			esti += ((*f)[move] += update);
+		for (auto f = begin; f != end; f++)
+			esti += ((*f)[move] += upd);
 		return esti;
 	}
+
+	inline void operator <<(const board& b) {
+		assign(b, feature::begin(), feature::end());
+	}
+	inline numeric operator +=(const numeric& v) {
+		return update(v, feature::begin(), feature::end());
+	}
+
 	inline void operator >>(board& b) const { b = move; }
 	inline bool operator >(const state& s) const { return esti > s.esti; }
 
@@ -411,14 +402,6 @@ struct select {
 		move[3] << b;
 		return operator <<(move);
 	}
-//	inline select& operator <<(board& b) {
-//		b.mark();
-//		move[0].assign(b, b.up());
-//		move[1].assign(b, b.right());
-//		move[2].assign(b, b.down());
-//		move[3].assign(b, b.left());
-//		return operator <<(move);
-//	}
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(board& b) const { *best >> b; }
 	inline operator bool() const { return score() != -1; }
