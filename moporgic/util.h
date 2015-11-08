@@ -20,6 +20,10 @@
 
 #endif /* DEBUG */
 
+#ifndef MOPORGIC_SEQSTATIC_POOL
+#define MOPORGIC_SEQSTATIC_POOL 1
+#endif
+
 #include <cstdint>
 #include <chrono>
 #include <vector>
@@ -50,11 +54,11 @@ uint64_t mspass(std::vector<uint64_t>& stk) {
 }
 
 const uint32_t seq32_static(const int& i = 0) {
-	static uint32_t seq[8] = {};
+	static uint32_t seq[MOPORGIC_SEQSTATIC_POOL] = {};
 	return seq[i]++;
 }
 const uint64_t seq64_static(const int& i = 0) {
-	static uint64_t seq[8] = {};
+	static uint64_t seq[MOPORGIC_SEQSTATIC_POOL] = {};
 	return seq[i]++;
 }
 

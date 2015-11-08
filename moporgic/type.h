@@ -7,6 +7,8 @@
  *      Author: moporgic
  */
 
+// TODO: constexpr
+
 typedef long long int ll;
 typedef long double llf;
 typedef long double quadruple;
@@ -29,18 +31,12 @@ typedef unsigned char byte;
 typedef short life; // life is short
 
 //#define raw_cast(type, var) (*(type*)(&var))
-template<typename T> inline T& raw_cast(const unsigned int& a) { return *((T*) &a); }
-template<typename T> inline T& raw_cast(const signed int& a) { return *((T*) &a); }
-template<typename T> inline T& raw_cast(const unsigned short& a) { return *((T*) &a); }
-template<typename T> inline T& raw_cast(const signed short& a) { return *((T*) &a); }
-template<typename T> inline T& raw_cast(const unsigned long long& a) { return *((T*) &a); }
-template<typename T> inline T& raw_cast(const signed long long& a) { return *((T*) &a); }
-template<typename T> inline T& raw_cast(const unsigned char& a) { return *((T*) &a); }
-template<typename T> inline T& raw_cast(const signed char& a) { return *((T*) &a); }
-template<typename T> inline T& raw_cast(const long double& a) { return *((T*) &a); }
-template<typename T> inline T& raw_cast(const double& a) { return *((T*) &a); }
-template<typename T> inline T& raw_cast(const float& a) { return *((T*) &a); }
-template<typename T> inline T& raw_cast(const bool& a) { return *((T*) &a); }
+
+template<typename dst, typename src> inline
+dst ptr_cast(src p) { return (dst) p; /*return reinterpret_cast<dst>(p);*/ }
+
+template<typename dst, typename src> inline
+dst& raw_cast(src& v, const int off = 0) { return *(ptr_cast<dst*>(&v) + off); }
 
 struct u8c {
 	byte v;
@@ -90,8 +86,10 @@ union r16 {
 	inline r16(const r16& v);
 	inline r16(const u8& v);
 	inline r16(const i8& v);
-	inline r16(const u8* b, const int& e = 0);
-	inline r16(const i8* b, const int& e = 0);
+	inline r16(const u8* b);
+	inline r16(const i8* b);
+	inline r16(const u8* b, const int& e);
+	inline r16(const i8* b, const int& e);
 	inline u8c& operator[](const int& i);
 	inline operator u8*() const;
 	inline operator i8*() const;
@@ -123,9 +121,11 @@ union r32 {
 	inline r32(const r32& v);
 	inline r32(const u8& v);
 	inline r32(const i8& v);
-	inline r32(const r16* v, const int& e = 0);
-	inline r32(const u8* b, const int& e = 0);
-	inline r32(const i8* b, const int& e = 0);
+	inline r32(const u8* b);
+	inline r32(const i8* b);
+	inline r32(const r16* v, const int& e);
+	inline r32(const u8* b, const int& e);
+	inline r32(const i8* b, const int& e);
 	inline u8c& operator[](const int& i);
 	inline operator u8*() const;
 	inline operator i8*() const;
@@ -159,10 +159,12 @@ union r64 {
 	inline r64(const r64& v);
 	inline r64(const u8& v);
 	inline r64(const i8& v);
-	inline r64(const r16* v, const int& e = 0);
-	inline r64(const r32* v, const int& e = 0);
-	inline r64(const u8* b, const int& e = 0);
-	inline r64(const i8* b, const int& e = 0);
+	inline r64(const u8* b);
+	inline r64(const i8* b);
+	inline r64(const r16* v, const int& e);
+	inline r64(const r32* v, const int& e);
+	inline r64(const u8* b, const int& e);
+	inline r64(const i8* b, const int& e);
 	inline u8c& operator[](const int& i);
 	inline operator u8*() const;
 	inline operator i8*() const;
@@ -191,7 +193,7 @@ const int le = r32(0x01)[sizeof(r32) - 1];
 const int be = r32(0x01)[0];
 inline bool is_le() { return le == 0; } // on a little-endian machine, LE will be 0 and BE will be 1
 inline bool is_be() { return be == 0; } // on a big-endian machine,    LE will be 1 and BE will be 0
-template<typename T> inline T repos(const T& v, const int& i, const int& p) { return ((v >> (i << 3)) & 0xf) << (p << 3); }
+template<typename T> inline T repos(const T& v, const int& i, const int& p) { return ((v >> (i << 3)) & 0xff) << (p << 3); }
 template<typename T> inline T swpos(const T& v, const int& i, const int& p) { return repos(v, i, p) | repos(v, p, i); }
 inline u16 to_le(const u16& v) { return is_le() ? v : swpos(v, 0, 1); }
 inline u32 to_le(const u32& v) { return is_le() ? v : swpos(v, 0, 3) | swpos(v, 1, 2); }
@@ -202,21 +204,21 @@ inline u64 to_be(const u64& v) { return is_be() ? v : swpos(v, 0, 7) | swpos(v, 
 }
 }
 
-inline u8c::u8c(const u32& b) : v(b & 0xff) {}
+inline u8c::u8c(const u32& b) : v(b) {}
 inline u8c::u8c(const u8c& b) : v(b.v) {}
-inline u8c& u8c::operator =(const u32& b) { v = b & 0xff; return *this; }
-inline u8c& u8c::operator -=(const u32& b) { v = (v - (b & 0xff)) & 0xff; return *this; }
-inline u8c& u8c::operator +=(const u32& b) { v = (v + (b & 0xff)) & 0xff; return *this; }
-inline u8c& u8c::operator <<=(const u32& s) { v = (v << s) & 0xff; return *this; }
-inline u8c& u8c::operator >>=(const u32& s) { v = (v >> s) & 0xff; return *this; }
-inline u8c& u8c::operator &=(const u32& b) { v = (v & b) & 0xff; return *this; }
-inline u8c& u8c::operator |=(const u32& b) { v = (v | b) & 0xff; return *this; }
-inline bool u8c::operator ==(const u32& b) const { return v == (b & 0xff); }
-inline bool u8c::operator !=(const u32& b) const { return v != (b & 0xff); }
-inline bool u8c::operator <(const u32& b) const { return v < (b & 0xff); }
-inline bool u8c::operator >(const u32& b) const { return v > (b & 0xff); }
-inline bool u8c::operator <=(const u32& b) const { return v <= (b & 0xff); }
-inline bool u8c::operator >=(const u32& b) const { return v >= (b & 0xff); }
+inline u8c& u8c::operator =(const u32& b) { v = b; return *this; }
+inline u8c& u8c::operator -=(const u32& b) { v -= byte(b); return *this; }
+inline u8c& u8c::operator +=(const u32& b) { v += byte(b); return *this; }
+inline u8c& u8c::operator <<=(const u32& s) { v <<= s; return *this; }
+inline u8c& u8c::operator >>=(const u32& s) { v >>= s; return *this; }
+inline u8c& u8c::operator &=(const u32& b) { v &= byte(b); return *this; }
+inline u8c& u8c::operator |=(const u32& b) { v |= byte(b); return *this; }
+inline bool u8c::operator ==(const u32& b) const { return v == byte(b); }
+inline bool u8c::operator !=(const u32& b) const { return v != byte(b); }
+inline bool u8c::operator <(const u32& b) const { return v < byte(b); }
+inline bool u8c::operator >(const u32& b) const { return v > byte(b); }
+inline bool u8c::operator <=(const u32& b) const { return v <= byte(b); }
+inline bool u8c::operator >=(const u32& b) const { return v >= byte(b); }
 inline bool u8c::operator !() const { return (v & 0xff) == 0; }
 inline u32 u8c::operator +(const u32& b) const { return u32(v) + b; }
 inline u32 u8c::operator -(const u32& b) const { return u32(v) - b; }
@@ -232,8 +234,8 @@ inline u32 u8c::operator --() { return ++v; }
 inline u8c::operator u32() const { return v; }
 inline u8c::operator i32() const { return v; }
 inline u8c::operator bool() const { return (v & 0xff) != 0; }
-inline u8c::operator u8*() const { return (u8*) &v; }
-inline u8c::operator i8*() const { return (i8*) &v; }
+inline u8c::operator u8*() const { return ptr_cast<u8*>(&v); }
+inline u8c::operator i8*() const { return ptr_cast<i8*>(&v); }
 
 inline r16::r16(const u16& v) : v_u16(v) {}
 inline r16::r16(const i16& v) : v_u16(v) {}
@@ -244,6 +246,8 @@ inline r16::r16(const i64& v) : v_u16(v) {}
 inline r16::r16(const r16& v) : v_u16(v) {}
 inline r16::r16(const u8& v)  : v_u16(v) {}
 inline r16::r16(const i8& v)  : v_u16(v) {}
+inline r16::r16(const u8* b)  : v_u16(*ptr_cast<u16*>(b)) {}
+inline r16::r16(const i8* b)  : v_u16(*ptr_cast<u16*>(b)) {}
 inline r16::r16(const u8* b, const int& e) {
 	const int* endian = moporgic::endian::b2endian[e];
 	for (int i = 0; i < 2; i++) v_u8c[i] = b[endian[i]];
@@ -253,8 +257,8 @@ inline r16::r16(const i8* b, const int& e) {
 	for (int i = 0; i < 2; i++) v_u8c[i] = b[endian[i]];
 }
 inline u8c& r16::operator[](const int& i) { return v_u8c[i]; }
-inline r16::operator u8*() const { return (u8*) v_u8; }
-inline r16::operator i8*() const { return (i8*) v_u8; }
+inline r16::operator u8*() const { return ptr_cast<u8*>(v_u8); }
+inline r16::operator i8*() const { return ptr_cast<i8*>(v_u8); }
 inline r16::operator u16() const { return v_u16; }
 inline r16::operator i16() const { return v_u16; }
 inline r16::operator u32() const { return v_u16; }
@@ -277,6 +281,8 @@ inline r32::r32(const f64& v) : v_f32(v) {}
 inline r32::r32(const r32& v) : v_u32(v) {}
 inline r32::r32(const u8& v)  : v_u32(v) {}
 inline r32::r32(const i8& v)  : v_u32(v) {}
+inline r32::r32(const u8* b)  : v_u32(*ptr_cast<u32*>(b)) {}
+inline r32::r32(const i8* b)  : v_u32(*ptr_cast<u32*>(b)) {}
 inline r32::r32(const r16* v, const int& e) {
 	const int* endian = moporgic::endian::b2endian[e];
 	for (int i = 0; i < 2; i++) v_r16[i] = v[endian[i]];
@@ -290,8 +296,8 @@ inline r32::r32(const i8* b, const int& e) {
 	for (int i = 0; i < 4; i++) v_u8c[i] = b[endian[i]];
 }
 inline u8c& r32::operator[](const int& i) { return v_u8c[i]; }
-inline r32::operator u8*() const { return (u8*) v_u8; }
-inline r32::operator i8*() const { return (i8*) v_u8; }
+inline r32::operator u8*() const { return ptr_cast<u8*>(v_u8); }
+inline r32::operator i8*() const { return ptr_cast<i8*>(v_u8); }
 inline r32::operator u32() const { return v_u32; }
 inline r32::operator i32() const { return v_u32; }
 inline r32::operator f32() const { return v_f32; }
@@ -315,6 +321,8 @@ inline r64::r64(const f64& v) : v_f64(v) {}
 inline r64::r64(const r64& v) : v_u64(v) {}
 inline r64::r64(const u8& v)  : v_u64(v) {}
 inline r64::r64(const i8& v)  : v_u64(v) {}
+inline r64::r64(const u8* b)  : v_u64(*ptr_cast<u64*>(b)) {}
+inline r64::r64(const i8* b)  : v_u64(*ptr_cast<u64*>(b)) {}
 inline r64::r64(const r16* v, const int& e) {
 	const int* endian = moporgic::endian::b4endian[e];
 	for (int i = 0; i < 4; i++) v_r16[i] = v[endian[i]];
@@ -332,8 +340,8 @@ inline r64::r64(const i8* b, const int& e) {
 	for (int i = 0; i < 8; i++) v_u8c[i] = b[endian[i]];
 }
 inline u8c& r64::operator[](const int& i) { return v_u8c[i]; }
-inline r64::operator u8*() const { return (u8*) v_u8; }
-inline r64::operator i8*() const { return (i8*) v_u8; }
+inline r64::operator u8*() const { return ptr_cast<u8*>(v_u8); }
+inline r64::operator i8*() const { return ptr_cast<i8*>(v_u8); }
 inline r64::operator u64() const { return v_u64; }
 inline r64::operator i64() const { return v_u64; }
 inline r64::operator f64() const { return v_f64; }
