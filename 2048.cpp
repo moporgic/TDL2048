@@ -374,12 +374,10 @@ struct state {
 	void operator >>(std::ostream& out) const {
 		move >> out;
 		moporgic::write(out, score);
-		moporgic::write(out, esti);
 	}
 	void operator <<(std::istream& in) {
 		move << in;
 		moporgic::read(in, score);
-		moporgic::read(in, esti);
 	}
 };
 struct select {
@@ -431,13 +429,15 @@ struct statistic {
 		u64 opers;
 		u32 max;
 		u32 hash;
-	} total = {}, local = {};
+	} total, local;
 
 	void init(const u64& max, const u64& chk = 1000) {
 		limit = max * chk;
 		loop = 1;
 		check = chk;
 
+		total = {};
+		local = {};
 		local.time = moporgic::millisec();
 	}
 	u64 operator++(int) { return (++loop) - 1; }
@@ -762,6 +762,9 @@ int main(int argc, const char* argv[]) {
 	std::vector<state> path;
 	path.reserve(5000);
 
+	std::ofstream pout;
+	pout.open("C:\\tdl2048-16k.path", std::ios::out | std::ios::binary | std::ios::app);
+
 	for (stats.init(train); stats; stats++) {
 
 		u32 score = 0;
@@ -774,12 +777,24 @@ int main(int argc, const char* argv[]) {
 			best >> b;
 		}
 
-		for (numeric v = 0; path.size(); path.pop_back()) {
-			v = (path.back() += v);
+		if (b.hash() >= 16384) {
+			u32 size = path.size();
+			moporgic::write(pout, size);
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				path.back() >> pout;
+				v = (path.back() += v);
+			}
+		} else {
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				v = (path.back() += v);
+			}
 		}
 
 		stats.update(score, b.hash(), opers);
 	}
+
+	pout.flush();
+	pout.close();
 
 	weight::save(weightout);
 	feature::save(featureout);
