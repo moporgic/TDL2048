@@ -171,10 +171,15 @@ public:
 		cache()[sign] = weights().back();
 		return weights().back();
 	}
-	static weight at(const u32& sign) { return cache().at(sign); }
+	static inline weight at(const u32& sign) { return cache().at(sign); }
 	typedef std::vector<weight>::iterator iter;
-	static iter begin() { return weights().begin(); }
-	static iter end() { return weights().end(); }
+	static inline iter begin() { return weights().begin(); }
+	static inline iter end() { return weights().end(); }
+	static inline iter find(const u32& sign) {
+		for (auto it = begin(); it != end(); it++)
+			if (it->signature() == sign) return it;
+		return end();
+	}
 private:
 	weight(const u32& sign, const u64& size)
 			: sign(sign), value(new numeric[size]()), size(size) {}
@@ -201,11 +206,15 @@ public:
 		cache()[sign] = indexers().back();
 		return indexers().back();
 	}
-	static indexer at(const u32& sign) { return cache().at(sign); }
+	static inline indexer at(const u32& sign) { return cache().at(sign); }
 	typedef std::vector<indexer>::iterator iter;
 	static inline iter begin() { return indexers().begin(); }
 	static inline iter end() { return indexers().end(); }
-	static inline u64 size() { return indexers().size(); }
+	static inline iter find(const u32& sign) {
+		for (auto it = begin(); it != end(); it++)
+			if (it->signature() == sign) return it;
+		return end();
+	}
 private:
 	indexer(const u32& sign, mapper map) : sign(sign), map(map) {}
 	static inline std::map<u32, indexer>& cache() { static std::map<u32, indexer> c; return c; }
@@ -322,7 +331,11 @@ public:
 	typedef std::vector<feature>::iterator iter;
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end() { return feats().end(); }
-	static inline u64 size() { return feats().size(); }
+	static inline iter find(const u32& wgt, const u32& idx) {
+		for (auto it = begin(); it != end(); it++)
+			if (weight(*it).signature() == wgt && indexer(*it).signature() == idx) return it;
+		return end();
+	}
 
 private:
 	feature(const weight& value, const indexer& index) : index(index), value(value) {}
