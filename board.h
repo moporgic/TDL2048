@@ -410,14 +410,25 @@ public:
 		return board::lookup(fetch(r));
 	}
 
-	inline void operator >>(std::ostream& out) const {
+	inline void operator >>(std::ostream& out) const { write(out); }
+	inline void operator <<(std::istream& in) { read(in); }
+	inline void write(std::ostream& out) const { write64(out); }
+	inline void read(std::istream& in) { read64(in); }
+
+	inline void write64(std::ostream& out) const {
 		moporgic::write(out, raw);
-//		moporgic::write(out, ext);
+	}
+	inline void write80(std::ostream& out) const {
+		write64(out);
+		moporgic::write(out, raw_cast<u16>(ext, 1));
 	}
 
-	inline void operator <<(std::istream& in) {
+	inline void read64(std::istream& in) {
 		moporgic::read(in, raw);
-//		moporgic::read(in, ext);
+	}
+	inline void read80(std::istream& in) {
+		read64(in);
+		moporgic::read(in, raw_cast<u16>(ext, 1));
 	}
 
 	void print(const bool& raw = true, std::ostream& out = std::cout) const {
