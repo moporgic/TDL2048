@@ -399,6 +399,16 @@ public:
 		return board::lookup(fetch(r));
 	}
 
+	inline void operator >>(std::ostream& out) const {
+		moporgic::write(out, raw);
+		moporgic::write(out, ext);
+	}
+
+	inline void operator <<(std::istream& in) {
+		moporgic::read(in, raw);
+		moporgic::read(in, ext);
+	}
+
 	static void print(const board& b, const bool& fib = false) {
 		static u32 T[16];
 		bool width = false;
