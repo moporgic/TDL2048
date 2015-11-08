@@ -62,7 +62,7 @@ public:
 		tiles<u64> layout; // layout of board-type
 	private:
 		~cache() {}
-		cache() : rowraw(0), rowext(0), maxtile(0), merged(0), count(), mask() {}
+		cache() : rowraw(0), rowext(0), maxtile(0), merged(0), left(), right(), count(), mask(), layout() {}
 		cache(const u32& r) : count(), mask() {
 			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
 
@@ -73,13 +73,6 @@ public:
 
 			assign(L, Ll, Lh, rowraw, rowext);
 			maxtile = (1 << *std::max_element(V, V + 4)) & 0xfffffffeU;
-			for (int i = 0; i < 4; i++) {
-				count[V[i]]++;
-				mask[V[i]] |= (1 << i);
-			}
-			for (int i = 0; i < 16; i++) {
-				if ((r >> i) & 1) layout.tile |= (u64(i) << ((layout.size++) << 2));
-			}
 
 			mvleft(L, left.score, merged);
 			u32 mvL = assign(L, Ll, Lh, left.moveHraw, left.moveHext);
@@ -92,6 +85,14 @@ public:
 			std::reverse(Rl, Rl + 4); std::reverse(Rh, Rh + 4);
 			right.moved = mvR == r ? -1 : 0;
 			map(right.moveVraw, right.moveVext, Rl, Rh, 12, 8, 4, 0);
+
+			for (int i = 0; i < 4; i++) {
+				count[V[i]]++;
+				mask[V[i]] |= (1 << i);
+			}
+			for (int i = 0; i < 16; i++) {
+				if ((r >> i) & 1) layout.tile |= (u64(i) << ((layout.size++) << 2));
+			}
 		}
 
 		u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
