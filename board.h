@@ -195,6 +195,7 @@ public:
 
 	inline u32 fetch(const u32& i) const { return fetch16(i); }
 	inline u32 at(const u32& i) const { return at4(i); }
+	inline u32 exact(const u32& i) const { return (1 << at(i)) & 0xfffffffe; }
 	inline void set(const u32& i, const u32& t) { set4(i, t); }
 	inline void mirror() { mirror64(); }
 	inline void flip() { flip64(); }
@@ -409,23 +410,21 @@ public:
 		moporgic::read(in, ext);
 	}
 
-	static void print(const board& b, const bool& fib = false) {
-		static u32 T[16];
-		bool width = false;
-		for (int i = 0; i < 16; i++) {
-			u32 t = b.at(i);
-			T[i] = fib ? ((1 << t) & 0xfffffffeUL) : t;
-			width |= T[i] >= 10000;
-		}
-		const char* format = (width) ? "|%8d%8d%8d%8d|" : "|%4d%4d%4d%4d|";
-		const char* edge = (width) ? "+--------------------------------+" : "+----------------+";
+	void print(const bool& raw = true, std::ostream& out = std::cout) const {
+		const char* format = raw ? "|%4d%4d%4d%4d|" : "|%6d%6d%6d%6d|";
+		const char* edge = raw ? "+----------------+" : "+------------------------+";
+		auto get = raw ? &board::at : &board::exact;
 		static char buff[40];
-		std::cout << edge << std::endl;
-		for (u32 *t = T; t < T + 16; t += 4) {
-			std::snprintf(buff, sizeof(buff), format, t[0], t[1], t[2], t[3]);
-			std::cout << buff << std::endl;
+		out << edge << std::endl;
+		for (int i = 0; i < 16; i += 4) {
+			u32 t0 = (this->*get)(i + 0);
+			u32 t1 = (this->*get)(i + 1);
+			u32 t2 = (this->*get)(i + 2);
+			u32 t3 = (this->*get)(i + 3);
+			std::snprintf(buff, sizeof(buff), format, t0, t1, t2, t3);
+			out << buff << std::endl;
 		}
-		std::cout << edge << std::endl;
+		out << edge << std::endl;
 	}
 };
 
