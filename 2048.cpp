@@ -171,7 +171,7 @@ public:
 		cache()[sign] = weights().back();
 		return weights().back();
 	}
-	static weight find(const u32& sign) { return cache().at(sign); }
+	static weight at(const u32& sign) { return cache().at(sign); }
 	typedef std::vector<weight>::iterator iter;
 	static iter begin() { return weights().begin(); }
 	static iter end() { return weights().end(); }
@@ -201,7 +201,7 @@ public:
 		cache()[sign] = indexers().back();
 		return indexers().back();
 	}
-	static indexer find(const u32& sign) { return cache().at(sign); }
+	static indexer at(const u32& sign) { return cache().at(sign); }
 	typedef std::vector<indexer>::iterator iter;
 	static inline iter begin() { return indexers().begin(); }
 	static inline iter end() { return indexers().end(); }
@@ -255,8 +255,8 @@ public:
 		const int LE = moporgic::endian::le;
 		switch (*load(1)) {
 		case 0:
-			index = indexer::find(r32(load(4), LE));
-			value = weight::find(r32(load(4), LE));
+			index = indexer::at(r32(load(4), LE));
+			value = weight::at(r32(load(4), LE));
 			break;
 		default:
 			break;
@@ -314,8 +314,8 @@ public:
 		return true;
 	}
 
-	static feature make(const u32& wgt, const u32& idx) {
-		feats().push_back(feature(weight::find(wgt), indexer::find(idx)));
+	static feature make(const u32& wgt, const u32& idx) { // TODO at?
+		feats().push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
 
@@ -341,6 +341,10 @@ struct state {
 	state(i32 (board::*oper)()) : oper(oper), score(-1), esti(0) {}
 	state(const state& s) = default;
 
+	inline void assign(const board& b) {
+		move = b;
+		score = (move.*oper)();
+	}
 	inline void estimate(feature::iter begin, feature::iter end) {
 		if (score >= 0) {
 			esti = score;
@@ -349,10 +353,6 @@ struct state {
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
-	}
-	inline void assign(const board& b) {
-		move = b;
-		score = (move.*oper)();
 	}
 	inline numeric update(const numeric& v, feature::iter begin, feature::iter end) {
 		const numeric upd = alpha * (v - (esti - score));
