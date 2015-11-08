@@ -341,9 +341,7 @@ struct state {
 	state(i32 (board::*oper)()) : oper(oper), score(-1), esti(0) {}
 	state(const state& s) = default;
 
-	inline void assign(const board& b, feature::iter begin, feature::iter end) {
-		move = b;
-		score = (move.*oper)();
+	inline void estimate(feature::iter begin, feature::iter end) {
 		if (score >= 0) {
 			esti = score;
 			for (auto f = begin; f != end; f++)
@@ -351,6 +349,10 @@ struct state {
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
+	}
+	inline void assign(const board& b) {
+		move = b;
+		score = (move.*oper)();
 	}
 	inline numeric update(const numeric& v, feature::iter begin, feature::iter end) {
 		const numeric upd = alpha * (v - (esti - score));
@@ -361,7 +363,8 @@ struct state {
 	}
 
 	inline void operator <<(const board& b) {
-		assign(b, feature::begin(), feature::end());
+		assign(b);
+		estimate(feature::begin(), feature::end());
 	}
 	inline numeric operator +=(const numeric& v) {
 		return update(v, feature::begin(), feature::end());
