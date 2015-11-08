@@ -3,7 +3,6 @@
 #include "moporgic/util.h"
 #include <algorithm>
 #include <iostream>
-#include <vector>
 #include <array>
 
 namespace moporgic {
@@ -26,42 +25,40 @@ public:
 		friend class board;
 		friend class cache;
 		public:
-			const u32 moveHraw; // horizontal move (16-bit raw)
-			const u32 moveHext; // horizontal move (4-bit extra)
-			const u64 moveVraw; // vertical move (64-bit raw)
-			const u32 moveVext; // vertical move (16-bit extra)
+			const u32 rawh; // horizontal move (16-bit raw)
+			const u32 exth; // horizontal move (4-bit extra)
+			const u64 rawv; // vertical move (64-bit raw)
+			const u32 extv; // vertical move (16-bit extra)
 			const u32 score; // merge score
 			const i32 moved; // moved or not (moved: 0, otherwise -1)
 
-			inline void moveH(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { moveH64(raw, ext, sc, mv, i); }
-			inline void moveV(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { moveV64(raw, ext, sc, mv, i); }
+			inline void moveh(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { moveh64(raw, ext, sc, mv, i); }
+			inline void movev(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { movev64(raw, ext, sc, mv, i); }
 
-			inline void moveH64(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
-				raw |= u64(moveHraw) << (i << 4);
+			inline void moveh64(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
+				raw |= u64(rawh) << (i << 4);
 				sc += score;
 				mv &= moved;
 			}
-			inline void moveH80(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
-				moveH64(raw, ext, sc, mv, i);
-				ext |= moveHext << (i << 2);
+			inline void moveh80(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
+				moveh64(raw, ext, sc, mv, i);
+				ext |= exth << (i << 2);
 			}
-			inline void moveV64(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
-				raw |= moveVraw << (i << 2);
+			inline void movev64(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
+				raw |= rawv << (i << 2);
 				sc += score;
 				mv &= moved;
 			}
-			inline void moveV80(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
-				moveV64(raw, ext, sc, mv, i);
-				ext |= moveVext << i;
+			inline void movev80(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
+				movev64(raw, ext, sc, mv, i);
+				ext |= extv << i;
 			}
 			operation(const operation& op) = default;
 			operation() = delete;
 			~operation() = default;
 		private:
-			operation(u32 moveHraw, u32 moveHext, u64 moveVraw, u32 moveVext, u32 score, i32 moved)
-				: moveHraw(moveHraw), moveHext(moveHext),
-				  moveVraw(moveVraw), moveVext(moveVext),
-				  score(score), moved(moved) {}
+			operation(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved)
+				: rawh(rawh), exth(exth), rawv(rawv), extv(extv), score(score), moved(moved) {}
 		};
 		typedef std::array<u16, 32> info;
 		const u32 raw; // base row (16-bit raw)
@@ -301,10 +298,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.moveH(rawn, extn, score, moved, 0);
-		query(1).left.moveH(rawn, extn, score, moved, 1);
-		query(2).left.moveH(rawn, extn, score, moved, 2);
-		query(3).left.moveH(rawn, extn, score, moved, 3);
+		query(0).left.moveh(rawn, extn, score, moved, 0);
+		query(1).left.moveh(rawn, extn, score, moved, 1);
+		query(2).left.moveh(rawn, extn, score, moved, 2);
+		query(3).left.moveh(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -314,10 +311,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.moveH(rawn, extn, score, moved, 0);
-		query(1).right.moveH(rawn, extn, score, moved, 1);
-		query(2).right.moveH(rawn, extn, score, moved, 2);
-		query(3).right.moveH(rawn, extn, score, moved, 3);
+		query(0).right.moveh(rawn, extn, score, moved, 0);
+		query(1).right.moveh(rawn, extn, score, moved, 1);
+		query(2).right.moveh(rawn, extn, score, moved, 2);
+		query(3).right.moveh(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -328,10 +325,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.moveV(rawn, extn, score, moved, 0);
-		query(1).left.moveV(rawn, extn, score, moved, 1);
-		query(2).left.moveV(rawn, extn, score, moved, 2);
-		query(3).left.moveV(rawn, extn, score, moved, 3);
+		query(0).left.movev(rawn, extn, score, moved, 0);
+		query(1).left.movev(rawn, extn, score, moved, 1);
+		query(2).left.movev(rawn, extn, score, moved, 2);
+		query(3).left.movev(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -342,10 +339,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.moveV(rawn, extn, score, moved, 0);
-		query(1).right.moveV(rawn, extn, score, moved, 1);
-		query(2).right.moveV(rawn, extn, score, moved, 2);
-		query(3).right.moveV(rawn, extn, score, moved, 3);
+		query(0).right.movev(rawn, extn, score, moved, 0);
+		query(1).right.movev(rawn, extn, score, moved, 1);
+		query(2).right.movev(rawn, extn, score, moved, 2);
+		query(3).right.movev(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
