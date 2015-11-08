@@ -194,6 +194,7 @@ public:
 public:
 	board(const u64& raw = 0) : raw(raw), rawc(0), ext(0), extc(0) {}
 	board(const u64& raw, const u32& ext) : raw(raw), rawc(0), ext(ext), extc(0) {}
+	board(const u64& raw, const u16& ext) : board(raw, u32(ext) << 16) {}
 	board(const board& b) = default;
 	~board() = default;
 	inline board& operator =(const u64& raw) { this->raw = raw; return *this; }
