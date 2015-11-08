@@ -179,6 +179,16 @@ load_t make_load(std::istream& in, char* buf, int on_fail = 0x3) {
 
 #endif
 
+template<typename type> inline
+std::ostream& write(std::ostream& out, type& v) {
+	return out.write(reinterpret_cast<char*>(&v), sizeof(v));
+}
+
+template<typename type> inline
+std::istream& read(std::istream& in, type& v) {
+	return in.read(reinterpret_cast<char*>(&v), sizeof(v));
+}
+
 #ifdef MOPORGIC_MACRO
 #define postusp(v)	moporgic::postu(v); putsp();
 #define postlusp(v)	moporgic::postlu(v); putsp();
