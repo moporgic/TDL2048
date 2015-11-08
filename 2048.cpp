@@ -777,17 +777,11 @@ int main(int argc, const char* argv[]) {
 			best >> b;
 		}
 
-		if (b.hash() >= 16384) {
-			u32 size = path.size();
-			moporgic::write(pout, size);
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				path.back() >> pout;
-				v = (path.back() += v);
-			}
-		} else {
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				v = (path.back() += v);
-			}
+		moporgic::write(pout, u32(b.hash()));
+		moporgic::write(pout, u32(path.size()));
+		for (numeric v = 0; path.size(); path.pop_back()) {
+			path.back() >> pout;
+			v = (path.back() += v);
 		}
 
 		stats.update(score, b.hash(), opers);
