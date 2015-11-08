@@ -2,10 +2,8 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include <algorithm>
-#include <functional>
-#include <vector>
 #include <iostream>
-#include <cstdio>
+#include <vector>
 #include <array>
 
 namespace moporgic {
@@ -405,13 +403,6 @@ public:
 			std::cout << buff << std::endl;
 		}
 		std::cout << edge << std::endl;
-	}
-	static std::vector<std::function<i32(void)>> moves(board& b) {
-		static i32 (board::*oper[])() = {&board::up, &board::right, &board::down, &board::left};
-		std::vector<std::function<i32(void)>> opers = {
-				std::bind(oper[0], &b), std::bind(oper[1], &b),
-				std::bind(oper[2], &b), std::bind(oper[3], &b)};
-		return opers;
 	}
 };
 board::cache board::look[1 << 20](board::cache::make(seq32_static()));
