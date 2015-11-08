@@ -1,6 +1,14 @@
 #pragma once
+//============================================================================
+// Name        : board.h
+// Author      : Hung Guei
+// Version     : 2.4
+// Description : bitboard of 2048
+//============================================================================
 #include "moporgic/type.h"
 #include "moporgic/util.h"
+#include "moporgic/io.h"
+#include <cstdio>
 #include <algorithm>
 #include <iostream>
 #include <array>
@@ -185,7 +193,9 @@ public:
 
 public:
 	board(const u64& raw = 0) : raw(raw), rawc(0), ext(0), extc(0) {}
-	board(const board& b) : raw(b.raw), rawc(b.rawc), ext(b.ext), extc(b.extc) {}
+	board(const u64& raw, const u32& ext) : raw(raw), rawc(0), ext(ext), extc(0) {}
+	board(const board& b) = default;
+	~board() = default;
 	inline board& operator =(const u64& raw) { this->raw = raw; return *this; }
 	inline board& operator =(const board& b) { raw = b.raw, ext = b.ext; rawc = b.rawc, extc = b.extc; return *this; }
 	inline bool operator==(const board& b) const { return raw == b.raw && ext == b.ext; }
