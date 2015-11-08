@@ -53,7 +53,7 @@ public:
 		};
 		u32 rowraw; // base row (16-bit raw)
 		u32 rowext; // base row (4-bit extra)
-		u32 maxtile; // max tile
+		u32 hash; // hash of this row
 		u32 merged; // number of merged tiles
 		oper left; // left operation
 		oper right; // right operation
@@ -62,7 +62,7 @@ public:
 		tiles<u64> layout; // layout of board-type
 	private:
 		~cache() {}
-		cache() : rowraw(0), rowext(0), maxtile(0), merged(0), left(), right(), count(), mask(), layout() {}
+		cache() : rowraw(0), rowext(0), hash(0), merged(0), left(), right(), count(), mask(), layout() {}
 		cache(const u32& r) : count(), mask() {
 			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
 
@@ -72,7 +72,6 @@ public:
 			u32 R[4] = { V[3], V[2], V[1], V[0] }, Rl[4], Rh[4]; // mirrored
 
 			assign(L, Ll, Lh, rowraw, rowext);
-			maxtile = (1 << *std::max_element(V, V + 4)) & 0xfffffffeU;
 
 			mvleft(L, left.score, merged);
 			u32 mvL = assign(L, Ll, Lh, left.moveHraw, left.moveHext);
@@ -86,7 +85,9 @@ public:
 			right.moved = mvR == r ? -1 : 0;
 			map(right.moveVraw, right.moveVext, Rl, Rh, 12, 8, 4, 0);
 
+			hash = 0;
 			for (int i = 0; i < 4; i++) {
+				hash |= (1 << V[i]) & 0xfffffffeU;
 				count[V[i]]++;
 				mask[V[i]] |= (1 << i);
 			}
@@ -316,8 +317,11 @@ public:
 		ext = extc;
 	}
 
+	inline u32 hash() const {
+		return lookup(0).hash | lookup(1).hash | lookup(2).hash | lookup(3).hash;
+	}
 	inline u32 max() const {
-		return math::log2(lookup(0).maxtile | lookup(1).maxtile | lookup(2).maxtile | lookup(3).maxtile);
+		return math::log2(hash());
 	}
 
 	inline u32 count(const u32& t) const {
