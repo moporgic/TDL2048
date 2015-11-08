@@ -388,19 +388,16 @@ struct select {
 		move[2] = state(&board::down);
 		move[3] = state(&board::left);
 	}
-	inline select& operator <<(state move[]) {
-		best = move;
-		if (move[1] > *best) best = move + 1;
-		if (move[2] > *best) best = move + 2;
-		if (move[3] > *best) best = move + 3;
-		return *this;
-	}
 	inline select& operator <<(const board& b) {
 		move[0] << b;
 		move[1] << b;
 		move[2] << b;
 		move[3] << b;
-		return operator <<(move);
+		best = move;
+		if (move[1] > *best) best = move + 1;
+		if (move[2] > *best) best = move + 2;
+		if (move[3] > *best) best = move + 3;
+		return *this;
 	}
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(board& b) const { *best >> b; }
