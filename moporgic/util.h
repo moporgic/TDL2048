@@ -49,6 +49,15 @@ uint64_t mspass(std::vector<uint64_t>& stk) {
 	return elapsed;
 }
 
+const uint32_t seq32_static(const int& i = 0) {
+	static uint32_t seq[8] = {};
+	return seq[i]++;
+}
+const uint64_t seq64_static(const int& i = 0) {
+	static uint64_t seq[8] = {};
+	return seq[i]++;
+}
+
 __constexpr
 uint32_t to_hash_tail(const char* str, const uint32_t& hash) noexcept {
 	if (*str) return to_hash_tail(str + 1, (hash << 5) - hash + (*str));
@@ -59,7 +68,8 @@ uint32_t to_hash(const char* str) noexcept {
 	return to_hash_tail(str, 0); // i' = 31 * i + c
 }
 
-inline uint32_t to_hash(const std::string& str) noexcept {
+inline
+uint32_t to_hash(const std::string& str) noexcept {
 	return to_hash(str.c_str());
 }
 

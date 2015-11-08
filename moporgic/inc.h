@@ -11,6 +11,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <cstring>
 #include <vector>
 #include <stack>
 #include <queue>
@@ -37,3 +38,5 @@
 #include <numeric>
 #include <limits>
 #include <cstddef>
+#include <clocale>
+#include <cwchar>

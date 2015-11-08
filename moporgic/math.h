@@ -27,7 +27,8 @@ namespace math {
  * Bit Reversal
  * Reversing the bits in an integer x is somewhat painful, but here's a SWAR algorithm for a 32-bit value
  */
-inline unsigned int reverse(register unsigned int x) {
+static inline __constexpr
+unsigned int reverse(register unsigned int x) {
 	x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1));
 	x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2));
 	x = (((x & 0xf0f0f0f0) >> 4) | ((x & 0x0f0f0f0f) << 4));
@@ -38,7 +39,8 @@ inline unsigned int reverse(register unsigned int x) {
  * Bit Reversal (re-write Bit Reversal algorithm to use 4 instead of 8 constants)
  * Reversing the bits in an integer x is somewhat painful, but here's a SWAR algorithm for a 32-bit value
  */
-inline unsigned int reverse_v2(register unsigned int x) {
+static inline __constexpr
+unsigned int reverse_v2(register unsigned int x) {
 	register unsigned int y = 0x55555555;
 	x = (((x >> 1) & y) | ((x & y) << 1));
 	y = 0x33333333;
@@ -53,7 +55,7 @@ inline unsigned int reverse_v2(register unsigned int x) {
  * Is Power of 2
  * A non-negative binary integer value x is a power of 2 iff (x&(x-1)) is 0 using 2's complement arithmetic.
  */
-inline
+static inline __constexpr
 bool ispw2(register unsigned int x) {
 	return (x & (x - 1)) == 0;
 }
@@ -67,13 +69,21 @@ bool ispw2(register unsigned int x) {
  * The following code uses a variable-precision SWAR algorithm to perform a tree
  * reduction adding the bits in a 32-bit value:
  */
-inline unsigned int ones32(register unsigned int x) {
+static inline __constexpr
+unsigned int ones32(register unsigned int x) {
 	x -= ((x >> 1) & 0x55555555);
 	x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
 	x = (((x >> 4) + x) & 0x0f0f0f0f);
 	x += (x >> 8);
 	x += (x >> 16);
 	return (x & 0x0000003f);
+}
+
+static inline __constexpr
+unsigned int ones64(register unsigned long long x) {
+	x = (x & 0x5555555555555555ull) + ((x >> 1) & 0x5555555555555555ull);
+	x = (x & 0x3333333333333333ull) + ((x >> 2) & 0x3333333333333333ull);
+	return (((x + (x >> 4)) & 0x0f0f0f0f0f0f0f0full) * 0x0101010101010101ull) >> 56;
 }
 
 /**
@@ -83,7 +93,7 @@ inline unsigned int ones32(register unsigned int x) {
  * floor of base 2 log of x is (WORDBITS-lzc(x)). In any case, this operation has found its way
  * into quite a few algorithms, so it is useful to have an efficient implementation:
  */
-inline
+static inline __constexpr
 unsigned int lzc(register unsigned int x) {
 	x |= (x >> 1);
 	x |= (x >> 2);
@@ -104,7 +114,7 @@ unsigned int lzc(register unsigned int x) {
  * the least significant 1 bit is also (x^(x&(x-1))).
  *
  */
-inline
+static inline __constexpr
 unsigned int lsb32(register unsigned int x) {
 	return (x ^ (x & (x - 1)));
 }
@@ -117,7 +127,7 @@ unsigned int lsb32(register unsigned int x) {
  * the same most significant 1 as x, but all 1's below it. Bitwise AND of the original value with
  * the complement of the "folded" value shifted down by one yields the most significant bit. For a 32-bit value:
  */
-inline
+static inline __constexpr
 unsigned int msb32(register unsigned int x) {
 	x |= (x >> 1);
 	x |= (x >> 2);
@@ -139,7 +149,7 @@ unsigned int msb32(register unsigned int x) {
  * if LOG0UNDEFINED, this code returns -1 for log2(0); otherwise, it returns 0 for log2(0). For a 32-bit value:
  *
  */
-inline
+static inline __constexpr
 unsigned int log2(register unsigned int x) {
 	x |= (x >> 1);
 	x |= (x >> 2);
@@ -153,6 +163,11 @@ unsigned int log2(register unsigned int x) {
 #endif
 }
 
+static inline __constexpr
+unsigned int lg(register unsigned int x) {
+	return log2(x);
+}
+
 /**
  * Log2 of an Integer
  * Suppose instead that you want the ceiling of the base 2 log.
@@ -161,7 +176,7 @@ unsigned int log2(register unsigned int x) {
  * followed with the comparison-to-mask shift used in integer minimum/maximum.
  * The result is:
  */
-inline
+static inline __constexpr
 unsigned int log2_unstable(register unsigned int x) {
 	register int y = (x & (x - 1));
 
@@ -186,7 +201,7 @@ unsigned int log2_unstable(register unsigned int x) {
  *  This process yields a bit vector with the same most significant 1 as x, but all 1's below it.
  *  Adding 1 to that value yields the next largest power of 2. For a 32-bit value:
  */
-inline
+static inline __constexpr
 unsigned int nlpo2(register unsigned int x) {
 	x |= (x >> 1);
 	x |= (x >> 2);
@@ -200,7 +215,7 @@ unsigned int nlpo2(register unsigned int x) {
  * Swap without temporary
  */
 template<typename T>
-inline
+static inline
 void swap(T& x, T& y) {
 	x ^= y; /* x' = (x^y) */
 	y ^= x; /* y' = (y^(x^y)) = x */
@@ -211,7 +226,7 @@ void swap(T& x, T& y) {
  * Swap without temporary
  */
 template<typename T>
-inline
+static inline
 void swap_v2(T& x, T& y) {
 	x += y; /* x' = (x+y) */
 	y = x - y; /* y' = (x+y)-y = x */
@@ -223,7 +238,7 @@ void swap_v2(T& x, T& y) {
  * Given the Least Significant 1 Bit and Population Count (Ones Count) algorithms,
  * it is trivial to combine them to construct a trailing zero count (as pointed-out by Joe Bowbeer):
  */
-inline
+static inline __constexpr
 unsigned int tzc(register int x) {
 	return (ones32((x & -x) - 1));
 }
