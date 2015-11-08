@@ -297,10 +297,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		lookup(0).left.moveH(rawn, extn, score, moved, 0);
-		lookup(1).left.moveH(rawn, extn, score, moved, 1);
-		lookup(2).left.moveH(rawn, extn, score, moved, 2);
-		lookup(3).left.moveH(rawn, extn, score, moved, 3);
+		query(0).left.moveH(rawn, extn, score, moved, 0);
+		query(1).left.moveH(rawn, extn, score, moved, 1);
+		query(2).left.moveH(rawn, extn, score, moved, 2);
+		query(3).left.moveH(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -310,10 +310,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		lookup(0).right.moveH(rawn, extn, score, moved, 0);
-		lookup(1).right.moveH(rawn, extn, score, moved, 1);
-		lookup(2).right.moveH(rawn, extn, score, moved, 2);
-		lookup(3).right.moveH(rawn, extn, score, moved, 3);
+		query(0).right.moveH(rawn, extn, score, moved, 0);
+		query(1).right.moveH(rawn, extn, score, moved, 1);
+		query(2).right.moveH(rawn, extn, score, moved, 2);
+		query(3).right.moveH(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -324,10 +324,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		lookup(0).left.moveV(rawn, extn, score, moved, 0);
-		lookup(1).left.moveV(rawn, extn, score, moved, 1);
-		lookup(2).left.moveV(rawn, extn, score, moved, 2);
-		lookup(3).left.moveV(rawn, extn, score, moved, 3);
+		query(0).left.moveV(rawn, extn, score, moved, 0);
+		query(1).left.moveV(rawn, extn, score, moved, 1);
+		query(2).left.moveV(rawn, extn, score, moved, 2);
+		query(3).left.moveV(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -338,10 +338,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		lookup(0).right.moveV(rawn, extn, score, moved, 0);
-		lookup(1).right.moveV(rawn, extn, score, moved, 1);
-		lookup(2).right.moveV(rawn, extn, score, moved, 2);
-		lookup(3).right.moveV(rawn, extn, score, moved, 3);
+		query(0).right.moveV(rawn, extn, score, moved, 0);
+		query(1).right.moveV(rawn, extn, score, moved, 1);
+		query(2).right.moveV(rawn, extn, score, moved, 2);
+		query(3).right.moveV(rawn, extn, score, moved, 3);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -357,33 +357,38 @@ public:
 	}
 
 	inline u32 hash() const {
-		return lookup(0).hash | lookup(1).hash | lookup(2).hash | lookup(3).hash;
+		return query(0).hash | query(1).hash | query(2).hash | query(3).hash;
 	}
 	inline u32 max() const {
 		return math::log2(hash());
 	}
 
 	inline u32 count(const u32& t) const {
-		return lookup(0).count[t] + lookup(1).count[t] + lookup(2).count[t] + lookup(3).count[t];
+		return query(0).count[t] + query(1).count[t] + query(2).count[t] + query(3).count[t];
 	}
 	inline void count(u16 num[32], const u32& min = 0, const u32& max = 32) const {
-		const cache::info& count0 = lookup(0).count;
-		const cache::info& count1 = lookup(1).count;
-		const cache::info& count2 = lookup(2).count;
-		const cache::info& count3 = lookup(3).count;
+		const cache::info& count0 = query(0).count;
+		const cache::info& count1 = query(1).count;
+		const cache::info& count2 = query(2).count;
+		const cache::info& count3 = query(3).count;
 		for (u32 i = min; i < max; i++) {
 			num[i] = count0[i] + count1[i] + count2[i] + count3[i];
 		}
 	}
 
 	inline tiles<u64> find(const u32& t) const {
-		u32 mask = (lookup(0).mask[t] << 0) | (lookup(1).mask[t] << 4)
-				 | (lookup(2).mask[t] << 8) | (lookup(3).mask[t] << 12);
+		u32 mask = (query(0).mask[t] << 0) | (query(1).mask[t] << 4)
+				 | (query(2).mask[t] << 8) | (query(3).mask[t] << 12);
 		return look[mask].pos;
 	}
 
-	inline cache& lookup(const u32& r) const {
+	inline const cache& query(const u32& r) const {
 		return board::look[fetch(r)];
+	}
+
+	inline static const cache& LUT(const u32& i) const {
+		static cache caches[1 << 20](cache::make(seq32_static()));
+		return caches[i];
 	}
 
 	static void print(const board& b, const bool& fib = false) {
