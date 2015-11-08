@@ -485,18 +485,20 @@ int main(int argc, const char* argv[]) {
 //	randinit();
 //	board bb;	bb.init();
 //	for (int i = 0; i < 16; i++) bb.set(i, rand() % 22);
-//	time_t start = moporgic::millisec();
-//	for (int i = 0; i < 10000000; i++) {
-////		bb.rotate(rand() % 4);
-////		if (!bb.next()) bb.init();
-//		bb.set(rand() % 16, rand() % 22);
-//	}
-//	std::cout << (moporgic::millisec() - start) ;
+////	time_t start = moporgic::millisec();
+////	for (int i = 0; i < 10000000; i++) {
+//////		bb.rotate(rand() % 4);
+//////		if (!bb.next()) bb.init();
+////		bb.set(rand() % 16, rand() % 22);
+////	}
+////	std::cout << (moporgic::millisec() - start) ;
 //	board::print(bb);
 //	for (int i = 0; i < 16; i++) {
-//		std::cout << i << "\t" << bb.find(i).size << std::endl;
+//		std::cout << bb.at(i) << "\t";
+////		printf("%d:%d:%08x", i, bb.count(i), bb.mask(i));
+////		std::cout << std::endl;
 //	}
-//	std::cout << bb.max() << std::endl;
+////	std::cout << bb.max() << std::endl;
 //	return 0;
 
 	u32 train = 100;
