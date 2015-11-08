@@ -763,8 +763,6 @@ int main(int argc, const char* argv[]) {
 	path.reserve(5000);
 
 	std::ofstream pout;
-	char pbuf[1 << 20];
-	pout.rdbuf()->pubsetbuf(pbuf, sizeof(pbuf));
 	pout.open("C:\\tdl2048-16k.path", std::ios::out | std::ios::binary | std::ios::app);
 
 	for (stats.init(train); stats; stats++) {
