@@ -208,7 +208,6 @@ public:
 	}
 
 	inline u32 at4(const u32& i) const {
-//		return (fetch16(i >> 2) >> ((i % 4) << 2)) & 0x0f;
 		return (raw >> (i << 2)) & 0x0f;
 	}
 	inline u32 at5(const u32& i) const {
