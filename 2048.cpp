@@ -115,9 +115,9 @@ public:
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(cache().size()).endian(LE), 4);
-			for (auto iter = cache().begin(); iter != cache().end(); iter++)
-				iter->second >> out;
+			out.write(r32(u32(weights().size())).endian(LE), 4);
+			for (weight w : weights())
+				w >> out;
 			break;
 		default:
 			break;
@@ -136,7 +136,6 @@ public:
 			for (u32 size = r32(buf, LE); size; size--) {
 				weights().push_back(weight());
 				weights().back() << in;
-				cache()[weights().back().sign] = weights().back();
 			}
 			break;
 		default:
@@ -168,10 +167,13 @@ public:
 
 	static weight make(const u32& sign, const u64& size) {
 		weights().push_back(weight(sign, size));
-		cache()[sign] = weights().back();
 		return weights().back();
 	}
-	static inline weight at(const u32& sign) { return cache().at(sign); }
+	static inline weight at(const u32& sign) {
+		for (weight w : weights())
+			if (w.signature() == sign) return w;
+		return weights().at(-1);
+	}
 	typedef std::vector<weight>::iterator iter;
 	static inline iter begin() { return weights().begin(); }
 	static inline iter end() { return weights().end(); }
@@ -181,9 +183,7 @@ public:
 		return end();
 	}
 private:
-	weight(const u32& sign, const u64& size)
-			: sign(sign), value(new numeric[size]()), size(size) {}
-	static inline std::map<u32, weight>& cache() { static std::map<u32, weight> m; return m; }
+	weight(const u32& sign, const u64& size) : sign(sign), value(new numeric[size]()), size(size) {}
 	static inline std::vector<weight>& weights() { static std::vector<weight> w; return w; }
 
 	u32 sign;
@@ -203,10 +203,13 @@ public:
 	typedef std::function<u64(const board&)> mapper;
 	static indexer make(const u32& sign, mapper map) {
 		indexers().push_back(indexer(sign, map));
-		cache()[sign] = indexers().back();
 		return indexers().back();
 	}
-	static inline indexer at(const u32& sign) { return cache().at(sign); }
+	static inline indexer at(const u32& sign) {
+		for (indexer i : indexers())
+			if (i.signature() == sign) return i;
+		return indexers().at(-1);
+	}
 	typedef std::vector<indexer>::iterator iter;
 	static inline iter begin() { return indexers().begin(); }
 	static inline iter end() { return indexers().end(); }
@@ -217,7 +220,6 @@ public:
 	}
 private:
 	indexer(const u32& sign, mapper map) : sign(sign), map(map) {}
-	static inline std::map<u32, indexer>& cache() { static std::map<u32, indexer> c; return c; }
 	static inline std::vector<indexer>& indexers() { static std::vector<indexer> i; return i; }
 
 	u32 sign;
@@ -323,11 +325,17 @@ public:
 		return true;
 	}
 
-	static feature make(const u32& wgt, const u32& idx) { // TODO at?
+	static feature make(const u32& wgt, const u32& idx) {
 		feats().push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
-
+	static feature at(const u32& wgt, const u32& idx) {
+		for (auto feat : feats()) {
+			if (weight(feat).signature() == wgt && indexer(feat).signature() == idx)
+				return feat;
+		}
+		return feats().at(-1);
+	}
 	typedef std::vector<feature>::iterator iter;
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end() { return feats().end(); }
