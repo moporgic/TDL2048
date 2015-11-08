@@ -51,10 +51,10 @@ public:
 				ext |= moveVext << i;
 			}
 		};
-		u32 rowraw; // base row (16-bit raw)
-		u32 rowext; // base row (4-bit extra)
+		u32 raw; // base row (16-bit raw)
+		u32 ext; // base row (4-bit extra)
 		u32 hash; // hash of this row
-		u32 merged; // number of merged tiles
+		u32 merge; // number of merged tiles
 		oper left; // left operation
 		oper right; // right operation
 		u16 count[32]; // number of each tile-type
@@ -62,7 +62,7 @@ public:
 		tiles<u64> layout; // layout of board-type
 	private:
 		~cache() {}
-		cache() : rowraw(0), rowext(0), hash(0), merged(0), left(), right(), count(), mask(), layout() {}
+		cache() : raw(0), ext(0), hash(0), merge(0), left(), right(), count(), mask(), layout() {}
 		cache(const u32& r) : count(), mask() {
 			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
 
@@ -71,15 +71,15 @@ public:
 			u32 L[4] = { V[0], V[1], V[2], V[3] }, Ll[4], Lh[4];
 			u32 R[4] = { V[3], V[2], V[1], V[0] }, Rl[4], Rh[4]; // mirrored
 
-			assign(L, Ll, Lh, rowraw, rowext);
+			assign(L, Ll, Lh, raw, ext);
 
-			mvleft(L, left.score, merged);
+			mvleft(L, left.score, merge);
 			u32 mvL = assign(L, Ll, Lh, left.moveHraw, left.moveHext);
 			std::reverse(Ll, Ll + 4); std::reverse(Lh, Lh + 4);
 			left.moved = mvL == r ? -1 : 0;
 			map(left.moveVraw, left.moveVext, Ll, Lh, 12, 8, 4, 0);
 
-			mvleft(R, right.score, merged); std::reverse(R, R + 4);
+			mvleft(R, right.score, merge); std::reverse(R, R + 4);
 			u32 mvR = assign(R, Rl, Rh, right.moveHraw, right.moveHext);
 			std::reverse(Rl, Rl + 4); std::reverse(Rh, Rh + 4);
 			right.moved = mvR == r ? -1 : 0;
@@ -134,6 +134,11 @@ public:
 				}
 			}
 			if (tmp != 0) row[top] = tmp;
+		}
+
+		static u32 seqidx() {
+			static u32 idx = 0;
+			return idx++;
 		}
 	};
 	static cache look[1 << 20];
@@ -347,10 +352,6 @@ public:
 		return board::look[fetch(r)];
 	}
 
-	static void initialize() {
-		for (u32 i = 0; i < (1 << 20); i++)
-			board::look[i] = cache(i);
-	}
 	static void print(const board& b, const bool& fib = false) {
 		static u32 T[16];
 		bool width = false;
@@ -377,6 +378,6 @@ public:
 		return opers;
 	}
 };
-board::cache board::look[1 << 20];
+board::cache board::look[1 << 20](board::cache::seqidx());
 
 } // namespace moporgic
