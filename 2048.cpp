@@ -762,9 +762,6 @@ int main(int argc, const char* argv[]) {
 	std::vector<state> path;
 	path.reserve(5000);
 
-	std::ofstream pout;
-	pout.open("C:\\tdl2048-16k.path", std::ios::out | std::ios::binary | std::ios::app);
-
 	for (stats.init(train); stats; stats++) {
 
 		u32 score = 0;
@@ -777,18 +774,12 @@ int main(int argc, const char* argv[]) {
 			best >> b;
 		}
 
-		moporgic::write(pout, u32(b.hash()));
-		moporgic::write(pout, u32(path.size()));
 		for (numeric v = 0; path.size(); path.pop_back()) {
-			path.back() >> pout;
 			v = (path.back() += v);
 		}
 
 		stats.update(score, b.hash(), opers);
 	}
-
-	pout.flush();
-	pout.close();
 
 	weight::save(weightout);
 	feature::save(featureout);
