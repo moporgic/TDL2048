@@ -419,7 +419,7 @@ struct statistic {
 		u64 time;
 		u64 opers;
 		u32 maxscore;
-		u32 maxtile;
+		u32 hash;
 	} total = {}, local = {};
 
 	void init(const u64& max, const u64& chk = 1000) {
@@ -433,11 +433,11 @@ struct statistic {
 	u64 operator++() { return (++loop); }
 	operator bool() { return loop <= limit; }
 
-	void update(const u32& score, const u32& max, const u32& opers) {
+	void update(const u32& score, const u32& hash, const u32& opers) {
 		local.score += score;
-		local.maxtile |= (1 << max);
+		local.hash |= hash;
 		local.opers += opers;
-		if (max >= 11 /* 2048 */) local.win++;
+		if (hash >= 2048) local.win++;
 		local.maxscore = std::max(local.maxscore, score);
 
 		if ((loop % check) != 0) return;
@@ -448,7 +448,7 @@ struct statistic {
 		total.win += local.win;
 		total.time += elapsedtime;
 		total.opers += local.opers;
-		total.maxtile |= local.maxtile;
+		total.hash |= local.hash;
 		total.maxscore = std::max(total.maxscore, local.maxscore);
 
 		std::cout << std::endl;
@@ -462,13 +462,13 @@ struct statistic {
 		snprintf(buf, sizeof(buf), "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / check,
 				local.maxscore,
-				math::msb32(local.maxtile),
+				math::msb32(local.hash),
 				local.win * 100.0 / check);
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / loop,
 				total.maxscore,
-				math::msb32(total.maxtile),
+				math::msb32(total.hash),
 				total.win * 100.0 / loop);
 		std::cout << buf << std::endl;
 
@@ -476,13 +476,12 @@ struct statistic {
 		local.win = 0;
 		local.time = currtimept;
 		local.opers = 0;
-		local.maxtile = 0;
+		local.hash = 0;
 		local.maxscore = 0;
 	}
 };
 
 int main(int argc, const char* argv[]) {
-	moporgic::board::initialize();
 //	randinit();
 //	board bb;	bb.init();
 //	for (int i = 0; i < 16; i++) bb.set(i, rand() % 22);
@@ -640,14 +639,14 @@ int main(int argc, const char* argv[]) {
 	auto indexmerge = [](const board& b) -> u64 { // 16-bit
 		board q = b; q.rotright();
 		u32 hori = 0, vert = 0;
-		hori += b.lookup(0).merged << 0;
-		hori += b.lookup(1).merged << 2;
-		hori += b.lookup(2).merged << 4;
-		hori += b.lookup(3).merged << 6;
-		vert += q.lookup(0).merged << 0;
-		vert += q.lookup(1).merged << 2;
-		vert += q.lookup(2).merged << 4;
-		vert += q.lookup(3).merged << 6;
+		hori += b.lookup(0).merge << 0;
+		hori += b.lookup(1).merge << 2;
+		hori += b.lookup(2).merge << 4;
+		hori += b.lookup(3).merge << 6;
+		vert += q.lookup(0).merge << 0;
+		vert += q.lookup(1).merge << 2;
+		vert += q.lookup(2).merge << 4;
+		vert += q.lookup(3).merge << 6;
 		return hori | (vert << 8);
 	};
 	auto indexnum0 = [](const board& b) -> u64 { // 12-bit
@@ -760,7 +759,7 @@ int main(int argc, const char* argv[]) {
 			v = (path.back() += v);
 		}
 
-		stats.update(score, b.max(), opers);
+		stats.update(score, b.hash(), opers);
 	}
 
 	weight::save(weightout);
@@ -779,7 +778,7 @@ int main(int argc, const char* argv[]) {
 			best >> b;
 		}
 
-		stats.update(score, b.max(), opers);
+		stats.update(score, b.hash(), opers);
 	}
 
 	return 0;
