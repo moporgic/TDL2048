@@ -24,7 +24,7 @@ public:
 	class cache {
 	friend class board;
 	public:
-		class oper {
+		class operation {
 		friend class board;
 		friend class cache;
 		public:
@@ -56,30 +56,29 @@ public:
 				moveV64(raw, ext, sc, mv, i);
 				ext |= moveVext << i;
 			}
-			oper(const oper& op) = default;
-			oper() = delete;
-			~oper() = default;
+			operation(const operation& op) = default;
+			operation() = delete;
+			~operation() = default;
 		private:
-			oper(u32 moveHraw, u32 moveHext, u64 moveVraw, u32 moveVext, u32 score, i32 moved)
-				: moveHraw(moveHraw), moveHext(moveHext), moveVraw(moveVraw), moveVext(moveVext), score(score), moved(moved) {}
+			operation(u32 moveHraw, u32 moveHext, u64 moveVraw, u32 moveVext, u32 score, i32 moved)
+				: moveHraw(moveHraw), moveHext(moveHext),
+				  moveVraw(moveVraw), moveVext(moveVext),
+				  score(score), moved(moved) {}
 		};
 		typedef std::array<u16, 32> info;
 		const u32 raw; // base row (16-bit raw)
 		const u32 ext; // base row (4-bit extra)
 		const u32 hash; // hash of this row
 		const u32 merge; // number of merged tiles
-		const oper left; // left operation
-		const oper right; // right operation
+		const operation left; // left operation
+		const operation right; // right operation
 		const info count; // number of each tile-type
 		const info mask; // mask of each tile-type
-		const tiles<u64> layout; // layout of board-type
+		const tiles<u64> pos; // layout of board-type
 
 		cache(const cache& c) = default;
 		cache() = delete;
 		~cache() = default;
-	private:
-		cache(u32 raw, u32 ext, u32 hash, u32 merge, oper left, oper right, info count, info mask, tiles<u64> layout)
-				: raw(raw), ext(ext), hash(hash), merge(merge), left(left), right(right), count(count), mask(mask), layout(layout) {}
 
 		static cache make(const u32& r) {
 			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
@@ -106,20 +105,20 @@ public:
 			std::reverse(Ll, Ll + 4); std::reverse(Lh, Lh + 4);
 			moved = mvL == r ? -1 : 0;
 			map(vraw, vext, Ll, Lh, 12, 8, 4, 0);
-			oper left(hraw, hext, vraw, vext, score, moved);
+			operation left(hraw, hext, vraw, vext, score, moved);
 
 			mvleft(R, score, merge); std::reverse(R, R + 4);
 			u32 mvR = assign(R, Rl, Rh, hraw, hext);
 			std::reverse(Rl, Rl + 4); std::reverse(Rh, Rh + 4);
 			moved = mvR == r ? -1 : 0;
 			map(vraw, vext, Rl, Rh, 12, 8, 4, 0);
-			oper right(hraw, hext, vraw, vext, score, moved);
+			operation right(hraw, hext, vraw, vext, score, moved);
 
 			u32 hash = 0;
 			info count = {};
 			info mask = {};
 			for (int i = 0; i < 4; i++) {
-				hash |= (1 << V[i]) & 0xfffffffeU;
+				hash |= (1 << V[i]);
 				count[V[i]]++;
 				mask[V[i]] |= (1 << i);
 			}
@@ -129,10 +128,14 @@ public:
 			for (int i = 0; i < 16; i++) {
 				if ((r >> i) & 1) ltile |= (u64(i) << ((lsize++) << 2));
 			}
-			tiles<u64> layout(ltile, lsize);
+			tiles<u64> pos(ltile, lsize);
 
-			return cache(raw, ext, hash, merge, left, right, count, mask, layout);
+			return cache(raw, ext, hash, merge, left, right, count, mask, pos);
 		}
+	private:
+		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right, info count, info mask, tiles<u64> pos)
+				: raw(raw), ext(ext), hash(hash), merge(merge),
+				  left(left), right(right), count(count), mask(mask), pos(pos) {}
 
 		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
 			for (u32 i = 0; i < 4; i++) {
@@ -378,7 +381,7 @@ public:
 	inline tiles<u64> find(const u32& t) const {
 		u32 mask = (lookup(0).mask[t] << 0) | (lookup(1).mask[t] << 4)
 				 | (lookup(2).mask[t] << 8) | (lookup(3).mask[t] << 12);
-		return look[mask].layout;
+		return look[mask].pos;
 	}
 
 	inline cache& lookup(const u32& r) const {
