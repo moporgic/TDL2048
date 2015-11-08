@@ -377,10 +377,22 @@ public:
 		}
 	}
 
+	inline u32 mask(const u32& t) const {
+		return (query(0).mask[t] << 0) | (query(1).mask[t] << 4)
+			 | (query(2).mask[t] << 8) | (query(3).mask[t] << 12);
+	}
+	inline void mask(u16 msk[32], const u32& min = 0, const u32& max = 32) const {
+		const cache::info& mask0 = query(0).mask;
+		const cache::info& mask1 = query(1).mask;
+		const cache::info& mask2 = query(2).mask;
+		const cache::info& mask3 = query(3).mask;
+		for (u32 i = min; i < max; i++) {
+			msk[i] = (mask0[i] << 0) | (mask1[i] << 4) | (mask2[i] << 8) | (mask3[i] << 12);
+		}
+	}
+
 	inline tiles<u64> find(const u32& t) const {
-		u32 mask = (query(0).mask[t] << 0) | (query(1).mask[t] << 4)
-				 | (query(2).mask[t] << 8) | (query(3).mask[t] << 12);
-		return board::lookup(mask).pos;
+		return board::lookup(mask(t)).pos;
 	}
 
 	inline const cache& query(const u32& r) const {
