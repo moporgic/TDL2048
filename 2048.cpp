@@ -41,7 +41,7 @@ public:
 	numeric& operator [](const u64& i) { return value.get()[i]; }
 	size_t length() const { return size; }
 
-	template<typename rxx> void write(std::ostream& out) {
+	template<typename rxx> void write(std::ostream& out) const {
 		numeric *v = value.get();
 		for (u64 i = 0; i < size; i++)
 			out.write(rxx(v[i]).le(), sizeof(rxx));
@@ -54,7 +54,7 @@ public:
 			v[i] = rxx(load(sizeof(rxx))).le();
 	}
 
-	void operator >>(std::ostream& out) {
+	void operator >>(std::ostream& out) const {
 		const int LE = moporgic::endian::le;
 		const char serial = 1;
 		out.write(&serial, 1);
@@ -228,7 +228,7 @@ public:
 	operator indexer() const { return index; }
 	operator weight() const { return value; }
 
-	void operator >>(std::ostream& out) {
+	void operator >>(std::ostream& out) const {
 		const int LE = moporgic::endian::le;
 		const char serial = 0;
 		out.write(&serial, 1);
@@ -370,6 +370,17 @@ struct state {
 	}
 	inline void operator >>(board& b) const { b = move; }
 	inline bool operator >(const state& s) const { return esti > s.esti; }
+
+	void operator >>(std::ostream& out) const {
+		move >> out;
+		moporgic::write(out, score);
+		moporgic::write(out, esti);
+	}
+	void operator <<(std::istream& in) {
+		move << in;
+		moporgic::read(in, score);
+		moporgic::read(in, esti);
+	}
 };
 struct select {
 	state move[4];
@@ -485,25 +496,30 @@ int main(int argc, const char* argv[]) {
 //	randinit();
 //	board bb;	bb.init();
 //	for (int i = 0; i < 16; i++) bb.set(i, rand() % 22);
-////	time_t start = moporgic::millisec();
-////	for (int i = 0; i < 10000000; i++) {
-//////		bb.rotate(rand() % 4);
-//////		if (!bb.next()) bb.init();
-////		bb.set(rand() % 16, rand() % 22);
-////	}
-////	std::cout << (moporgic::millisec() - start) ;
-//	board::print(bb);
-//	for (int i = 0; i < 16; i++) {
-//		std::cout << bb.at(i) << "\t";
-////		printf("%d:%d:%08x", i, bb.count(i), bb.mask(i));
-////		std::cout << std::endl;
+//	time_t start = moporgic::millisec();
+//	for (int i = 0; i < 10000000; i++) {
+////		bb.rotate(rand() % 4);
+////		if (!bb.next()) bb.init();
+//		bb.set(rand() % 16, rand() % 22);
 //	}
-////	std::cout << bb.max() << std::endl;
+//	std::cout << (moporgic::millisec() - start) ;
+
+//	std::ifstream in;
+//	in.open("X:\\bb.bin", std::ios::in | std::ios::binary);
+//	bb << in;
+//	board::print(bb);
+
+//	std::ofstream out;
+//	out.open("X:\\bb.bin", std::ios::out | std::ios::binary | std::ios::trunc);
+//	bb >> out;
+//	out.flush();
+//	out.close();
+
 //	return 0;
 
 	u32 train = 100;
 	u32 test = 10;
-	time_t seed = std::time(nullptr);
+	u32 seed = std::time(nullptr);
 	std::string weightin;
 	std::string weightout;
 	std::string featurein;
@@ -540,7 +556,7 @@ int main(int argc, const char* argv[]) {
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
-			seed = time_t(std::stod(valueof(i, nullptr)));
+			seed = u32(std::stod(valueof(i, nullptr)));
 			break;
 		case to_hash("-i"):
 		case to_hash("--input"):
