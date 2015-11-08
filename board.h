@@ -1,10 +1,12 @@
 #pragma once
 #include "moporgic/type.h"
+#include "moporgic/util.h"
 #include <algorithm>
 #include <functional>
 #include <vector>
 #include <iostream>
 #include <cstdio>
+#include <array>
 
 namespace moporgic {
 
@@ -15,19 +17,23 @@ public:
 		Tis tile;
 		u32 size;
 		tiles(const Tis& t, const u32& s) : tile(t), size(s) {}
-		tiles(const tiles<Tis>& t) : tile(t.tile), size(t.size) {}
+		tiles(const tiles<Tis>& t) = default;
 		tiles() : tile(0), size(0) {}
+		~tiles() = default;
 	};
 	class cache {
 	friend class board;
 	public:
-		struct oper {
-			u32 moveHraw; // horizontal move (16-bit raw)
-			u32 moveHext; // horizontal move (4-bit extra)
-			u64 moveVraw; // vertical move (64-bit raw)
-			u32 moveVext; // vertical move (16-bit extra)
-			u32 score; // merge score
-			i32 moved; // moved or not (moved: 0, otherwise -1)
+		class oper {
+		friend class board;
+		friend class cache;
+		public:
+			const u32 moveHraw; // horizontal move (16-bit raw)
+			const u32 moveHext; // horizontal move (4-bit extra)
+			const u64 moveVraw; // vertical move (64-bit raw)
+			const u32 moveVext; // vertical move (16-bit extra)
+			const u32 score; // merge score
+			const i32 moved; // moved or not (moved: 0, otherwise -1)
 
 			inline void moveH(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { moveH64(raw, ext, sc, mv, i); }
 			inline void moveV(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { moveV64(raw, ext, sc, mv, i); }
@@ -50,20 +56,32 @@ public:
 				moveV64(raw, ext, sc, mv, i);
 				ext |= moveVext << i;
 			}
+			oper(const oper& op) = default;
+			oper() = delete;
+			~oper() = default;
+		private:
+			oper(u32 moveHraw, u32 moveHext, u64 moveVraw, u32 moveVext, u32 score, i32 moved)
+				: moveHraw(moveHraw), moveHext(moveHext), moveVraw(moveVraw), moveVext(moveVext), score(score), moved(moved) {}
 		};
-		u32 raw; // base row (16-bit raw)
-		u32 ext; // base row (4-bit extra)
-		u32 hash; // hash of this row
-		u32 merge; // number of merged tiles
-		oper left; // left operation
-		oper right; // right operation
-		u16 count[32]; // number of each tile-type
-		u16 mask[32]; // mask of each tile-type
-		tiles<u64> layout; // layout of board-type
+		typedef std::array<u16, 32> info;
+		const u32 raw; // base row (16-bit raw)
+		const u32 ext; // base row (4-bit extra)
+		const u32 hash; // hash of this row
+		const u32 merge; // number of merged tiles
+		const oper left; // left operation
+		const oper right; // right operation
+		const info count; // number of each tile-type
+		const info mask; // mask of each tile-type
+		const tiles<u64> layout; // layout of board-type
+
+		cache(const cache& c) = default;
+		cache() = delete;
+		~cache() = default;
 	private:
-		~cache() {}
-		cache() : raw(0), ext(0), hash(0), merge(0), left(), right(), count(), mask(), layout() {}
-		cache(const u32& r) : count(), mask() {
+		cache(u32 raw, u32 ext, u32 hash, u32 merge, oper left, oper right, info count, info mask, tiles<u64> layout)
+				: raw(raw), ext(ext), hash(hash), merge(merge), left(left), right(right), count(count), mask(mask), layout(layout) {}
+
+		static cache make(const u32& r) {
 			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
 
 			u32 V[4] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
@@ -71,32 +89,52 @@ public:
 			u32 L[4] = { V[0], V[1], V[2], V[3] }, Ll[4], Lh[4];
 			u32 R[4] = { V[3], V[2], V[1], V[0] }, Rl[4], Rh[4]; // mirrored
 
+			u32 raw, ext;
 			assign(L, Ll, Lh, raw, ext);
 
-			mvleft(L, left.score, merge);
-			u32 mvL = assign(L, Ll, Lh, left.moveHraw, left.moveHext);
+			u32 merge;
+
+			u32 hraw;
+			u32 hext;
+			u64 vraw;
+			u32 vext;
+			u32 score;
+			i32 moved;
+
+			mvleft(L, score, merge);
+			u32 mvL = assign(L, Ll, Lh, hraw, hext);
 			std::reverse(Ll, Ll + 4); std::reverse(Lh, Lh + 4);
-			left.moved = mvL == r ? -1 : 0;
-			map(left.moveVraw, left.moveVext, Ll, Lh, 12, 8, 4, 0);
+			moved = mvL == r ? -1 : 0;
+			map(vraw, vext, Ll, Lh, 12, 8, 4, 0);
+			oper left(hraw, hext, vraw, vext, score, moved);
 
-			mvleft(R, right.score, merge); std::reverse(R, R + 4);
-			u32 mvR = assign(R, Rl, Rh, right.moveHraw, right.moveHext);
+			mvleft(R, score, merge); std::reverse(R, R + 4);
+			u32 mvR = assign(R, Rl, Rh, hraw, hext);
 			std::reverse(Rl, Rl + 4); std::reverse(Rh, Rh + 4);
-			right.moved = mvR == r ? -1 : 0;
-			map(right.moveVraw, right.moveVext, Rl, Rh, 12, 8, 4, 0);
+			moved = mvR == r ? -1 : 0;
+			map(vraw, vext, Rl, Rh, 12, 8, 4, 0);
+			oper right(hraw, hext, vraw, vext, score, moved);
 
-			hash = 0;
+			u32 hash = 0;
+			info count = {};
+			info mask = {};
 			for (int i = 0; i < 4; i++) {
 				hash |= (1 << V[i]) & 0xfffffffeU;
 				count[V[i]]++;
 				mask[V[i]] |= (1 << i);
 			}
+
+			u64 ltile = 0;
+			u32 lsize = 0;
 			for (int i = 0; i < 16; i++) {
-				if ((r >> i) & 1) layout.tile |= (u64(i) << ((layout.size++) << 2));
+				if ((r >> i) & 1) ltile |= (u64(i) << ((lsize++) << 2));
 			}
+			tiles<u64> layout(ltile, lsize);
+
+			return cache(raw, ext, hash, merge, left, right, count, mask, layout);
 		}
 
-		u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
+		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
 			for (u32 i = 0; i < 4; i++) {
 				hi[i] = (src[i] & 0x10) >> 4;
 				lo[i] = (src[i] & 0x0f);
@@ -105,12 +143,12 @@ public:
 			ext = ((hi[0] << 0) | (hi[1] << 1) | (hi[2] << 2) | (hi[3] << 3)) << 16;
 			return raw | ext;
 		}
-		void map(u64& raw, u32& ext, u32 lo[], u32 hi[], int s0, int s1, int s2, int s3) {
+		static void map(u64& raw, u32& ext, u32 lo[], u32 hi[], int s0, int s1, int s2, int s3) {
 			raw = (u64(lo[0]) << (s0 << 2)) | (u64(lo[1]) << (s1 << 2))
 				| (u64(lo[2]) << (s2 << 2)) | (u64(lo[3]) << (s3 << 2));
 			ext = ((hi[0] << s0) | (hi[1] << s1) | (hi[2] << s2) | (hi[3] << s3)) << 16;
 		}
-		void mvleft(u32 row[], u32& score, u32& merge) {
+		static void mvleft(u32 row[], u32& score, u32& merge) {
 			u32 top = 0;
 			u32 tmp = 0;
 			score = merge = 0;
@@ -134,11 +172,6 @@ public:
 				}
 			}
 			if (tmp != 0) row[top] = tmp;
-		}
-
-		static u32 seqidx() {
-			static u32 idx = 0;
-			return idx++;
 		}
 	};
 	static cache look[1 << 20];
@@ -333,10 +366,10 @@ public:
 		return lookup(0).count[t] + lookup(1).count[t] + lookup(2).count[t] + lookup(3).count[t];
 	}
 	inline void count(u16 num[32], const u32& min = 0, const u32& max = 32) const {
-		const u16* count0 = lookup(0).count;
-		const u16* count1 = lookup(1).count;
-		const u16* count2 = lookup(2).count;
-		const u16* count3 = lookup(3).count;
+		const cache::info& count0 = lookup(0).count;
+		const cache::info& count1 = lookup(1).count;
+		const cache::info& count2 = lookup(2).count;
+		const cache::info& count3 = lookup(3).count;
 		for (u32 i = min; i < max; i++) {
 			num[i] = count0[i] + count1[i] + count2[i] + count3[i];
 		}
@@ -378,6 +411,6 @@ public:
 		return opers;
 	}
 };
-board::cache board::look[1 << 20](board::cache::seqidx());
+board::cache board::look[1 << 20](board::cache::make(seq32_static()));
 
 } // namespace moporgic
