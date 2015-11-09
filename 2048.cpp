@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : 2048.cpp
 // Author      : Hung Guei
-// Version     : alpha
+// Version     : beta
 // Description : 2048
 //============================================================================
 
@@ -120,6 +120,7 @@ public:
 				w >> out;
 			break;
 		default:
+			std::cerr << "unknown serial at weight::save" << std::endl;
 			break;
 		}
 		out.flush();
@@ -139,6 +140,7 @@ public:
 			}
 			break;
 		default:
+			std::cerr << "unknown serial at weight::load" << std::endl;
 			break;
 		}
 	}
@@ -251,18 +253,13 @@ public:
 			out.write(r32(value.signature()).endian(LE), 4);
 			break;
 		default:
+			std::cerr << "unknown serial at feature::>>" << std::endl;
 			break;
 		}
 	}
 	void operator <<(std::istream& in) {
 		char buf[8];
-		auto load = [&](u32 len) -> char* {
-			if (!in.read(buf, len)) {
-				std::cerr << "load failure" << std::endl;
-				std::exit(2);
-			}
-			return buf;
-		};
+		auto load = moporgic::make_load(in, buf);
 		const int LE = moporgic::endian::le;
 		switch (*load(1)) {
 		case 0:
@@ -270,6 +267,7 @@ public:
 			value = weight::at(r32(load(4), LE));
 			break;
 		default:
+			std::cerr << "unknown serial at feature::<<" << std::endl;
 			break;
 		}
 	}
@@ -285,6 +283,7 @@ public:
 				feats()[i] >> out;
 			break;
 		default:
+			std::cerr << "unknown serial at feature::save" << std::endl;
 			break;
 		}
 		out.flush();
@@ -303,6 +302,7 @@ public:
 			}
 			break;
 		default:
+			std::cerr << "unknown serial at feature::load" << std::endl;
 			break;
 		}
 	}
@@ -341,7 +341,8 @@ public:
 	static inline iter end() { return feats().end(); }
 	static inline iter find(const u32& wgt, const u32& idx) {
 		for (auto it = begin(); it != end(); it++)
-			if (weight(*it).signature() == wgt && indexer(*it).signature() == idx) return it;
+			if (weight(*it).signature() == wgt && indexer(*it).signature() == idx)
+				return it;
 		return end();
 	}
 
@@ -365,6 +366,10 @@ struct state {
 	inline void assign(const board& b) {
 		move = b;
 		score = (move.*oper)();
+	}
+	inline void assign(const board& b, const i32& s) {
+		move = b;
+		score = s;
 	}
 	inline void estimate(feature::iter begin, feature::iter end) {
 		if (score >= 0) {
@@ -417,6 +422,21 @@ struct select {
 		move[1] << b;
 		move[2] << b;
 		move[3] << b;
+		return update();
+	}
+	inline void assign(const board& b) {
+		move[0].assign(b);
+		move[1].assign(b);
+		move[2].assign(b);
+		move[3].assign(b);
+	}
+	inline void estimate(feature::iter begin, feature::iter end) {
+		move[0].estimate(begin, end);
+		move[1].estimate(begin, end);
+		move[2].estimate(begin, end);
+		move[3].estimate(begin, end);
+	}
+	inline select& update() {
 		best = move;
 		if (move[1] > *best) best = move + 1;
 		if (move[2] > *best) best = move + 2;
@@ -645,7 +665,7 @@ int main(int argc, const char* argv[]) {
 	std::vector<std::function<void(int&)>> mapfx = { rotfx, rotfx, rotfx, mirfx, rotfx, rotfx, rotfx, mirfx };
 	std::vector<std::vector<int>> patt6t =
 		{ { 0, 1, 2, 3, 6, 7 }, { 4, 5, 6, 7, 10, 11 }, { 0, 1, 2, 4, 5, 6 }, { 4, 5, 6, 8, 9, 10 }, };
-	auto hash =
+	auto hashfx =
 			[](std::vector<int>& p) -> u32 {u32 h = 0; for (int t : p) h = (h << 4) | t; return h;};
 
 	const u32 base = 16;
@@ -718,7 +738,7 @@ int main(int argc, const char* argv[]) {
 
 	for (auto& p : patt6t) {
 		for (auto fx : mapfx) {
-			indexer::make(hash(p),
+			indexer::make(hashfx(p),
 				std::bind(index6t, std::placeholders::_1, p[0], p[1], p[2], p[3], p[4], p[5]));
 			std::for_each(p.begin(), p.end(), fx);
 		}
@@ -729,18 +749,17 @@ int main(int argc, const char* argv[]) {
 
 	if (weight::load(weightin) == false) {
 		for (auto& p : patt6t) {
-			weight::make(hash(p), std::pow(base, 6));
+			weight::make(hashfx(p), std::pow(base, 6));
 		}
 //		weight::make(0xfe000000, 1 << 25);
 		weight::make(0xfe000001, 1 << 25);
 		weight::make(0xff000000, 1 << 16);
 	}
-
 	if (feature::load(featurein) == false) {
 		for (auto& p : patt6t) {
-			const u32 wsign = hash(p);
+			const u32 wsign = hashfx(p);
 			for (auto fx : mapfx) {
-				feature::make(wsign, hash(p)); // FIXME
+				feature::make(wsign, hashfx(p)); // FIXME
 				std::for_each(p.begin(), p.end(), fx);
 			}
 		}
@@ -748,6 +767,21 @@ int main(int argc, const char* argv[]) {
 		feature::make(0xfe000001, 0xfe000001);
 		feature::make(0xff000000, 0xff000000);
 	}
+
+	// for 2nd layer-->
+	for (auto& p : patt6t) {
+		const u32 wsign = hashfx(p) | 0x10000000;
+		weight::make(wsign, std::pow(base, 6));
+		for (auto fx : mapfx) {
+			feature::make(wsign, hashfx(p)); // FIXME
+			std::for_each(p.begin(), p.end(), fx);
+		}
+	}
+	weight::make(0xfe100001, 1 << 25);
+	weight::make(0xff100000, 1 << 16);
+	feature::make(0xfe100001, 0xfe000001);
+	feature::make(0xff100000, 0xff000000);
+	// <--for 2nd layer
 
 	for (auto it = weight::begin(); it != weight::end(); it++) {
 		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
@@ -774,20 +808,52 @@ int main(int argc, const char* argv[]) {
 	std::vector<state> path;
 	path.reserve(5000);
 
+//	for (stats.init(train); stats; stats++) {
+//
+//		u32 score = 0;
+//		u32 opers = 0;
+//
+//		for (b.init(); best << b; b.next()) {
+//			score += best.score();
+//			opers += 1;
+//			best >> path;
+//			best >> b;
+//		}
+//
+//		for (numeric v = 0; path.size(); path.pop_back()) {
+//			v = (path.back() += v);
+//		}
+//
+//		stats.update(score, b.hash(), opers);
+//	}
+
+	auto s0begin = feature::begin();
+	auto s0end = feature::find(0x10012367, 0x00012367);
+	auto s1begin = s0end;
+	auto s1end = feature::end();
+	std::cout << "multi-stage hint: " << (s0end - s0begin) << " | " << (s1end - s1begin) << std::endl;
+
+	state s16k;
 	for (stats.init(train); stats; stats++) {
 
 		u32 score = 0;
 		u32 opers = 0;
 
-		for (b.init(); best << b; b.next()) {
+		for (b.init(); true; b.next()) {
+			best.assign(b);
+			best.estimate(s0begin, s0end);
+			if (!best.update()) break;
 			score += best.score();
 			opers += 1;
 			best >> path;
 			best >> b;
 		}
 
-		for (numeric v = 0; path.size(); path.pop_back()) {
-			v = (path.back() += v);
+		for (numeric v = 0, u = 0; path.size(); path.pop_back()) {
+			v = path.back().update(v, s0begin, s0end);
+			s16k.assign(path.back().move, path.back().score);
+			s16k.estimate(s1begin, s1end);
+			u = s16k.update(u, s1begin, s1end);
 		}
 
 		stats.update(score, b.hash(), opers);
