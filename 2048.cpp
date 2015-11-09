@@ -764,20 +764,20 @@ int main(int argc, const char* argv[]) {
 		feature::make(0xff000000, 0xff000000);
 	}
 
-	// for 2nd layer-->
-	for (auto& p : patt6t) {
-		const u32 wsign = hashfx(p) | 0x10000000;
-		weight::make(wsign, std::pow(base, 6));
-		for (auto fx : mapfx) {
-			feature::make(wsign, hashfx(p)); // FIXME
-			std::for_each(p.begin(), p.end(), fx);
-		}
-	}
-	weight::make(0xfe100001, 1 << 25);
-	weight::make(0xff100000, 1 << 16);
-	feature::make(0xfe100001, 0xfe000001);
-	feature::make(0xff100000, 0xff000000);
-	// <--for 2nd layer
+//	// for 2nd layer-->
+//	for (auto& p : patt6t) {
+//		const u32 wsign = hashfx(p) | 0x10000000;
+//		weight::make(wsign, std::pow(base, 6));
+//		for (auto fx : mapfx) {
+//			feature::make(wsign, hashfx(p)); // FIXME
+//			std::for_each(p.begin(), p.end(), fx);
+//		}
+//	}
+//	weight::make(0xfe100001, 1 << 25);
+//	weight::make(0xff100000, 1 << 16);
+//	feature::make(0xfe100001, 0xfe000001);
+//	feature::make(0xff100000, 0xff000000);
+//	// <--for 2nd layer
 
 	for (auto it = weight::begin(); it != weight::end(); it++) {
 		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
