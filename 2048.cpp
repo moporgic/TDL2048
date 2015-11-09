@@ -367,10 +367,6 @@ struct state {
 		move = b;
 		score = (move.*oper)();
 	}
-	inline void assign(const board& b, const i32& s) {
-		move = b;
-		score = s;
-	}
 	inline void estimate(feature::iter begin, feature::iter end) {
 		if (score >= 0) {
 			esti = score;
@@ -833,7 +829,6 @@ int main(int argc, const char* argv[]) {
 	auto s1end = feature::end();
 	std::cout << "multi-stage hint: " << (s0end - s0begin) << " | " << (s1end - s1begin) << std::endl;
 
-	state s16k;
 	for (stats.init(train); stats; stats++) {
 
 		u32 score = 0;
@@ -849,11 +844,17 @@ int main(int argc, const char* argv[]) {
 			best >> b;
 		}
 
-		for (numeric v = 0, u = 0; path.size(); path.pop_back()) {
-			v = path.back().update(v, s0begin, s0end);
-			s16k.assign(path.back().move, path.back().score);
-			s16k.estimate(s1begin, s1end);
-			u = s16k.update(u, s1begin, s1end);
+		if (b.hash() >= 16384) {
+			for (numeric v = 0, u = 0; path.size(); path.pop_back()) {
+				state& s = path.back();
+				v = s.update(v, s0begin, s0end);
+				s.estimate(s1begin, s1end);
+				u = s.update(u, s1begin, s1end);
+			}
+		} else {
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				v = path.back().update(v, s0begin, s0end);
+			}
 		}
 
 		stats.update(score, b.hash(), opers);
