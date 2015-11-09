@@ -829,6 +829,7 @@ int main(int argc, const char* argv[]) {
 	auto s1end = feature::end();
 	std::cout << "multi-stage hint: " << (s0end - s0begin) << " | " << (s1end - s1begin) << std::endl;
 
+	u64 s1upd = 0;
 	for (stats.init(train); stats; stats++) {
 
 		u32 score = 0;
@@ -851,6 +852,7 @@ int main(int argc, const char* argv[]) {
 				s.estimate(s1begin, s1end);
 				u = s.update(u, s1begin, s1end);
 			}
+			if (++s1upd % 1000 == 0) std::cout << "multi-stage hint: " << s1upd << std::endl;
 		} else {
 			for (numeric v = 0; path.size(); path.pop_back()) {
 				v = path.back().update(v, s0begin, s0end);
@@ -859,6 +861,7 @@ int main(int argc, const char* argv[]) {
 
 		stats.update(score, b.hash(), opers);
 	}
+	std::cout << "multi-stage hint: " << s1upd << std::endl;
 
 	weight::save(weightout);
 	feature::save(featureout);
