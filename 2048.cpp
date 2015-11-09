@@ -367,7 +367,7 @@ struct state {
 		move = b;
 		score = (move.*oper)();
 	}
-	inline void estimate(feature::iter begin, feature::iter end) {
+	inline void estimate(const feature::iter begin, const feature::iter end) {
 		if (score >= 0) {
 			esti = score;
 			for (auto f = begin; f != end; f++)
@@ -376,7 +376,7 @@ struct state {
 			esti = -std::numeric_limits<numeric>::max();
 		}
 	}
-	inline numeric update(const numeric& v, feature::iter begin, feature::iter end) {
+	inline numeric update(const numeric& v, const feature::iter begin, const feature::iter end) {
 		const numeric upd = alpha * (v - (esti - score));
 		esti = score;
 		for (auto f = begin; f != end; f++)
@@ -413,24 +413,23 @@ struct select {
 		move[2] = state(&board::down);
 		move[3] = state(&board::left);
 	}
-	inline select& operator <<(const board& b) {
+	inline select& operator ()(const board& b) {
 		move[0] << b;
 		move[1] << b;
 		move[2] << b;
 		move[3] << b;
 		return update();
 	}
-	inline void assign(const board& b) {
+	inline select& operator ()(const board& b, const feature::iter begin, const feature::iter end) {
 		move[0].assign(b);
 		move[1].assign(b);
 		move[2].assign(b);
 		move[3].assign(b);
-	}
-	inline void estimate(feature::iter begin, feature::iter end) {
 		move[0].estimate(begin, end);
 		move[1].estimate(begin, end);
 		move[2].estimate(begin, end);
 		move[3].estimate(begin, end);
+		return update();
 	}
 	inline select& update() {
 		best = move;
@@ -439,6 +438,7 @@ struct select {
 		if (move[3] > *best) best = move + 3;
 		return *this;
 	}
+	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(board& b) const { *best >> b; }
 	inline operator bool() const { return score() != -1; }
@@ -835,10 +835,7 @@ int main(int argc, const char* argv[]) {
 		u32 score = 0;
 		u32 opers = 0;
 
-		for (b.init(); true; b.next()) {
-			best.assign(b);
-			best.estimate(s0begin, s0end);
-			if (!best.update()) break;
+		for (b.init(); best(b, s0begin, s0end); b.next()) {
 			score += best.score();
 			opers += 1;
 			best >> path;
@@ -866,6 +863,22 @@ int main(int argc, const char* argv[]) {
 	weight::save(weightout);
 	feature::save(featureout);
 
+//	std::cout << std::endl;
+//	std::cout << "start testing..." << std::endl;
+//	for (stats.init(test); stats; stats++) {
+//
+//		u32 score = 0;
+//		u32 opers = 0;
+//
+//		for (b.init(); best << b; b.next()) {
+//			score += best.score();
+//			opers += 1;
+//			best >> b;
+//		}
+//
+//		stats.update(score, b.hash(), opers);
+//	}
+
 	std::cout << std::endl;
 	std::cout << "start testing..." << std::endl;
 	for (stats.init(test); stats; stats++) {
@@ -873,14 +886,22 @@ int main(int argc, const char* argv[]) {
 		u32 score = 0;
 		u32 opers = 0;
 
-		for (b.init(); best << b; b.next()) {
+		for (b.init(); best(b, s0begin, s0end); b.next()) {
+			score += best.score();
+			opers += 1;
+			best >> b;
+			if (b.hash() >= 16384) break;
+		}
+		for (b.next(); best(b, s1begin, s1end); b.next()) {
 			score += best.score();
 			opers += 1;
 			best >> b;
 		}
 
+
 		stats.update(score, b.hash(), opers);
 	}
+
 
 	return 0;
 }
