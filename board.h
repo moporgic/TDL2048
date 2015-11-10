@@ -257,6 +257,9 @@ public:
 	inline void transpose64() {
 		raw = (raw & 0xf0f00f0ff0f00f0fULL) | ((raw & 0x0000f0f00000f0f0ULL) << 12) | ((raw & 0x0f0f00000f0f0000ULL) >> 12);
 		raw = (raw & 0xff00ff0000ff00ffULL) | ((raw & 0x00000000ff00ff00ULL) << 24) | ((raw & 0x00ff00ff00000000ULL) >> 24);
+//		register u64 t;
+//		t = (raw ^ (raw >> 12)) & 0x0000f0f00000f0f0ULL; raw = raw ^ t ^ (t << 12);
+//		t = (raw ^ (raw >> 24)) & 0x00000000ff00ff00ULL; raw = raw ^ t ^ (t << 24);
 	}
 	inline void transpose80() {
 		transpose64();
