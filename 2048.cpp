@@ -523,7 +523,7 @@ struct statistic {
 int main(int argc, const char* argv[]) {
 //	randinit();
 //	board bb;	bb.init();
-//	for (int i = 0; i < 16; i++) bb.set(i, rand() % 22);
+//	for (int i = 0; i < 16; i++) bb.set(i, rand() % 6);
 //	time_t start = moporgic::millisec();
 //	for (int i = 0; i < 10000000; i++) {
 ////		bb.rotate(rand() % 4);
@@ -537,6 +537,7 @@ int main(int argc, const char* argv[]) {
 //	bb << in;
 //	board::print(bb);
 //	bb.print();
+//	printf("%08x\n%08x\n",bb.mask(1), bb.mask(4));
 
 //	std::ofstream out;
 //	out.open("X:\\bb.bin", std::ios::out | std::ios::binary | std::ios::trunc);
@@ -724,6 +725,9 @@ int main(int argc, const char* argv[]) {
 		index += (num[15] & 0x03) << 23;
 		return index;
 	};
+	auto indexmask = [](const board& b, const int& t) -> u64 { // 16-bit
+		return b.mask(t);
+	};
 
 //	for (int hash = 0; hash < 0x00ffffff; hash++) {
 //		int p[6];
@@ -742,6 +746,8 @@ int main(int argc, const char* argv[]) {
 	indexer::make(0xfe000000, indexnum0);
 	indexer::make(0xfe000001, indexnum1);
 	indexer::make(0xff000000, indexmerge);
+//	for (int i = 0; i < 16; i++)
+//		indexer::make(0xfd000000 + (i << 16), std::bind(indexmask, std::placeholders::_1, i));
 
 	if (weight::load(weightin) == false) {
 		for (auto& p : patt6t) {
@@ -750,7 +756,9 @@ int main(int argc, const char* argv[]) {
 //		weight::make(0xfe000000, 1 << 25);
 		weight::make(0xfe000001, 1 << 25);
 		weight::make(0xff000000, 1 << 16);
+//		for (int i = 0; i < 16; i++) weight::make(0xfd000000 + (i << 16), 1 << 16);
 	}
+
 	if (feature::load(featurein) == false) {
 		for (auto& p : patt6t) {
 			const u32 wsign = hashfx(p);
@@ -762,6 +770,7 @@ int main(int argc, const char* argv[]) {
 	//	feature::make(0xfe000000, 0xfe000000);
 		feature::make(0xfe000001, 0xfe000001);
 		feature::make(0xff000000, 0xff000000);
+//		for (int i = 0; i < 16; i++) feature::make(0xfd000000 + (i << 16), 0xfd000000 + (i << 16));
 	}
 
 //	// for 2nd layer-->
@@ -804,80 +813,64 @@ int main(int argc, const char* argv[]) {
 	std::vector<state> path;
 	path.reserve(5000);
 
-//	for (stats.init(train); stats; stats++) {
-//
-//		u32 score = 0;
-//		u32 opers = 0;
-//
-//		for (b.init(); best << b; b.next()) {
-//			score += best.score();
-//			opers += 1;
-//			best >> path;
-//			best >> b;
-//		}
-//
-//		for (numeric v = 0; path.size(); path.pop_back()) {
-//			v = (path.back() += v);
-//		}
-//
-//		stats.update(score, b.hash(), opers);
-//	}
-
-	auto s0begin = feature::begin();
-	auto s0end = feature::find(0x10012367, 0x00012367);
-	auto s1begin = s0end;
-	auto s1end = feature::end();
-	std::cout << "multi-stage hint: " << (s0end - s0begin) << " | " << (s1end - s1begin) << std::endl;
-
-	u64 s1upd = 0;
 	for (stats.init(train); stats; stats++) {
 
 		u32 score = 0;
 		u32 opers = 0;
 
-		for (b.init(); best(b, s0begin, s0end); b.next()) {
+		for (b.init(); best << b; b.next()) {
 			score += best.score();
 			opers += 1;
 			best >> path;
 			best >> b;
 		}
 
-		if (b.hash() >= 16384) {
-			for (numeric v = 0, u = 0; path.size(); path.pop_back()) {
-				state& s = path.back();
-				v = s.update(v, s0begin, s0end);
-				s.estimate(s1begin, s1end);
-				u = s.update(u, s1begin, s1end);
-			}
-			if (++s1upd % 1000 == 0) std::cout << "multi-stage hint: " << s1upd << std::endl;
-		} else {
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				v = path.back().update(v, s0begin, s0end);
-			}
+		for (numeric v = 0; path.size(); path.pop_back()) {
+			v = (path.back() += v);
 		}
 
 		stats.update(score, b.hash(), opers);
 	}
-	std::cout << "multi-stage hint: " << s1upd << std::endl;
 
-	weight::save(weightout);
-	feature::save(featureout);
-
-//	std::cout << std::endl;
-//	std::cout << "start testing..." << std::endl;
-//	for (stats.init(test); stats; stats++) {
+//	auto s0begin = feature::begin();
+//	auto s0end = feature::find(0x10012367, 0x00012367);
+//	auto s1begin = s0end;
+//	auto s1end = feature::end();
+//	std::cout << "multi-stage hint: " << (s0end - s0begin) << " | " << (s1end - s1begin) << std::endl;
+//
+//	u64 s1upd = 0;
+//	for (stats.init(train); stats; stats++) {
 //
 //		u32 score = 0;
 //		u32 opers = 0;
 //
-//		for (b.init(); best << b; b.next()) {
+//		for (b.init(); best(b, s0begin, s0end); b.next()) {
 //			score += best.score();
 //			opers += 1;
+//			best >> path;
 //			best >> b;
+//		}
+//
+//		if (b.hash() >= 16384) {
+//			for (numeric v = 0, u = 0; path.size(); path.pop_back()) {
+//				state& s = path.back();
+//				v = s.update(v, s0begin, s0end);
+//				s.estimate(s1begin, s1end);
+//				u = s.update(u, s1begin, s1end);
+//			}
+//			if (++s1upd % 1000 == 0) std::cout << "multi-stage hint: " << s1upd << std::endl;
+//		} else {
+//			for (numeric v = 0; path.size(); path.pop_back()) {
+//				v = path.back().update(v, s0begin, s0end);
+//			}
 //		}
 //
 //		stats.update(score, b.hash(), opers);
 //	}
+//	std::cout << "multi-stage hint: " << s1upd << std::endl;
+
+	weight::save(weightout);
+	feature::save(featureout);
 
 	std::cout << std::endl;
 	std::cout << "start testing..." << std::endl;
@@ -886,21 +879,37 @@ int main(int argc, const char* argv[]) {
 		u32 score = 0;
 		u32 opers = 0;
 
-		for (b.init(); best(b, s0begin, s0end); b.next()) {
-			score += best.score();
-			opers += 1;
-			best >> b;
-			if (b.hash() >= 16384) break;
-		}
-		for (b.next(); best(b, s1begin, s1end); b.next()) {
+		for (b.init(); best << b; b.next()) {
 			score += best.score();
 			opers += 1;
 			best >> b;
 		}
-
 
 		stats.update(score, b.hash(), opers);
 	}
+
+//	std::cout << std::endl;
+//	std::cout << "start testing..." << std::endl;
+//	for (stats.init(test); stats; stats++) {
+//
+//		u32 score = 0;
+//		u32 opers = 0;
+//
+//		for (b.init(); best(b, s0begin, s0end); b.next()) {
+//			score += best.score();
+//			opers += 1;
+//			best >> b;
+//			if (b.hash() >= 16384) break;
+//		}
+//		for (b.next(); best(b, s1begin, s1end); b.next()) {
+//			score += best.score();
+//			opers += 1;
+//			best >> b;
+//		}
+//
+//
+//		stats.update(score, b.hash(), opers);
+//	}
 
 
 	return 0;
