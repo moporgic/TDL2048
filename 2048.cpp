@@ -539,6 +539,9 @@ int main(int argc, const char* argv[]) {
 //		bb.init();
 //	}
 //	std::cout << (moporgic::millisec() - start) << std::endl ;
+//	bb.print();
+//	for (int i = 0; i < 16; i++)
+//		std::cout << i << "\t" << bb.count(i) << std::endl;
 //	return 0;
 //
 //	start = moporgic::millisec();
@@ -672,7 +675,8 @@ int main(int argc, const char* argv[]) {
 	std::srand(seed);
 	std::cout << "TDL 2048" << std::endl;
 	std::cout << "seed = " << seed << std::endl;
-	std::cout << "alpha = " << alpha << std::endl;
+//	std::cout << "alpha = " << alpha << std::endl;
+	std::cout << "alpha = " << "0.0025/32  " << "0.0025/4" << std::endl;
 	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
@@ -873,14 +877,14 @@ int main(int argc, const char* argv[]) {
 		if (b.hash() >= 16384) {
 			for (numeric v = 0, u = 0; path.size(); path.pop_back()) {
 				state& s = path.back();
-				v = s.update(v, alpha / 16, s0begin, s0end);
+				v = s.update(v, 0.0025 / 32, s0begin, s0end);
 				s.estimate(s1begin, s1end);
-				u = s.update(u, alpha / 4, s1begin, s1end);
+				u = s.update(u, 0.0025 / 4, s1begin, s1end);
 			}
 			if (++s1upd % 1000 == 0) std::cout << "multi-stage hint: " << s1upd << std::endl;
 		} else {
 			for (numeric v = 0; path.size(); path.pop_back()) {
-				v = path.back().update(v, alpha / 16, s0begin, s0end);
+				v = path.back().update(v, 0.0025 / 32, s0begin, s0end);
 			}
 		}
 
