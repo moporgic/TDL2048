@@ -676,7 +676,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "TDL 2048" << std::endl;
 	std::cout << "seed = " << seed << std::endl;
 //	std::cout << "alpha = " << alpha << std::endl;
-	std::cout << "alpha = " << "0  " << "0.0025/4" << std::endl;
+	std::cout << "alpha = " << "0 " << "0.0025" << std::endl;
 	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
@@ -796,7 +796,7 @@ int main(int argc, const char* argv[]) {
 //		for (int i = 0; i < 16; i++) feature::make(0xfd000000 + (i << 16), 0xfd000000 + (i << 16));
 	}
 
-//	// for 2nd layer-->
+	// for 2nd layer-->
 //	for (auto& p : patt6t) {
 //		const u32 wsign = hashfx(p) | 0x10000000;
 //		weight::make(wsign, std::pow(base, 6));
@@ -809,7 +809,7 @@ int main(int argc, const char* argv[]) {
 //	weight::make(0xff100000, 1 << 16);
 //	feature::make(0xfe100001, 0xfe000001);
 //	feature::make(0xff100000, 0xff000000);
-//	// <--for 2nd layer
+	// <--for 2nd layer
 
 	for (auto it = weight::begin(); it != weight::end(); it++) {
 		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
@@ -883,6 +883,7 @@ int main(int argc, const char* argv[]) {
 //			}
 			for (numeric u = 0; path.size(); path.pop_back()) {
 				state& s = path.back();
+				if (s.move.hash() < 16384) break;
 				s.estimate(s1begin, s1end);
 				u = s.update(u, 0.0025 / 4, s1begin, s1end);
 			}
@@ -892,6 +893,7 @@ int main(int argc, const char* argv[]) {
 //				v = path.back().update(v, 0.0025 / 32, s0begin, s0end);
 //			}
 		}
+		path.clear();
 
 		stats.update(score, b.hash(), opers);
 	}
