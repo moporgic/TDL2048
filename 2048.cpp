@@ -676,7 +676,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "TDL 2048" << std::endl;
 	std::cout << "seed = " << seed << std::endl;
 //	std::cout << "alpha = " << alpha << std::endl;
-	std::cout << "alpha = " << "0 " << "0.0025" << std::endl;
+	std::cout << "alpha = " << "0 " << alpha << std::endl;
 	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
@@ -885,7 +885,7 @@ int main(int argc, const char* argv[]) {
 				state& s = path.back();
 				if (s.move.hash() < 16384) break;
 				s.estimate(s1begin, s1end);
-				u = s.update(u, 0.0025 / 4, s1begin, s1end);
+				u = s.update(u, s1begin, s1end);
 			}
 			if (++s1upd % 1000 == 0) std::cout << "multi-stage hint: " << s1upd << std::endl;
 		} else {
