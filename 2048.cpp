@@ -856,8 +856,8 @@ int main(int argc, const char* argv[]) {
 //	}
 
 	auto s0begin = feature::begin();
-	auto s0end = feature::find(0x10012367, 0x00012367);
-	auto s1begin = s0end;
+	auto s1begin = feature::find(0x10012367, 0x00012367);
+	auto s0end = s1begin;
 	auto s1end = feature::end();
 	std::cout << "multi-stage hint: " << (s0end - s0begin) << " | " << (s1end - s1begin) << std::endl;
 
@@ -867,7 +867,21 @@ int main(int argc, const char* argv[]) {
 		u32 score = 0;
 		u32 opers = 0;
 
+//		for (b.init(); best(b, s0begin, s0end); b.next()) {
+//			score += best.score();
+//			opers += 1;
+//			best >> path;
+//			best >> b;
+//		}
+
 		for (b.init(); best(b, s0begin, s0end); b.next()) {
+			score += best.score();
+			opers += 1;
+			best >> path;
+			best >> b;
+			if (b.hash() >= 16384) break;
+		}
+		for (b.next(); best(b, s1begin, s1end); b.next()) {
 			score += best.score();
 			opers += 1;
 			best >> path;
