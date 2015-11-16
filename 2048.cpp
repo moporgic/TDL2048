@@ -930,8 +930,9 @@ int main(int argc, const char* argv[]) {
 //				s.estimate(s1begin, s1end);
 //				u = s.update(u, 0.0025 / 4, s1begin, s1end);
 //			}
+			numeric u = 0, w = 0;
 			if (hash >= 16384 + 8192) {
-				for (numeric u = 0, w = 0; path.size(); path.pop_back()) {
+				for (; path.size(); path.pop_back()) {
 					state& s = path.back();
 					if (s.move.hash() < 16384 + 8192) break;
 					s.estimate(s1begin, s1end);
@@ -941,7 +942,7 @@ int main(int argc, const char* argv[]) {
 				}
 				if (++s2upd % 1000 == 0) std::cout << "multi-stage hint: s2 " << s2upd << std::endl;
 			}
-			for (numeric u = 0; path.size(); path.pop_back()) {
+			for (; path.size(); path.pop_back()) {
 				state& s = path.back();
 				if (s.move.hash() < 16384) break;
 				s.estimate(s1begin, s1end);
