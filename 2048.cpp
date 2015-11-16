@@ -903,7 +903,6 @@ int main(int argc, const char* argv[]) {
 		for (b.init(); best(b, s0begin, s0end); b.next()) {
 			score += best.score();
 			opers += 1;
-			best >> path;
 			best >> b;
 			if (b.hash() >= 16384) break;
 		}
@@ -934,7 +933,7 @@ int main(int argc, const char* argv[]) {
 //			}
 			for (numeric u = 0; path.size(); path.pop_back()) {
 				state& s = path.back();
-				if (s.move.hash() < 16384) break;
+				s.estimate(s1begin, s1end);
 				u = s.update(u, alpha1, s1begin, s1end);
 			}
 			if (++s1upd % 1000 == 0) std::cout << "multi-stage hint: s1 " << s1upd << std::endl;
