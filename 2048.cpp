@@ -527,6 +527,8 @@ struct statistic {
 	}
 };
 
+numeric alpha1 = 0.0025;
+numeric alpha2 = 0.0025;
 int main(int argc, const char* argv[]) {
 //	randinit();
 //	board bb;	bb.init();
@@ -665,6 +667,12 @@ int main(int argc, const char* argv[]) {
 		case to_hash("-f"):
 		case to_hash("--feature"):
 			break;
+		case to_hash("--alpha-1-divide"):
+			alpha1 /= std::stod(valueof(i, nullptr));
+			break;
+		case to_hash("--alpha-2-divide"):
+			alpha2 /= std::stod(valueof(i, nullptr));
+			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
 			std::exit(1);
@@ -676,7 +684,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "TDL 2048" << std::endl;
 	std::cout << "seed = " << seed << std::endl;
 //	std::cout << "alpha = " << alpha << std::endl;
-	std::cout << "alpha = " << "0 " << alpha << std::endl;
+	std::cout << "alpha = " << alpha1 << " " << alpha2 << std::endl;
 	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
@@ -811,6 +819,21 @@ int main(int argc, const char* argv[]) {
 //	feature::make(0xff100000, 0xff000000);
 	// <--for 2nd layer
 
+	// for 3rd layer-->
+	for (auto& p : patt6t) {
+		const u32 wsign = hashfx(p) | 0x20000000;
+		weight::make(wsign, std::pow(base, 6));
+		for (auto fx : mapfx) {
+			feature::make(wsign, hashfx(p)); // FIXME
+			std::for_each(p.begin(), p.end(), fx);
+		}
+	}
+	weight::make(0xfe200001, 1 << 25);
+	weight::make(0xff200000, 1 << 16);
+	feature::make(0xfe200001, 0xfe000001);
+	feature::make(0xff200000, 0xff000000);
+	// <--for 3rd layer
+
 	for (auto it = weight::begin(); it != weight::end(); it++) {
 		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
 		u32 usageM = usageK >> 10;
@@ -857,11 +880,14 @@ int main(int argc, const char* argv[]) {
 
 	auto s0begin = feature::begin();
 	auto s1begin = feature::find(0x10012367, 0x00012367);
+	auto s2begin = feature::find(0x20012367, 0x00012367);
 	auto s0end = s1begin;
-	auto s1end = feature::end();
-	std::cout << "multi-stage hint: " << (s0end - s0begin) << " | " << (s1end - s1begin) << std::endl;
+	auto s1end = s2begin;
+	auto s2end = feature::end();
+	std::cout << "multi-stage hint: " << (s0end - s0begin) << " | " << (s1end - s1begin) << " | " << (s2end - s2begin) << std::endl;
 
 	u64 s1upd = 0;
+	u64 s2upd = 0;
 	for (stats.init(train); stats; stats++) {
 
 		u32 score = 0;
@@ -886,22 +912,42 @@ int main(int argc, const char* argv[]) {
 			opers += 1;
 			best >> path;
 			best >> b;
+			if (b.hash() >= 16384 + 8192) break;
+		}
+		for (b.next(); best(b, s2begin, s2end); b.next()) {
+			score += best.score();
+			opers += 1;
+			best >> path;
+			best >> b;
 		}
 
-		if (b.hash() >= 16384) {
+		u32 hash = b.hash();
+
+		if (hash >= 16384) {
 //			for (numeric v = 0, u = 0; path.size(); path.pop_back()) {
 //				state& s = path.back();
 //				v = s.update(v, 0.0025 / 32, s0begin, s0end);
 //				s.estimate(s1begin, s1end);
 //				u = s.update(u, 0.0025 / 4, s1begin, s1end);
 //			}
+			if (hash >= 16384 + 8192) {
+				for (numeric u = 0, w = 0; path.size(); path.pop_back()) {
+					state& s = path.back();
+					if (s.move.hash() < 16384 + 8192) break;
+					s.estimate(s1begin, s1end);
+					u = s.update(u, alpha1, s1begin, s1end);
+					s.estimate(s2begin, s2end);
+					w = s.update(w, alpha2, s2begin, s2end);
+				}
+				if (++s2upd % 1000 == 0) std::cout << "multi-stage hint: s2 " << s2upd << std::endl;
+			}
 			for (numeric u = 0; path.size(); path.pop_back()) {
 				state& s = path.back();
 				if (s.move.hash() < 16384) break;
 				s.estimate(s1begin, s1end);
-				u = s.update(u, s1begin, s1end);
+				u = s.update(u, alpha1, s1begin, s1end);
 			}
-			if (++s1upd % 1000 == 0) std::cout << "multi-stage hint: " << s1upd << std::endl;
+			if (++s1upd % 1000 == 0) std::cout << "multi-stage hint: s1 " << s1upd << std::endl;
 		} else {
 //			for (numeric v = 0; path.size(); path.pop_back()) {
 //				v = path.back().update(v, 0.0025 / 32, s0begin, s0end);
@@ -909,9 +955,9 @@ int main(int argc, const char* argv[]) {
 		}
 		path.clear();
 
-		stats.update(score, b.hash(), opers);
+		stats.update(score, hash, opers);
 	}
-	std::cout << "multi-stage hint: " << s1upd << std::endl;
+	std::cout << "multi-stage hint: " << s1upd << " / " << s2upd << std::endl;
 
 	weight::save(weightout);
 	feature::save(featureout);
@@ -946,6 +992,12 @@ int main(int argc, const char* argv[]) {
 			if (b.hash() >= 16384) break;
 		}
 		for (b.next(); best(b, s1begin, s1end); b.next()) {
+			score += best.score();
+			opers += 1;
+			best >> b;
+			if (b.hash() >= 16384 + 8192) break;
+		}
+		for (b.next(); best(b, s2begin, s2end); b.next()) {
 			score += best.score();
 			opers += 1;
 			best >> b;
