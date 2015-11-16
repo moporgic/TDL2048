@@ -935,17 +935,17 @@ int main(int argc, const char* argv[]) {
 				for (; path.size(); path.pop_back()) {
 					state& s = path.back();
 					if (s.move.hash() < 16384 + 8192) break;
+					//s.estimate(s2begin, s2end);
+					w = s.update(w, alpha2, s2begin, s2end);
 					s.estimate(s1begin, s1end);
 					u = s.update(u, alpha1, s1begin, s1end);
-					s.estimate(s2begin, s2end);
-					w = s.update(w, alpha2, s2begin, s2end);
 				}
 				if (++s2upd % 1000 == 0) std::cout << "multi-stage hint: s2 " << s2upd << std::endl;
 			}
 			for (; path.size(); path.pop_back()) {
 				state& s = path.back();
 				if (s.move.hash() < 16384) break;
-				s.estimate(s1begin, s1end);
+				//s.estimate(s1begin, s1end);
 				u = s.update(u, alpha1, s1begin, s1end);
 			}
 			if (++s1upd % 1000 == 0) std::cout << "multi-stage hint: s1 " << s1upd << std::endl;
