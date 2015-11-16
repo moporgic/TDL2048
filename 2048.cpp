@@ -820,18 +820,18 @@ int main(int argc, const char* argv[]) {
 	// <--for 2nd layer
 
 	// for 3rd layer-->
-	for (auto& p : patt6t) {
-		const u32 wsign = hashfx(p) | 0x20000000;
-		weight::make(wsign, std::pow(base, 6));
-		for (auto fx : mapfx) {
-			feature::make(wsign, hashfx(p)); // FIXME
-			std::for_each(p.begin(), p.end(), fx);
-		}
-	}
-	weight::make(0xfe200001, 1 << 25);
-	weight::make(0xff200000, 1 << 16);
-	feature::make(0xfe200001, 0xfe000001);
-	feature::make(0xff200000, 0xff000000);
+//	for (auto& p : patt6t) {
+//		const u32 wsign = hashfx(p) | 0x20000000;
+//		weight::make(wsign, std::pow(base, 6));
+//		for (auto fx : mapfx) {
+//			feature::make(wsign, hashfx(p)); // FIXME
+//			std::for_each(p.begin(), p.end(), fx);
+//		}
+//	}
+//	weight::make(0xfe200001, 1 << 25);
+//	weight::make(0xff200000, 1 << 16);
+//	feature::make(0xfe200001, 0xfe000001);
+//	feature::make(0xff200000, 0xff000000);
 	// <--for 3rd layer
 
 	for (auto it = weight::begin(); it != weight::end(); it++) {
