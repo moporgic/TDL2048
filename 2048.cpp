@@ -396,6 +396,7 @@ struct state {
 		estimate(feature::begin(), feature::end());
 	}
 	inline numeric operator +=(const numeric& v) {
+		estimate(feature::begin(), feature::end());
 		return update(v, feature::begin(), feature::end());
 	}
 
@@ -911,14 +912,7 @@ int main(int argc, const char* argv[]) {
 			opers += 1;
 			best >> path;
 			best >> b;
-//			if (b.hash() >= 16384 + 8192) break;
 		}
-//		for (b.next(); best(b, s2begin, s2end); b.next()) {
-//			score += best.score();
-//			opers += 1;
-//			best >> path;
-//			best >> b;
-//		}
 
 		u32 hash = b.hash();
 
