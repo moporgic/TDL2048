@@ -285,8 +285,8 @@ public:
 	inline bool next() {
 		tiles<u64> empty = spaces();
 		if (empty.size == 0) return false;
-		u32 p = ((empty.tile >> ((rand() % empty.size) << 2)) & 0x0f) << 2;
-		raw |= u64(rand() % 10 ? 1 : 2) << p;
+		u32 p = ((empty.tile >> ((rand() % empty.size) << 2)) & 0x0f);
+		raw |= u64(rand() % 10 ? 1 : 2) << (p << 2);
 		return true;
 	}
 
@@ -424,7 +424,7 @@ public:
 	}
 	inline void write80(std::ostream& out) const {
 		write64(out);
-		moporgic::write(out, raw_cast<u16>(ext, 1));
+		moporgic::write(out, raw_cast<u16>(ext, moporgic::endian::be));
 	}
 
 	inline void read64(std::istream& in) {
@@ -432,7 +432,7 @@ public:
 	}
 	inline void read80(std::istream& in) {
 		read64(in);
-		moporgic::read(in, raw_cast<u16>(ext, 1));
+		moporgic::read(in, raw_cast<u16>(ext, moporgic::endian::be));
 	}
 
 	void print(const bool& raw = true, std::ostream& out = std::cout) const {
