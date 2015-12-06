@@ -2,15 +2,15 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 2.4
+// Version     : 2.5
 // Description : bitboard of 2048
 //============================================================================
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/io.h"
-#include <cstdio>
 #include <algorithm>
 #include <iostream>
+#include <cstdio>
 #include <array>
 
 namespace moporgic {
@@ -273,9 +273,9 @@ public:
 	}
 
 	inline void init() {
-		const u32 r = rand();
-		const u32 i = (r) & 0x0f;
-		const u32 j = (i + 1 + (r >> 4) % 15) & 0x0f;
+		const u32 k = rand();
+		const u32 i = (k) & 0x0f;
+		const u32 j = (i + (k >> 4) + 1) & 0x0f;
 		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
 		ext = 0;
 	}
@@ -286,7 +286,7 @@ public:
 		tiles<u64> empty = spaces();
 		if (empty.size == 0) return false;
 		u32 p = ((empty.tile >> ((rand() % empty.size) << 2)) & 0x0f);
-		raw |= u64(rand() % 10 ? 1 : 2) << (p << 2);
+		raw |= (rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
 
@@ -436,20 +436,26 @@ public:
 	}
 
 	void print(const bool& raw = true, std::ostream& out = std::cout) const {
-		const char* format = raw ? "|%4d%4d%4d%4d|" : "|%6d%6d%6d%6d|";
-		const char* edge = raw ? "+----------------+" : "+------------------------+";
+		auto wtmp = out.width();
+		auto ftmp = out.fill();
+
+		u32 delim = raw ? 4 : 6;
 		auto get = raw ? &board::at : &board::exact;
-		static char buff[40];
-		out << edge << std::endl;
-		for (int i = 0; i < 16; i += 4) {
-			u32 t0 = (this->*get)(i + 0);
-			u32 t1 = (this->*get)(i + 1);
-			u32 t2 = (this->*get)(i + 2);
-			u32 t3 = (this->*get)(i + 3);
-			std::snprintf(buff, sizeof(buff), format, t0, t1, t2, t3);
-			out << buff << std::endl;
+
+		out.width(0); out << "+";
+		out.width(delim * 4); out.fill('-'); out << "";
+		out.width(0); out << "+" << std::endl;
+		for (int i = 0; i < 16; i++) {
+			if (i % 4 == 0) out << "|";
+			out.width(delim); out.fill(' ');
+			out << (this->*get)(i);
+			if (i % 4 == 3) out << "|" << std::endl;
 		}
-		out << edge << std::endl;
+		out.width(0); out << "+";
+		out.width(delim * 4); out.fill('-'); out << "";
+		out.width(0); out << "+" << std::endl;
+
+		out.width(wtmp); out.fill(ftmp);
 	}
 };
 
