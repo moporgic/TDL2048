@@ -279,7 +279,7 @@ public:
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(feats().size()).endian(LE), 4);
+			out.write(r32(u32(feats().size())).endian(LE), 4);
 			for (u32 i = 0, size = feats().size(); i < size; i++)
 				feats()[i] >> out;
 			break;
