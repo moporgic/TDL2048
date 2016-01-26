@@ -40,3 +40,15 @@
 #include <cstddef>
 #include <clocale>
 #include <cwchar>
+#include <mutex>
+#include <iterator>
+#include <utility>
+#include <iomanip>
+// #define INC_MOPORGIC_LIB // to include moporgious libiray
+#ifdef INC_MOPORGIC_LIB
+#include "type.h"
+#include "util.h"
+#include "math.h"
+#include "half.h"
+#include "io.h"
+#endif

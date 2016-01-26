@@ -229,4 +229,26 @@ std::istream& read(std::istream& in, type& v) {
 #undef _postf_vtype
 #undef _postf_defprec
 
-}
+} // namespace moporgic
+
+namespace moporgic {
+
+#define setwf(w, f) std::setw(w) << std::setfill(f)
+#define sethex() std::hex << setwf(2, '0')
+#define setpw(p, w) p << std::setw(w)
+#define setpwf(p, w, f) setpw(p, w) << std::setfill(f)
+
+//inline std::ostream& setwf(std::ostream& out, int w, char f) {
+//	return out << std::setw(w) << std::setfill(f);
+//}
+//inline std::ostream& sethex(std::ostream& out) {
+//	return out << std::hex << setwf(out, 2, '0');
+//}
+//inline std::ostream& setpw(std::ostream& out, std::ios_base& (*p) (std::ios_base&), int w) {
+//	return out << p << std::setw(w);
+//}
+//inline std::ostream& setpwf(std::ostream& out, std::ios_base& (*p) (std::ios_base&), int w, char f) {
+//	return setpw(out, p, w) << std::setfill(f);
+//}
+
+} // namespace moporgic
