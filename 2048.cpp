@@ -821,10 +821,14 @@ int main(int argc, const char* argv[]) {
 	utils::make_indexers();
 
 	if (weight::load(weightio.input) == false) {
+		if (weightio.input.size())
+			std::cerr << "warning: " << weightio.input << " not loaded!" << std::endl;
 		utils::make_weights();
 	}
 
 	if (feature::load(featureio.input) == false) {
+		if (featureio.input.size())
+			std::cerr << "warning: " << featureio.input << " not loaded!" << std::endl;
 		utils::make_features();
 	}
 
@@ -846,7 +850,6 @@ int main(int argc, const char* argv[]) {
 		std::cout << std::endl;
 	}
 
-	std::cout << "start training..." << std::endl;
 
 	board b;
 	select best;
@@ -854,10 +857,11 @@ int main(int argc, const char* argv[]) {
 	std::vector<state> path;
 	path.reserve(5000);
 
+	if (train) std::cout << "start training..." << std::endl;
 	for (stats.init(train); stats; stats++) {
 
-		u32 score = 0;
-		u32 opers = 0;
+		register u32 score = 0;
+		register u32 opers = 0;
 
 		for (b.init(); best << b; b.next()) {
 			score += best.score();
@@ -876,12 +880,11 @@ int main(int argc, const char* argv[]) {
 	weight::save(weightio.output);
 	feature::save(featureio.output);
 
-	std::cout << std::endl;
-	std::cout << "start testing..." << std::endl;
+	if (test) std::cout << std::endl << "start testing..." << std::endl;
 	for (stats.init(test); stats; stats++) {
 
-		u32 score = 0;
-		u32 opers = 0;
+		register u32 score = 0;
+		register u32 opers = 0;
 
 		for (b.init(); best << b; b.next()) {
 			score += best.score();
