@@ -138,7 +138,7 @@ public:
 			return cache(raw, ext, hash, merge, left, right, count, mask, pos);
 		}
 	private:
-		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right, info count, info mask, tiles<u64> pos, u32 mono)
+		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right, info count, info mask, tiles<u64> pos)
 				: raw(raw), ext(ext), hash(hash), merge(merge),
 				  left(left), right(right), count(count), mask(mask), pos(pos) {}
 
