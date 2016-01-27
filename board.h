@@ -205,6 +205,7 @@ public:
 	inline bool operator!=(const u64& raw) const { return this->raw != raw || this->ext != 0; }
 
 	inline u32 fetch(const u32& i) const { return fetch16(i); }
+	inline void place(const u32& i, const u32& r) { place16(i, r); }
 	inline u32 at(const u32& i) const { return at4(i); }
 	inline u32 exact(const u32& i) const { return (1 << at(i)) & 0xfffffffe; }
 	inline void set(const u32& i, const u32& t) { set4(i, t); }
@@ -217,6 +218,14 @@ public:
 	}
 	inline u32 fetch20(const u32& i) const {
 		return fetch16(i) | ((ext >> (i << 2)) & 0xf0000);
+	}
+
+	inline void place16(const u32& i, const u32& r) {
+		raw = (raw & ~(0xffffULL << (i << 4))) | (u64(r & 0xffff) << (i << 4));
+	}
+	inline void place20(const u32& i, const u32& r) {
+		place16(i, r & 0xffff);
+		ext = (ext & ~(0xf0000 << (i << 2))) | ((r & 0xf0000) << (i << 2));
 	}
 
 	inline u32 at4(const u32& i) const {
