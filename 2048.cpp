@@ -486,9 +486,12 @@ u64 indexnum2x(const board& b) { // 25-bit
 
 template<bool transpose, bool isleft>
 u64 indexmono(const board& b) { // 24-bit
-	board o = b;
-	if (transpose) o.transpose();
-	return o.mono(isleft);
+	if (transpose) {
+		board o = b;
+		o.transpose();
+		return o.mono(isleft);
+	}
+	return b.mono(isleft);
 }
 
 void make_indexers() {
