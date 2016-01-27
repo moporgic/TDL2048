@@ -424,13 +424,14 @@ public:
 		}
 	}
 
-	inline u32 monol() const {
-		return (query(0).left.mono << 0)  | (query(1).left.mono << 6)
-			 | (query(2).left.mono << 12) | (query(3).left.mono << 18);
-	}
-	inline u32 monor() const {
-		return (query(0).right.mono << 0)  | (query(1).right.mono << 6)
-			 | (query(2).right.mono << 12) | (query(3).right.mono << 18);
+	inline u32 mono(const bool& left = true) const {
+		if (left) {
+			return (query(0).left.mono << 0)  | (query(1).left.mono << 6)
+				 | (query(2).left.mono << 12) | (query(3).left.mono << 18);
+		} else {
+			return (query(0).right.mono << 0)  | (query(1).right.mono << 6)
+				 | (query(2).right.mono << 12) | (query(3).right.mono << 18);
+		}
 	}
 
 	inline tiles<u64> find(const u32& t) const {
