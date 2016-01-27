@@ -234,6 +234,11 @@ public:
 	feature(const feature& t) : index(t.index), value(t.value) {}
 	~feature() {}
 
+	template<numeric* value, u64 (*index)(const board&)>
+	static inline numeric& pass(const board& b) { return value[index(b)]; }
+	template<weight& value, indexer& index>
+	static inline numeric& pass(const board& b) { return value[index(b)]; }
+
 	inline u64 signature() const {
 		return (u64(value.signature()) << 32) | index.signature();
 	}
@@ -409,7 +414,7 @@ u64 indexmerge(const board& b) {
 	return hori | (vert << 8);
 }
 
-u64 indexnum0(const board& b) {
+u64 indexnum0(const board& b) { // 10-bit
 	// 2k ~ 32k, 2-bit ea.
 	static u16 num[32];
 	b.count(num, 11, 16);
@@ -422,7 +427,7 @@ u64 indexnum0(const board& b) {
 	return index;
 }
 
-u64 indexnum1(const board& b) {
+u64 indexnum1(const board& b) { // 25-bit
 	static u16 num[32];
 	b.count(num, 5, 16);
 	register u64 index = 0;
@@ -436,6 +441,69 @@ u64 indexnum1(const board& b) {
 	index += (num[13] & 0x03) << 19;
 	index += (num[14] & 0x03) << 21;
 	index += (num[15] & 0x03) << 23;
+	return index;
+}
+
+u64 indexnum2(const board& b) { // 25-bit
+	static u16 num[32];
+	b.count(num);
+	register u64 index = 0;
+	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-bit
+	index += ((num[3] + num[4]) & 0x07) << 3; // 8 & 16, 3-bit
+	index += ((num[5] + num[6]) & 0x07) << 6; // 32 & 64, 3-bit
+	index += ((num[7] + num[8]) & 0x07) << 9; // 126 & 256, 3-bit
+	index += ((num[9] + num[10]) & 0x07) << 12; // 512 & 1k, 3-bit
+	index += ((num[11]) & 0x03) << 15; // 2k ~ 32k, 2-bit ea.
+	index += ((num[12]) & 0x03) << 17;
+	index += ((num[13]) & 0x03) << 19;
+	index += ((num[14]) & 0x03) << 21;
+	index += ((num[15]) & 0x03) << 23;
+
+	return index;
+}
+
+template<bool transpose, int off>
+u64 indexnum2x(const board& b) { // 25-bit
+	board o = b;
+	if (transpose) o.transpose();
+	auto& m = o.query(0 + (off ? 2 : 0)).count;
+	auto& n = o.query(1 + (off ? 2 : 0)).count;
+
+	register u64 index = 0;
+	index += ((m[1] + n[1] + m[2] + n[2]) & 0x07) << 0; // 2 & 4, 3-bit
+	index += ((m[3] + n[3] + m[4] + n[4]) & 0x07) << 3; // 8 & 16, 3-bit
+	index += ((m[5] + n[5] + m[6] + n[6]) & 0x07) << 6; // 32 & 64, 3-bit
+	index += ((m[7] + n[7] + m[8] + n[8]) & 0x07) << 9; // 126 & 256, 3-bit
+	index += ((m[9] + n[9] + m[10] + n[10]) & 0x07) << 12; // 512 & 1k, 3-bit
+	index += ((m[11] + n[11]) & 0x03) << 15; // 2k ~ 32k, 2-bit ea.
+	index += ((m[12] + n[12]) & 0x03) << 17;
+	index += ((m[13] + n[13]) & 0x03) << 19;
+	index += ((m[14] + n[14]) & 0x03) << 21;
+	index += ((m[15] + n[15]) & 0x03) << 23;
+
+	return index;
+}
+
+template<bool transpose, bool mirror>
+u64 indexmono(const board& b) { // 24-bit
+	static u32 cell[16];
+	board o = b;
+	if (transpose) o.transpose();
+	if (mirror) o.mirror();
+	o >> cell;
+	register u64 index = 0;
+
+	for (u32 i = 0; i < 4; i++) {
+		index <<= 6;
+		u32* c = cell + (i << 2);
+		if (c[0] > c[1]) index |= 0x0001;
+		if (c[0] > c[2]) index |= 0x0002;
+		if (c[0] > c[3]) index |= 0x0004;
+		if (c[1] > c[2]) index |= 0x0008;
+		if (c[1] > c[3]) index |= 0x0010;
+		if (c[2] > c[3]) index |= 0x0020;
+	}
+
 	return index;
 }
 
@@ -492,6 +560,15 @@ void make_indexers() {
 	indexer::make(0x00765ba9, utils::index6t<7,6,5,11,10,9>);
 	indexer::make(0xfe000000, utils::indexnum0);
 	indexer::make(0xfe000001, utils::indexnum1);
+	indexer::make(0xfe000002, utils::indexnum2);
+	indexer::make(0xfe800002, utils::indexnum2x<false, 0>);
+	indexer::make(0xfe900002, utils::indexnum2x<false, 1>);
+	indexer::make(0xfec00002, utils::indexnum2x<true, 0>);
+	indexer::make(0xfed00002, utils::indexnum2x<true, 1>);
+	indexer::make(0xfd000000, utils::indexmono<false, false>);
+	indexer::make(0xfd000001, utils::indexmono<false, true>);
+	indexer::make(0xfd000002, utils::indexmono<true, false>);
+	indexer::make(0xfd000003, utils::indexmono<true, true>);
 	indexer::make(0xff000000, utils::indexmerge);
 }
 
@@ -500,7 +577,9 @@ void make_weights() {
 	for (auto& p : utils::patt6t) {
 		weight::make(utils::hashfx(p), std::pow(utils::base, 6));
 	}
-	weight::make(0xfe000001, 1 << 25);
+//	weight::make(0xfe000001, 1 << 25);
+	weight::make(0xfe000002, 1 << 25);
+	weight::make(0xfd000000, 1 << 24);
 	weight::make(0xff000000, 1 << 16);
 
 }
@@ -513,7 +592,16 @@ void make_features() {
 			std::for_each(p.begin(), p.end(), fx);
 		}
 	}
-	feature::make(0xfe000001, 0xfe000001);
+//	feature::make(0xfe000001, 0xfe000001);
+//	feature::make(0xfe000002, 0xfe000002);
+	feature::make(0xfe000002, 0xfe800002);
+	feature::make(0xfe000002, 0xfe900002);
+	feature::make(0xfe000002, 0xfec00002);
+	feature::make(0xfe000002, 0xfed00002);
+	feature::make(0xfd000000, 0xfd000000);
+	feature::make(0xfd000000, 0xfd000001);
+	feature::make(0xfd000000, 0xfd000002);
+	feature::make(0xfd000000, 0xfd000003);
 	feature::make(0xff000000, 0xff000000);
 }
 
