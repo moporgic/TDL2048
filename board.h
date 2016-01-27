@@ -424,6 +424,11 @@ public:
 		}
 	}
 
+	inline u32 monotonic() const {
+		return (query(0).mono << 0)  | (query(1).mono << 6)
+			 | (query(2).mono << 12) | (query(3).mono << 16);
+	}
+
 	inline tiles<u64> find(const u32& t) const {
 		return board::lookup(mask(t)).pos;
 	}
