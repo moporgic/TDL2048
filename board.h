@@ -39,6 +39,7 @@ public:
 			const u32 extv; // vertical move (16-bit extra)
 			const u32 score; // merge score
 			const i32 moved; // moved or not (moved: 0, otherwise -1)
+			const u32 mono; // monotonic decreasing value (6-bit)
 
 			inline void moveh(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { moveh64(raw, ext, sc, mv, i); }
 			inline void movev(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { movev64(raw, ext, sc, mv, i); }
@@ -65,8 +66,8 @@ public:
 			operation() = delete;
 			~operation() = default;
 		private:
-			operation(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved)
-				: rawh(rawh), exth(exth), rawv(rawv), extv(extv), score(score), moved(moved) {}
+			operation(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved, u32 mono)
+				: rawh(rawh), exth(exth), rawv(rawv), extv(extv), score(score), moved(moved), mono(mono) {}
 		};
 		typedef std::array<u16, 32> info;
 		const u32 raw; // base row (16-bit raw)
@@ -78,7 +79,6 @@ public:
 		const info count; // number of each tile-type
 		const info mask; // mask of each tile-type
 		const tiles<u64> pos; // layout of board-type
-		const u32 mono;
 
 		cache(const cache& c) = default;
 		cache() = delete;
@@ -103,20 +103,21 @@ public:
 			u32 vext;
 			u32 score;
 			i32 moved;
+			u32 mono;
 
-			mvleft(L, score, merge);
+			mvleft(L, score, merge, mono);
 			u32 mvL = assign(L, Ll, Lh, hraw, hext);
 			std::reverse(Ll, Ll + 4); std::reverse(Lh, Lh + 4);
 			moved = mvL == r ? -1 : 0;
 			map(vraw, vext, Ll, Lh, 12, 8, 4, 0);
-			operation left(hraw, hext, vraw, vext, score, moved);
+			operation left(hraw, hext, vraw, vext, score, moved, mono);
 
-			mvleft(R, score, merge); std::reverse(R, R + 4);
+			mvleft(R, score, merge, mono); std::reverse(R, R + 4);
 			u32 mvR = assign(R, Rl, Rh, hraw, hext);
 			std::reverse(Rl, Rl + 4); std::reverse(Rh, Rh + 4);
 			moved = mvR == r ? -1 : 0;
 			map(vraw, vext, Rl, Rh, 12, 8, 4, 0);
-			operation right(hraw, hext, vraw, vext, score, moved);
+			operation right(hraw, hext, vraw, vext, score, moved, mono);
 
 			u32 hash = 0;
 			info count = {};
@@ -134,20 +135,12 @@ public:
 			}
 			tiles<u64> pos(ltile, lsize);
 
-			u32 mono = 0;
-			if (V[0] >= V[1]) mono |= 0x01;
-			if (V[0] >= V[2]) mono |= 0x02;
-			if (V[0] >= V[3]) mono |= 0x04;
-			if (V[1] >= V[2]) mono |= 0x08;
-			if (V[1] >= V[3]) mono |= 0x10;
-			if (V[2] >= V[3]) mono |= 0x20;
-
-			return cache(raw, ext, hash, merge, left, right, count, mask, pos, mono);
+			return cache(raw, ext, hash, merge, left, right, count, mask, pos);
 		}
 	private:
 		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right, info count, info mask, tiles<u64> pos, u32 mono)
 				: raw(raw), ext(ext), hash(hash), merge(merge),
-				  left(left), right(right), count(count), mask(mask), pos(pos), mono(mono) {}
+				  left(left), right(right), count(count), mask(mask), pos(pos) {}
 
 		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
 			for (u32 i = 0; i < 4; i++) {
@@ -163,10 +156,17 @@ public:
 				| (u64(lo[2]) << (s2 << 2)) | (u64(lo[3]) << (s3 << 2));
 			ext = ((hi[0] << s0) | (hi[1] << s1) | (hi[2] << s2) | (hi[3] << s3)) << 16;
 		}
-		static void mvleft(u32 row[], u32& score, u32& merge) {
+		static void mvleft(u32 row[], u32& score, u32& merge, u32& mono) {
 			u32 top = 0;
 			u32 tmp = 0;
-			score = merge = 0;
+			score = merge = mono = 0;
+			if (row[0] >= row[1]) mono |= 0x01;
+			if (row[0] >= row[2]) mono |= 0x02;
+			if (row[0] >= row[3]) mono |= 0x04;
+			if (row[1] >= row[2]) mono |= 0x08;
+			if (row[1] >= row[3]) mono |= 0x10;
+			if (row[2] >= row[3]) mono |= 0x20;
+
 			for (u32 i = 0; i < 4; i++) {
 				u32 tile = row[i];
 				if (tile == 0) continue;
@@ -424,9 +424,13 @@ public:
 		}
 	}
 
-	inline u32 monotonic() const {
-		return (query(0).mono << 0)  | (query(1).mono << 6)
-			 | (query(2).mono << 12) | (query(3).mono << 16);
+	inline u32 monol() const {
+		return (query(0).left.mono << 0)  | (query(1).left.mono << 6)
+			 | (query(2).left.mono << 12) | (query(3).left.mono << 18);
+	}
+	inline u32 monor() const {
+		return (query(0).right.mono << 0)  | (query(1).right.mono << 6)
+			 | (query(2).right.mono << 12) | (query(3).right.mono << 18);
 	}
 
 	inline tiles<u64> find(const u32& t) const {
