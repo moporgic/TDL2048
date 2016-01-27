@@ -78,6 +78,7 @@ public:
 		const info count; // number of each tile-type
 		const info mask; // mask of each tile-type
 		const tiles<u64> pos; // layout of board-type
+		const u32 mono;
 
 		cache(const cache& c) = default;
 		cache() = delete;
@@ -133,12 +134,20 @@ public:
 			}
 			tiles<u64> pos(ltile, lsize);
 
-			return cache(raw, ext, hash, merge, left, right, count, mask, pos);
+			u32 mono = 0;
+			if (V[0] >= V[1]) mono |= 0x01;
+			if (V[0] >= V[2]) mono |= 0x02;
+			if (V[0] >= V[3]) mono |= 0x04;
+			if (V[1] >= V[2]) mono |= 0x08;
+			if (V[1] >= V[3]) mono |= 0x10;
+			if (V[2] >= V[3]) mono |= 0x20;
+
+			return cache(raw, ext, hash, merge, left, right, count, mask, pos, mono);
 		}
 	private:
-		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right, info count, info mask, tiles<u64> pos)
+		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right, info count, info mask, tiles<u64> pos, u32 mono)
 				: raw(raw), ext(ext), hash(hash), merge(merge),
-				  left(left), right(right), count(count), mask(mask), pos(pos) {}
+				  left(left), right(right), count(count), mask(mask), pos(pos), mono(mono) {}
 
 		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
 			for (u32 i = 0; i < 4; i++) {
