@@ -486,25 +486,10 @@ u64 indexnum2x(const board& b) { // 25-bit
 
 template<bool transpose, bool mirror>
 u64 indexmono(const board& b) { // 24-bit
-	static u32 cell[16];
 	board o = b;
 	if (transpose) o.transpose();
 	if (mirror) o.mirror();
-	o >> cell;
-	register u64 index = 0;
-
-	for (u32 i = 0; i < 4; i++) {
-		index <<= 6;
-		u32* c = cell + (i << 2);
-		if (c[0] > c[1]) index |= 0x0001;
-		if (c[0] > c[2]) index |= 0x0002;
-		if (c[0] > c[3]) index |= 0x0004;
-		if (c[1] > c[2]) index |= 0x0008;
-		if (c[1] > c[3]) index |= 0x0010;
-		if (c[2] > c[3]) index |= 0x0020;
-	}
-
-	return index;
+	return o.monotonic();
 }
 
 void make_indexers() {
