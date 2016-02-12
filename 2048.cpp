@@ -374,19 +374,6 @@ inline u32 hashfx(std::vector<int>& p) {
 
 
 const u32 base = 16;
-//u64 index6t(const board& b,
-//		const int& p0, const int& p1, const int& p2,
-//		const int& p3, const int& p4, const int& p5) {
-////	std::cout << p0 << "\t" << p1 << "\t" << p2 << "\t" << p3 << "\t" << p4 << "\t" << p5 << std::endl;
-//	register u64 index = 0;
-//	index += b.at(p0) <<  0;
-//	index += b.at(p1) <<  4;
-//	index += b.at(p2) <<  8;
-//	index += b.at(p3) << 12;
-//	index += b.at(p4) << 16;
-//	index += b.at(p5) << 20;
-//	return index;
-//}
 template<int p0, int p1, int p2, int p3, int p4, int p5>
 u64 index6t(const board& b) {
 //	std::cout << p0 << "\t" << p1 << "\t" << p2 << "\t" << p3 << "\t" << p4 << "\t" << p5 << std::endl;
@@ -397,6 +384,36 @@ u64 index6t(const board& b) {
 	index += b.at(p3) << 12;
 	index += b.at(p4) << 16;
 	index += b.at(p5) << 20;
+	return index;
+}
+u64 index6t(const board& b,
+		const int& p0, const int& p1, const int& p2,
+		const int& p3, const int& p4, const int& p5) {
+//	std::cout << p0 << "\t" << p1 << "\t" << p2 << "\t" << p3 << "\t" << p4 << "\t" << p5 << std::endl;
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	index += b.at(p5) << 20;
+	return index;
+}
+template<int p0, int p1, int p2, int p3>
+u64 index4t(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	return index;
+}
+u64 index4t(const board& b, const int& p0, const int& p1, const int& p2, const int& p3) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
 	return index;
 }
 
@@ -462,12 +479,12 @@ u64 indexnum2(const board& b) { // 25-bit
 	return index;
 }
 
-template<bool transpose, int off>
+template<bool transpose, int qu0, int qu1>
 u64 indexnum2x(const board& b) { // 25-bit
 	board o = b;
 	if (transpose) o.transpose();
-	auto& m = o.query(0 + (off ? 2 : 0)).count;
-	auto& n = o.query(1 + (off ? 2 : 0)).count;
+	auto& m = o.query(qu0).count;
+	auto& n = o.query(qu1).count;
 
 	register u64 index = 0;
 	index += ((m[1] + n[1] + m[2] + n[2]) & 0x07) << 0; // 2 & 4, 3-bit
@@ -548,10 +565,10 @@ void make_indexers() {
 	indexer::make(0xfe000000, utils::indexnum0);
 	indexer::make(0xfe000001, utils::indexnum1);
 	indexer::make(0xfe000002, utils::indexnum2);
-	indexer::make(0xfe800002, utils::indexnum2x<false, 0>);
-	indexer::make(0xfe900002, utils::indexnum2x<false, 1>);
-	indexer::make(0xfec00002, utils::indexnum2x<true, 0>);
-	indexer::make(0xfed00002, utils::indexnum2x<true, 1>);
+	indexer::make(0xfe800002, utils::indexnum2x<false, 0, 1>);
+	indexer::make(0xfe900002, utils::indexnum2x<false, 2, 3>);
+	indexer::make(0xfec00002, utils::indexnum2x<true, 0, 1>);
+	indexer::make(0xfed00002, utils::indexnum2x<true, 2, 3>);
 	indexer::make(0xfd000000, utils::indexmono<false, false>);
 	indexer::make(0xfd000001, utils::indexmono<false, true>);
 	indexer::make(0xfd000002, utils::indexmono<true, false>);
