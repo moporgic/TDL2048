@@ -686,6 +686,7 @@ struct select {
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
+	inline void operator >>(state& s) const { s = (*best); }
 	inline void operator >>(board& b) const { *best >> b; }
 	inline operator bool() const { return score() != -1; }
 	inline i32 score() const { return best->score; }
