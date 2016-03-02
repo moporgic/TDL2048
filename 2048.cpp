@@ -561,9 +561,9 @@ void make_weights() {
 	for (auto& p : utils::patt6t) {
 		weight::make(utils::hashfx(p), std::pow(utils::base, 6));
 	}
-//	weight::make(0xfe000001, 1 << 25);
-	weight::make(0xfe000002, 1 << 25);
-	weight::make(0xfd000000, 1 << 24);
+	weight::make(0xfe000001, 1 << 25);
+//	weight::make(0xfe000002, 1 << 25);
+//	weight::make(0xfd000000, 1 << 24);
 	weight::make(0xff000000, 1 << 16);
 
 }
@@ -576,16 +576,16 @@ void make_features() {
 			std::for_each(p.begin(), p.end(), fx);
 		}
 	}
-//	feature::make(0xfe000001, 0xfe000001);
+	feature::make(0xfe000001, 0xfe000001);
 //	feature::make(0xfe000002, 0xfe000002);
-	feature::make(0xfe000002, 0xfe800002);
-	feature::make(0xfe000002, 0xfe900002);
-	feature::make(0xfe000002, 0xfec00002);
-	feature::make(0xfe000002, 0xfed00002);
-	feature::make(0xfd000000, 0xfd000000);
-	feature::make(0xfd000000, 0xfd000001);
-	feature::make(0xfd000000, 0xfd000002);
-	feature::make(0xfd000000, 0xfd000003);
+//	feature::make(0xfe000002, 0xfe800002);
+//	feature::make(0xfe000002, 0xfe900002);
+//	feature::make(0xfe000002, 0xfec00002);
+//	feature::make(0xfe000002, 0xfed00002);
+//	feature::make(0xfd000000, 0xfd000000);
+//	feature::make(0xfd000000, 0xfd000001);
+//	feature::make(0xfd000000, 0xfd000002);
+//	feature::make(0xfd000000, 0xfd000003);
 	feature::make(0xff000000, 0xff000000);
 }
 
@@ -936,13 +936,54 @@ int main(int argc, const char* argv[]) {
 		register u32 score = 0;
 		register u32 opers = 0;
 
-		for (b.init(); best << b; b.next()) {
+//		for (b.init(); best << b; b.next()) {
+//			score += best.score();
+//			opers += 1;
+//			best >> path;
+//			best >> b;
+//		}
+//
+//		for (numeric v = 0; path.size(); path.pop_back()) {
+//			v = (path.back() += v);
+//		}
+
+//		state last;
+//		b.init();
+//		best << b;
+//		score += best.score();
+//		opers += 1;
+//		best >> last;
+//		best >> b;
+//		b.next();
+//		while (best << b) {
+//			last += best.esti();
+//			score += best.score();
+//			opers += 1;
+//			best >> last;
+//			best >> b;
+//			b.next();
+//		}
+//		last += 0;
+
+		state last;
+		b.init();
+		best << b;
+		score += best.score();
+		opers += 1;
+		best >> last;
+		best >> path;
+		best >> b;
+		b.next();
+		while (best << b) {
+			last += best.esti();
 			score += best.score();
 			opers += 1;
+			best >> last;
 			best >> path;
 			best >> b;
+			b.next();
 		}
-
+		last += 0;
 		for (numeric v = 0; path.size(); path.pop_back()) {
 			v = (path.back() += v);
 		}
