@@ -25,6 +25,7 @@ public:
 		tiles(const tiles<Tis>& t) = default;
 		tiles() : tile(0), size(0) {}
 		~tiles() = default;
+		inline u32 operator[] (const u32& i) const { return (tile >> (i << 2)) & 0x0f; }
 	};
 	class cache {
 	friend class board;
@@ -303,7 +304,7 @@ public:
 	inline bool next() {
 		tiles<u64> empty = spaces();
 		if (empty.size == 0) return false;
-		u32 p = ((empty.tile >> ((rand() % empty.size) << 2)) & 0x0f);
+		u32 p = empty[rand() % empty.size];
 		raw |= (rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
