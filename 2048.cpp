@@ -823,6 +823,7 @@ int main(int argc, const char* argv[]) {
 		std::string input;
 		std::string output;
 	} weightio, featureio;
+	std::string opts;
 
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
@@ -877,6 +878,12 @@ int main(int argc, const char* argv[]) {
 		case to_hash("-f"):
 		case to_hash("--feature"):
 			break;
+		case to_hash("--option"):
+		case to_hash("--extra"):
+		case to_hash("--config"):
+			for (std::string w; (w = valueof(i, "")).size(); )
+				opts.append(w.append(" "));
+			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
 			std::exit(1);
@@ -923,72 +930,100 @@ int main(int argc, const char* argv[]) {
 		std::cout << std::endl;
 	}
 
+	int traintype = 0;
+	const int FORWARD = 1, BACKWARD = 2;
+	if (opts.find("forward") != std::string::npos)  traintype |= FORWARD;
+	if (opts.find("backward") != std::string::npos) traintype |= BACKWARD;
 
 	board b;
+	state last;
 	select best;
 	statistic stats;
 	std::vector<state> path;
 	path.reserve(5000);
 
 	if (train) std::cout << "start training..." << std::endl;
-	for (stats.init(train); stats; stats++) {
+	switch (traintype) {
+	default:
+	case BACKWARD:
+		for (stats.init(train); stats; stats++) {
 
-		register u32 score = 0;
-		register u32 opers = 0;
+			register u32 score = 0;
+			register u32 opers = 0;
 
-//		for (b.init(); best << b; b.next()) {
-//			score += best.score();
-//			opers += 1;
-//			best >> path;
-//			best >> b;
-//		}
-//
-//		for (numeric v = 0; path.size(); path.pop_back()) {
-//			v = (path.back() += v);
-//		}
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
 
-//		state last;
-//		b.init();
-//		best << b;
-//		score += best.score();
-//		opers += 1;
-//		best >> last;
-//		best >> b;
-//		b.next();
-//		while (best << b) {
-//			last += best.esti();
-//			score += best.score();
-//			opers += 1;
-//			best >> last;
-//			best >> b;
-//			b.next();
-//		}
-//		last += 0;
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				v = (path.back() += v);
+			}
 
-		state last;
-		b.init();
-		best << b;
-		score += best.score();
-		opers += 1;
-		best >> last;
-		best >> path;
-		best >> b;
-		b.next();
-		while (best << b) {
-			last += best.esti();
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case FORWARD:
+		for (stats.init(train); stats; stats++) {
+
+			register u32 score = 0;
+			register u32 opers = 0;
+
+			b.init();
+			best << b;
+			score += best.score();
+			opers += 1;
+			best >> last;
+			best >> b;
+			b.next();
+			while (best << b) {
+				last += best.esti();
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> b;
+				b.next();
+			}
+			last += 0;
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case FORWARD | BACKWARD:
+		for (stats.init(train); stats; stats++) {
+
+			register u32 score = 0;
+			register u32 opers = 0;
+
+			b.init();
+			best << b;
 			score += best.score();
 			opers += 1;
 			best >> last;
 			best >> path;
 			best >> b;
 			b.next();
-		}
-		last += 0;
-		for (numeric v = 0; path.size(); path.pop_back()) {
-			v = (path.back() += v);
-		}
+			while (best << b) {
+				last += best.esti();
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			last += 0;
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				v = (path.back() += v);
+			}
 
-		stats.update(score, b.hash(), opers);
+			stats.update(score, b.hash(), opers);
+		}
+		break;
 	}
 
 	weight::save(weightio.output);
