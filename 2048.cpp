@@ -657,6 +657,9 @@ struct state {
 		estimate(feature::begin(), feature::end());
 		return update(v, feature::begin(), feature::end());
 	}
+	inline numeric operator +=(const state& s) {
+		return operator +=(s.esti);
+	}
 
 	inline void operator >>(board& b) const { b = move; }
 	inline bool operator >(const state& s) const { return esti > s.esti; }
@@ -960,12 +963,58 @@ int main(int argc, const char* argv[]) {
 	select best;
 	statistic stats;
 	std::vector<state> path;
-	path.reserve(5000);
+	path.reserve(20000);
 
 	if (train) std::cout << "start training..." << std::endl;
-	switch (traintype) {
-	default:
-	case BACKWARD:
+	if (opts.find("forward-online") != std::string::npos) {
+		for (stats.init(train); stats; stats++) {
+
+			register u32 score = 0;
+			register u32 opers = 0;
+
+			b.init();
+			best << b;
+			score += best.score();
+			opers += 1;
+			best >> last;
+			best >> b;
+			b.next();
+			while (best << b) {
+				last += best.esti();
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> b;
+				b.next();
+			}
+			last += 0;
+
+			stats.update(score, b.hash(), opers);
+		}
+
+	} else if (opts.find("forward-offline") != std::string::npos) {
+		for (stats.init(train); stats; stats++) {
+
+			register u32 score = 0;
+			register u32 opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			u32 n = path.size();
+			path.push_back(state());
+			for (u32 i = 0; i < n; i++)
+				path[i] += path[i + 1];
+			path.clear();
+
+			stats.update(score, b.hash(), opers);
+		}
+
+	} else if (opts.find("backward") != std::string::npos) {
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
@@ -984,66 +1033,38 @@ int main(int argc, const char* argv[]) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
 
-	case FORWARD:
+	} else if (opts.find("random") != std::string::npos) {
+		std::vector<u32> seq;
+		seq.reserve(20000);
+
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
 			register u32 opers = 0;
 
-			b.init();
-			best << b;
-			score += best.score();
-			opers += 1;
-			best >> last;
-			best >> b;
-			b.next();
-			while (best << b) {
-				last += best.esti();
+			for (b.init(); best << b; b.next()) {
 				score += best.score();
 				opers += 1;
-				best >> last;
-				best >> b;
-				b.next();
-			}
-			last += 0;
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
-
-	case FORWARD | BACKWARD:
-		for (stats.init(train); stats; stats++) {
-
-			register u32 score = 0;
-			register u32 opers = 0;
-
-			b.init();
-			best << b;
-			score += best.score();
-			opers += 1;
-			best >> last;
-			best >> path;
-			best >> b;
-			b.next();
-			while (best << b) {
-				last += best.esti();
-				score += best.score();
-				opers += 1;
-				best >> last;
 				best >> path;
 				best >> b;
-				b.next();
+				seq.push_back(seq.size());
 			}
-			last += 0;
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				v = (path.back() += v);
+
+			path.push_back(state());
+			std::random_shuffle(seq.begin(), seq.end());
+			for (u32 i : seq) {
+				path[i] += path[i + 1];
 			}
+			path.clear();
+			seq.clear();
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+
+	} else {
+		std::cerr << "bad training operation: " << opts << std::endl;
+		return -1;
 	}
 
 	weight::save(weightio.output);
