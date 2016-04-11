@@ -900,6 +900,7 @@ int main(int argc, const char* argv[]) {
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
+			for (std::string f; (f = valueof(i, "")).size(); ) {}
 			break;
 		case to_hash("--option"):
 		case to_hash("--extra"):
@@ -918,6 +919,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "TDL 2048" << std::endl;
 	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
+	std::cout << "opts = " << opts << std::endl;
 	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
@@ -954,9 +956,12 @@ int main(int argc, const char* argv[]) {
 	}
 
 	int traintype = 0;
-	const int FORWARD = 1, BACKWARD = 2;
+	const int FORWARD = 1, BACKWARD = 2, RANDOM = 4;
+	const int ONLINE = 4, OFFLINE = 8;
 	if (opts.find("forward") != std::string::npos)  traintype |= FORWARD;
 	if (opts.find("backward") != std::string::npos) traintype |= BACKWARD;
+	if (opts.find("online") != std::string::npos)   traintype |= ONLINE;
+	if (opts.find("offline") != std::string::npos)  traintype |= OFFLINE;
 
 	board b;
 	state last;
@@ -966,7 +971,30 @@ int main(int argc, const char* argv[]) {
 	path.reserve(20000);
 
 	if (train) std::cout << "start training..." << std::endl;
-	if (opts.find("forward-online") != std::string::npos) {
+	switch (traintype) {
+	default:
+	case BACKWARD:
+		for (stats.init(train); stats; stats++) {
+
+			register u32 score = 0;
+			register u32 opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				v = (path.back() += v);
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case FORWARD + ONLINE:
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
@@ -991,8 +1019,9 @@ int main(int argc, const char* argv[]) {
 
 			stats.update(score, b.hash(), opers);
 		}
+		break;
 
-	} else if (opts.find("forward-offline") != std::string::npos) {
+	case FORWARD + OFFLINE:
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
@@ -1013,28 +1042,9 @@ int main(int argc, const char* argv[]) {
 
 			stats.update(score, b.hash(), opers);
 		}
+		break;
 
-	} else if (opts.find("backward") != std::string::npos) {
-		for (stats.init(train); stats; stats++) {
-
-			register u32 score = 0;
-			register u32 opers = 0;
-
-			for (b.init(); best << b; b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> path;
-				best >> b;
-			}
-
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				v = (path.back() += v);
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
-
-	} else if (opts.find("random") != std::string::npos) {
+	case RANDOM:
 		std::vector<u32> seq;
 		seq.reserve(20000);
 
@@ -1061,10 +1071,7 @@ int main(int argc, const char* argv[]) {
 
 			stats.update(score, b.hash(), opers);
 		}
-
-	} else {
-		std::cerr << "bad training operation: " << opts << std::endl;
-		return -1;
+		break;
 	}
 
 	weight::save(weightio.output);
