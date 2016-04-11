@@ -727,6 +727,7 @@ struct statistic {
 		u64 opers;
 		u32 max;
 		u32 hash;
+		std::array<u32, 32> count;
 	} total, local;
 
 	void init(const u64& max, const u64& chk = 1000) {
@@ -787,6 +788,30 @@ struct statistic {
 		local.opers = 0;
 		local.hash = 0;
 		local.max = 0;
+	}
+
+	inline void updatec(const u32& score, const u32& hash, const u32& opers) {
+		update(score, hash, opers);
+		u32 max = std::log2(hash);
+		local.count[max]++;
+		total.count[max]++;
+		if ((loop % check) != 0) return;
+		local.count = {};
+	}
+
+	void summary(const u32& begin = 1, const u32& end = 17) {
+		std::cout << "max tile summary" << std::endl;
+
+		auto iter = total.count.begin();
+		double sum = std::accumulate(iter + begin, iter + end, 0);
+		char buf[64];
+		for (u32 i = begin; i < end; ++i) {
+			snprintf(buf, sizeof(buf), "%d:\t%8d%8.2f%%%8.2f%%",
+					(1 << i) & 0xfffffffeu, total.count[i],
+					(total.count[i] * 100.0 / sum),
+					(std::accumulate(iter + begin, iter + i + 1, 0) * 100.0 / sum));
+			std::cout << buf << std::endl;
+		}
 	}
 };
 
