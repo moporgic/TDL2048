@@ -985,6 +985,7 @@ int main(int argc, const char* argv[]) {
 	const int ONLINE = 4, OFFLINE = 8;
 	if (opts.find("forward") != std::string::npos)  traintype |= FORWARD;
 	if (opts.find("backward") != std::string::npos) traintype |= BACKWARD;
+	if (opts.find("random") != std::string::npos)   traintype |= RANDOM;
 	if (opts.find("online") != std::string::npos)   traintype |= ONLINE;
 	if (opts.find("offline") != std::string::npos)  traintype |= OFFLINE;
 
