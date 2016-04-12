@@ -709,6 +709,25 @@ void make_features(const std::string& value = "") {
 	}
 }
 
+void list_mapping() {
+	for (auto it = weight::begin(); it != weight::end(); it++) {
+		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
+		u32 usageM = usageK >> 10;
+		printf("weight(%08x)[%llu] = %d%c", it->signature(), it->length(),
+				usageM ? usageM : usageK, usageM ? 'M' : 'K');
+		std::vector<u32> feats;
+		for (auto ft = feature::begin(); ft != feature::end(); ft++) {
+			if (weight(*ft).signature() == it->signature())
+				feats.push_back(feature(*ft).signature());
+		}
+		if (feats.size()) {
+			std::cout << " :";
+			for (auto f : feats) printf(" %08x", f);
+		}
+		std::cout << std::endl;
+	}
+}
+
 } // utils
 
 
@@ -927,6 +946,7 @@ int main(int argc, const char* argv[]) {
 		std::string value;
 	} weightio, featureio;
 	std::string opts;
+	std::string traintype;
 
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
@@ -948,29 +968,36 @@ int main(int argc, const char* argv[]) {
 		case to_hash("--train"):
 			train = u32(std::stod(valueof(i, nullptr)));
 			break;
-		case to_hash("-e"):
+		case to_hash("-T"):
 		case to_hash("--test"):
 			test = u32(std::stod(valueof(i, nullptr)));
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
+		case to_hash("--srand"):
 			seed = u32(std::stod(valueof(i, nullptr)));
 			break;
+		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
 			weightio.input = weightio.output = valueof(i, "tdl2048.weight");
 			break;
+		case to_hash("-wi"):
 		case to_hash("--weight-input"):
 			weightio.input = valueof(i, "tdl2048.weight");
 			break;
+		case to_hash("-wo"):
 		case to_hash("--weight-output"):
 			weightio.output = valueof(i, "tdl2048.weight");
 			break;
+		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
 			featureio.input = featureio.output = valueof(i, "tdl2048.feature");
 			break;
+		case to_hash("-fi"):
 		case to_hash("--feature-input"):
 			featureio.input = valueof(i, "tdl2048.feature");
 			break;
+		case to_hash("-fo"):
 		case to_hash("--feature-output"):
 			featureio.output = valueof(i, "tdl2048.feature");
 			break;
@@ -986,11 +1013,15 @@ int main(int argc, const char* argv[]) {
 			for (std::string f; (f = valueof(i, "")).size(); )
 				featureio.value.append(f.append(" "));
 			break;
+		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 		case to_hash("--extra"):
 			for (std::string w; (w = valueof(i, "")).size(); )
 				opts.append(w.append(" "));
+			break;
+		case to_hash("--train-type"):
+			traintype = valueof(i, "");
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1009,6 +1040,8 @@ int main(int argc, const char* argv[]) {
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
+
+
 	utils::make_indexers();
 
 	if (weight::load(weightio.input) == false) {
@@ -1023,31 +1056,11 @@ int main(int argc, const char* argv[]) {
 		utils::make_features(featureio.value);
 	}
 
-	for (auto it = weight::begin(); it != weight::end(); it++) {
-		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
-		u32 usageM = usageK >> 10;
-		printf("weight(%08x)[%llu] = %d%c", it->signature(), it->length(),
-				usageM ? usageM : usageK, usageM ? 'M' : 'K');
-		std::vector<u32> feats;
-		for (auto ft = feature::begin(); ft != feature::end(); ft++) {
-			if (weight(*ft).signature() == it->signature())
-				feats.push_back(feature(*ft).signature());
-		}
-		if (feats.size()) {
-			std::cout << " :";
-			for (auto f : feats) printf(" %08x", f);
-		}
-		std::cout << std::endl;
-	}
+	utils::list_mapping();
 
-	int traintype = 0;
-	const int FORWARD = 1, BACKWARD = 2, RANDOM = 4;
-	const int ONLINE = 4, OFFLINE = 8;
-	if (opts.find("forward") != std::string::npos)  traintype |= FORWARD;
-	if (opts.find("backward") != std::string::npos) traintype |= BACKWARD;
-	if (opts.find("random") != std::string::npos)   traintype |= RANDOM;
-	if (opts.find("online") != std::string::npos)   traintype |= ONLINE;
-	if (opts.find("offline") != std::string::npos)  traintype |= OFFLINE;
+
+
+
 
 	board b;
 	state last;
@@ -1057,9 +1070,14 @@ int main(int argc, const char* argv[]) {
 	path.reserve(20000);
 
 	if (train) std::cout << std::endl << "start training..." << std::endl;
-	switch (traintype) {
+	switch (to_hash(traintype)) {
+
+	case to_hash("backward/online"):
+		std::cerr << "warning: use backward/offline instead" << std::endl;
+		// no break
 	default:
-	case BACKWARD:
+	case to_hash("backward/offline"):
+	case to_hash("backward"):
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
@@ -1080,7 +1098,8 @@ int main(int argc, const char* argv[]) {
 		}
 		break;
 
-	case FORWARD + ONLINE:
+	case to_hash("forward"):
+	case to_hash("forward/online"):
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
@@ -1107,7 +1126,7 @@ int main(int argc, const char* argv[]) {
 		}
 		break;
 
-	case FORWARD + OFFLINE:
+	case to_hash("forward/offline"):
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
@@ -1130,7 +1149,11 @@ int main(int argc, const char* argv[]) {
 		}
 		break;
 
-	case RANDOM:
+	case to_hash("random/online"):
+		std::cerr << "warning: use random/offline instead" << std::endl;
+		// no break
+	case to_hash("random/offline"):
+	case to_hash("random"):
 		std::vector<u32> seq;
 		seq.reserve(20000);
 
@@ -1162,6 +1185,9 @@ int main(int argc, const char* argv[]) {
 
 	weight::save(weightio.output);
 	feature::save(featureio.output);
+
+
+
 
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
 	for (stats.init(test); stats; stats++) {
