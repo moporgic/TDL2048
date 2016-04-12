@@ -662,19 +662,13 @@ void make_weights(const std::string& value = "") {
 
 	} else {
 		// 0x0a:100 0xab(10) 0x123456a[100]
-		for (char d : std::string(":()[]"))
-			while (value.find(d) != std::string::npos)
-				value[value.find(d)] = ' ';
-
-		std::stringstream wghtin(value);
+		std::string in(value);
+		while (in.find_first_of(":()[]") != std::string::npos)
+			in[in.find_first_of(":()[]")] = ' ';
+		std::stringstream wghtin(in);
 		u32 sign, size;
-		while (wghtin >> std::hex >> sign) {
-			if (wghtin >> std::dec >> size) {
-				weight::make(sign, size);
-			} else {
-				char buf[16]; snprintf(buf, sizeof(buf), "%08x", sign);
-				std::cerr << "bad size for weight(" << buf << ")" << std::endl;
-			}
+		while (wghtin >> std::hex >> sign && wghtin >> std::dec >> size) {
+			weight::make(sign, size);
 		}
 	}
 
@@ -703,19 +697,13 @@ void make_features(const std::string& value = "") {
 		feature::make(0xff000000, 0xff000000);
 	} else {
 		// weight:indexer weight(indexer) weight[indexer]
-		for (char d : std::string(":()[]"))
-			while (value.find(d) != std::string::npos)
-				value[value.find(d)] = ' ';
-
-		std::stringstream featin(value);
+		std::string in(value);
+		while (in.find_first_of(":()[]") != std::string::npos)
+			in[in.find_first_of(":()[]")] = ' ';
+		std::stringstream featin(in);
 		u32 wght, idxr;
-		while (featin >> std::hex >> wght) {
-			if (featin >> std::hex >> idxr) {
-				feature::make(wght, idxr);
-			} else {
-				char buf[16]; snprintf(buf, sizeof(buf), "%08x", wght);
-				std::cerr << "bad indexer for weight(" << buf << ")" << std::endl;
-			}
+		while (featin >> std::hex >> wght && featin >> std::hex >> idxr) {
+			feature::make(wght, idxr);
 		}
 	}
 }
@@ -1023,16 +1011,14 @@ int main(int argc, const char* argv[]) {
 	if (weight::load(weightio.input) == false) {
 		if (weightio.input.size())
 			std::cerr << "warning: " << weightio.input << " not loaded!" << std::endl;
-		utils::make_weights();
+		utils::make_weights(weightio.value);
 	}
-	utils::make_weights(weightio.value);
 
 	if (feature::load(featureio.input) == false) {
 		if (featureio.input.size())
 			std::cerr << "warning: " << featureio.input << " not loaded!" << std::endl;
-		utils::make_features();
+		utils::make_features(featureio.value);
 	}
-	utils::make_features(featureio.value);
 
 	for (auto it = weight::begin(); it != weight::end(); it++) {
 		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
