@@ -975,17 +975,19 @@ int main(int argc, const char* argv[]) {
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
+		case to_hash("--weight-value"):
 			for (std::string w; (w = valueof(i, "")).size(); )
 				weightio.value.append(w.append(" "));
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
+		case to_hash("--feature-value"):
 			for (std::string f; (f = valueof(i, "")).size(); )
 				featureio.value.append(f.append(" "));
 			break;
 		case to_hash("--option"):
+		case to_hash("--options"):
 		case to_hash("--extra"):
-		case to_hash("--config"):
 			for (std::string w; (w = valueof(i, "")).size(); )
 				opts.append(w.append(" "));
 			break;
