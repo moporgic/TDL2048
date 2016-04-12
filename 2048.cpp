@@ -669,8 +669,12 @@ void make_weights(const std::string& value = "") {
 		std::stringstream wghtin(value);
 		u32 sign, size;
 		while (wghtin >> std::hex >> sign) {
-			wghtin >> std::dec >> size;
-			weight::make(sign, size);
+			if (wghtin >> std::dec >> size) {
+				weight::make(sign, size);
+			} else {
+				char buf[16]; snprintf(buf, sizeof(buf), "%08x", sign);
+				std::cerr << "bad size for weight(" << buf << ")" << std::endl;
+			}
 		}
 	}
 
@@ -703,11 +707,15 @@ void make_features(const std::string& value = "") {
 			while (value.find(d) != std::string::npos)
 				value[value.find(d)] = ' ';
 
-		std::stringstream wghtin(value);
+		std::stringstream featin(value);
 		u32 wght, idxr;
-		while (wghtin >> std::hex >> wght) {
-			wghtin >> std::hex >> idxr;
-			feature::make(wght, idxr);
+		while (featin >> std::hex >> wght) {
+			if (featin >> std::hex >> idxr) {
+				feature::make(wght, idxr);
+			} else {
+				char buf[16]; snprintf(buf, sizeof(buf), "%08x", wght);
+				std::cerr << "bad indexer for weight(" << buf << ")" << std::endl;
+			}
 		}
 	}
 }
