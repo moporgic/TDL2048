@@ -46,19 +46,6 @@ public:
 	inline bool operator ==(const u32& s) const { return sign == s; }
 	inline size_t length() const { return size; }
 
-	template<typename rxx> void write(std::ostream& out) const {
-		numeric *v = value.get();
-		for (u64 i = 0; i < size; i++)
-			out.write(rxx(v[i]).le(), sizeof(rxx));
-	}
-	template<typename rxx> void read(std::istream& in) {
-		char buf[8];
-		auto load = moporgic::make_load(in, buf);
-		numeric *v = value.get();
-		for (u64 i = 0; i < size; i++)
-			v[i] = rxx(load(sizeof(rxx))).le();
-	}
-
 	void operator >>(std::ostream& out) const {
 		const int LE = moporgic::endian::le;
 		const char serial = 1;
@@ -190,6 +177,19 @@ public:
 private:
 	weight(const u32& sign, const u64& size) : sign(sign), value(new numeric[size]()), size(size) {}
 	static inline std::vector<weight>& weights() { static std::vector<weight> w; return w; }
+
+	template<typename rxx> void write(std::ostream& out) const {
+		numeric *v = value.get();
+		for (u64 i = 0; i < size; i++)
+			out.write(rxx(v[i]).le(), sizeof(rxx));
+	}
+	template<typename rxx> void read(std::istream& in) {
+		char buf[8];
+		auto load = moporgic::make_load(in, buf);
+		numeric *v = value.get();
+		for (u64 i = 0; i < size; i++)
+			v[i] = rxx(load(sizeof(rxx))).le();
+	}
 
 	u32 sign;
 	std::shared_ptr<numeric> value;
@@ -948,6 +948,7 @@ int main(int argc, const char* argv[]) {
 	std::string opts;
 	std::string traintype;
 
+
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
 		if (def != nullptr) return def;
@@ -1041,7 +1042,6 @@ int main(int argc, const char* argv[]) {
 	std::cout << std::endl;
 
 
-
 	utils::make_indexers();
 
 	if (weight::load(weightio.input) == false) {
@@ -1057,9 +1057,6 @@ int main(int argc, const char* argv[]) {
 	}
 
 	utils::list_mapping();
-
-
-
 
 
 	board b;
