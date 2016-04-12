@@ -28,6 +28,7 @@
 #include <limits>
 #include <cctype>
 #include <iterator>
+#include <sstream>
 
 namespace moporgic {
 
