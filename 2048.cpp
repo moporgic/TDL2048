@@ -27,6 +27,7 @@
 #include <thread>
 #include <limits>
 #include <cctype>
+#include <iterator>
 
 namespace moporgic {
 
@@ -513,23 +514,6 @@ u64 indexmono(const board& b) { // 24-bit
 
 void make_indexers() {
 
-	//	for (int hash = 0; hash < 0x00ffffff; hash++) {
-	//		int p[6];
-	//		for (int i = 0; i < 6; i++) p[i] = (hash >> ((5 - i) << 2)) & 0x0f;
-	//		indexer::make(hash,
-	//			std::bind(index6t, std::placeholders::_1, p[0], p[1], p[2], p[3], p[4], p[5]));
-	//	}
-
-	//	for (auto& p : utils::patt6t) {
-	//		for (auto fx : utils::mapfx) {
-	//			indexer::make(utils::hashfx(p), std::bind(utils::index6t, std::placeholders::_1,
-	////					std::cref(p[0]), std::cref(p[1]), std::cref(p[2]),
-	////					std::cref(p[3]), std::cref(p[4]), std::cref(p[5])));
-	//					(p[0]), (p[1]), (p[2]), (p[3]), (p[4]), (p[5])));
-	//			std::for_each(p.begin(), p.end(), fx);
-	//		}
-	//	}
-
 	indexer::make(0x00012367, utils::index6t<0,1,2,3,6,7>);
 	indexer::make(0x0037bfae, utils::index6t<3,7,11,15,10,14>);
 	indexer::make(0x00fedc98, utils::index6t<15,14,13,12,9,8>);
@@ -664,37 +648,68 @@ void make_indexers() {
 	indexer::make(0xff000000, utils::indexmerge);
 }
 
-void make_weights() {
+void make_weights(const std::string& value = "") {
 
-	for (auto& p : utils::patt6t) {
-		weight::make(utils::hashfx(p), std::pow(utils::base, 6));
-	}
-	weight::make(0xfe000001, 1 << 25);
-//	weight::make(0xfe000002, 1 << 25);
-//	weight::make(0xfd000000, 1 << 24);
-	weight::make(0xff000000, 1 << 16);
+	if (value.empty()) {
+		// make default weights
+		for (auto& p : utils::patt6t) {
+			weight::make(utils::hashfx(p), std::pow(utils::base, 6));
+		}
+		weight::make(0xfe000001, 1 << 25);
+//		weight::make(0xfe000002, 1 << 25);
+//		weight::make(0xfd000000, 1 << 24);
+		weight::make(0xff000000, 1 << 16);
 
-}
-void make_features() {
+	} else {
+		// 0x0a:100 0xab(10) 0x123456a[100]
+		for (char d : std::string(":()[]"))
+			while (value.find(d) != std::string::npos)
+				value[value.find(d)] = ' ';
 
-	for (auto& p : utils::patt6t) {
-		const u32 wsign = utils::hashfx(p);
-		for (auto fx : utils::mapfx) {
-			feature::make(wsign, utils::hashfx(p));
-			std::for_each(p.begin(), p.end(), fx);
+		std::stringstream wghtin(value);
+		u32 sign, size;
+		while (wghtin >> std::hex >> sign) {
+			wghtin >> std::dec >> size;
+			weight::make(sign, size);
 		}
 	}
-	feature::make(0xfe000001, 0xfe000001);
-//	feature::make(0xfe000002, 0xfe000002);
-//	feature::make(0xfe000002, 0xfe800002);
-//	feature::make(0xfe000002, 0xfe900002);
-//	feature::make(0xfe000002, 0xfec00002);
-//	feature::make(0xfe000002, 0xfed00002);
-//	feature::make(0xfd000000, 0xfd000000);
-//	feature::make(0xfd000000, 0xfd000001);
-//	feature::make(0xfd000000, 0xfd000002);
-//	feature::make(0xfd000000, 0xfd000003);
-	feature::make(0xff000000, 0xff000000);
+
+}
+void make_features(const std::string& value = "") {
+
+	if (value.empty()) {
+		// make default features
+		for (auto& p : utils::patt6t) {
+			const u32 wsign = utils::hashfx(p);
+			for (auto fx : utils::mapfx) {
+				feature::make(wsign, utils::hashfx(p));
+				std::for_each(p.begin(), p.end(), fx);
+			}
+		}
+		feature::make(0xfe000001, 0xfe000001);
+//		feature::make(0xfe000002, 0xfe000002);
+//		feature::make(0xfe000002, 0xfe800002);
+//		feature::make(0xfe000002, 0xfe900002);
+//		feature::make(0xfe000002, 0xfec00002);
+//		feature::make(0xfe000002, 0xfed00002);
+//		feature::make(0xfd000000, 0xfd000000);
+//		feature::make(0xfd000000, 0xfd000001);
+//		feature::make(0xfd000000, 0xfd000002);
+//		feature::make(0xfd000000, 0xfd000003);
+		feature::make(0xff000000, 0xff000000);
+	} else {
+		// weight:indexer weight(indexer) weight[indexer]
+		for (char d : std::string(":()[]"))
+			while (value.find(d) != std::string::npos)
+				value[value.find(d)] = ' ';
+
+		std::stringstream wghtin(value);
+		u32 wght, idxr;
+		while (wghtin >> std::hex >> wght) {
+			wghtin >> std::hex >> idxr;
+			feature::make(wght, idxr);
+		}
+	}
 }
 
 } // utils
@@ -904,60 +919,15 @@ struct statistic {
 };
 
 int main(int argc, const char* argv[]) {
-//	randinit();
-//	board bb;	bb.init();
-//	for (int i = 0; i < 16; i++) bb.set(i, rand() % 16);
-//	time_t start = moporgic::millisec();
-//	for (u64 i = 0; i < 20000000000ULL; i++) {
-//		//bb.transpose64();
-//		bb.transpose2();
-//		//bb.set(rand() % 16, rand() % 16);
-//		bb.init();
-//	}
-//	std::cout << (moporgic::millisec() - start) << std::endl ;
-//	bb.print();
-//	for (int i = 0; i < 16; i++)
-//		std::cout << i << "\t" << bb.count(i) << std::endl;
-//	return 0;
-//
-//	start = moporgic::millisec();
-//	for (u64 i = 0; i < 1000000000ULL; i++) {
-//		bb.transpose64();
-//	//	bb.transpose2();
-//		bb.set(rand() % 16, rand() % 16);
-//	}
-//	std::cout << (moporgic::millisec() - start) ;
-
-//	std::ifstream in;
-//	in.open("X:\\bb.bin", std::ios::in | std::ios::binary);
-//	bb << in;
-//	board::print(bb);
-//	bb.print();
-//	bb.transpose2();
-//	bb.print();
-//	printf("%08x\n%08x\n",bb.mask(1), bb.mask(4));
-
-//	std::ofstream out;
-//	out.open("X:\\bb.bin", std::ios::out | std::ios::binary | std::ios::trunc);
-//	bb >> out;
-//	out.flush();
-//	out.close();
-
-//	int q[16] = {0};
-//	for (int i = 0; i < 10000000; i++) {
-//		bb.init();
-//		for (int t = 0; t < 16; t++) q[t] += bb.at(t);
-//	}
-//	for (int i = 0; i < 16; i++)
-//		std::cout << q[i] << "\t";
-//	return 0;
-
 	u32 train = 100;
 	u32 test = 10;
-	u32 seed = std::time(nullptr);
+	u32 timestamp = std::time(nullptr);
+	u32 seed = timestamp;
+	numeric& alpha = moporgic::alpha;
 	struct tdlio {
 		std::string input;
 		std::string output;
+		std::string value;
 	} weightio, featureio;
 	std::string opts;
 
@@ -1009,11 +979,13 @@ int main(int argc, const char* argv[]) {
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
-			for (std::string w; (w = valueof(i, "")).size(); ) {}
+			for (std::string w; (w = valueof(i, "")).size(); )
+				weightio.value.append(w.append(" "));
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
-			for (std::string f; (f = valueof(i, "")).size(); ) {}
+			for (std::string f; (f = valueof(i, "")).size(); )
+				featureio.value.append(f.append(" "));
 			break;
 		case to_hash("--option"):
 		case to_hash("--extra"):
@@ -1029,11 +1001,13 @@ int main(int argc, const char* argv[]) {
 	}
 
 	std::srand(seed);
-	std::cout << "TDL 2048" << std::endl;
-	std::cout << "seed = " << seed << std::endl;
+	std::cout << "TDL2048+ LOG" << std::endl;
+	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
+	std::cout << std::endl;
+	std::cout << "timestamp = " << timestamp << std::endl;
+	std::cout << "srand = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
-	std::cout << "opts = " << opts << std::endl;
-	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
+//	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
 	utils::make_indexers();
@@ -1043,13 +1017,14 @@ int main(int argc, const char* argv[]) {
 			std::cerr << "warning: " << weightio.input << " not loaded!" << std::endl;
 		utils::make_weights();
 	}
+	utils::make_weights(weightio.value);
 
 	if (feature::load(featureio.input) == false) {
 		if (featureio.input.size())
 			std::cerr << "warning: " << featureio.input << " not loaded!" << std::endl;
 		utils::make_features();
 	}
-
+	utils::make_features(featureio.value);
 
 	for (auto it = weight::begin(); it != weight::end(); it++) {
 		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
@@ -1084,7 +1059,7 @@ int main(int argc, const char* argv[]) {
 	std::vector<state> path;
 	path.reserve(20000);
 
-	if (train) std::cout << "start training..." << std::endl;
+	if (train) std::cout << std::endl << "start training..." << std::endl;
 	switch (traintype) {
 	default:
 	case BACKWARD:
