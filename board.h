@@ -445,7 +445,7 @@ public:
 
 	inline bool finished() const {
 		board b(*this);
-		if (b.spaces()) return false;
+		if (b.spaces().size) return false;
 		b.mark();
 		if (b.up() != -1) return true;
 		b.reset();
