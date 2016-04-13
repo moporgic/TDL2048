@@ -1162,8 +1162,10 @@ int main(int argc, const char* argv[]) {
 
 			u32 n = path.size();
 			path.push_back(state());
-			for (u32 i = 0; i < n; i++)
+			for (u32 i = 0; i < n; i++) {
+				if (path[i + 1].move != 0) path[i + 1].estimate();
 				path[i] += path[i + 1];
+			}
 			path.clear();
 
 			stats.update(score, b.hash(), opers);
@@ -1194,6 +1196,7 @@ int main(int argc, const char* argv[]) {
 			path.push_back(state());
 			std::random_shuffle(seq.begin(), seq.end());
 			for (u32 i : seq) {
+				if (path[i + 1].move != 0) path[i + 1].estimate();
 				path[i] += path[i + 1];
 			}
 			path.clear();
