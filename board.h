@@ -443,9 +443,9 @@ public:
 		return board::lookup(fetch(r));
 	}
 
-	inline bool finished() const {
+	inline bool operable() const {
 		board b(*this);
-		if (b.spaces().size) return false;
+		if (b.spaces().size) return true;
 		b.mark();
 		if (b.up() != -1) return true;
 		b.reset();
