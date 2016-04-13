@@ -443,6 +443,20 @@ public:
 		return board::lookup(fetch(r));
 	}
 
+	inline bool finished() const {
+		board b(*this);
+		if (b.spaces()) return false;
+		b.mark();
+		if (b.up() != -1) return true;
+		b.reset();
+		if (b.right() != -1) return true;
+		b.reset();
+		if (b.down() != -1) return true;
+		b.reset();
+		if (b.left() != -1) return true;
+		return false;
+	}
+
 	inline void operator >>(std::ostream& out) const { write(out); }
 	inline void operator <<(std::istream& in) { read(in); }
 	inline void operator >>(u32* cell) const { write(cell); }
