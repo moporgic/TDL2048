@@ -1021,6 +1021,7 @@ int main(int argc, const char* argv[]) {
 			for (std::string w; (w = valueof(i, "")).size(); )
 				opts.append(w.append(" "));
 			break;
+		case to_hash("-tt"):
 		case to_hash("--train-type"):
 			traintype = valueof(i, "");
 			break;
