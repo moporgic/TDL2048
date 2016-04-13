@@ -29,6 +29,7 @@
 #include <cctype>
 #include <iterator>
 #include <sstream>
+#include <list>
 
 namespace moporgic {
 
@@ -361,6 +362,36 @@ private:
 
 namespace utils {
 
+struct options : public std::list<std::string> {
+	options() : std::list<std::string>() {}
+	options(const std::list<std::string>& opts) : std::list<std::string>(opts) {}
+
+	options& operator +=(const std::string& opt) {
+		push_back(opt);
+		return *this;
+	}
+	options& operator -=(const std::string& opt) {
+		auto it = std::find(begin(), end(), opt);
+		if (it != end()) this->erase(it);
+		return *this;
+	}
+
+	bool exists(const std::string& opt) const {
+		return std::find(begin(), end(), opt) != end();
+	}
+	std::string& operator [](const std::string& opt) {
+		auto it = std::find(begin(), end(), opt);
+		if (it == end()) return (operator +=(opt))[opt];
+		if (++it == end()) return (operator +=(""))[opt];
+		return (*it);
+	}
+
+	operator std::string() const {
+		std::stringstream ss;
+		std::copy(begin(), end(), std::ostream_iterator<std::string>(ss, " "));
+		return ss.str();
+	}};
+
 inline void rotfx(int& i) {
 	i = (3 - (i >> 2)) + ((i % 4) << 2);
 }
@@ -664,8 +695,8 @@ void make_weights(const std::string& value = "") {
 	} else {
 		// 0x0a:100 0xab(10) 0x123456a[100]
 		std::string in(value);
-		while (in.find_first_of(":()[]") != std::string::npos)
-			in[in.find_first_of(":()[]")] = ' ';
+		while (in.find_first_of(":()[],") != std::string::npos)
+			in[in.find_first_of(":()[],")] = ' ';
 		std::stringstream wghtin(in);
 		u32 sign, size;
 		while (wghtin >> std::hex >> sign && wghtin >> std::dec >> size) {
@@ -699,8 +730,8 @@ void make_features(const std::string& value = "") {
 	} else {
 		// weight:indexer weight(indexer) weight[indexer]
 		std::string in(value);
-		while (in.find_first_of(":()[]") != std::string::npos)
-			in[in.find_first_of(":()[]")] = ' ';
+		while (in.find_first_of(":()[],") != std::string::npos)
+			in[in.find_first_of(":()[],")] = ' ';
 		std::stringstream featin(in);
 		u32 wght, idxr;
 		while (featin >> std::hex >> wght && featin >> std::hex >> idxr) {
@@ -940,13 +971,9 @@ int main(int argc, const char* argv[]) {
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = moporgic::alpha;
-	struct tdlio {
-		std::string input;
-		std::string output;
-		std::string value;
-	} weightio, featureio;
-	std::string opts;
-	std::string traintype;
+	utils::options wopts;
+	utils::options fopts;
+	utils::options opts;
 
 
 	auto valueof = [&](int& i, const char* def) -> const char* {
@@ -980,50 +1007,52 @@ int main(int argc, const char* argv[]) {
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
-			weightio.input = weightio.output = valueof(i, "tdl2048.weight");
+			wopts["input"] = valueof(i, "tdl2048.weight");
+			wopts["output"] = wopts["input"];
 			break;
 		case to_hash("-wi"):
 		case to_hash("--weight-input"):
-			weightio.input = valueof(i, "tdl2048.weight");
+			wopts["input"] = valueof(i, "tdl2048.weight");
 			break;
 		case to_hash("-wo"):
 		case to_hash("--weight-output"):
-			weightio.output = valueof(i, "tdl2048.weight");
+			wopts["output"] = valueof(i, "tdl2048.weight");
 			break;
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			featureio.input = featureio.output = valueof(i, "tdl2048.feature");
+			fopts["input"] = valueof(i, "tdl2048.feature");
+			fopts["output"] = fopts["input"];
 			break;
 		case to_hash("-fi"):
 		case to_hash("--feature-input"):
-			featureio.input = valueof(i, "tdl2048.feature");
+			fopts["input"] = valueof(i, "tdl2048.feature");
 			break;
 		case to_hash("-fo"):
 		case to_hash("--feature-output"):
-			featureio.output = valueof(i, "tdl2048.feature");
+			fopts["output"] = valueof(i, "tdl2048.feature");
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
 		case to_hash("--weight-value"):
 			for (std::string w; (w = valueof(i, "")).size(); )
-				weightio.value.append(w.append(" "));
+				wopts["value"] += (w += ',');
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
 		case to_hash("--feature-value"):
 			for (std::string f; (f = valueof(i, "")).size(); )
-				featureio.value.append(f.append(" "));
+				fopts["value"] += (f += ',');
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 		case to_hash("--extra"):
-			for (std::string w; (w = valueof(i, "")).size(); )
-				opts.append(w.append(" "));
+			for (std::string o; (o = valueof(i, "")).size(); )
+				opts += o;
 			break;
 		case to_hash("-tt"):
 		case to_hash("--train-type"):
-			traintype = valueof(i, "");
+			opts["train-type"] = valueof(i, "");
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1045,16 +1074,16 @@ int main(int argc, const char* argv[]) {
 
 	utils::make_indexers();
 
-	if (weight::load(weightio.input) == false) {
-		if (weightio.input.size())
-			std::cerr << "warning: " << weightio.input << " not loaded!" << std::endl;
-		utils::make_weights(weightio.value);
+	if (weight::load(wopts["input"]) == false) {
+		if (wopts["input"].size())
+			std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
+		utils::make_weights(wopts["value"]);
 	}
 
-	if (feature::load(featureio.input) == false) {
-		if (featureio.input.size())
-			std::cerr << "warning: " << featureio.input << " not loaded!" << std::endl;
-		utils::make_features(featureio.value);
+	if (feature::load(fopts["input"]) == false) {
+		if (fopts["input"].size())
+			std::cerr << "warning: " << fopts["input"] << " not loaded!" << std::endl;
+		utils::make_features(fopts["value"]);
 	}
 
 	utils::list_mapping();
@@ -1068,7 +1097,7 @@ int main(int argc, const char* argv[]) {
 	path.reserve(20000);
 
 	if (train) std::cout << std::endl << "start training..." << std::endl;
-	switch (to_hash(traintype)) {
+	switch (to_hash(opts["train-type"])) {
 
 	case to_hash("backward/online"):
 		std::cerr << "warning: use backward/offline instead" << std::endl;
@@ -1181,8 +1210,8 @@ int main(int argc, const char* argv[]) {
 		break;
 	}
 
-	weight::save(weightio.output);
-	feature::save(featureio.output);
+	weight::save(wopts["output"]);
+	feature::save(fopts["output"]);
 
 
 
