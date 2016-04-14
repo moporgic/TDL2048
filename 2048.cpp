@@ -1173,6 +1173,101 @@ int main(int argc, const char* argv[]) {
 		}
 		break;
 
+	case to_hash("random/mem"):
+	case to_hash("random/mem/offline"):
+	{
+		if (opts["history-size"].empty()) opts["history-size"] = "200000";
+		if (opts["training-step"].empty()) opts["training-step"] = "1";
+		u32 memsize = std::stol(opts["history-size"]);
+		u32 step = std::stol(opts["training-step"]);
+
+		auto *history = new std::pair<state, state>[memsize]();
+		u32 size = 0;
+
+		for (stats.init(train); stats; stats++) {
+
+			register u32 score = 0;
+			register u32 opers = 0;
+
+			b.init();
+			best << b;
+			score += best.score();
+			opers += 1;
+			best >> last;
+			best >> b;
+			for (b.next(); best << b; b.next()) {
+				history[(size++) % memsize] = std::make_pair(last, *(best.best));
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> b;
+			}
+			history[(size++) % memsize] = std::make_pair(last, state());
+
+			u32 range = std::min(size, memsize);
+			for (u32 s = step * opers; s; --s) {
+				auto& pair = history[randx() % range];
+				if (pair.second.move != 0) pair.second.estimate();
+				pair.first += pair.second;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+
+		delete[] history;
+
+		break;
+	}
+	case to_hash("random/mem/online"):
+	{
+		if (opts["history-size"].empty()) opts["history-size"] = "200000";
+		if (opts["training-step"].empty()) opts["training-step"] = "1";
+		u32 memsize = std::stol(opts["history-size"]);
+		u32 step = std::stol(opts["training-step"]);
+
+		auto *history = new std::pair<state, state>[memsize]();
+		u32 size = 0;
+
+		for (stats.init(train); stats; stats++) {
+
+			register u32 score = 0;
+			register u32 opers = 0;
+
+			b.init();
+			best << b;
+			score += best.score();
+			opers += 1;
+			best >> last;
+			best >> b;
+			for (b.next(); best << b; b.next()) {
+				history[(size++) % memsize] = std::make_pair(last, *(best.best));
+				u32 range = std::min(size, memsize);
+				for (u32 s = step; s; --s) {
+					auto& pair = history[randx() % range];
+					if (pair.second.move != 0) pair.second.estimate();
+					pair.first += pair.second;
+				}
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> b;
+			}
+			history[(size++) % memsize] = std::make_pair(last, state());
+			u32 range = std::min(size, memsize);
+			for (u32 s = step; s; --s) {
+				auto& pair = history[randx() % range];
+				if (pair.second.move != 0) pair.second.estimate();
+				pair.first += pair.second;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+
+		delete[] history;
+
+		break;
+	}
+
 	case to_hash("random/online"):
 		std::cerr << "warning: use random/offline instead" << std::endl;
 		// no break
