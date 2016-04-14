@@ -775,7 +775,7 @@ struct state {
 		move = b;
 		score = (move.*oper)();
 	}
-	inline void estimate(const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	inline numeric estimate(const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		if (score >= 0) {
 			esti = score;
 			for (auto f = begin; f != end; f++)
@@ -783,6 +783,7 @@ struct state {
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
+		return esti;
 	}
 	inline numeric update(const numeric& v, const numeric& alpha = moporgic::alpha,
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
