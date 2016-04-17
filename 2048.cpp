@@ -740,6 +740,28 @@ void make_features(const std::string& value = "") {
 	}
 }
 
+inline numeric estimate(const board& state, const i32& reward,
+		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	if (reward >= 0) {
+		register numeric esti = reward;
+		for (auto f = begin; f != end; f++)
+			esti += (*f)[state];
+		return esti;
+	} else {
+		return -std::numeric_limits<numeric>::max();
+	}
+}
+
+inline numeric update(const board& state, const numeric& current, const i32& reward,
+		const numeric& accuracy, const numeric& alpha = moporgic::alpha,
+		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	const numeric updv = alpha * (accuracy - (current - reward));
+	register numeric esti = reward;
+	for (auto f = begin; f != end; f++)
+		esti += ((*f)[state] += updv);
+	return esti;
+}
+
 void list_mapping() {
 	for (auto it = weight::begin(); it != weight::end(); it++) {
 		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
