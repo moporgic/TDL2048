@@ -1244,7 +1244,6 @@ int main(int argc, const char* argv[]) {
 				u32 range = std::min(size, memsize);
 				for (u32 s = step; s; --s) {
 					auto& pair = history[randx() % range];
-					if (pair.second.move != 0) pair.second.estimate();
 					pair.first += pair.second;
 				}
 				score += best.score();
@@ -1256,7 +1255,6 @@ int main(int argc, const char* argv[]) {
 			u32 range = std::min(size, memsize);
 			for (u32 s = step; s; --s) {
 				auto& pair = history[randx() % range];
-				if (pair.second.move != 0) pair.second.estimate();
 				pair.first += pair.second;
 			}
 
