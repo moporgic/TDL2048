@@ -1177,9 +1177,9 @@ int main(int argc, const char* argv[]) {
 	case to_hash("random/mem/offline"):
 	{
 		if (opts["history-size"].empty()) opts["history-size"] = "200000";
-		if (opts["training-step"].empty()) opts["training-step"] = "1";
+		if (opts["training-batch"].empty()) opts["training-batch"] = "1";
 		u32 memsize = std::stol(opts["history-size"]);
-		u32 step = std::stol(opts["training-step"]);
+		u32 batch = std::stol(opts["training-batch"]);
 
 		auto *history = new std::pair<state, state>[memsize]();
 		u32 size = 0;
@@ -1205,7 +1205,7 @@ int main(int argc, const char* argv[]) {
 			history[(size++) % memsize] = std::make_pair(last, state());
 
 			u32 range = std::min(size, memsize);
-			for (u32 s = step * opers; s; --s) {
+			for (u32 s = batch * opers; s; --s) {
 				auto& pair = history[randx() % range];
 				if (pair.second.move != 0) pair.second.estimate();
 				pair.first += pair.second;
@@ -1221,9 +1221,9 @@ int main(int argc, const char* argv[]) {
 	case to_hash("random/mem/online"):
 	{
 		if (opts["history-size"].empty()) opts["history-size"] = "200000";
-		if (opts["training-step"].empty()) opts["training-step"] = "1";
+		if (opts["training-batch"].empty()) opts["training-batch"] = "1";
 		u32 memsize = std::stol(opts["history-size"]);
-		u32 step = std::stol(opts["training-step"]);
+		u32 batch = std::stol(opts["training-batch"]);
 
 		auto *history = new std::pair<state, state>[memsize]();
 		u32 size = 0;
@@ -1242,7 +1242,7 @@ int main(int argc, const char* argv[]) {
 			for (b.next(); best << b; b.next()) {
 				history[(size++) % memsize] = std::make_pair(last, *(best.best));
 				u32 range = std::min(size, memsize);
-				for (u32 s = step; s; --s) {
+				for (u32 s = batch; s; --s) {
 					auto& pair = history[randx() % range];
 					pair.first += pair.second;
 				}
@@ -1253,7 +1253,7 @@ int main(int argc, const char* argv[]) {
 			}
 			history[(size++) % memsize] = std::make_pair(last, state());
 			u32 range = std::min(size, memsize);
-			for (u32 s = step; s; --s) {
+			for (u32 s = batch; s; --s) {
 				auto& pair = history[randx() % range];
 				pair.first += pair.second;
 			}
