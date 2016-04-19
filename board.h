@@ -2,7 +2,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 2.5
+// Version     : 2.6
 // Description : bitboard of 2048
 //============================================================================
 #include "moporgic/type.h"
@@ -80,6 +80,7 @@ public:
 		const info count; // number of each tile-type
 		const info mask; // mask of each tile-type
 		const tiles<u64> pos; // layout of board-type
+		const i32 moved; // moved or not
 
 		cache(const cache& c) = default;
 		cache() = delete;
@@ -135,13 +136,15 @@ public:
 				if ((r >> i) & 1) ltile |= (u64(i) << ((lsize++) << 2));
 			}
 			tiles<u64> pos(ltile, lsize);
+			moved = left.moved & right.moved;
 
-			return cache(raw, ext, hash, merge, left, right, count, mask, pos);
+			return cache(raw, ext, hash, merge, left, right, count, mask, pos, moved);
 		}
 	private:
-		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right, info count, info mask, tiles<u64> pos)
+		cache(u32 raw, u32 ext, u32 hash, u32 merge,
+				operation left, operation right, info count, info mask, tiles<u64> pos, i32 moved)
 				: raw(raw), ext(ext), hash(hash), merge(merge),
-				  left(left), right(right), count(count), mask(mask), pos(pos) {}
+				  left(left), right(right), count(count), mask(mask), pos(pos), moved(moved) {}
 
 		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
 			for (u32 i = 0; i < 4; i++) {
@@ -444,19 +447,16 @@ public:
 	}
 
 	inline bool operable() const {
+		if (this->query(0).moved == 0) return true;
+		if (this->query(1).moved == 0) return true;
+		if (this->query(2).moved == 0) return true;
+		if (this->query(3).moved == 0) return true;
 		board trans(*this); trans.transpose();
-		const cache* row[] = { &query(0), &query(1), &query(2), &query(3) };
-		const cache* col[] = { &trans.query(0), &trans.query(1), &trans.query(2), &trans.query(3) };
-		register i32 moved = -1;
-		moved &= row[0]->left.moved; moved &= row[0]->right.moved;
-		moved &= row[1]->left.moved; moved &= row[1]->right.moved;
-		moved &= row[2]->left.moved; moved &= row[2]->right.moved;
-		moved &= row[3]->left.moved; moved &= row[3]->right.moved;
-		moved &= col[0]->left.moved; moved &= col[0]->right.moved;
-		moved &= col[1]->left.moved; moved &= col[1]->right.moved;
-		moved &= col[2]->left.moved; moved &= col[2]->right.moved;
-		moved &= col[3]->left.moved; moved &= col[3]->right.moved;
-		return moved != -1;
+		if (trans.query(0).moved == 0) return true;
+		if (trans.query(1).moved == 0) return true;
+		if (trans.query(2).moved == 0) return true;
+		if (trans.query(3).moved == 0) return true;
+		return false;
 	}
 
 	inline void operator >>(std::ostream& out) const { write(out); }
