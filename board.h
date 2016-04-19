@@ -444,17 +444,19 @@ public:
 	}
 
 	inline bool operable() const {
-		board b(*this);
-		if (b.spaces().size) return true;
-		b.mark();
-		if (b.up() != -1) return true;
-		b.reset();
-		if (b.right() != -1) return true;
-		b.reset();
-		if (b.down() != -1) return true;
-		b.reset();
-		if (b.left() != -1) return true;
-		return false;
+		board trans(*this); trans.transpose();
+		const cache* row[] = { &query(0), &query(1), &query(2), &query(3) };
+		const cache* col[] = { &trans.query(0), &trans.query(1), &trans.query(2), &trans.query(3) };
+		register i32 moved = -1;
+		moved &= row[0]->left.moved; moved &= row[0]->right.moved;
+		moved &= row[1]->left.moved; moved &= row[1]->right.moved;
+		moved &= row[2]->left.moved; moved &= row[2]->right.moved;
+		moved &= row[3]->left.moved; moved &= row[3]->right.moved;
+		moved &= col[0]->left.moved; moved &= col[0]->right.moved;
+		moved &= col[1]->left.moved; moved &= col[1]->right.moved;
+		moved &= col[2]->left.moved; moved &= col[2]->right.moved;
+		moved &= col[3]->left.moved; moved &= col[3]->right.moved;
+		return moved != -1;
 	}
 
 	inline void operator >>(std::ostream& out) const { write(out); }
