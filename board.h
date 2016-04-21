@@ -461,14 +461,9 @@ public:
 
 	inline void operator >>(std::ostream& out) const { write(out); }
 	inline void operator <<(std::istream& in) { read(in); }
-	inline void operator >>(u32* cell) const { write(cell); }
-	inline void operator <<(u32* cell) { read(cell); }
 
 	inline void write(std::ostream& out) const { write64(out); }
 	inline void read(std::istream& in) { read64(in); }
-
-	inline void write(u32* cell) const { for (u32 i = 0; i < 16; i++) cell[i] = at(i); }
-	inline void read(u32* cell) { for (u32 i = 0; i < 16; i++) set(i, cell[i]); }
 
 	inline void write64(std::ostream& out) const {
 		moporgic::write(out, raw);
