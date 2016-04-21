@@ -17,12 +17,11 @@ namespace moporgic {
 
 class board {
 public:
-	template<typename Tis>
 	struct tiles {
-		Tis tile;
+		u64 tile;
 		u32 size;
-		tiles(const Tis& t, const u32& s) : tile(t), size(s) {}
-		tiles(const tiles<Tis>& t) = default;
+		tiles(const u64& t, const u32& s) : tile(t), size(s) {}
+		tiles(const tiles& t) = default;
 		tiles() : tile(0), size(0) {}
 		~tiles() = default;
 		inline u32 operator[] (const u32& i) const { return (tile >> (i << 2)) & 0x0f; }
@@ -79,7 +78,7 @@ public:
 		const operation right; // right operation
 		const info count; // number of each tile-type
 		const info mask; // mask of each tile-type
-		const tiles<u64> pos; // layout of board-type
+		const tiles pos; // layout of board-type
 		const i32 moved; // moved or not
 
 		cache(const cache& c) = default;
@@ -135,14 +134,14 @@ public:
 			for (int i = 0; i < 16; i++) {
 				if ((r >> i) & 1) ltile |= (u64(i) << ((lsize++) << 2));
 			}
-			tiles<u64> pos(ltile, lsize);
+			tiles pos(ltile, lsize);
 			moved = left.moved & right.moved;
 
 			return cache(raw, ext, hash, merge, left, right, count, mask, pos, moved);
 		}
 	private:
 		cache(u32 raw, u32 ext, u32 hash, u32 merge,
-				operation left, operation right, info count, info mask, tiles<u64> pos, i32 moved)
+				operation left, operation right, info count, info mask, tiles pos, i32 moved)
 				: raw(raw), ext(ext), hash(hash), merge(merge),
 				  left(left), right(right), count(count), mask(mask), pos(pos), moved(moved) {}
 
@@ -301,11 +300,11 @@ public:
 		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
 		ext = 0;
 	}
-	inline tiles<u64> spaces() const {
+	inline tiles spaces() const {
 		return find(0);
 	}
 	inline bool next() {
-		tiles<u64> empty = spaces();
+		tiles empty = spaces();
 		if (empty.size == 0) return false;
 		u32 p = empty[rand() % empty.size];
 		raw |= (rand() % 10 ? 1ULL : 2ULL) << (p << 2);
@@ -438,7 +437,7 @@ public:
 		}
 	}
 
-	inline tiles<u64> find(const u32& t) const {
+	inline tiles find(const u32& t) const {
 		return board::lookup(mask(t)).pos;
 	}
 
