@@ -839,6 +839,7 @@ struct state {
 		move << in;
 		moporgic::read(in, score);
 	}
+	inline operator bool() const { return score >= 0; }
 };
 struct select {
 	state move[4];
@@ -874,6 +875,15 @@ struct select {
 		if (move[3] > *best) best = move + 3;
 		return *this;
 	}
+	inline select& update_rand() {
+		const u32 i = std::rand() % 4;
+		best = move + i;
+		if (move[(i + 1) % 4] > *best) best = move + ((i + 1) % 4);
+		if (move[(i + 2) % 4] > *best) best = move + ((i + 2) % 4);
+		if (move[(i + 3) % 4] > *best) best = move + ((i + 3) % 4);
+		return *this;
+	}
+	inline void shuffle() { std::random_shuffle(move, move + 4); }
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
