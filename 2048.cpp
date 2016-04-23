@@ -864,6 +864,7 @@ struct select {
 		return update();
 	}
 	inline select& update() {
+		return update_rand();
 		best = move;
 		if (move[1] > *best) best = move + 1;
 		if (move[2] > *best) best = move + 2;
@@ -913,7 +914,8 @@ struct statistic {
 	}
 	u64 operator++(int) { return (++loop) - 1; }
 	u64 operator++() { return (++loop); }
-	operator bool() { return loop <= limit; }
+	operator bool() const { return loop <= limit; }
+	bool checked() const { return (loop % check) == 0; }
 
 	void update(const u32& score, const u32& hash, const u32& opers) {
 		local.score += score;
@@ -1064,6 +1066,8 @@ int main(int argc, const char* argv[]) {
 		case to_hash("--feature-value"):
 			for (std::string f; (f = valueof(i, "")).size(); )
 				fopts["value"] += (f += ',');
+			break;
+		case to_hash("--modify"):
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
