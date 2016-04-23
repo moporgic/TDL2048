@@ -748,14 +748,18 @@ inline numeric estimate(const board& state,
 	return esti;
 }
 
-inline numeric update(const board& state,
-		const numeric& current, const numeric& accuracy, const numeric& alpha = moporgic::alpha,
+inline numeric update(const board& state, const numeric& updv,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
-	const numeric updv = alpha * (accuracy - current);
 	register numeric esti = 0;
 	for (auto f = begin; f != end; f++)
 		esti += ((*f)[state] += updv);
 	return esti;
+}
+
+inline numeric update(const board& state,
+		const numeric& curr, const numeric& accu, const numeric& alpha = moporgic::alpha,
+		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	return update(state, alpha * (accu - curr), begin, end);
 }
 
 void list_mapping() {
@@ -795,20 +799,15 @@ struct state {
 	}
 	inline numeric estimate(const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		if (score >= 0) {
-			esti = score;
-			for (auto f = begin; f != end; f++)
-				esti += (*f)[move];
+			esti = score + utils::estimate(move, begin, end);
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
 		return esti;
 	}
-	inline numeric update(const numeric& v, const numeric& alpha = moporgic::alpha,
+	inline numeric update(const numeric& accu, const numeric& alpha = moporgic::alpha,
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
-		const numeric upd = alpha * (v - (esti - score));
-		esti = score;
-		for (auto f = begin; f != end; f++)
-			esti += ((*f)[move] += upd);
+		esti = score + utils::update(move, alpha * (accu - (esti - score)), begin, end);
 		return esti;
 	}
 
