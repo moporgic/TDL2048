@@ -458,6 +458,24 @@ public:
 		return false;
 	}
 
+	class tile {
+	friend class board;
+	public:
+		board& b;
+		const u32 i;
+	private:
+		inline tile(const board& b, const u32& i) : b(const_cast<board&>(b)), i(i) {}
+	public:
+		inline tile(const tile& t) = default;
+		tile() = delete;
+		inline operator u32() const { return b.at(i); }
+		inline tile& operator =(const u32& k) { b.set(i, k); return *this; }
+		inline tile& operator =(const tile& t) { return operator =(u32(t)); }
+		inline bool operator ==(const u32& k) const { return b.at(i) == k; }
+		inline bool operator !=(const u32& k) const { return b.at(i) != k; }
+	};
+	inline tile operator [](const u32& i) const { return tile(*this, i); }
+
 	inline void operator >>(std::ostream& out) const { write(out); }
 	inline void operator <<(std::istream& in) { read(in); }
 
