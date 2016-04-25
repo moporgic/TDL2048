@@ -740,26 +740,26 @@ void make_features(const std::string& value = "") {
 	}
 }
 
-inline numeric estimate(const board& state, const i32& reward,
+inline numeric estimate(const board& state,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
-	if (reward >= 0) {
-		register numeric esti = reward;
-		for (auto f = begin; f != end; f++)
-			esti += (*f)[state];
-		return esti;
-	} else {
-		return -std::numeric_limits<numeric>::max();
-	}
+	register numeric esti = 0;
+	for (auto f = begin; f != end; f++)
+		esti += (*f)[state];
+	return esti;
 }
 
-inline numeric update(const board& state, const numeric& current, const i32& reward,
-		const numeric& accuracy, const numeric& alpha = moporgic::alpha,
+inline numeric update(const board& state, const numeric& updv,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
-	const numeric updv = alpha * (accuracy - (current - reward));
-	register numeric esti = reward;
+	register numeric esti = 0;
 	for (auto f = begin; f != end; f++)
 		esti += ((*f)[state] += updv);
 	return esti;
+}
+
+inline numeric update(const board& state,
+		const numeric& curr, const numeric& accu, const numeric& alpha = moporgic::alpha,
+		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	return update(state, alpha * (accu - curr), begin, end);
 }
 
 void list_mapping() {
@@ -799,20 +799,15 @@ struct state {
 	}
 	inline numeric estimate(const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		if (score >= 0) {
-			esti = score;
-			for (auto f = begin; f != end; f++)
-				esti += (*f)[move];
+			esti = score + utils::estimate(move, begin, end);
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
 		return esti;
 	}
-	inline numeric update(const numeric& v, const numeric& alpha = moporgic::alpha,
+	inline numeric update(const numeric& accu, const numeric& alpha = moporgic::alpha,
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
-		const numeric upd = alpha * (v - (esti - score));
-		esti = score;
-		for (auto f = begin; f != end; f++)
-			esti += ((*f)[move] += upd);
+		esti = score + utils::update(move, alpha * (accu - (esti - score)), begin, end);
 		return esti;
 	}
 
@@ -839,6 +834,7 @@ struct state {
 		move << in;
 		moporgic::read(in, score);
 	}
+	inline operator bool() const { return score >= 0; }
 };
 struct select {
 	state move[4];
@@ -868,12 +864,22 @@ struct select {
 		return update();
 	}
 	inline select& update() {
+		return update_rand();
 		best = move;
 		if (move[1] > *best) best = move + 1;
 		if (move[2] > *best) best = move + 2;
 		if (move[3] > *best) best = move + 3;
 		return *this;
 	}
+	inline select& update_rand() {
+		const u32 i = std::rand() % 4;
+		best = move + i;
+		if (move[(i + 1) % 4] > *best) best = move + ((i + 1) % 4);
+		if (move[(i + 2) % 4] > *best) best = move + ((i + 2) % 4);
+		if (move[(i + 3) % 4] > *best) best = move + ((i + 3) % 4);
+		return *this;
+	}
+	inline void shuffle() { std::random_shuffle(move, move + 4); }
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
@@ -908,7 +914,8 @@ struct statistic {
 	}
 	u64 operator++(int) { return (++loop) - 1; }
 	u64 operator++() { return (++loop); }
-	operator bool() { return loop <= limit; }
+	operator bool() const { return loop <= limit; }
+	bool checked() const { return (loop % check) == 0; }
 
 	void update(const u32& score, const u32& hash, const u32& opers) {
 		local.score += score;
@@ -1059,6 +1066,8 @@ int main(int argc, const char* argv[]) {
 		case to_hash("--feature-value"):
 			for (std::string f; (f = valueof(i, "")).size(); )
 				fopts["value"] += (f += ',');
+			break;
+		case to_hash("--modify"):
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
