@@ -544,6 +544,14 @@ u64 indexmono(const board& b) { // 24-bit
 	return b.mono(isleft);
 }
 
+template<int rotate, int mirror>
+u64 indexmax(const board& b) { // 16-bit
+	board k = b;
+	k.rotate(rotate);
+	if (mirror) k.mirror();
+	return k.mask(k.max());
+}
+
 void make_indexers() {
 
 	indexer::make(0x00012367, utils::index6t<0,1,2,3,6,7>);
@@ -673,11 +681,19 @@ void make_indexers() {
 	indexer::make(0xfe900002, utils::indexnum2x<false, 2, 3>);
 	indexer::make(0xfec00002, utils::indexnum2x<true, 0, 1>);
 	indexer::make(0xfed00002, utils::indexnum2x<true, 2, 3>);
+	indexer::make(0xff000000, utils::indexmerge);
 	indexer::make(0xfd000000, utils::indexmono<false, false>);
 	indexer::make(0xfd000001, utils::indexmono<false, true>);
 	indexer::make(0xfd000002, utils::indexmono<true, false>);
 	indexer::make(0xfd000003, utils::indexmono<true, true>);
-	indexer::make(0xff000000, utils::indexmerge);
+	indexer::make(0xfc000000, utils::indexmax<0, 0>);
+	indexer::make(0xfc000001, utils::indexmax<1, 0>);
+	indexer::make(0xfc000002, utils::indexmax<2, 0>);
+	indexer::make(0xfc000003, utils::indexmax<3, 0>);
+	indexer::make(0xfc000010, utils::indexmax<0, 1>);
+	indexer::make(0xfc000011, utils::indexmax<1, 1>);
+	indexer::make(0xfc000012, utils::indexmax<2, 1>);
+	indexer::make(0xfc000013, utils::indexmax<3, 1>);
 }
 
 void make_weights(const std::string& value = "") {
