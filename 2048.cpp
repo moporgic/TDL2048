@@ -360,6 +360,86 @@ private:
 	weight value;
 };
 
+class zhasher {
+public:
+	zhasher(const u32& sign, const u64& mask) : sign(sign), mask(mask) {
+		for (auto& pos : z)
+			for (auto& hv : pos)
+				hv = rand64();
+	}
+	zhasher(const zhasher& z) = default;
+	~zhasher() = default;
+	inline u64 operator ()(const board& b) const { // TODO: after of before
+		register u64 v = 0;
+		for (u32 i = 0; i < 16; i++)
+			v ^= z[i][b.at(i)];
+		return v & mask;
+	}
+//	inline indexer::mapper build() const {
+//		if (indexer::find(sign) != indexer::end())
+//			return indexer::at(sign);
+//		indexer::mapper mapper = std::bind(zhasher::operator (), this);
+//		return indexer::make(sign, mapper);
+//	}
+private:
+	u32 sign;
+	std::array<std::array<u64, 32>, 16> z;
+	u64 mask;
+};
+
+class transposition {
+public:
+	class entry {
+	friend class transposition;
+	public:
+		numeric& value;
+		i8& depth;
+	private:
+		entry(numeric& value, i8& depth) : value(value), depth(depth) {}
+	};
+	transposition(const u64& size) : zhasher(0xffff0001, -1), value(new numeric[size]()), depth(new i8[size]()) {}
+	inline entry operator[] (const board& b) {
+		struct om {
+			int weight;
+			u64 hash;
+		};
+
+		board isomo = b;
+		u64 hash = zhasher(isomo);
+		isomo.rotate();
+		hash = std::min(hash, zhasher(isomo));
+		isomo.rotate();
+		hash = std::min(hash, zhasher(isomo));
+		isomo.rotate();
+		hash = std::min(hash, zhasher(isomo));
+		isomo.mirror();
+		hash = std::min(hash, zhasher(isomo));
+		isomo.rotate();
+		hash = std::min(hash, zhasher(isomo));
+		isomo.rotate();
+		hash = std::min(hash, zhasher(isomo));
+		isomo.rotate();
+		hash = std::min(hash, zhasher(isomo));
+
+		hash &= 0x01ffffff;
+
+		return entry(value[hash], depth[hash]);
+	}
+	inline int weight(const board& b) {
+		int w = 0;
+		for (u32 i = 0; i < 16; i++) {
+			w += b.at(i) * (i + 1);
+		}
+		return w;
+	}
+private:
+	zhasher zhasher;
+	numeric* value;
+	i8* depth;
+};
+transposition tpa(1 << 25);
+transposition tpb(1 << 25);
+
 namespace utils {
 
 struct options : public std::list<std::string> {
@@ -762,6 +842,56 @@ inline numeric update(const board& state,
 	return update(state, alpha * (accu - curr), begin, end);
 }
 
+numeric search_expt(const board& after, const i32& depth);
+numeric search_max(const board& before, const i32& depth);
+
+numeric search_expt(const board& after, const i32& depth) {
+	if (depth <= 0) return utils::estimate(after);
+	auto ca = tpa[after], cb = tpb[after];
+	if (ca.depth >= depth && cb.depth >= depth) {
+		if (ca.value == cb.value) return ca.value;
+	}
+	const auto spaces = after.spaces();
+	numeric expt = 0;
+	board before = after;
+	before.mark();
+	for (u32 i = 0; i < spaces.size; i++) {
+		const u32 pos = spaces[i];
+		before.set(pos, 1);
+		expt += 9 * search_max(before, depth - 1);
+		before.set(pos, 2);
+		expt += 1 * search_max(before, depth - 1);
+		before.reset();
+	}
+	ca.depth = cb.depth = depth;
+	ca.value = cb.value = expt / (10 * spaces.size);
+	return expt / (10 * spaces.size);
+}
+
+numeric search_max(const board& before, const i32& depth) {
+	numeric expt = -std::numeric_limits<numeric>::max();
+	board after = before;
+	after.mark();
+	register i32 reward;
+	if ((reward = after.up()) != -1) {
+		expt = std::max(expt, reward + search_expt(after, depth - 1));
+		after.reset();
+	}
+	if ((reward = after.right()) != -1) {
+		expt = std::max(expt, reward + search_expt(after, depth - 1));
+		after.reset();
+	}
+	if ((reward = after.down()) != -1) {
+		expt = std::max(expt, reward + search_expt(after, depth - 1));
+		after.reset();
+	}
+	if ((reward = after.left()) != -1) {
+		expt = std::max(expt, reward + search_expt(after, depth - 1));
+		after.reset();
+	}
+	return expt;
+}
+
 void list_mapping() {
 	for (auto it = weight::begin(); it != weight::end(); it++) {
 		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
@@ -888,6 +1018,50 @@ struct select {
 	inline i32 score() const { return best->score; }
 	inline numeric esti() const { return best->esti; }
 };
+struct search {
+	numeric expt;
+	board after;
+	i32 reward;
+	inline operator bool() const { return reward != -1; }
+	inline i32 score() const { return reward; }
+	inline void clear() {
+		this->expt = -std::numeric_limits<numeric>::max();
+		this->after = 0;
+		this->reward = -1;
+	}
+	inline void update(const numeric& expt, const board& after, const i32& score) {
+		if (expt > this->expt) {
+			this->expt = expt;
+			this->after = after;
+			this->reward = score;
+		}
+	}
+	search& operator >>(board& after) { after = this->after; return *this; }
+	search& operator <<(const board& before) {
+		static int depthres[16] = { 9, 9, 5, 5, 3, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1 };
+		const int depth = depthres[before.spaces().size];
+		clear();
+		board after = before; after.mark();
+		register i32 reward;
+		if ((reward = after.up()) != -1) {
+			update(reward + utils::search_expt(after, depth - 1), after, reward);
+			after.reset();
+		}
+		if ((reward = after.right()) != -1) {
+			update(reward + utils::search_expt(after, depth - 1), after, reward);
+			after.reset();
+		}
+		if ((reward = after.down()) != -1) {
+			update(reward + utils::search_expt(after, depth - 1), after, reward);
+			after.reset();
+		}
+		if ((reward = after.left()) != -1) {
+			update(reward + utils::search_expt(after, depth - 1), after, reward);
+			after.reset();
+		}
+		return (*this);
+	}
+};
 struct statistic {
 	u64 limit;
 	u64 loop;
@@ -974,6 +1148,7 @@ struct statistic {
 	}
 
 	void summary(const u32& begin = 1, const u32& end = 17) {
+		std::cout << std::endl;
 		std::cout << "max tile summary" << std::endl;
 
 		auto iter = total.count.begin();
@@ -1079,6 +1254,11 @@ int main(int argc, const char* argv[]) {
 		case to_hash("-tt"):
 		case to_hash("--train-type"):
 			opts["train-type"] = valueof(i, "");
+			break;
+		case to_hash("-Tt"):
+		case to_hash("-TT"):
+		case to_hash("--test-type"):
+			opts["test-type"] = valueof(i, "");
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1339,7 +1519,7 @@ int main(int argc, const char* argv[]) {
 
 
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
-	for (stats.init(test); stats; stats++) {
+	for (stats.init(test, 1); stats; stats++) {
 
 		register u32 score = 0;
 		register u32 opers = 0;
