@@ -534,21 +534,19 @@ u64 indexnum2x(const board& b) { // 25-bit
 	return index;
 }
 
-template<bool transpose, bool isleft>
+template<int isomorphic>
 u64 indexmono(const board& b) { // 24-bit
-	if (transpose) {
-		board o = b;
-		o.transpose();
-		return o.mono(isleft);
-	}
-	return b.mono(isleft);
+	board k = b;
+	k.rotate(isomorphic);
+	if (isomorphic >= 4) k.mirror();
+	return k.mono();
 }
 
-template<int rotate, int mirror>
+template<int isomorphic>
 u64 indexmax(const board& b) { // 16-bit
 	board k = b;
-	k.rotate(rotate);
-	if (mirror) k.mirror();
+	k.rotate(isomorphic);
+	if (isomorphic >= 4) k.mirror();
 	return k.mask(k.max());
 }
 
@@ -682,18 +680,22 @@ void make_indexers() {
 	indexer::make(0xfec00002, utils::indexnum2x<true, 0, 1>);
 	indexer::make(0xfed00002, utils::indexnum2x<true, 2, 3>);
 	indexer::make(0xff000000, utils::indexmerge);
-	indexer::make(0xfd000000, utils::indexmono<false, false>);
-	indexer::make(0xfd000001, utils::indexmono<false, true>);
-	indexer::make(0xfd000002, utils::indexmono<true, false>);
-	indexer::make(0xfd000003, utils::indexmono<true, true>);
-	indexer::make(0xfc000000, utils::indexmax<0, 0>);
-	indexer::make(0xfc000001, utils::indexmax<1, 0>);
-	indexer::make(0xfc000002, utils::indexmax<2, 0>);
-	indexer::make(0xfc000003, utils::indexmax<3, 0>);
-	indexer::make(0xfc000010, utils::indexmax<0, 1>);
-	indexer::make(0xfc000011, utils::indexmax<1, 1>);
-	indexer::make(0xfc000012, utils::indexmax<2, 1>);
-	indexer::make(0xfc000013, utils::indexmax<3, 1>);
+	indexer::make(0xfd000000, utils::indexmono<0>);
+	indexer::make(0xfd000001, utils::indexmono<1>);
+	indexer::make(0xfd000002, utils::indexmono<2>);
+	indexer::make(0xfd000003, utils::indexmono<3>);
+	indexer::make(0xfd000004, utils::indexmono<4>);
+	indexer::make(0xfd000005, utils::indexmono<5>);
+	indexer::make(0xfd000006, utils::indexmono<6>);
+	indexer::make(0xfd000007, utils::indexmono<7>);
+	indexer::make(0xfc000000, utils::indexmax<0>);
+	indexer::make(0xfc000001, utils::indexmax<1>);
+	indexer::make(0xfc000002, utils::indexmax<2>);
+	indexer::make(0xfc000003, utils::indexmax<3>);
+	indexer::make(0xfc000004, utils::indexmax<4>);
+	indexer::make(0xfc000005, utils::indexmax<5>);
+	indexer::make(0xfc000006, utils::indexmax<6>);
+	indexer::make(0xfc000007, utils::indexmax<7>);
 }
 
 void make_weights(const std::string& value = "") {
