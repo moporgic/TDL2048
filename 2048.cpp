@@ -450,35 +450,35 @@ u64 index4t(const board& b, const int& p0, const int& p1, const int& p2, const i
 	return index;
 }
 
-u64 indexmerge(const board& b) {
+u64 indexmerge(const board& b) { // 16-bit
 	board q = b; q.transpose();
-	u32 hori = 0, vert = 0;
-	hori += b.query(0).merge << 0;
-	hori += b.query(1).merge << 2;
-	hori += b.query(2).merge << 4;
-	hori += b.query(3).merge << 6;
-	vert += q.query(0).merge << 0;
-	vert += q.query(1).merge << 2;
-	vert += q.query(2).merge << 4;
-	vert += q.query(3).merge << 6;
+	register u32 hori = 0, vert = 0;
+	hori |= b.query(0).merge << 0;
+	hori |= b.query(1).merge << 2;
+	hori |= b.query(2).merge << 4;
+	hori |= b.query(3).merge << 6;
+	vert |= q.query(0).merge << 0;
+	vert |= q.query(1).merge << 2;
+	vert |= q.query(2).merge << 4;
+	vert |= q.query(3).merge << 6;
 	return hori | (vert << 8);
 }
 
 u64 indexnum0(const board& b) { // 10-bit
 	// 2k ~ 32k, 2-bit ea.
-	static u16 num[32];
+	u16 num[16];
 	b.count(num, 11, 16);
 	register u64 index = 0;
 	index += (num[11] & 0x03) << 0;
-	index += (num[12] & 0x03) << 0;
-	index += (num[13] & 0x03) << 0;
-	index += (num[14] & 0x03) << 0;
-	index += (num[15] & 0x03) << 0;
+	index += (num[12] & 0x03) << 2;
+	index += (num[13] & 0x03) << 4;
+	index += (num[14] & 0x03) << 6;
+	index += (num[15] & 0x03) << 8;
 	return index;
 }
 
 u64 indexnum1(const board& b) { // 25-bit
-	static u16 num[32];
+	u16 num[16];
 	b.count(num, 5, 16);
 	register u64 index = 0;
 	index += ((num[5] + num[6]) & 0x0f) << 0; // 32 & 64, 4-bit
@@ -495,7 +495,7 @@ u64 indexnum1(const board& b) { // 25-bit
 }
 
 u64 indexnum2(const board& b) { // 25-bit
-	static u16 num[32];
+	u16 num[16];
 	b.count(num);
 	register u64 index = 0;
 	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-bit
@@ -672,6 +672,7 @@ void make_indexers() {
 	indexer::make(0x00002637, utils::index4t<2,6,3,7>);
 	indexer::make(0x00006a7b, utils::index4t<6,10,7,11>);
 	indexer::make(0x0000aebf, utils::index4t<10,14,11,15>);
+	indexer::make(0xff000000, utils::indexmerge);
 	indexer::make(0xfe000000, utils::indexnum0);
 	indexer::make(0xfe000001, utils::indexnum1);
 	indexer::make(0xfe000002, utils::indexnum2);
@@ -679,7 +680,6 @@ void make_indexers() {
 	indexer::make(0xfe900002, utils::indexnum2x<0, 2, 3>);
 	indexer::make(0xfec00002, utils::indexnum2x<1, 0, 1>);
 	indexer::make(0xfed00002, utils::indexnum2x<1, 2, 3>);
-	indexer::make(0xff000000, utils::indexmerge);
 	indexer::make(0xfd000000, utils::indexmono<0>);
 	indexer::make(0xfd100000, utils::indexmono<1>);
 	indexer::make(0xfd200000, utils::indexmono<2>);
