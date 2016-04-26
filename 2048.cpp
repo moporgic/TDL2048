@@ -708,6 +708,7 @@ void make_weights(const std::string& value = "") {
 		weight::make(0xfe000001, 1 << 25);
 //		weight::make(0xfe000002, 1 << 25);
 //		weight::make(0xfd000000, 1 << 24);
+//		weight::make(0xfc000000, 1 << 16);
 		weight::make(0xff000000, 1 << 16);
 
 	} else {
@@ -740,10 +741,8 @@ void make_features(const std::string& value = "") {
 //		feature::make(0xfe000002, 0xfe900002);
 //		feature::make(0xfe000002, 0xfec00002);
 //		feature::make(0xfe000002, 0xfed00002);
-//		feature::make(0xfd000000, 0xfd000000);
-//		feature::make(0xfd000000, 0xfd000001);
-//		feature::make(0xfd000000, 0xfd000002);
-//		feature::make(0xfd000000, 0xfd000003);
+//		for (int i = 0; i < 8; i++) feature::make(0xfd000000, 0xfd000000 | (i << 20));
+//		for (int i = 0; i < 8; i++) feature::make(0xfc000000, 0xfc000000 | (i << 20));
 		feature::make(0xff000000, 0xff000000);
 	} else {
 		// weight:indexer weight(indexer) weight[indexer]
