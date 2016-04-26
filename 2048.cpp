@@ -756,7 +756,7 @@ void make_weights(const std::string& value = "") {
 	if (value.empty()) {
 		// make default weights
 		for (auto& p : utils::patt6t) {
-			weight::make(utils::hashfx(p), std::pow(utils::base, 6));
+			weight::make(utils::hashfx(p), std::pow(u64(utils::base), 6));
 		}
 		weight::make(0xfe000001, 1 << 25);
 //		weight::make(0xfe000002, 1 << 25);
@@ -771,7 +771,7 @@ void make_weights(const std::string& value = "") {
 		while (in.find_first_of(":()[],") != std::string::npos)
 			in[in.find_first_of(":()[],")] = ' ';
 		std::stringstream wghtin(in);
-		u32 sign, size;
+		u32 sign; u64 size;
 		while (wghtin >> std::hex >> sign && wghtin >> std::dec >> size) {
 			weight::make(sign, size);
 		}
