@@ -450,7 +450,7 @@ u64 index4t(const board& b, const int& p0, const int& p1, const int& p2, const i
 	return index;
 }
 
-u64 indexmerge(const board& b) { // 16-bit
+u64 indexmerge0(const board& b) { // 16-bit
 	board q = b; q.transpose();
 	register u32 hori = 0, vert = 0;
 	hori |= b.query(0).merge << 0;
@@ -462,6 +462,15 @@ u64 indexmerge(const board& b) { // 16-bit
 	vert |= q.query(2).merge << 4;
 	vert |= q.query(3).merge << 6;
 	return hori | (vert << 8);
+}
+
+u64 indexmerge1(const board& b) { // 8-bit
+	register u32 merge = 0;
+	merge |= b.query(0).merge << 0;
+	merge |= b.query(1).merge << 2;
+	merge |= b.query(2).merge << 4;
+	merge |= b.query(3).merge << 6;
+	return merge;
 }
 
 u64 indexnum0(const board& b) { // 10-bit
@@ -672,7 +681,8 @@ void make_indexers() {
 	indexer::make(0x00002637, utils::index4t<2,6,3,7>);
 	indexer::make(0x00006a7b, utils::index4t<6,10,7,11>);
 	indexer::make(0x0000aebf, utils::index4t<10,14,11,15>);
-	indexer::make(0xff000000, utils::indexmerge);
+	indexer::make(0xff000000, utils::indexmerge0);
+	indexer::make(0xff000001, utils::indexmerge1);
 	indexer::make(0xfe000000, utils::indexnum0);
 	indexer::make(0xfe000001, utils::indexnum1);
 	indexer::make(0xfe000002, utils::indexnum2);
@@ -710,6 +720,7 @@ void make_weights(const std::string& value = "") {
 //		weight::make(0xfd000000, 1 << 24);
 //		weight::make(0xfc000000, 1 << 16);
 		weight::make(0xff000000, 1 << 16);
+//		weight::make(0xff000001, 1 << 8);
 
 	} else {
 		// 0x0a:100 0xab(10) 0x123456a[100]
@@ -744,6 +755,7 @@ void make_features(const std::string& value = "") {
 //		for (int i = 0; i < 8; i++) feature::make(0xfd000000, 0xfd000000 | (i << 20));
 //		for (int i = 0; i < 8; i++) feature::make(0xfc000000, 0xfc000000 | (i << 20));
 		feature::make(0xff000000, 0xff000000);
+//		feature::make(0xff000001, 0xff000001);
 	} else {
 		// weight:indexer weight(indexer) weight[indexer]
 		std::string in(value);
