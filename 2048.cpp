@@ -1139,7 +1139,9 @@ int main(int argc, const char* argv[]) {
 			for (std::string f; (f = valueof(i, "")).size(); )
 				fopts["value"] += (f += ',');
 			break;
-		case to_hash("--modify"):
+		case to_hash("-u"):
+		case to_hash("--util"):
+		case to_hash("--utils"):
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
