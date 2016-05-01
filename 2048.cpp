@@ -399,9 +399,9 @@ inline void mirfx(int& s) {
 	s = ((s >> 2) << 2) + (3 - (s % 4));
 }
 std::vector<std::function<void(int&)>> mapfx = { rotfx, rotfx, rotfx, mirfx, rotfx, rotfx, rotfx, mirfx };
-std::vector<std::vector<int>> patt6t =
+std::vector<std::vector<int>> defpatt =
 	{ { 0, 1, 2, 3, 6, 7 }, { 4, 5, 6, 7, 10, 11 }, { 0, 1, 2, 4, 5, 6 }, { 4, 5, 6, 8, 9, 10 }, };
-inline u32 hashfx(std::vector<int>& p) {
+inline u32 hashfx(const std::vector<int>& p) {
 	u32 h = 0; for (int t : p) h = (h << 4) | t; return h;
 }
 
@@ -755,8 +755,8 @@ void make_weights(const std::string& value = "") {
 
 	if (value.empty()) {
 		// make default weights
-		for (auto& p : utils::patt6t) {
-			weight::make(utils::hashfx(p), std::pow(u64(utils::base), 6));
+		for (const auto& patt : utils::defpatt) {
+			weight::make(utils::hashfx(patt), std::pow(u64(utils::base), patt.size()));
 		}
 		weight::make(0xfe000001, 1 << 25);
 //		weight::make(0xfe000002, 1 << 25);
@@ -782,11 +782,11 @@ void make_features(const std::string& value = "") {
 
 	if (value.empty()) {
 		// make default features
-		for (auto& p : utils::patt6t) {
-			const u32 wsign = utils::hashfx(p);
+		for (auto patt : utils::defpatt) {
+			const u32 wsign = utils::hashfx(patt);
 			for (auto fx : utils::mapfx) {
-				feature::make(wsign, utils::hashfx(p));
-				std::for_each(p.begin(), p.end(), fx);
+				feature::make(wsign, utils::hashfx(patt));
+				std::for_each(patt.begin(), patt.end(), fx);
 			}
 		}
 		feature::make(0xfe000001, 0xfe000001);
