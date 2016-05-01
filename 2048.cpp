@@ -392,18 +392,14 @@ struct options : public std::list<std::string> {
 		return ss.str();
 	}};
 
-inline void rotfx(int& i) {
-	i = (3 - (i >> 2)) + ((i % 4) << 2);
-}
-inline void mirfx(int& s) {
-	s = ((s >> 2) << 2) + (3 - (s % 4));
-}
+inline void rotfx(int& i) { i = (3 - (i >> 2)) + ((i % 4) << 2); }
+inline void mirfx(int& s) { s = ((s >> 2) << 2) + (3 - (s % 4)); }
 std::vector<std::function<void(int&)>> mapfx = { rotfx, rotfx, rotfx, mirfx, rotfx, rotfx, rotfx, mirfx };
-std::vector<std::vector<int>> defpatt =
-	{ { 0, 1, 2, 3, 6, 7 }, { 4, 5, 6, 7, 10, 11 }, { 0, 1, 2, 4, 5, 6 }, { 4, 5, 6, 8, 9, 10 }, };
 inline u32 hashfx(const std::vector<int>& p) {
 	u32 h = 0; for (int t : p) h = (h << 4) | t; return h;
 }
+std::vector<std::vector<int>> defpatt =
+	{ { 0, 1, 2, 3, 6, 7 }, { 4, 5, 6, 7, 10, 11 }, { 0, 1, 2, 4, 5, 6 }, { 4, 5, 6, 8, 9, 10 } };
 
 
 const u32 base = 16;
