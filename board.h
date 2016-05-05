@@ -487,6 +487,7 @@ public:
 		if (trans.query(3).moved == 0) return true;
 		return false;
 	}
+	inline bool movable() const { return operable(); }
 
 	class tile {
 	friend class board;
