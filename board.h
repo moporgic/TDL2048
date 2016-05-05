@@ -296,8 +296,9 @@ public:
 		u32 i = (k) & 0x0f;
 		u32 j = (i + (k >> 4) + 1) & 0x0f;
 //		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
-		raw =  (std::rand() % 10 ? 1ULL : 2ULL) << (i << 2);
-		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (j << 2);
+		u32 r = std::rand() % 100;
+		raw =  (r >=  1 ? 1ULL : 2ULL) << (i << 2);
+		raw |= (r >= 18 ? 1ULL : 2ULL) << (j << 2);
 		ext = 0;
 	}
 	inline void next() {
