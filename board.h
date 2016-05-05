@@ -2,7 +2,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 2.6
+// Version     : 2.7
 // Description : bitboard of 2048
 //============================================================================
 #include "moporgic/type.h"
@@ -25,6 +25,7 @@ public:
 		tiles() : tile(0), size(0) {}
 		~tiles() = default;
 		inline u32 operator[] (const u32& i) const { return (tile >> (i << 2)) & 0x0f; }
+		inline operator bool() const { return size > 0; }
 	};
 	class cache {
 	friend class board;
@@ -291,21 +292,33 @@ public:
 	}
 
 	inline void init() {
-		const u32 k = rand();
-		const u32 i = (k) & 0x0f;
-		const u32 j = (i + (k >> 4) + 1) & 0x0f;
-		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
+		u32 k = std::rand();
+		u32 i = (k) & 0x0f;
+		u32 j = (i + (k >> 4) + 1) & 0x0f;
+//		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
+		raw =  (std::rand() % 10 ? 1ULL : 2ULL) << (i << 2);
+		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (j << 2);
 		ext = 0;
+	}
+	inline void next() {
+		tiles empty = spaces();
+		u32 p = empty[std::rand() % empty.size];
+		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
 	inline tiles spaces() const {
 		return find(0);
 	}
-	inline bool next() {
+
+	inline bool popup() {
 		tiles empty = spaces();
 		if (empty.size == 0) return false;
-		u32 p = empty[rand() % empty.size];
-		raw |= (rand() % 10 ? 1ULL : 2ULL) << (p << 2);
+		u32 p = empty[std::rand() % empty.size];
+		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
+	}
+	inline void clear() {
+		raw = 0;
+		ext = 0;
 	}
 
 	inline void rotate(const int& r = 1) {
@@ -379,6 +392,26 @@ public:
 		raw = rawn;
 		ext = extn;
 		return score | moved;
+	}
+
+	class optype {
+	public:
+		optype() = delete;
+		typedef i32 oper;
+		static constexpr oper up = 0;
+		static constexpr oper right = 1;
+		static constexpr oper down = 2;
+		static constexpr oper left = 3;
+		static constexpr oper illegal = -1;
+	};
+	inline i32 move(const optype::oper& op) {
+		switch (op) {
+		case optype::up:    return up();
+		case optype::right: return right();
+		case optype::down:  return down();
+		case optype::left:  return left();
+		default:            return -1;
+		}
 	}
 
 	inline void mark() {
@@ -517,6 +550,7 @@ public:
 
 		out.width(wtmp); out.fill(ftmp);
 	}
+
 };
 
 } // namespace moporgic
