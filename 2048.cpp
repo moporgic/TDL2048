@@ -1195,11 +1195,6 @@ int main(int argc, const char* argv[]) {
 	if (train) std::cout << std::endl << "start training..." << std::endl;
 	switch (to_hash(opts["train-type"])) {
 
-	case to_hash("backward/online"):
-		std::cerr << "warning: use backward/offline instead" << std::endl;
-		// no break
-	default:
-	case to_hash("backward/offline"):
 	case to_hash("backward"):
 		for (stats.init(train); stats; stats++) {
 
@@ -1221,8 +1216,8 @@ int main(int argc, const char* argv[]) {
 		}
 		break;
 
+	default:
 	case to_hash("forward"):
-	case to_hash("forward/online"):
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
@@ -1244,31 +1239,6 @@ int main(int argc, const char* argv[]) {
 				b.next();
 			}
 			last += 0;
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
-
-	case to_hash("forward/offline"):
-		for (stats.init(train); stats; stats++) {
-
-			register u32 score = 0;
-			register u32 opers = 0;
-
-			for (b.init(); best << b; b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> path;
-				best >> b;
-			}
-
-			u32 n = path.size();
-			path.push_back(state());
-			for (u32 i = 0; i < n; i++) {
-				if (path[i + 1].move != 0) path[i + 1].estimate();
-				path[i] += path[i + 1];
-			}
-			path.clear();
 
 			stats.update(score, b.hash(), opers);
 		}
