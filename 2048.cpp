@@ -508,6 +508,11 @@ u64 index2t(const board& b, const int& p0, const int& p1) {
 	index += b.at(p1) <<  4;
 	return index;
 }
+u64 index1t(const board& b, const int& p0) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	return index;
+}
 
 u64 indexmerge0(const board& b) { // 16-bit
 	board q = b; q.transpose();
