@@ -1150,6 +1150,15 @@ int main(int argc, const char* argv[]) {
 		case to_hash("--train-type"):
 			opts["train-type"] = valueof(i, "");
 			break;
+		case to_hash("-Tt"):
+		case to_hash("-TT"):
+		case to_hash("--test-type"):
+			opts["test-type"] = valueof(i, "");
+			break;
+		case to_hash("-c"):
+		case to_hash("--comment"):
+			opts["comment"] = valueof(i, "");
+			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
 			std::exit(1);
