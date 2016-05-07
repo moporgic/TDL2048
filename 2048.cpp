@@ -473,6 +473,42 @@ u64 index8t(const board& b,
 	return index;
 }
 
+u64 index7t(const board& b, const int& p0, const int& p1,
+		const int& p2, const int& p3, const int& p4, const int& p5, const int& p6) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	index += b.at(p5) << 20;
+	index += b.at(p6) << 24;
+	return index;
+}
+u64 index5t(const board& b, const int& p0, const int& p1,
+		const int& p2, const int& p3, const int& p4) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	return index;
+}
+u64 index3t(const board& b, const int& p0, const int& p1, const int& p2) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	return index;
+}
+u64 index2t(const board& b, const int& p0, const int& p1) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	return index;
+}
+
 u64 indexmerge0(const board& b) { // 16-bit
 	board q = b; q.transpose();
 	register u32 hori = 0, vert = 0;
