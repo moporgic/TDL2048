@@ -395,8 +395,17 @@ struct options : public std::list<std::string> {
 inline void rotfx(int& i) { i = (3 - (i >> 2)) + ((i % 4) << 2); }
 inline void mirfx(int& s) { s = ((s >> 2) << 2) + (3 - (s % 4)); }
 std::vector<std::function<void(int&)>> mapfx = { rotfx, rotfx, rotfx, mirfx, rotfx, rotfx, rotfx, mirfx };
-inline u32 hashfx(const std::vector<int>& p) {
-	u32 h = 0; for (int t : p) h = (h << 4) | t; return h;
+inline u32 hashpatt(const std::vector<int>& patt) {
+	u32 hash = 0;
+	for (auto tile : patt) hash = (hash << 4) | tile;
+	return hash;
+}
+inline std::vector<int> hashpatt(const std::string& hashs) {
+	u32 hash; std::stringstream(hashs) >> std::hex >> hash;
+	std::vector<int> patt(hashs.size());
+	for (auto it = patt.rbegin(); it != patt.rend(); it++, hash >>= 4)
+		(*it) = hash & 0x0f;
+	return patt;
 }
 std::vector<std::vector<int>> defpatt =
 	{ { 0, 1, 2, 3, 6, 7 }, { 4, 5, 6, 7, 10, 11 }, { 0, 1, 2, 4, 5, 6 }, { 4, 5, 6, 8, 9, 10 } };
@@ -415,29 +424,8 @@ u64 index6t(const board& b) {
 	index += b.at(p5) << 20;
 	return index;
 }
-u64 index6t(const board& b,
-		const int& p0, const int& p1, const int& p2,
-		const int& p3, const int& p4, const int& p5) {
-//	std::cout << p0 << "\t" << p1 << "\t" << p2 << "\t" << p3 << "\t" << p4 << "\t" << p5 << std::endl;
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	return index;
-}
 template<int p0, int p1, int p2, int p3>
 u64 index4t(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	return index;
-}
-u64 index4t(const board& b, const int& p0, const int& p1, const int& p2, const int& p3) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
 	index += b.at(p1) <<  4;
@@ -458,7 +446,7 @@ u64 index8t(const board& b) {
 	index += b.at(p7) << 28;
 	return index;
 }
-u64 index8t(const board& b,
+u64 index8ta(const board& b,
 		const int& p0, const int& p1, const int& p2, const int& p3,
 		const int& p4, const int& p5, const int& p6, const int& p7) {
 	register u64 index = 0;
@@ -472,8 +460,7 @@ u64 index8t(const board& b,
 	index += b.at(p7) << 28;
 	return index;
 }
-
-u64 index7t(const board& b, const int& p0, const int& p1,
+u64 index7ta(const board& b, const int& p0, const int& p1,
 		const int& p2, const int& p3, const int& p4, const int& p5, const int& p6) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -485,7 +472,20 @@ u64 index7t(const board& b, const int& p0, const int& p1,
 	index += b.at(p6) << 24;
 	return index;
 }
-u64 index5t(const board& b, const int& p0, const int& p1,
+u64 index6ta(const board& b,
+		const int& p0, const int& p1, const int& p2,
+		const int& p3, const int& p4, const int& p5) {
+//	std::cout << p0 << "\t" << p1 << "\t" << p2 << "\t" << p3 << "\t" << p4 << "\t" << p5 << std::endl;
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	index += b.at(p5) << 20;
+	return index;
+}
+u64 index5ta(const board& b, const int& p0, const int& p1,
 		const int& p2, const int& p3, const int& p4) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -495,22 +495,36 @@ u64 index5t(const board& b, const int& p0, const int& p1,
 	index += b.at(p4) << 16;
 	return index;
 }
-u64 index3t(const board& b, const int& p0, const int& p1, const int& p2) {
+u64 index4ta(const board& b, const int& p0, const int& p1, const int& p2, const int& p3) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	return index;
+}
+u64 index3ta(const board& b, const int& p0, const int& p1, const int& p2) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
 	index += b.at(p1) <<  4;
 	index += b.at(p2) <<  8;
 	return index;
 }
-u64 index2t(const board& b, const int& p0, const int& p1) {
+u64 index2ta(const board& b, const int& p0, const int& p1) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
 	index += b.at(p1) <<  4;
 	return index;
 }
-u64 index1t(const board& b, const int& p0) {
+u64 index1ta(const board& b, const int& p0) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
+	return index;
+}
+u64 indexnta(const board& b, const std::vector<int>& p) {
+	register u64 index = 0;
+	for (size_t i = 0; i < p.size(); i++)
+		index += b.at(p[i]) << (i << 2);
 	return index;
 }
 
@@ -793,7 +807,7 @@ void make_weights(const std::string& value = "") {
 	if (value.empty()) {
 		// make default weights
 		for (const auto& patt : utils::defpatt) {
-			weight::make(utils::hashfx(patt), std::pow(u64(utils::base), patt.size()));
+			weight::make(utils::hashpatt(patt), std::pow(u64(utils::base), patt.size()));
 		}
 		weight::make(0xfe000001, 1 << 25);
 //		weight::make(0xfe000002, 1 << 25);
@@ -808,8 +822,15 @@ void make_weights(const std::string& value = "") {
 		while (in.find_first_of(":()[],") != std::string::npos)
 			in[in.find_first_of(":()[],")] = ' ';
 		std::stringstream wghtin(in);
-		u32 sign; u64 size;
-		while (wghtin >> std::hex >> sign && wghtin >> std::dec >> size) {
+		std::string signs, sizes;
+		while (wghtin >> signs && wghtin >> sizes) {
+			u32 sign; u64 size;
+			std::stringstream(signs) >> std::hex >> sign;
+			std::stringstream(sizes) >> std::dec >> size;
+			if (weight::find(sign) != weight::end()) {
+				std::cerr << "error: redefined weight " << signs << std::endl;
+				std::exit(1);
+			}
 			weight::make(sign, size);
 		}
 	}
@@ -820,9 +841,9 @@ void make_features(const std::string& value = "") {
 	if (value.empty()) {
 		// make default features
 		for (auto patt : utils::defpatt) {
-			const u32 wsign = utils::hashfx(patt);
+			const u32 wsign = utils::hashpatt(patt);
 			for (auto fx : utils::mapfx) {
-				feature::make(wsign, utils::hashfx(patt));
+				feature::make(wsign, utils::hashpatt(patt));
 				std::for_each(patt.begin(), patt.end(), fx);
 			}
 		}
@@ -842,8 +863,21 @@ void make_features(const std::string& value = "") {
 		while (in.find_first_of(":()[],") != std::string::npos)
 			in[in.find_first_of(":()[],")] = ' ';
 		std::stringstream featin(in);
-		u32 wght, idxr;
-		while (featin >> std::hex >> wght && featin >> std::hex >> idxr) {
+		std::string wghts, idxrs;
+		while (featin >> wghts && featin >> idxrs) {
+			u32 wght, idxr;
+			std::stringstream(wghts) >> std::hex >> wght;
+			std::stringstream(idxrs) >> std::hex >> idxr;
+			if (weight::find(wght) == weight::end()) {
+				std::cerr << "error: undefined weight " << wghts << std::endl;
+				std::exit(1);
+			}
+			if (indexer::find(idxr) == indexer::end()) {
+				std::cerr << "warning: undefined indexer " << idxrs;
+				std::cerr << " [assume " << (idxrs.size()) << "-tile pattern]" << std::endl;
+				auto patt = new std::vector<int>(hashpatt(idxrs)); // will NOT be deleted
+				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+			}
 			feature::make(wght, idxr);
 		}
 	}
