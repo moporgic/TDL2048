@@ -175,9 +175,14 @@ public:
 	static inline iter find(const u32& sign) {
 		return std::find(begin(), end(), sign);
 	}
+	typedef std::shared_ptr<numeric> table;
 private:
-	weight(const u32& sign, const u64& size) : sign(sign), value(new numeric[size]()), size(size) {}
+	weight(const u32& sign, const u64& size) : sign(sign), value(make_table(size)), size(size) {}
 	static inline std::vector<weight>& weights() { static std::vector<weight> w; return w; }
+
+	static inline table make_table(const u64& size) {
+		return table(new numeric[size](), std::default_delete<numeric[]>());
+	}
 
 	template<typename rxx> void write(std::ostream& out) const {
 		numeric *v = value.get();
@@ -193,7 +198,7 @@ private:
 	}
 
 	u32 sign;
-	std::shared_ptr<numeric> value;
+	table value;
 	u64 size;
 };
 
