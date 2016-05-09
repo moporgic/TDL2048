@@ -806,6 +806,41 @@ void make_indexers() {
 	make(0xfc700000, utils::indexmax<7>);
 }
 
+void make_custom_indexers(const std::string& value = "") {
+	if (value.empty()) return;
+	std::string in(value);
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
+	std::stringstream idxin(in);
+	std::string type, sign;
+	// patt(012367) num(-)
+	while (idxin >> type && idxin >> sign) {
+		u32 idxr;
+		using moporgic::to_hash;
+		switch (to_hash(type)) {
+		case to_hash("p"):
+		case to_hash("patt"):
+		case to_hash("pattern"):
+		case to_hash("tuple"):
+			std::stringstream(sign) >> std::hex >> idxr;
+			if (indexer::find(idxr) == indexer::end()) {
+				auto patt = new std::vector<int>(hashpatt(sign)); // will NOT be deleted
+				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+			} else {
+				std::cerr << "warning: redefined indexer " << sign << std::endl;
+			}
+			break;
+		case to_hash("n"):
+		case to_hash("num"):
+		case to_hash("count"):
+			std::cerr << "error: unsupported custom indexer type " << type << std::endl;
+			break;
+		default:
+			std::cerr << "error: unknown custom indexer type " << type << std::endl;
+		}
+	}
+}
+
 void make_weights(const std::string& value = "") {
 
 	auto make = [](u32 sign, u64 size) {
