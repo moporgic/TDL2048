@@ -829,7 +829,7 @@ void make_indexers(const std::string& res = "") {
 	std::stringstream idxin(in);
 	std::string type, sign;
 	while (idxin >> type && idxin >> sign) {
-		u32 idxr;
+		u32 idxr = 0;
 		using moporgic::to_hash;
 		switch (to_hash(type)) {
 		case to_hash("p"):
@@ -861,7 +861,7 @@ void make_weights(const std::string& res = "") {
 	};
 
 	// weight:size weight(size) weight[size]
-	std::string in(res.size() ? res : "default");
+	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
 	if (in.find("default") != std::string::npos) {
@@ -877,7 +877,7 @@ void make_weights(const std::string& res = "") {
 	std::stringstream wghtin(in);
 	std::string signs, sizes;
 	while (wghtin >> signs && wghtin >> sizes) {
-		u32 sign; u64 size;
+		u32 sign = 0; u64 size = 0;
 		std::stringstream(signs) >> std::hex >> sign;
 		std::stringstream(sizes) >> std::dec >> size;
 		if (weight::find(sign) != weight::end()) {
@@ -894,7 +894,7 @@ void make_features(const std::string& res = "") {
 	};
 
 	// weight:indexer weight(indexer) weight[indexer]
-	std::string in(res.size() ? res : "default");
+	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
 	if (in.find("default") != std::string::npos) {
@@ -914,7 +914,7 @@ void make_features(const std::string& res = "") {
 	std::stringstream featin(in);
 	std::string wghts, idxrs;
 	while (featin >> wghts && featin >> idxrs) {
-		u32 wght, idxr;
+		u32 wght = 0, idxr = 0;
 		std::stringstream(wghts) >> std::hex >> wght;
 		std::stringstream(idxrs) >> std::hex >> idxr;
 		if (weight::find(wght) == weight::end()) {
@@ -1305,14 +1305,18 @@ int main(int argc, const char* argv[]) {
 	if (weight::load(wopts["input"]) == false) {
 		if (wopts["input"].size())
 			std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
-		utils::make_weights(wopts["value"]);
+		if (wopts["value"].empty())
+			wopts["value"] = "default";
 	}
+	utils::make_weights(wopts["value"]);
 
 	if (feature::load(fopts["input"]) == false) {
 		if (fopts["input"].size())
 			std::cerr << "warning: " << fopts["input"] << " not loaded!" << std::endl;
-		utils::make_features(fopts["value"]);
+		if (fopts["value"].empty())
+			fopts["value"] = "default";
 	}
+	utils::make_features(fopts["value"]);
 
 	utils::list_mapping();
 
