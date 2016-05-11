@@ -339,6 +339,10 @@ public:
 		transpose();
 		flip();
 	}
+	inline void isomorphic(const int& i = 0) {
+		if ((i % 8) / 4) mirror();
+		rotate(i);
+	}
 
 	inline i32 left() {
 		register u64 rawn = 0;
