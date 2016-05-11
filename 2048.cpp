@@ -139,7 +139,7 @@ public:
 		}
 	}
 
-	static weight make(const u32& sign, const u64& size) {
+	static weight make(const u32& sign, const size_t& size) {
 		weights().push_back(weight(sign, size));
 		return weights().back();
 	}
@@ -155,29 +155,29 @@ public:
 	static inline const std::vector<weight>& list() { return weights(); }
 private:
 	typedef std::shared_ptr<numeric> table;
-	weight(const u32& sign, const u64& size) : sign(sign), value(make_table(size)), size(size) {}
+	weight(const u32& sign, const size_t& size) : sign(sign), value(make_table(size)), size(size) {}
 	static inline std::vector<weight>& weights() { static std::vector<weight> w; return w; }
 
-	static inline table make_table(const u64& size) {
+	static inline table make_table(const size_t& size) {
 		return table(new numeric[size](), std::default_delete<numeric[]>());
 	}
 
 	template<typename rxx> void write(std::ostream& out) const {
 		numeric *v = value.get();
-		for (u64 i = 0; i < size; i++)
+		for (size_t i = 0; i < size; i++)
 			out.write(rxx(v[i]).le(), sizeof(rxx));
 	}
 	template<typename rxx> void read(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
 		numeric *v = value.get();
-		for (u64 i = 0; i < size; i++)
+		for (size_t i = 0; i < size; i++)
 			v[i] = rxx(load(sizeof(rxx))).le();
 	}
 
 	u32 sign;
 	table value;
-	u64 size;
+	size_t size;
 };
 
 class indexer {
