@@ -45,7 +45,7 @@ public:
 
 	inline u32 signature() const { return sign; }
 	inline numeric& operator [](const u64& i) { return value.get()[i]; }
-	inline bool operator ==(const u32& s) const { return sign == s; }
+	inline bool operator ==(const weight& w) const { return sign == w.sign; }
 	inline size_t length() const { return size; }
 
 	void operator >>(std::ostream& out) const {
@@ -151,9 +151,7 @@ public:
 	typedef std::vector<weight>::iterator iter;
 	static inline iter begin() { return weights().begin(); }
 	static inline iter end() { return weights().end(); }
-	static inline iter find(const u32& sign) {
-		return std::find(begin(), end(), sign);
-	}
+	static inline iter find(const u32& sign) { return std::find(begin(), end(), sign); }
 	typedef std::shared_ptr<numeric> table;
 private:
 	weight(const u32& sign, const u64& size) : sign(sign), value(make_table(size)), size(size) {}
@@ -189,7 +187,7 @@ public:
 
 	inline u32 signature() const { return sign; }
 	inline u64 operator ()(const board& b) const { return map(b); }
-	inline bool operator ==(const u32& s) const { return sign == s; }
+	inline bool operator ==(const indexer& i) const { return sign == i.sign; }
 
 	typedef std::function<u64(const board&)> mapper;
 	static indexer make(const u32& sign, mapper map) {
@@ -232,7 +230,7 @@ public:
 	inline numeric& operator [](const board& b) { return value[index(b)]; }
 	inline numeric& operator [](const u64& idx) { return value[idx]; }
 	inline u64 operator ()(const board& b) const { return index(b); }
-	inline bool operator ==(const u64& s) const { return signature() == s; }
+	inline bool operator ==(const feature& f) const { return signature() == f.signature(); }
 	inline operator indexer() const { return index; }
 	inline operator weight() const { return value; }
 
