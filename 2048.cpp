@@ -590,7 +590,7 @@ u64 indexnum1(const board& b) { // 25-bit
 
 u64 indexnum2(const board& b) { // 25-bit
 	u16 num[16];
-	b.count(num);
+	b.count(num, 0, 16);
 	register u64 index = 0;
 	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-bit
 	index += ((num[3] + num[4]) & 0x07) << 3; // 8 & 16, 3-bit
