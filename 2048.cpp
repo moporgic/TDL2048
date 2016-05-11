@@ -138,28 +138,6 @@ public:
 		}
 	}
 
-	static bool save(const std::string& path) {
-		std::ofstream out;
-		char buf[1 << 20];
-		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
-		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-		if (!out.is_open()) return false;
-		weight::save(out);
-		out.flush();
-		out.close();
-		return true;
-	}
-	static bool load(const std::string& path) {
-		std::ifstream in;
-		char buf[1 << 20];
-		in.rdbuf()->pubsetbuf(buf, sizeof(buf));
-		in.open(path, std::ios::in | std::ios::binary);
-		if (!in.is_open()) return false;
-		weight::load(in);
-		in.close();
-		return true;
-	}
-
 	static weight make(const u32& sign, const u64& size) {
 		weights().push_back(weight(sign, size));
 		return weights().back();
@@ -319,24 +297,6 @@ public:
 			std::cerr << "unknown serial at feature::load" << std::endl;
 			break;
 		}
-	}
-
-	static bool save(const std::string& path) {
-		std::ofstream out;
-		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-		if (!out.is_open()) return false;
-		feature::save(out);
-		out.flush();
-		out.close();
-		return true;
-	}
-	static bool load(const std::string& path) {
-		std::ifstream in;
-		in.open(path, std::ios::in | std::ios::binary);
-		if (!in.is_open()) return false;
-		feature::load(in);
-		in.close();
-		return true;
 	}
 
 	static feature make(const u32& wgt, const u32& idx) {
@@ -855,6 +815,27 @@ void make_indexers(const std::string& res = "") {
 	}
 }
 
+bool save_weights(const std::string& path) {
+	std::ofstream out;
+	char buf[1 << 20];
+	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out.is_open()) return false;
+	weight::save(out);
+	out.flush();
+	out.close();
+	return true;
+}
+bool load_weights(const std::string& path) {
+	std::ifstream in;
+	char buf[1 << 20];
+	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	in.open(path, std::ios::in | std::ios::binary);
+	if (!in.is_open()) return false;
+	weight::load(in);
+	in.close();
+	return true;
+}
 void make_weights(const std::string& res = "") {
 	auto wmake = [](u32 sign, u64 size) {
 		if (weight::find(sign) == weight::end()) weight::make(sign, size);
@@ -888,6 +869,23 @@ void make_weights(const std::string& res = "") {
 	}
 }
 
+bool save_features(const std::string& path) {
+	std::ofstream out;
+	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out.is_open()) return false;
+	feature::save(out);
+	out.flush();
+	out.close();
+	return true;
+}
+bool load_features(const std::string& path) {
+	std::ifstream in;
+	in.open(path, std::ios::in | std::ios::binary);
+	if (!in.is_open()) return false;
+	feature::load(in);
+	in.close();
+	return true;
+}
 void make_features(const std::string& res = "") {
 	auto fmake = [](u32 wght, u32 idxr) {
 		if (feature::find(wght, idxr) == feature::end()) feature::make(wght, idxr);
@@ -1302,7 +1300,7 @@ int main(int argc, const char* argv[]) {
 
 	utils::make_indexers();
 
-	if (weight::load(wopts["input"]) == false) {
+	if (utils::load_weights(wopts["input"]) == false) {
 		if (wopts["input"].size())
 			std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
 		if (wopts["value"].empty())
@@ -1310,7 +1308,7 @@ int main(int argc, const char* argv[]) {
 	}
 	utils::make_weights(wopts["value"]);
 
-	if (feature::load(fopts["input"]) == false) {
+	if (utils::load_features(fopts["input"]) == false) {
 		if (fopts["input"].size())
 			std::cerr << "warning: " << fopts["input"] << " not loaded!" << std::endl;
 		if (fopts["value"].empty())
@@ -1381,8 +1379,8 @@ int main(int argc, const char* argv[]) {
 		break;
 	}
 
-	weight::save(wopts["output"]);
-	feature::save(fopts["output"]);
+	utils::save_weights(wopts["output"]);
+	utils::save_features(fopts["output"]);
 
 
 
