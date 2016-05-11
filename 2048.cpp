@@ -857,51 +857,51 @@ void parse_indexers(const std::string& value = "") {
 	}
 }
 
-void make_weights(const std::string& value = "") {
-
+void make_weights(const std::string& res = "") {
 	auto make = [](u32 sign, u64 size) {
 		if (weight::find(sign) == weight::end()) weight::make(sign, size);
 	};
 
-	if (value.empty()) {
+	// weight:size weight(size) weight[size]
+	std::string in(res.size() ? res : "default");
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
+	if (in.find("default") != std::string::npos) {
+		in.replace(in.find("default"), 7, "");
+
 		// make default weights
 		for (const auto& patt : utils::defpatt) {
 			make(utils::hashpatt(patt), std::pow(u64(utils::base), patt.size()));
 		}
 		make(0xfe000001, 1 << 25);
-//		make(0xfe000002, 1 << 25);
-//		make(0xfd000000, 1 << 24);
-//		make(0xfc000000, 1 << 16);
 		make(0xff000000, 1 << 16);
-//		make(0xff000001, 1 << 8);
-
-	} else {
-		// 0x0a:100 0xab(10) 0x123456a[100]
-		std::string in(value);
-		while (in.find_first_of(":()[],") != std::string::npos)
-			in[in.find_first_of(":()[],")] = ' ';
-		std::stringstream wghtin(in);
-		std::string signs, sizes;
-		while (wghtin >> signs && wghtin >> sizes) {
-			u32 sign; u64 size;
-			std::stringstream(signs) >> std::hex >> sign;
-			std::stringstream(sizes) >> std::dec >> size;
-			if (weight::find(sign) != weight::end()) {
-				std::cerr << "error: redefined weight " << signs << std::endl;
-				std::exit(1);
-			}
-			make(sign, size);
-		}
 	}
-
+	std::stringstream wghtin(in);
+	std::string signs, sizes;
+	while (wghtin >> signs && wghtin >> sizes) {
+		u32 sign; u64 size;
+		std::stringstream(signs) >> std::hex >> sign;
+		std::stringstream(sizes) >> std::dec >> size;
+		if (weight::find(sign) != weight::end()) {
+			std::cerr << "error: redefined weight " << signs << std::endl;
+			std::exit(1);
+		}
+		make(sign, size);
+	}
 }
-void make_features(const std::string& value = "") {
 
+void make_features(const std::string& res = "") {
 	auto make = [](u32 wght, u32 idxr) {
 		if (feature::find(wght, idxr) == feature::end()) feature::make(wght, idxr);
 	};
 
-	if (value.empty()) {
+	// weight:indexer weight(indexer) weight[indexer]
+	std::string in(res.size() ? res : "default");
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
+	if (in.find("default") != std::string::npos) {
+		in.replace(in.find("default"), 7, "");
+
 		// make default features
 		for (auto patt : utils::defpatt) {
 			const u32 wsign = utils::hashpatt(patt);
@@ -911,38 +911,25 @@ void make_features(const std::string& value = "") {
 			}
 		}
 		make(0xfe000001, 0xfe000001);
-//		make(0xfe000002, 0xfe000002);
-//		make(0xfe000002, 0xfe800002);
-//		make(0xfe000002, 0xfe900002);
-//		make(0xfe000002, 0xfec00002);
-//		make(0xfe000002, 0xfed00002);
-//		for (int i = 0; i < 8; i++) make(0xfd000000, 0xfd000000 | (i << 20));
-//		for (int i = 0; i < 8; i++) make(0xfc000000, 0xfc000000 | (i << 20));
 		make(0xff000000, 0xff000000);
-//		make(0xff000001, 0xff000001);
-	} else {
-		// weight:indexer weight(indexer) weight[indexer]
-		std::string in(value);
-		while (in.find_first_of(":()[],") != std::string::npos)
-			in[in.find_first_of(":()[],")] = ' ';
-		std::stringstream featin(in);
-		std::string wghts, idxrs;
-		while (featin >> wghts && featin >> idxrs) {
-			u32 wght, idxr;
-			std::stringstream(wghts) >> std::hex >> wght;
-			std::stringstream(idxrs) >> std::hex >> idxr;
-			if (weight::find(wght) == weight::end()) {
-				std::cerr << "error: undefined weight " << wghts << std::endl;
-				std::exit(1);
-			}
-			if (indexer::find(idxr) == indexer::end()) {
-				std::cerr << "warning: undefined indexer " << idxrs;
-				std::cerr << " [assume " << (idxrs.size()) << "-tile pattern]" << std::endl;
-				auto patt = new std::vector<int>(hashpatt(idxrs)); // will NOT be deleted
-				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
-			}
-			make(wght, idxr);
+	}
+	std::stringstream featin(in);
+	std::string wghts, idxrs;
+	while (featin >> wghts && featin >> idxrs) {
+		u32 wght, idxr;
+		std::stringstream(wghts) >> std::hex >> wght;
+		std::stringstream(idxrs) >> std::hex >> idxr;
+		if (weight::find(wght) == weight::end()) {
+			std::cerr << "error: undefined weight " << wghts << std::endl;
+			std::exit(1);
 		}
+		if (indexer::find(idxr) == indexer::end()) {
+			std::cerr << "warning: undefined indexer " << idxrs;
+			std::cerr << " [assume " << (idxrs.size()) << "-tile pattern]" << std::endl;
+			auto patt = new std::vector<int>(hashpatt(idxrs)); // will NOT be deleted
+			indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+		}
+		make(wght, idxr);
 	}
 }
 
