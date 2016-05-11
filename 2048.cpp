@@ -356,11 +356,10 @@ struct options : public std::list<std::string> {
 		std::stringstream ss;
 		std::copy(begin(), end(), std::ostream_iterator<std::string>(ss, " "));
 		return ss.str();
-	}};
+	}
+};
 
-//inline void rotfx(int& i) { i = (3 - (i >> 2)) + ((i % 4) << 2); }
-//inline void mirfx(int& s) { s = ((s >> 2) << 2) + (3 - (s % 4)); }
-//std::vector<std::function<void(int&)>> mapfx = { rotfx, rotfx, rotfx, mirfx, rotfx, rotfx, rotfx, mirfx };
+
 inline u32 hashpatt(const std::vector<int>& patt) {
 	u32 hash = 0;
 	for (auto tile : patt) hash = (hash << 4) | tile;
@@ -373,13 +372,9 @@ inline std::vector<int> hashpatt(const std::string& hashs) {
 		(*it) = hash & 0x0f;
 	return patt;
 }
-//std::vector<std::vector<int>> defpatt =
-//	{ { 0, 1, 2, 3, 6, 7 }, { 4, 5, 6, 7, 10, 11 }, { 0, 1, 2, 4, 5, 6 }, { 4, 5, 6, 8, 9, 10 } };
-
 
 template<int p0, int p1, int p2, int p3, int p4, int p5>
 u64 index6t(const board& b) {
-//	std::cout << p0 << "\t" << p1 << "\t" << p2 << "\t" << p3 << "\t" << p4 << "\t" << p5 << std::endl;
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
 	index += b.at(p1) <<  4;
@@ -912,7 +907,6 @@ void make_features(const std::string& res = "") {
 			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
 		};
 		for (const auto& patt : defpatt) {
-			const u32 wsign = utils::hashpatt(patt);
 			auto xpatt = patt;
 			for (u32 iso = 0; iso < 8; iso++) {
 				std::transform(patt.begin(), patt.end(), xpatt.begin(), [=](int i) -> int {
@@ -920,7 +914,7 @@ void make_features(const std::string& res = "") {
 					x.isomorphic(-iso);
 					return x[i];
 				});
-				fmake(wsign, utils::hashpatt(xpatt));
+				fmake(utils::hashpatt(patt), utils::hashpatt(xpatt));
 			}
 		}
 		fmake(0xfe000001, 0xfe000001);
