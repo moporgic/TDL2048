@@ -547,12 +547,14 @@ u64 indexmerge0(const board& b) { // 16-bit
 	return hori | (vert << 8);
 }
 
+template<int transpose>
 u64 indexmerge1(const board& b) { // 8-bit
 	register u32 merge = 0;
-	merge |= b.query(0).merge << 0;
-	merge |= b.query(1).merge << 2;
-	merge |= b.query(2).merge << 4;
-	merge |= b.query(3).merge << 6;
+	board k = b; if (transpose) k.transpose();
+	merge |= k.query(0).merge << 0;
+	merge |= k.query(1).merge << 2;
+	merge |= k.query(2).merge << 4;
+	merge |= k.query(3).merge << 6;
 	return merge;
 }
 
@@ -632,6 +634,14 @@ u64 indexmono(const board& b) { // 24-bit
 	k.rotate(isomorphic);
 	if (isomorphic >= 4) k.mirror();
 	return k.mono();
+}
+
+template<u32 tile, int isomorphic>
+u64 indexmask(const board& b) { // 16-bit
+	board k = b;
+	k.rotate(isomorphic);
+	if (isomorphic >= 4) k.mirror();
+	return k.mask(tile);
 }
 
 template<int isomorphic>
@@ -785,30 +795,31 @@ void make_indexers() {
 	make(0x048c159d, utils::index8t<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
 	make(0x159d26ae, utils::index8t<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
 	make(0xff000000, utils::indexmerge0);
-	make(0xff000001, utils::indexmerge1);
+	make(0xff000001, utils::indexmerge1<0>);
+	make(0xff000011, utils::indexmerge1<1>);
 	make(0xfe000000, utils::indexnum0);
 	make(0xfe000001, utils::indexnum1);
 	make(0xfe000002, utils::indexnum2);
-	make(0xfe800002, utils::indexnum2x<0, 0, 1>);
-	make(0xfe900002, utils::indexnum2x<0, 2, 3>);
-	make(0xfec00002, utils::indexnum2x<1, 0, 1>);
-	make(0xfed00002, utils::indexnum2x<1, 2, 3>);
+	make(0xfe000082, utils::indexnum2x<0, 0, 1>);
+	make(0xfe000092, utils::indexnum2x<0, 2, 3>);
+	make(0xfe0000c2, utils::indexnum2x<1, 0, 1>);
+	make(0xfe0000d2, utils::indexnum2x<1, 2, 3>);
 	make(0xfd000000, utils::indexmono<0>);
-	make(0xfd100000, utils::indexmono<1>);
-	make(0xfd200000, utils::indexmono<2>);
-	make(0xfd300000, utils::indexmono<3>);
-	make(0xfd400000, utils::indexmono<4>);
-	make(0xfd500000, utils::indexmono<5>);
-	make(0xfd600000, utils::indexmono<6>);
-	make(0xfd700000, utils::indexmono<7>);
+	make(0xfd000010, utils::indexmono<1>);
+	make(0xfd000020, utils::indexmono<2>);
+	make(0xfd000030, utils::indexmono<3>);
+	make(0xfd000040, utils::indexmono<4>);
+	make(0xfd000050, utils::indexmono<5>);
+	make(0xfd000060, utils::indexmono<6>);
+	make(0xfd000070, utils::indexmono<7>);
 	make(0xfc000000, utils::indexmax<0>);
-	make(0xfc100000, utils::indexmax<1>);
-	make(0xfc200000, utils::indexmax<2>);
-	make(0xfc300000, utils::indexmax<3>);
-	make(0xfc400000, utils::indexmax<4>);
-	make(0xfc500000, utils::indexmax<5>);
-	make(0xfc600000, utils::indexmax<6>);
-	make(0xfc700000, utils::indexmax<7>);
+	make(0xfc000010, utils::indexmax<1>);
+	make(0xfc000020, utils::indexmax<2>);
+	make(0xfc000030, utils::indexmax<3>);
+	make(0xfc000040, utils::indexmax<4>);
+	make(0xfc000050, utils::indexmax<5>);
+	make(0xfc000060, utils::indexmax<6>);
+	make(0xfc000070, utils::indexmax<7>);
 }
 
 void make_custom_indexers(const std::string& value = "") {
