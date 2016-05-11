@@ -822,7 +822,7 @@ void make_indexers() {
 	make(0xfc000070, utils::indexmax<7>);
 }
 
-void make_custom_indexers(const std::string& value = "") {
+void parse_indexers(const std::string& value = "") {
 	if (value.empty()) return;
 	std::string in(value);
 	while (in.find_first_of(":()[],") != std::string::npos)
