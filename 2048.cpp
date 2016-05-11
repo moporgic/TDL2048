@@ -652,8 +652,7 @@ u64 indexmax(const board& b) { // 16-bit
 	return k.mask(k.max());
 }
 
-void make_indexers() {
-
+void make_indexers(const std::string& res = "") {
 	auto make = [](u32 sign, indexer::mapper func) {
 		if (indexer::find(sign) == indexer::end()) indexer::make(sign, func);
 	};
@@ -820,16 +819,13 @@ void make_indexers() {
 	make(0xfc000050, utils::indexmax<5>);
 	make(0xfc000060, utils::indexmax<6>);
 	make(0xfc000070, utils::indexmax<7>);
-}
 
-void parse_indexers(const std::string& value = "") {
-	if (value.empty()) return;
-	std::string in(value);
+	// patt(012367) num(-)
+	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
 	std::stringstream idxin(in);
 	std::string type, sign;
-	// patt(012367) num(-)
 	while (idxin >> type && idxin >> sign) {
 		u32 idxr;
 		using moporgic::to_hash;
