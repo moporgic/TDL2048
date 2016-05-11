@@ -35,6 +35,7 @@ namespace moporgic {
 
 typedef double numeric;
 numeric alpha = 0.0025;
+const u64 base = 16;
 
 class weight {
 public:
@@ -357,9 +358,9 @@ struct options : public std::list<std::string> {
 		return ss.str();
 	}};
 
-inline void rotfx(int& i) { i = (3 - (i >> 2)) + ((i % 4) << 2); }
-inline void mirfx(int& s) { s = ((s >> 2) << 2) + (3 - (s % 4)); }
-std::vector<std::function<void(int&)>> mapfx = { rotfx, rotfx, rotfx, mirfx, rotfx, rotfx, rotfx, mirfx };
+//inline void rotfx(int& i) { i = (3 - (i >> 2)) + ((i % 4) << 2); }
+//inline void mirfx(int& s) { s = ((s >> 2) << 2) + (3 - (s % 4)); }
+//std::vector<std::function<void(int&)>> mapfx = { rotfx, rotfx, rotfx, mirfx, rotfx, rotfx, rotfx, mirfx };
 inline u32 hashpatt(const std::vector<int>& patt) {
 	u32 hash = 0;
 	for (auto tile : patt) hash = (hash << 4) | tile;
@@ -372,11 +373,10 @@ inline std::vector<int> hashpatt(const std::string& hashs) {
 		(*it) = hash & 0x0f;
 	return patt;
 }
-std::vector<std::vector<int>> defpatt =
-	{ { 0, 1, 2, 3, 6, 7 }, { 4, 5, 6, 7, 10, 11 }, { 0, 1, 2, 4, 5, 6 }, { 4, 5, 6, 8, 9, 10 } };
+//std::vector<std::vector<int>> defpatt =
+//	{ { 0, 1, 2, 3, 6, 7 }, { 4, 5, 6, 7, 10, 11 }, { 0, 1, 2, 4, 5, 6 }, { 4, 5, 6, 8, 9, 10 } };
 
 
-const u32 base = 16;
 template<int p0, int p1, int p2, int p3, int p4, int p5>
 u64 index6t(const board& b) {
 //	std::cout << p0 << "\t" << p1 << "\t" << p2 << "\t" << p3 << "\t" << p4 << "\t" << p5 << std::endl;
@@ -849,8 +849,14 @@ void make_weights(const std::string& res = "") {
 		in.replace(in.find("default"), 7, "");
 
 		// make default weights
-		for (const auto& patt : utils::defpatt) {
-			wmake(utils::hashpatt(patt), std::pow(u64(utils::base), patt.size()));
+		std::vector<std::vector<int>> defpatt = {
+			{ 0x0, 0x1, 0x2, 0x3, 0x6, 0x7 },
+			{ 0x4, 0x5, 0x6, 0x7, 0xa, 0xb },
+			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
+			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
+		};
+		for (const auto& patt : defpatt) {
+			wmake(utils::hashpatt(patt), std::pow(u64(base), patt.size()));
 		}
 		wmake(0xfe000001, 1 << 25);
 		wmake(0xff000000, 1 << 16);
@@ -899,11 +905,22 @@ void make_features(const std::string& res = "") {
 		in.replace(in.find("default"), 7, "");
 
 		// make default features
-		for (auto patt : utils::defpatt) {
+		std::vector<std::vector<int>> defpatt = {
+			{ 0x0, 0x1, 0x2, 0x3, 0x6, 0x7 },
+			{ 0x4, 0x5, 0x6, 0x7, 0xa, 0xb },
+			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
+			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
+		};
+		for (const auto& patt : defpatt) {
 			const u32 wsign = utils::hashpatt(patt);
-			for (auto fx : utils::mapfx) {
-				fmake(wsign, utils::hashpatt(patt));
-				std::for_each(patt.begin(), patt.end(), fx);
+			auto xpatt = patt;
+			for (u32 iso = 0; iso < 8; iso++) {
+				std::transform(patt.begin(), patt.end(), xpatt.begin(), [=](int i) -> int {
+					board x(0xfedcba9876543210);
+					x.isomorphic(-iso);
+					return x[i];
+				});
+				fmake(wsign, utils::hashpatt(xpatt));
 			}
 		}
 		fmake(0xfe000001, 0xfe000001);
@@ -916,8 +933,9 @@ void make_features(const std::string& res = "") {
 		std::stringstream(wghts) >> std::hex >> wght;
 		std::stringstream(idxrs) >> std::hex >> idxr;
 		if (weight::find(wght) == weight::end()) {
-			std::cerr << "error: undefined weight " << wghts << std::endl;
-			std::exit(1);
+			std::cerr << "warning: undefined weight " << wghts;
+			std::cerr << " [assume " << (wghts.size()) << "-tile pattern]" << std::endl;
+			weight::make(wght, std::pow(u64(base), wghts.size()));
 		}
 		if (indexer::find(idxr) == indexer::end()) {
 			std::cerr << "warning: undefined indexer " << idxrs;
