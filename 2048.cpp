@@ -45,7 +45,6 @@ public:
 
 	inline u32 signature() const { return sign; }
 	inline numeric& operator [](const u64& i) { return value.get()[i]; }
-	inline bool operator ==(const weight& w) const { return sign == w.sign; }
 	inline size_t length() const { return size; }
 
 	void operator >>(std::ostream& out) const {
@@ -119,7 +118,6 @@ public:
 		}
 		out.flush();
 	}
-
 	static void load(std::istream& in) {
 		const int LE = moporgic::endian::le;
 		char buf[8];
@@ -151,7 +149,9 @@ public:
 	typedef std::vector<weight>::iterator iter;
 	static inline iter begin() { return weights().begin(); }
 	static inline iter end() { return weights().end(); }
-	static inline iter find(const u32& sign) { return std::find(begin(), end(), sign); }
+	static inline iter find(const u32& sign) {
+		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
+	}
 	static inline const std::vector<weight>& list() { return weights(); }
 private:
 	typedef std::shared_ptr<numeric> table;
@@ -188,7 +188,6 @@ public:
 
 	inline u32 signature() const { return sign; }
 	inline u64 operator ()(const board& b) const { return map(b); }
-	inline bool operator ==(const indexer& i) const { return sign == i.sign; }
 
 	typedef std::function<u64(const board&)> mapper;
 	static indexer make(const u32& sign, mapper map) {
@@ -204,7 +203,7 @@ public:
 	static inline iter begin() { return indexers().begin(); }
 	static inline iter end() { return indexers().end(); }
 	static inline iter find(const u32& sign) {
-		return std::find(begin(), end(), sign);
+		return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign == sign; });
 	}
 	static inline const std::vector<indexer>& list() { return indexers(); }
 private:
@@ -312,7 +311,8 @@ public:
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end() { return feats().end(); }
 	static inline iter find(const u32& wgt, const u32& idx) {
-		return std::find(begin(), end(), make_sign(wgt, idx));
+		const u32 sign = make_sign(wgt, idx);
+		return std::find_if(begin(), end(), [=](const feature& f) { return f.signature() == sign; });
 	}
 	static inline const std::vector<feature>& list() { return feats(); }
 
