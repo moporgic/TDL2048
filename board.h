@@ -81,6 +81,7 @@ public:
 		const info mask; // mask of each tile-type
 		const tiles pos; // layout of board-type
 		const i32 moved; // moved or not
+		const u32 legal; // legal actions
 
 		cache(const cache& c) = default;
 		cache() = delete;
@@ -137,14 +138,17 @@ public:
 			}
 			tiles pos(ltile, lsize);
 			moved = left.moved & right.moved;
+			u32 legal = 0;
+			if (mvL != r) legal |= (0x08 | 0x01);
+			if (mvR != r) legal |= (0x02 | 0x04);
 
-			return cache(raw, ext, hash, merge, left, right, count, mask, pos, moved);
+			return cache(raw, ext, hash, merge, left, right, count, mask, pos, moved, legal);
 		}
 	private:
-		cache(u32 raw, u32 ext, u32 hash, u32 merge,
-				operation left, operation right, info count, info mask, tiles pos, i32 moved)
-				: raw(raw), ext(ext), hash(hash), merge(merge),
-				  left(left), right(right), count(count), mask(mask), pos(pos), moved(moved) {}
+		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right,
+			info count, info mask, tiles pos, i32 moved, u32 legal)
+				: raw(raw), ext(ext), hash(hash), merge(merge), left(left), right(right),
+				  count(count), mask(mask), pos(pos), moved(moved), legal(legal) {}
 
 		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
 			for (u32 i = 0; i < 4; i++) {
@@ -409,7 +413,7 @@ public:
 		static constexpr oper left = 3;
 		static constexpr oper illegal = -1;
 	};
-	inline i32 move(const optype::oper& op) {
+	inline i32 operate(const optype::oper& op) {
 		switch (op) {
 		case optype::up:    return up();
 		case optype::right: return right();
@@ -417,6 +421,16 @@ public:
 		case optype::left:  return left();
 		default:            return -1;
 		}
+	}
+	inline i32 move(const optype::oper& op) { return operate(op); }
+
+	inline u32 operations() const {
+		board trans(*this); trans.transpose();
+		u32 hori = this->query(0).legal | this->query(1).legal
+				 | this->query(2).legal | this->query(3).legal;
+		u32 vert = trans.query(0).legal | trans.query(1).legal
+				 | trans.query(2).legal | trans.query(3).legal;
+		return (hori & 0x0a) | (vert & 0x05);
 	}
 
 	inline void mark() {
