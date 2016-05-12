@@ -427,6 +427,10 @@ public:
 		raw = rawc;
 		ext = extc;
 	}
+	inline void swap() {
+		std::swap(raw, rawc);
+		std::swap(ext, extc);
+	}
 
 	inline u32 hash() const {
 		return query(0).hash | query(1).hash | query(2).hash | query(3).hash;
