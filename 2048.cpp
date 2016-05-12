@@ -154,7 +154,7 @@ public:
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
 	}
 private:
-	typedef numeric* table;
+	using table = numeric*;
 	weight(const u32& sign, const size_t& size) : sign(sign), value(make_table(size)), size(size) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
@@ -404,81 +404,7 @@ u64 index8t(const board& b) {
 	index += b.at(p7) << 28;
 	return index;
 }
-u64 index8ta(const board& b,
-		const int& p0, const int& p1, const int& p2, const int& p3,
-		const int& p4, const int& p5, const int& p6, const int& p7) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	index += b.at(p6) << 24;
-	index += b.at(p7) << 28;
-	return index;
-}
-u64 index7ta(const board& b, const int& p0, const int& p1,
-		const int& p2, const int& p3, const int& p4, const int& p5, const int& p6) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	index += b.at(p6) << 24;
-	return index;
-}
-u64 index6ta(const board& b,
-		const int& p0, const int& p1, const int& p2,
-		const int& p3, const int& p4, const int& p5) {
-//	std::cout << p0 << "\t" << p1 << "\t" << p2 << "\t" << p3 << "\t" << p4 << "\t" << p5 << std::endl;
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	return index;
-}
-u64 index5ta(const board& b, const int& p0, const int& p1,
-		const int& p2, const int& p3, const int& p4) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	return index;
-}
-u64 index4ta(const board& b, const int& p0, const int& p1, const int& p2, const int& p3) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	return index;
-}
-u64 index3ta(const board& b, const int& p0, const int& p1, const int& p2) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	return index;
-}
-u64 index2ta(const board& b, const int& p0, const int& p1) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	return index;
-}
-u64 index1ta(const board& b, const int& p0) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	return index;
-}
+
 u64 indexnta(const board& b, const std::vector<int>& p) {
 	register u64 index = 0;
 	for (size_t i = 0; i < p.size(); i++)
@@ -960,7 +886,7 @@ inline numeric update(const board& state,
 
 void list_mapping() {
 	for (weight w : weight::list()) {
-		u32 usageK = ((sizeof(numeric) * w.length()) >> 10);
+		u32 usageK = (sizeof(numeric) * w.length()) >> 10;
 		u32 usageM = usageK >> 10;
 		char buf[64];
 		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c", w.signature(), w.length(),
@@ -969,7 +895,7 @@ void list_mapping() {
 		std::string feats;
 		for (feature f : feature::list()) {
 			if (weight(f) == w) {
-				snprintf(buf, sizeof(buf), " %08x", f);
+				snprintf(buf, sizeof(buf), " %08x", indexer(f).signature());
 				feats += buf;
 			}
 		}
@@ -1153,12 +1079,8 @@ struct statistic {
 				total.win * 100.0 / loop);
 		std::cout << buf << std::endl;
 
-		local.score = 0;
-		local.win = 0;
+		local = {};
 		local.time = currtimept;
-		local.opers = 0;
-		local.hash = 0;
-		local.max = 0;
 	}
 
 	inline void updatec(const u32& score, const u32& hash, const u32& opers) {
