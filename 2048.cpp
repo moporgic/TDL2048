@@ -44,7 +44,7 @@ public:
 	~weight() {}
 
 	inline u32 signature() const { return sign; }
-	inline numeric& operator [](const u64& i) { return value.get()[i]; }
+	inline numeric& operator [](const u64& i) { return value[i]; }
 	inline size_t length() const { return size; }
 
 	void operator >>(std::ostream& out) const {
@@ -56,7 +56,7 @@ public:
 			out.write(r32(sign).endian(LE), 4);
 			out.write(r64(size).endian(LE), 8);
 			for (u64 i = 0; i < size; i++)
-				out.write(r32(value.get()[i]).endian(LE), 4);
+				out.write(r32(value[i]).endian(LE), 4);
 			break;
 		case 1:
 			out.write(r32(sign).le(), 4);
@@ -81,14 +81,14 @@ public:
 		case 0:
 			sign = r32(load(4), LE);
 			size = r64(load(8), LE);
-			value = std::shared_ptr<numeric>(new numeric[size]());
+			value = new numeric[size]();
 			for (u64 i = 0; i < size; i++)
-				value.get()[i] = r32(load(4), LE);
+				value[i] = r32(load(4), LE);
 			break;
 		case 1:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
-			value = std::shared_ptr<numeric>(new numeric[size]());
+			value = new numeric[size]();
 			switch (sizeof(numeric)) {
 			case 4: read<r32>(in);
 				break;
@@ -154,25 +154,23 @@ public:
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
 	}
 private:
-	typedef std::shared_ptr<numeric> table;
+	typedef numeric* table;
 	weight(const u32& sign, const size_t& size) : sign(sign), value(make_table(size)), size(size) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline table make_table(const size_t& size) {
-		return table(new numeric[size](), std::default_delete<numeric[]>());
+		return new numeric[size]();
 	}
 
 	template<typename rxx> void write(std::ostream& out) const {
-		numeric *v = value.get();
 		for (size_t i = 0; i < size; i++)
-			out.write(rxx(v[i]).le(), sizeof(rxx));
+			out.write(rxx(value[i]).le(), sizeof(rxx));
 	}
 	template<typename rxx> void read(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		numeric *v = value.get();
 		for (size_t i = 0; i < size; i++)
-			v[i] = rxx(load(sizeof(rxx))).le();
+			value[i] = rxx(load(sizeof(rxx))).le();
 	}
 
 	u32 sign;
