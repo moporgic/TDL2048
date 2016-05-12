@@ -108,8 +108,8 @@ public:
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(u32(weights().size())).endian(LE), 4);
-			for (weight w : weights())
+			out.write(r32(u32(wghts().size())).endian(LE), 4);
+			for (weight w : wghts())
 				w >> out;
 			break;
 		default:
@@ -127,8 +127,8 @@ public:
 		case 0:
 			in.read(buf, 4);
 			for (u32 size = r32(buf, LE); size; size--) {
-				weights().push_back(weight());
-				weights().back() << in;
+				wghts().push_back(weight());
+				wghts().back() << in;
 			}
 			break;
 		default:
@@ -138,25 +138,25 @@ public:
 	}
 
 	static weight make(const u32& sign, const size_t& size) {
-		weights().push_back(weight(sign, size));
-		return weights().back();
+		wghts().push_back(weight(sign, size));
+		return wghts().back();
 	}
 	static inline weight at(const u32& sign) {
-		for (weight w : weights())
-			if (w.signature() == sign) return w;
-		return weights().at(-1);
+		const auto it = find(sign);
+		if (it != end()) return (*it);
+		throw std::out_of_range("weight::at");
 	}
 	typedef std::vector<weight>::iterator iter;
-	static inline iter begin() { return weights().begin(); }
-	static inline iter end() { return weights().end(); }
+	static inline const std::vector<weight>& list() { return wghts(); }
+	static inline iter begin() { return wghts().begin(); }
+	static inline iter end() { return wghts().end(); }
 	static inline iter find(const u32& sign) {
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
 	}
-	static inline const std::vector<weight>& list() { return weights(); }
 private:
 	typedef std::shared_ptr<numeric> table;
 	weight(const u32& sign, const size_t& size) : sign(sign), value(make_table(size)), size(size) {}
-	static inline std::vector<weight>& weights() { static std::vector<weight> w; return w; }
+	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline table make_table(const size_t& size) {
 		return table(new numeric[size](), std::default_delete<numeric[]>());
@@ -191,24 +191,24 @@ public:
 
 	typedef std::function<u64(const board&)> mapper;
 	static indexer make(const u32& sign, mapper map) {
-		indexers().push_back(indexer(sign, map));
-		return indexers().back();
+		idxrs().push_back(indexer(sign, map));
+		return idxrs().back();
 	}
 	static inline indexer at(const u32& sign) {
-		for (indexer i : indexers())
-			if (i.signature() == sign) return i;
-		return indexers().at(-1);
+		const auto it = find(sign);
+		if (it != end()) return (*it);
+		throw std::out_of_range("indexer::at");
 	}
 	typedef std::vector<indexer>::iterator iter;
-	static inline iter begin() { return indexers().begin(); }
-	static inline iter end() { return indexers().end(); }
+	static inline const std::vector<indexer>& list() { return idxrs(); }
+	static inline iter begin() { return idxrs().begin(); }
+	static inline iter end() { return idxrs().end(); }
 	static inline iter find(const u32& sign) {
 		return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign == sign; });
 	}
-	static inline const std::vector<indexer>& list() { return indexers(); }
 private:
 	indexer(const u32& sign, mapper map) : sign(sign), map(map) {}
-	static inline std::vector<indexer>& indexers() { static std::vector<indexer> i; return i; }
+	static inline std::vector<indexer>& idxrs() { static std::vector<indexer> i; return i; }
 
 	u32 sign;
 	mapper map;
@@ -302,19 +302,18 @@ public:
 		return feats().back();
 	}
 	static feature at(const u32& wgt, const u32& idx) {
-		for (auto feat : feats())
-			if (feat.signature() == make_sign(wgt, idx))
-				return feat;
-		return feats().at(-1);
+		const auto it = find(wgt, idx);
+		if (it != end()) return (*it);
+		throw std::out_of_range("feature::at");
 	}
 	typedef std::vector<feature>::iterator iter;
+	static inline const std::vector<feature>& list() { return feats(); }
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end() { return feats().end(); }
 	static inline iter find(const u32& wgt, const u32& idx) {
 		const u32 sign = make_sign(wgt, idx);
 		return std::find_if(begin(), end(), [=](const feature& f) { return f.signature() == sign; });
 	}
-	static inline const std::vector<feature>& list() { return feats(); }
 
 private:
 	feature(const weight& value, const indexer& index) : index(index), value(value) {}
