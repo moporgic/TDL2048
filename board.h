@@ -497,6 +497,7 @@ public:
 				 | trans.query(2).legal | trans.query(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
+	inline u32 actions() const { return operations(); }
 
 	inline bool operable() const {
 		if (this->query(0).moved == 0) return true;
