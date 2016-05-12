@@ -48,15 +48,15 @@ public:
 	inline size_t length() const { return size; }
 
 	void operator >>(std::ostream& out) const {
-		const int LE = moporgic::endian::le;
+		using moporgic::endian::le;
 		const char serial = 1;
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(sign).endian(LE), 4);
-			out.write(r64(size).endian(LE), 8);
-			for (u64 i = 0; i < size; i++)
-				out.write(r32(value[i]).endian(LE), 4);
+			out.write(r32(sign).endian(le), 4);
+			out.write(r64(size).endian(le), 8);
+			for (size_t i = 0; i < size; i++)
+				out.write(r32(value[i]).endian(le), 4);
 			break;
 		case 1:
 			out.write(r32(sign).le(), 4);
@@ -76,14 +76,14 @@ public:
 	void operator <<(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		const int LE = moporgic::endian::le;
+		using moporgic::endian::le;
 		switch (*load(1)) {
 		case 0:
-			sign = r32(load(4), LE);
-			size = r64(load(8), LE);
+			sign = r32(load(4), le);
+			size = r64(load(8), le);
 			value = new numeric[size]();
-			for (u64 i = 0; i < size; i++)
-				value[i] = r32(load(4), LE);
+			for (size_t i = 0; i < size; i++)
+				value[i] = r32(load(4), le);
 			break;
 		case 1:
 			sign = r32(load(4)).le();
@@ -103,12 +103,12 @@ public:
 	}
 
 	static void save(std::ostream& out) {
-		const int LE = moporgic::endian::le;
+		using moporgic::endian::le;
 		const char serial = 0;
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(u32(wghts().size())).endian(LE), 4);
+			out.write(r32(u32(wghts().size())).endian(le), 4);
 			for (weight w : wghts())
 				w >> out;
 			break;
@@ -119,14 +119,14 @@ public:
 		out.flush();
 	}
 	static void load(std::istream& in) {
-		const int LE = moporgic::endian::le;
+		using moporgic::endian::le;
 		char buf[8];
 		char serial;
 		in.read(&serial, 1);
 		switch (serial) {
 		case 0:
 			in.read(buf, 4);
-			for (u32 size = r32(buf, LE); size; size--) {
+			for (u32 size = r32(buf, le); size; size--) {
 				wghts().push_back(weight());
 				wghts().back() << in;
 			}
