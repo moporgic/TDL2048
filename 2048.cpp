@@ -44,8 +44,11 @@ public:
 	~weight() {}
 
 	inline u32 signature() const { return sign; }
-	inline numeric& operator [](const u64& i) { return value[i]; }
 	inline size_t length() const { return size; }
+	inline numeric& operator [](const u64& i) { return value[i]; }
+
+	inline bool operator ==(const weight& w) const { return sign == w.sign; }
+	inline bool operator !=(const weight& w) const { return sign != w.sign; }
 
 	void operator >>(std::ostream& out) const {
 		const char serial = 1;
@@ -181,10 +184,15 @@ public:
 	indexer(const indexer& i) : sign(i.sign), map(i.map) {}
 	~indexer() {}
 
+	typedef std::function<u64(const board&)> mapper;
+
 	inline u32 signature() const { return sign; }
+	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return map(b); }
 
-	typedef std::function<u64(const board&)> mapper;
+	inline bool operator ==(const indexer& i) const { return sign == i.sign; }
+	inline bool operator !=(const indexer& i) const { return sign != i.sign; }
+
 	static indexer make(const u32& sign, mapper map) {
 		idxrs().push_back(indexer(sign, map));
 		return idxrs().back();
@@ -221,12 +229,14 @@ public:
 	static inline numeric& pass(const board& b) { return value[index(b)]; }
 
 	inline u64 signature() const { return make_sign(value.signature(), index.signature()); }
+	inline operator indexer() const { return index; }
+	inline operator weight() const { return value; }
 	inline numeric& operator [](const board& b) { return value[index(b)]; }
 	inline numeric& operator [](const u64& idx) { return value[idx]; }
 	inline u64 operator ()(const board& b) const { return index(b); }
+
 	inline bool operator ==(const feature& f) const { return signature() == f.signature(); }
-	inline operator indexer() const { return index; }
-	inline operator weight() const { return value; }
+	inline bool operator !=(const feature& f) const { return signature() != f.signature(); }
 
 	void operator >>(std::ostream& out) const {
 		const char serial = 0;
@@ -949,20 +959,21 @@ inline numeric update(const board& state,
 }
 
 void list_mapping() {
-	for (auto it = weight::begin(); it != weight::end(); it++) {
-		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
+	for (weight w : weight::list()) {
+		u32 usageK = ((sizeof(numeric) * w.length()) >> 10);
 		u32 usageM = usageK >> 10;
-		printf("weight(%08x)[%llu] = %d%c", it->signature(), it->length(),
+		char buf[64];
+		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c", w.signature(), w.length(),
 				usageM ? usageM : usageK, usageM ? 'M' : 'K');
-		std::vector<u32> feats;
-		for (auto ft = feature::begin(); ft != feature::end(); ft++) {
-			if (weight(*ft).signature() == it->signature())
-				feats.push_back(feature(*ft).signature());
+		std::cout << buf;
+		std::string feats;
+		for (feature f : feature::list()) {
+			if (weight(f) == w) {
+				snprintf(buf, sizeof(buf), " %08x", f);
+				feats += buf;
+			}
 		}
-		if (feats.size()) {
-			std::cout << " :";
-			for (auto f : feats) printf(" %08x", f);
-		}
+		if (feats.size()) std::cout << " :" << feats;
 		std::cout << std::endl;
 	}
 }
