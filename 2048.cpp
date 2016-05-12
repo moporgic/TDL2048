@@ -48,15 +48,14 @@ public:
 	inline size_t length() const { return size; }
 
 	void operator >>(std::ostream& out) const {
-		using moporgic::endian::le;
 		const char serial = 1;
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(sign).endian(le), 4);
-			out.write(r64(size).endian(le), 8);
+			out.write(r32(sign).le(), 4);
+			out.write(r64(size).le(), 8);
 			for (size_t i = 0; i < size; i++)
-				out.write(r32(value[i]).endian(le), 4);
+				out.write(r32(value[i]).le(), 4);
 			break;
 		case 1:
 			out.write(r32(sign).le(), 4);
@@ -76,14 +75,13 @@ public:
 	void operator <<(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		using moporgic::endian::le;
 		switch (*load(1)) {
 		case 0:
-			sign = r32(load(4), le);
-			size = r64(load(8), le);
+			sign = r32(load(4)).le();
+			size = r64(load(8)).le();
 			value = new numeric[size]();
 			for (size_t i = 0; i < size; i++)
-				value[i] = r32(load(4), le);
+				value[i] = r32(load(4)).le();
 			break;
 		case 1:
 			sign = r32(load(4)).le();
@@ -103,12 +101,11 @@ public:
 	}
 
 	static void save(std::ostream& out) {
-		using moporgic::endian::le;
 		const char serial = 0;
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(u32(wghts().size())).endian(le), 4);
+			out.write(r32(u32(wghts().size())).le(), 4);
 			for (weight w : wghts())
 				w >> out;
 			break;
@@ -119,14 +116,14 @@ public:
 		out.flush();
 	}
 	static void load(std::istream& in) {
-		using moporgic::endian::le;
 		char buf[8];
+		auto load = moporgic::make_load(in, buf);
 		char serial;
 		in.read(&serial, 1);
 		switch (serial) {
 		case 0:
 			in.read(buf, 4);
-			for (u32 size = r32(buf, le); size; size--) {
+			for (u32 size = r32(buf).le(); size; size--) {
 				wghts().push_back(weight());
 				wghts().back() << in;
 			}
@@ -232,13 +229,12 @@ public:
 	inline operator weight() const { return value; }
 
 	void operator >>(std::ostream& out) const {
-		const int LE = moporgic::endian::le;
 		const char serial = 0;
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(index.signature()).endian(LE), 4);
-			out.write(r32(value.signature()).endian(LE), 4);
+			out.write(r32(index.signature()).le(), 4);
+			out.write(r32(value.signature()).le(), 4);
 			break;
 		default:
 			std::cerr << "unknown serial at feature::>>" << std::endl;
@@ -248,11 +244,10 @@ public:
 	void operator <<(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		const int LE = moporgic::endian::le;
 		switch (*load(1)) {
 		case 0:
-			index = indexer::at(r32(load(4), LE));
-			value = weight::at(r32(load(4), LE));
+			index = indexer::at(r32(load(4)).le());
+			value = weight::at(r32(load(4)).le());
 			break;
 		default:
 			std::cerr << "unknown serial at feature::<<" << std::endl;
@@ -261,12 +256,11 @@ public:
 	}
 
 	static void save(std::ostream& out) {
-		const int LE = moporgic::endian::le;
 		const char serial = 0;
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(u32(feats().size())).endian(LE), 4);
+			out.write(r32(u32(feats().size())).le(), 4);
 			for (u32 i = 0, size = feats().size(); i < size; i++)
 				feats()[i] >> out;
 			break;
@@ -277,14 +271,13 @@ public:
 		out.flush();
 	}
 	static void load(std::istream& in) {
-		const int LE = moporgic::endian::le;
 		char buf[4];
 		char serial;
 		in.read(&serial, 1);
 		switch (serial) {
 		case 0:
 			in.read(buf, 4);
-			for (u32 size = r32(buf, LE); size; size--) {
+			for (u32 size = r32(buf).le(); size; size--) {
 				feats().push_back(feature());
 				feats().back() << in;
 			}
@@ -354,7 +347,6 @@ struct options : public std::list<std::string> {
 		return ss.str();
 	}
 };
-
 
 inline u32 hashpatt(const std::vector<int>& patt) {
 	u32 hash = 0;
@@ -802,6 +794,7 @@ void make_indexers(const std::string& res = "") {
 			break;
 		default:
 			std::cerr << "error: unknown custom indexer type " << type << std::endl;
+			break;
 		}
 	}
 }
@@ -858,10 +851,6 @@ void make_weights(const std::string& res = "") {
 		u32 sign = 0; u64 size = 0;
 		std::stringstream(signs) >> std::hex >> sign;
 		std::stringstream(sizes) >> std::dec >> size;
-		if (weight::find(sign) != weight::end()) {
-			std::cerr << "error: redefined weight " << signs << std::endl;
-			std::exit(1);
-		}
 		wmake(sign, size);
 	}
 }
