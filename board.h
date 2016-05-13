@@ -17,13 +17,13 @@ namespace moporgic {
 
 class board {
 public:
-	struct tiles {
+	struct list {
 		u64 tile;
 		u32 size;
-		tiles(const u64& t, const u32& s) : tile(t), size(s) {}
-		tiles(const tiles& t) = default;
-		tiles() : tile(0), size(0) {}
-		~tiles() = default;
+		list(const u64& t, const u32& s) : tile(t), size(s) {}
+		list(const list& t) = default;
+		list() : tile(0), size(0) {}
+		~list() = default;
 		inline u32 operator[] (const u32& i) const { return (tile >> (i << 2)) & 0x0f; }
 		inline operator bool() const { return size > 0; }
 	};
@@ -79,7 +79,7 @@ public:
 		const operation right; // right operation
 		const info count; // number of each tile-type
 		const info mask; // mask of each tile-type
-		const tiles pos; // layout of board-type
+		const list pos; // layout of board-type
 		const i32 moved; // moved or not
 		const u32 legal; // legal actions
 
@@ -136,7 +136,7 @@ public:
 			for (int i = 0; i < 16; i++) {
 				if ((r >> i) & 1) ltile |= (u64(i) << ((lsize++) << 2));
 			}
-			tiles pos(ltile, lsize);
+			list pos(ltile, lsize);
 			moved = left.moved & right.moved;
 			u32 legal = 0;
 			if (mvL != r) legal |= (0x08 | 0x01);
@@ -146,7 +146,7 @@ public:
 		}
 	private:
 		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right,
-			info count, info mask, tiles pos, i32 moved, u32 legal)
+			info count, info mask, list pos, i32 moved, u32 legal)
 				: raw(raw), ext(ext), hash(hash), merge(merge), left(left), right(right),
 				  count(count), mask(mask), pos(pos), moved(moved), legal(legal) {}
 
@@ -306,16 +306,16 @@ public:
 		ext = 0;
 	}
 	inline void next() {
-		tiles empty = spaces();
+		list empty = spaces();
 		u32 p = empty[std::rand() % empty.size];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
-	inline tiles spaces() const {
+	inline list spaces() const {
 		return find(0);
 	}
 
 	inline bool popup() {
-		tiles empty = spaces();
+		list empty = spaces();
 		if (empty.size == 0) return false;
 		u32 p = empty[std::rand() % empty.size];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
@@ -481,7 +481,7 @@ public:
 		}
 	}
 
-	inline tiles find(const u32& t) const {
+	inline list find(const u32& t) const {
 		return board::lookup(mask(t)).pos;
 	}
 
