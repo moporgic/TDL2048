@@ -222,11 +222,6 @@ public:
 	feature(const feature& t) : index(t.index), value(t.value) {}
 	~feature() {}
 
-	template<numeric* value, u64 (*index)(const board&)>
-	static inline numeric& pass(const board& b) { return value[index(b)]; }
-	template<weight& value, indexer& index>
-	static inline numeric& pass(const board& b) { return value[index(b)]; }
-
 	inline u64 signature() const { return make_sign(value.signature(), index.signature()); }
 	inline operator indexer() const { return index; }
 	inline operator weight() const { return value; }
