@@ -204,18 +204,17 @@ public:
 	}
 
 	u64 raw;
-	u64 rawc;
 	u32 ext;
-	u32 extc;
+	u32 nul;
 
 public:
-	inline board(const u64& raw = 0) : raw(raw), rawc(0), ext(0), extc(0) {}
-	inline board(const u64& raw, const u32& ext) : raw(raw), rawc(0), ext(ext), extc(0) {}
+	inline board(const u64& raw = 0) : raw(raw), ext(0), nul(0) {}
+	inline board(const u64& raw, const u32& ext) : raw(raw), ext(ext), nul(0) {}
 	inline board(const u64& raw, const u16& ext) : board(raw, u32(ext) << 16) {}
 	inline board(const board& b) = default;
 	inline ~board() = default;
 	inline board& operator =(const u64& raw) { this->raw = raw; return *this; }
-	inline board& operator =(const board& b) { raw = b.raw, ext = b.ext; rawc = b.rawc, extc = b.extc; return *this; }
+	inline board& operator =(const board& b) { raw = b.raw, ext = b.ext; return *this; }
 	inline bool operator==(const board& b) const { return raw == b.raw && ext == b.ext; }
 	inline bool operator!=(const board& b) const { return raw != b.raw || ext != b.ext; }
 	inline bool operator==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
@@ -424,19 +423,6 @@ public:
 		}
 	}
 	inline i32 move(const optype::oper& op) { return operate(op); }
-
-	inline void mark() {
-		rawc = raw;
-		extc = ext;
-	}
-	inline void reset() {
-		raw = rawc;
-		ext = extc;
-	}
-	inline void swap() {
-		std::swap(raw, rawc);
-		std::swap(ext, extc);
-	}
 
 	inline u32 hash() const {
 		return query(0).hash | query(1).hash | query(2).hash | query(3).hash;
