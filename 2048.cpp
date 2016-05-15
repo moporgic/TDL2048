@@ -56,17 +56,14 @@ public:
 		case 0:
 			out.write(r32(sign).le(), 4);
 			out.write(r64(size).le(), 8);
-			for (size_t i = 0; i < size; i++)
-				out.write(r32(value[i]).le(), 4);
+			write<r32>(out);
 			break;
 		case 1:
 			out.write(r32(sign).le(), 4);
 			out.write(r64(size).le(), 8);
 			switch (sizeof(numeric)) {
-			case 4: write<r32>(out);
-				break;
-			case 8: write<r64>(out);
-				break;
+			case 4: write<r32>(out); break;
+			case 8: write<r64>(out); break;
 			}
 			break;
 		default:
@@ -82,18 +79,15 @@ public:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
 			value = new numeric[size]();
-			for (size_t i = 0; i < size; i++)
-				value[i] = r32(load(4)).le();
+			read<r32>(in);
 			break;
 		case 1:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
 			value = new numeric[size]();
 			switch (sizeof(numeric)) {
-			case 4: read<r32>(in);
-				break;
-			case 8: read<r64>(in);
-				break;
+			case 4: read<r32>(in); break;
+			case 8: read<r64>(in); break;
 			}
 			break;
 		default:
