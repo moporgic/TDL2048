@@ -29,6 +29,7 @@
 #include <iterator>
 #include <sstream>
 #include <list>
+#include <thread>
 
 namespace moporgic {
 
@@ -1028,7 +1029,7 @@ struct statistic {
 	operator bool() const { return loop <= limit; }
 	bool checked() const { return (loop % check) == 0; }
 
-	void update(const u32& score, const u32& hash, const u32& opers) {
+	void update(const u32& score, const u32& hash, const u32& opers, const int& tid = 0) {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
@@ -1048,11 +1049,12 @@ struct statistic {
 
 		std::cout << std::endl;
 		char buf[64];
-		snprintf(buf, sizeof(buf), "%03llu/%03llu %llums %.2fops",
+		snprintf(buf, sizeof(buf), "%03llu/%03llu %llums %.2fops [%d]",
 				loop / check,
 				limit / check,
 				elapsedtime,
-				local.opers * 1000.0 / elapsedtime);
+				local.opers * 1000.0 / elapsedtime,
+				tid);
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / check,
@@ -1237,39 +1239,13 @@ int main(int argc, const char* argv[]) {
 	utils::list_mapping();
 
 
-	board b;
-	state last;
-	select best;
-	statistic stats;
-	std::vector<state> path;
-	path.reserve(20000);
-
 	if (train) std::cout << std::endl << "start training..." << std::endl;
-	switch (to_hash(opts["train-type"])) {
+	auto routine = [&](const int tid) {
+		board b;
+		state last;
+		select best;
+		statistic stats;
 
-	case to_hash("backward"):
-		for (stats.init(train); stats; stats++) {
-
-			register u32 score = 0;
-			register u32 opers = 0;
-
-			for (b.init(); best << b; b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> path;
-				best >> b;
-			}
-
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				v = (path.back() += v);
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
-
-	default:
-	case to_hash("forward"):
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
@@ -1292,10 +1268,13 @@ int main(int argc, const char* argv[]) {
 			}
 			last += 0;
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.hash(), opers, tid);
 		}
-		break;
-	}
+	};
+	std::thread th0(routine, 0);
+	std::thread th1(routine, 1);
+	th0.join();
+	th1.join();
 
 	utils::save_weights(wopts["output"]);
 	utils::save_features(fopts["output"]);
@@ -1304,6 +1283,9 @@ int main(int argc, const char* argv[]) {
 
 
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
+	board b;
+	select best;
+	statistic stats;
 	for (stats.init(test); stats; stats++) {
 
 		register u32 score = 0;
