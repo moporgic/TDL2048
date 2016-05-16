@@ -1107,7 +1107,7 @@ int main(int argc, const char* argv[]) {
 	utils::options wopts;
 	utils::options fopts;
 	utils::options opts;
-
+	u32 thdnum = 1;
 
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
@@ -1200,6 +1200,9 @@ int main(int argc, const char* argv[]) {
 		case to_hash("--comment"):
 			opts["comment"] = valueof(i, "");
 			break;
+		case to_hash("-thd"):
+			thdnum = std::stod(valueof(i, nullptr));
+			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
 			std::exit(1);
@@ -1271,10 +1274,13 @@ int main(int argc, const char* argv[]) {
 			stats.update(score, b.hash(), opers, tid);
 		}
 	};
-	std::thread th0(routine, 0);
-	std::thread th1(routine, 1);
-	th0.join();
-	th1.join();
+	std::vector<std::thread*> thdpool;
+	for (u32 i = 0; i < thdnum; i++) {
+		thdpool.push_back(new std::thread(routine, i));
+	}
+	for (u32 i = 0; i < thdnum; i++) {
+		thdpool[i]->join();
+	}
 
 	utils::save_weights(wopts["output"]);
 	utils::save_features(fopts["output"]);
