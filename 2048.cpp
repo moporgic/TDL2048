@@ -975,7 +975,7 @@ struct state {
 		esti = score + utils::update(move, alpha * (accu - (esti - score)), begin, end);
 		return esti;
 	}
-	inline numeric approach(const numeric& accu, const numeric& alpha = moporgic::alpha,
+	inline numeric optimize(const numeric& accu, const numeric& alpha = moporgic::alpha,
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		esti = score + utils::estimate(move, begin, end);
 		return update(accu, alpha, begin, end);
@@ -1319,7 +1319,7 @@ int main(int argc, const char* argv[]) {
 			}
 
 			for (numeric v = 0; path.size(); path.pop_back()) {
-				v = path.back().approach(v);
+				v = path.back().optimize(v);
 			}
 
 			stats.update(score, b.hash(), opers);
