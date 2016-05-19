@@ -975,19 +975,22 @@ struct state {
 		esti = score + utils::update(move, alpha * (accu - (esti - score)), begin, end);
 		return esti;
 	}
+	inline numeric approach(const numeric& accu, const numeric& alpha = moporgic::alpha,
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+		esti = score + utils::estimate(move, begin, end);
+		return update(accu, alpha, begin, end);
+	}
 
 	inline void operator <<(const board& b) {
 		assign(b);
 		estimate();
 	}
 	inline numeric operator +=(const numeric& v) {
-		estimate();
 		return update(v);
 	}
 	inline numeric operator +=(const state& s) {
 		return operator +=(s.esti);
 	}
-	// TODO: approximate
 
 	inline void operator >>(board& b) const { b = move; }
 	inline bool operator >(const state& s) const { return esti > s.esti; }
@@ -1316,7 +1319,7 @@ int main(int argc, const char* argv[]) {
 			}
 
 			for (numeric v = 0; path.size(); path.pop_back()) {
-				v = (path.back() += v);
+				v = path.back().approach(v);
 			}
 
 			stats.update(score, b.hash(), opers);
