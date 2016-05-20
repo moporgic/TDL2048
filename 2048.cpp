@@ -78,13 +78,13 @@ public:
 		case 0:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
-			value = new numeric[size]();
+			value = alloc(size);
 			read<r32>(in);
 			break;
 		case 1:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
-			value = new numeric[size]();
+			value = alloc(size);
 			switch (sizeof(numeric)) {
 			case 4: read<r32>(in); break;
 			case 8: read<r64>(in); break;
@@ -148,10 +148,10 @@ public:
 	}
 private:
 	using table = numeric*;
-	weight(const u32& sign, const size_t& size) : sign(sign), value(make_table(size)), size(size) {}
+	weight(const u32& sign, const size_t& size) : sign(sign), value(alloc(size)), size(size) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
-	static inline table make_table(const size_t& size) {
+	static inline table alloc(const size_t& size) {
 		return new numeric[size]();
 	}
 
