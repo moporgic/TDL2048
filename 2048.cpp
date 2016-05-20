@@ -147,11 +147,10 @@ public:
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
 	}
 private:
-	using table = numeric*;
 	weight(const u32& sign, const size_t& size) : sign(sign), value(alloc(size)), size(size) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
-	static inline table alloc(const size_t& size) {
+	static inline numeric* alloc(const size_t& size) {
 		return new numeric[size]();
 	}
 
@@ -167,8 +166,8 @@ private:
 	}
 
 	u32 sign;
-	table value;
 	size_t size;
+	numeric* value;
 };
 
 class indexer {
