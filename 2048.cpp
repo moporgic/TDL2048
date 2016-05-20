@@ -1306,6 +1306,7 @@ int main(int argc, const char* argv[]) {
 	switch (to_hash(opts["train-type"])) {
 
 	case to_hash("backward"):
+	case to_hash("backward-reesti"):
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
@@ -1327,6 +1328,7 @@ int main(int argc, const char* argv[]) {
 		break;
 
 	default:
+	case to_hash("online"):
 	case to_hash("forward"):
 		for (stats.init(train); stats; stats++) {
 
