@@ -982,15 +982,17 @@ struct state {
 		}
 		return esti;
 	}
-	inline numeric update(const numeric& accu, const numeric& alpha = moporgic::alpha,
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	inline numeric update(const numeric& accu,
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
+			const numeric& alpha = moporgic::alpha) {
 		esti = score + utils::update(move, alpha * (accu - (esti - score)), begin, end);
 		return esti;
 	}
-	inline numeric optimize(const numeric& accu, const numeric& alpha = moporgic::alpha,
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	inline numeric optimize(const numeric& accu,
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
+			const numeric& alpha = moporgic::alpha) {
 		esti = score + utils::estimate(move, begin, end);
-		return update(accu, alpha, begin, end);
+		return update(accu, begin, end, alpha);
 	}
 
 	inline void operator <<(const board& b) {
