@@ -26,6 +26,20 @@ public:
 		~list() = default;
 		inline u32 operator[] (const u32& i) const { return (tile >> (i << 2)) & 0x0f; }
 		inline operator bool() const { return size > 0; }
+		struct iter {
+			u64 raw;
+			u32 idx;
+			iter(const u64& raw, const u32& idx) : raw(raw), idx(idx) {}
+			inline u32 operator *() const { return (raw >> (idx << 2)) & 0x0f; }
+			inline bool operator==(const iter& i) const { return idx == i.idx; }
+			inline bool operator!=(const iter& i) const { return idx != i.idx; }
+			inline iter& operator++() { ++idx; return *this; }
+			inline iter& operator--() { --idx; return *this; }
+			inline iter  operator++(int) { return iter(raw, ++idx - 1); }
+			inline iter  operator--(int) { return iter(raw, --idx + 1); }
+		};
+		inline iter begin() const { return iter(tile, 0); }
+		inline iter end() const { return iter(tile, size); }
 	};
 	class cache {
 	friend class board;
