@@ -30,12 +30,46 @@
 #include <sstream>
 #include <list>
 #include <thread>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <signal.h>
 
 namespace moporgic {
 
 typedef double numeric;
 numeric alpha = 0.0025;
 const u64 base = 16;
+
+namespace shm {
+std::string hook = "./2048";
+bool master = true;
+int shmid = 0;
+void* shmptr = nullptr;
+size_t shmtop = 0;
+size_t shmlen = 800;
+
+void init() {
+	key_t shmkey = ftok(shm::hook.c_str(), 0x0f);
+	shm::shmid = shmget(shmkey, shmlen * (1 << 20), IPC_CREAT | 0600);
+	shm::shmptr = shmat(shm::shmid, nullptr, 0);
+}
+void free() {
+	if (shm::master == false)
+		std::cerr << "only shm master can free the memory" << std::endl;
+	shmdt(shm::shmptr);
+	shmctl(shm::shmid, IPC_RMID, nullptr);
+}
+numeric* alloc(size_t size) {
+	numeric* ptr = reinterpret_cast<numeric*>(shm::shmptr) + shm::shmtop;
+	shm::shmtop += size;
+	return ptr;
+}
+}
 
 class weight {
 public:
@@ -79,13 +113,13 @@ public:
 		case 0:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
-			value = new numeric[size]();
+			value = shm::alloc(size); //new numeric[size]();
 			read<r32>(in);
 			break;
 		case 1:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
-			value = new numeric[size]();
+			value = shm::alloc(size); //new numeric[size]();
 			switch (sizeof(numeric)) {
 			case 4: read<r32>(in); break;
 			case 8: read<r64>(in); break;
@@ -153,7 +187,9 @@ private:
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline table make_table(const size_t& size) {
-		return new numeric[size]();
+		table LUT = shm::alloc(size);
+		if (shm::master) std::fill_n(LUT, size, 0.0);
+		return LUT;
 	}
 
 	template<typename rxx> void write(std::ostream& out) const {
@@ -1108,6 +1144,7 @@ int main(int argc, const char* argv[]) {
 	utils::options fopts;
 	utils::options opts;
 	u32 thdnum = 1;
+	u32 thdid = 0;
 
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
@@ -1119,11 +1156,13 @@ int main(int argc, const char* argv[]) {
 		switch (to_hash(argv[i])) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
-			alpha = std::stod(valueof(i, nullptr));
+			opts["alpha"] = valueof(i, nullptr);
+			alpha = std::stod(opts["alpha"]);
 			break;
 		case to_hash("-a/"):
 		case to_hash("--alpha-divide"):
-			alpha /= std::stod(valueof(i, nullptr));
+			opts["alpha-divide"] = valueof(i, nullptr);
+			alpha /= std::stod(opts["alpha-divide"]);
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
@@ -1201,7 +1240,21 @@ int main(int argc, const char* argv[]) {
 			opts["comment"] = valueof(i, "");
 			break;
 		case to_hash("-thd"):
+		case to_hash("--thd"):
 			thdnum = std::stod(valueof(i, nullptr));
+			break;
+		case to_hash("--slave"):
+			shm::master = false;
+			thdid = std::stod(valueof(i, nullptr));
+			break;
+		case to_hash("--shm"):
+			opts["shmres"] = valueof(i, "./2048");
+			shm::hook = opts["shmres"];
+			if (shm::hook.find(':') != std::string::npos) {
+				auto split = shm::hook.find(':');
+				shm::shmlen = std::stol(shm::hook.substr(split + 1));
+				shm::hook = shm::hook.substr(0, split);
+			}
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1211,75 +1264,130 @@ int main(int argc, const char* argv[]) {
 	}
 
 	std::srand(seed);
-	std::cout << "TDL2048+ LOG" << std::endl;
-	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
-	std::cout << std::endl;
-	std::cout << "timestamp = " << timestamp << std::endl;
-	std::cout << "srand = " << seed << std::endl;
-	std::cout << "alpha = " << alpha << std::endl;
-//	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
-	std::cout << std::endl;
+	if (shm::master) {
+		std::cout << "TDL2048+ LOG" << std::endl;
+		std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
+		std::cout << std::endl;
+		std::cout << "timestamp = " << timestamp << std::endl;
+		std::cout << "srand = " << seed << std::endl;
+		std::cout << "alpha = " << alpha << std::endl;
+	//	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
+		std::cout << std::endl;
+	}
 
+	shm::init();
 
 	utils::make_indexers();
 
-	if (utils::load_weights(wopts["input"]) == false) {
-		if (wopts["input"].size())
-			std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
-		if (wopts["value"].empty())
-			wopts["value"] = "default";
+	if (shm::master) {
+		if (utils::load_weights(wopts["input"]) == false) {
+			if (wopts["input"].size())
+				std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
+			if (wopts["value"].empty())
+				wopts["value"] = "default";
+		}
+		utils::make_weights(wopts["value"]);
+
+		if (utils::load_features(fopts["input"]) == false) {
+			if (fopts["input"].size())
+				std::cerr << "warning: " << fopts["input"] << " not loaded!" << std::endl;
+			if (fopts["value"].empty())
+				fopts["value"] = "default";
+		}
+		utils::make_features(fopts["value"]);
+	} else {
+		if (wopts["value"].empty()) wopts["value"] = "default";
+		utils::make_weights(wopts["value"]);
+
+		if (fopts["value"].empty()) fopts["value"] = "default";
+		utils::make_features(fopts["value"]);
 	}
-	utils::make_weights(wopts["value"]);
 
-	if (utils::load_features(fopts["input"]) == false) {
-		if (fopts["input"].size())
-			std::cerr << "warning: " << fopts["input"] << " not loaded!" << std::endl;
-		if (fopts["value"].empty())
-			fopts["value"] = "default";
+	if (shm::master) utils::list_mapping();
+
+
+	if (shm::master && train) {
+
+		std::string t = std::to_string(train);
+
+		std::string af, a;
+		if (opts["alpha-divide"].size()) {
+			af = "-a/";
+			a = opts["alpha-divide"];
+		} else if (opts["alpha"].size()) {
+			af = "-a";
+			a = opts["alpha"];
+		}
+
+		char buf[64];
+		std::string ws;
+		for (weight w : weight::list()) {
+			snprintf(buf, sizeof(buf), " %08x[%llu]", w.signature(), w.length());
+			ws += buf;
+		}
+		std::string fs;
+		for (feature f : feature::list()) {
+			snprintf(buf, sizeof(buf), " %08x:%08x", weight(f).signature(), indexer(f).signature());
+			fs += buf;
+		}
+		ws = ws.substr(1);
+		fs = fs.substr(1);
+
+		std::string shm = shm::hook;
+		shm += ':';
+		shm += std::to_string(shm::shmlen);
+
+		for (u32 i = 1; i < thdnum; i++) {
+			int rv = fork();
+			if (rv == -1) std::cerr << "fork error" << std::endl;
+			if (rv != 0) continue;
+
+			std::string thd = std::to_string(i);
+			return execlp(argv[0], argv[0], "-c", opts["comment"].c_str(),
+					"-t", t.c_str(), "-T", "0", af.c_str(), a.c_str(),
+					"-w", ws.c_str(), "-f", fs.c_str(),
+					"--shm", shm.c_str(), "--slave", thd.c_str(), nullptr);
+		}
+		std::cout << std::endl << "start training..." << std::endl;
 	}
-	utils::make_features(fopts["value"]);
-
-	utils::list_mapping();
 
 
-	if (train) std::cout << std::endl << "start training..." << std::endl;
-	auto routine = [&](const int tid) {
-		board b;
-		state last;
-		select best;
-		statistic stats;
+	board b;
+	state last;
+	select best;
+	statistic stats;
 
-		for (stats.init(train); stats; stats++) {
+	for (stats.init(train); stats; stats++) {
 
-			register u32 score = 0;
-			register u32 opers = 0;
+		register u32 score = 0;
+		register u32 opers = 0;
 
-			b.init();
-			best << b;
+		b.init();
+		best << b;
+		score += best.score();
+		opers += 1;
+		best >> last;
+		best >> b;
+		b.next();
+		while (best << b) {
+			last += best.esti();
 			score += best.score();
 			opers += 1;
 			best >> last;
 			best >> b;
 			b.next();
-			while (best << b) {
-				last += best.esti();
-				score += best.score();
-				opers += 1;
-				best >> last;
-				best >> b;
-				b.next();
-			}
-			last += 0;
-
-			stats.update(score, b.hash(), opers, tid);
 		}
-	};
-	std::vector<std::thread*> thdpool;
-	for (u32 i = 0; i < thdnum; i++) {
-		thdpool.push_back(new std::thread(routine, i));
+		last += 0;
+
+		stats.update(score, b.hash(), opers, thdid);
 	}
-	for (u32 i = 0; i < thdnum; i++) {
-		thdpool[i]->join();
+
+	if (shm::master) {
+		int wpid;
+		int status;
+		while ((wpid = wait(&status)) > 0) sleep(1);
+	} else {
+		return 0;
 	}
 
 	utils::save_weights(wopts["output"]);
@@ -1289,9 +1397,6 @@ int main(int argc, const char* argv[]) {
 
 
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
-	board b;
-	select best;
-	statistic stats;
 	for (stats.init(test); stats; stats++) {
 
 		register u32 score = 0;
@@ -1305,6 +1410,8 @@ int main(int argc, const char* argv[]) {
 
 		stats.update(score, b.hash(), opers);
 	}
+
+	shm::free();
 
 	return 0;
 }
