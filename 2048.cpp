@@ -312,7 +312,7 @@ public:
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end() { return feats().end(); }
 	static inline iter find(const u32& wgt, const u32& idx) {
-		const u32 sign = make_sign(wgt, idx);
+		const auto sign = make_sign(wgt, idx);
 		return std::find_if(begin(), end(), [=](const feature& f) { return f.signature() == sign; });
 	}
 
