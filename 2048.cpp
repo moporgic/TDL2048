@@ -38,8 +38,8 @@ const u64 base = 16;
 
 class weight {
 public:
-	weight() : sign(0), value(nullptr), size(0) {}
-	weight(const weight& w) : sign(w.sign), value(w.value), size(w.size) {}
+	weight() : sign(0), size(0), value(nullptr) {}
+	weight(const weight& w) : sign(w.sign), size(w.size), value(w.value) {}
 	~weight() {}
 
 	inline u32 signature() const { return sign; }
@@ -120,8 +120,8 @@ public:
 		case 0:
 			in.read(buf, 4);
 			for (u32 size = r32(buf).le(); size; size--) {
-				wghts().push_back(weight());
-				wghts().back() << in;
+				weight w; w << in;
+				wghts().push_back(w);
 			}
 			break;
 		default:
@@ -147,7 +147,7 @@ public:
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
 	}
 private:
-	weight(const u32& sign, const size_t& size) : sign(sign), value(alloc(size)), size(size) {}
+	weight(const u32& sign, const size_t& size) : sign(sign), size(size), value(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
