@@ -1179,7 +1179,8 @@ int main(int argc, const char* argv[]) {
 			break;
 		case to_hash("-a/"):
 		case to_hash("--alpha-divide"):
-			alpha /= std::stod(valueof(i, nullptr));
+			opts["alpha-divide"] = valueof(i, nullptr);
+			alpha /= std::stod(opts["alpha-divide"]);
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
