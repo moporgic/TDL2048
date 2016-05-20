@@ -66,6 +66,15 @@ public:
 			case 8: write<r64>(out); break;
 			}
 			break;
+		case 2:
+			out.write(r32(sign).le(), 4);
+			out.write(r64(size).le(), 8);
+			out.write(r16(sizeof(numeric)).le(), 2);
+			switch (sizeof(numeric)) {
+			case 4: write<r32>(out); break;
+			case 8: write<r64>(out); break;
+			}
+			break;
 		default:
 			std::cerr << "unknown serial at weight::>>" << std::endl;
 			break;
@@ -86,6 +95,15 @@ public:
 			size = r64(load(8)).le();
 			value = alloc(size);
 			switch (sizeof(numeric)) {
+			case 4: read<r32>(in); break;
+			case 8: read<r64>(in); break;
+			}
+			break;
+		case 2:
+			sign = r32(load(4)).le();
+			size = r64(load(8)).le();
+			value = alloc(size);
+			switch (u32(r64(load(2)).le())) {
 			case 4: read<r32>(in); break;
 			case 8: read<r64>(in); break;
 			}
@@ -114,12 +132,9 @@ public:
 	static void load(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		char serial;
-		in.read(&serial, 1);
-		switch (serial) {
+		switch (*load(1)) {
 		case 0:
-			in.read(buf, 4);
-			for (u32 size = r32(buf).le(); size; size--) {
+			for (u32 size = r32(load(4)).le(); size; size--) {
 				weight w; w << in;
 				wghts().push_back(w);
 			}
@@ -258,8 +273,8 @@ public:
 		switch (serial) {
 		case 0:
 			out.write(r32(u32(feats().size())).le(), 4);
-			for (u32 i = 0, size = feats().size(); i < size; i++)
-				feats()[i] >> out;
+			for (feature f : feature::list())
+				f >> out;
 			break;
 		default:
 			std::cerr << "unknown serial at feature::save" << std::endl;
@@ -269,14 +284,12 @@ public:
 	}
 	static void load(std::istream& in) {
 		char buf[4];
-		char serial;
-		in.read(&serial, 1);
-		switch (serial) {
+		auto load = moporgic::make_load(in, buf);
+		switch (*load(1)) {
 		case 0:
-			in.read(buf, 4);
-			for (u32 size = r32(buf).le(); size; size--) {
-				feats().push_back(feature());
-				feats().back() << in;
+			for (u32 size = r32(load(4)).le(); size; size--) {
+				feature f; f << in;
+				feats().push_back(f);
 			}
 			break;
 		default:
