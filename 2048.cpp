@@ -964,7 +964,6 @@ struct state {
 		estimate();
 	}
 	inline numeric operator +=(const numeric& v) {
-		estimate();
 		return update(v);
 	}
 	inline numeric operator +=(const state& s) {
@@ -1307,10 +1306,9 @@ int main(int argc, const char* argv[]) {
 
 
 	if (shm::master && train) {
-
 		std::string t = std::to_string(train);
 
-		std::string af, a;
+		std::string af = "-a/", a = "1";
 		if (opts["alpha-divide"].size()) {
 			af = "-a/";
 			a = opts["alpha-divide"];
@@ -1344,9 +1342,10 @@ int main(int argc, const char* argv[]) {
 
 			std::string thd = std::to_string(i);
 			return execlp(argv[0], argv[0], "-c", opts["comment"].c_str(),
+					"--slave", thd.c_str(),
 					"-t", t.c_str(), "-T", "0", af.c_str(), a.c_str(),
 					"-w", ws.c_str(), "-f", fs.c_str(),
-					"--shm", shm.c_str(), "--slave", thd.c_str(), nullptr);
+					"--shm", shm.c_str(), nullptr);
 		}
 		std::cout << std::endl << "start training..." << std::endl;
 	}
