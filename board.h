@@ -7,6 +7,7 @@
 //============================================================================
 #include "moporgic/type.h"
 #include "moporgic/util.h"
+#include "moporgic/math.h"
 #include "moporgic/io.h"
 #include <algorithm>
 #include <iostream>
@@ -26,6 +27,20 @@ public:
 		~list() = default;
 		inline u32 operator[] (const u32& i) const { return (tile >> (i << 2)) & 0x0f; }
 		inline operator bool() const { return size > 0; }
+		struct iter {
+			u64 raw;
+			i32 idx;
+			iter(const u64& raw, const i32& idx) : raw(raw), idx(idx) {}
+			inline u32 operator *() const { return (raw >> (idx << 2)) & 0x0f; }
+			inline bool operator==(const iter& i) const { return idx == i.idx; }
+			inline bool operator!=(const iter& i) const { return idx != i.idx; }
+			inline iter& operator++() { ++idx; return *this; }
+			inline iter& operator--() { --idx; return *this; }
+			inline iter  operator++(int) { return iter(raw, ++idx - 1); }
+			inline iter  operator--(int) { return iter(raw, --idx + 1); }
+		};
+		inline iter begin() const { return iter(tile, 0); }
+		inline iter end() const { return iter(tile, size); }
 	};
 	class cache {
 	friend class board;
@@ -484,7 +499,19 @@ public:
 				 | trans.query(2).legal | trans.query(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
-	inline u32 actions() const { return operations(); }
+	inline list actions() const {
+		u32 o = operations();
+		using moporgic::math::ones32;
+		using moporgic::math::msb32;
+		using moporgic::math::log2;
+		u32 x = ones32(o);
+		u32 a = msb32(o);
+		u32 b = msb32(o & ~a);
+		u32 c = msb32(o & ~a & ~b);
+		u32 d = msb32(o & ~a & ~b & ~c);
+		u32 k = (log2(a) << 4*(x-1)) | (log2(b) << 4*(x-2)) | (log2(c) << 4*(x-3)) | (log2(d) << 4*(x-4));
+		return list(k, x);
+	}
 
 	inline bool operable() const {
 		if (this->query(0).moved == 0) return true;
@@ -540,27 +567,18 @@ public:
 		moporgic::read(in, raw_cast<u16>(ext, moporgic::endian::be));
 	}
 
-	void print(const bool& raw = true, std::ostream& out = std::cout) const {
-		auto wtmp = out.width();
-		auto ftmp = out.fill();
-
+	inline void print(const bool& raw = true, std::ostream& out = std::cout) const {
 		u32 delim = raw ? 4 : 6;
-		auto get = raw ? &board::at : &board::exact;
-
-		out.width(0); out << "+";
-		out.width(delim * 4); out.fill('-'); out << "";
-		out.width(0); out << "+" << std::endl;
-		for (int i = 0; i < 16; i++) {
-			if (i % 4 == 0) out << "|";
-			out.width(delim); out.fill(' ');
-			out << (this->*get)(i);
-			if (i % 4 == 3) out << "|" << std::endl;
+		char edge[32], line[32], buff[32];
+		snprintf(edge, sizeof(edge), "+%.*s+", delim * 4, "------------------------");
+		snprintf(line, sizeof(line), "|%%%uu%%%uu%%%uu%%%uu|", delim, delim, delim, delim);
+		out << edge << std::endl;
+		for (u32 i = 0, t[4]; i < 16; i += 4) {
+			for (u32 j = 0; j < 4; j++) t[j] = raw ? at(i+j) : exact(i+j);
+			snprintf(buff, sizeof(buff), line, t[0], t[1], t[2], t[3]);
+			out << buff << std::endl;
 		}
-		out.width(0); out << "+";
-		out.width(delim * 4); out.fill('-'); out << "";
-		out.width(0); out << "+" << std::endl;
-
-		out.width(wtmp); out.fill(ftmp);
+		out << edge << std::endl;
 	}
 
 };

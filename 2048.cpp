@@ -73,8 +73,8 @@ numeric* alloc(size_t size) {
 
 class weight {
 public:
-	weight() : sign(0), value(nullptr), size(0) {}
-	weight(const weight& w) : sign(w.sign), value(w.value), size(w.size) {}
+	weight() : sign(0), size(0), value(nullptr) {}
+	weight(const weight& w) : sign(w.sign), size(w.size), value(w.value) {}
 	~weight() {}
 
 	inline u32 signature() const { return sign; }
@@ -101,6 +101,15 @@ public:
 			case 8: write<r64>(out); break;
 			}
 			break;
+		case 2:
+			out.write(r32(sign).le(), 4);
+			out.write(r64(size).le(), 8);
+			out.write(r16(sizeof(numeric)).le(), 2);
+			switch (sizeof(numeric)) {
+			case 4: write<r32>(out); break;
+			case 8: write<r64>(out); break;
+			}
+			break;
 		default:
 			std::cerr << "unknown serial at weight::>>" << std::endl;
 			break;
@@ -113,14 +122,23 @@ public:
 		case 0:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
-			value = shm::alloc(size); //new numeric[size]();
+			value = alloc(size);
 			read<r32>(in);
 			break;
 		case 1:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
-			value = shm::alloc(size); //new numeric[size]();
+			value = alloc(size);
 			switch (sizeof(numeric)) {
+			case 4: read<r32>(in); break;
+			case 8: read<r64>(in); break;
+			}
+			break;
+		case 2:
+			sign = r32(load(4)).le();
+			size = r64(load(8)).le();
+			value = alloc(size);
+			switch (u32(r64(load(2)).le())) {
 			case 4: read<r32>(in); break;
 			case 8: read<r64>(in); break;
 			}
@@ -149,14 +167,11 @@ public:
 	static void load(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		char serial;
-		in.read(&serial, 1);
-		switch (serial) {
+		switch (*load(1)) {
 		case 0:
-			in.read(buf, 4);
-			for (u32 size = r32(buf).le(); size; size--) {
-				wghts().push_back(weight());
-				wghts().back() << in;
+			for (u32 size = r32(load(4)).le(); size; size--) {
+				weight w; w << in;
+				wghts().push_back(w);
 			}
 			break;
 		default:
@@ -182,14 +197,11 @@ public:
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
 	}
 private:
-	using table = numeric*;
-	weight(const u32& sign, const size_t& size) : sign(sign), value(make_table(size)), size(size) {}
+	weight(const u32& sign, const size_t& size) : sign(sign), size(size), value(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
-	static inline table make_table(const size_t& size) {
-		table LUT = shm::alloc(size);
-		if (shm::master) std::fill_n(LUT, size, 0.0);
-		return LUT;
+	static inline numeric* alloc(const size_t& size) {
+		return shm::alloc(size); //new numeric[size]();
 	}
 
 	template<typename rxx> void write(std::ostream& out) const {
@@ -204,8 +216,8 @@ private:
 	}
 
 	u32 sign;
-	table value;
 	size_t size;
+	numeric* value;
 };
 
 class indexer {
@@ -296,8 +308,8 @@ public:
 		switch (serial) {
 		case 0:
 			out.write(r32(u32(feats().size())).le(), 4);
-			for (u32 i = 0, size = feats().size(); i < size; i++)
-				feats()[i] >> out;
+			for (feature f : feature::list())
+				f >> out;
 			break;
 		default:
 			std::cerr << "unknown serial at feature::save" << std::endl;
@@ -307,14 +319,12 @@ public:
 	}
 	static void load(std::istream& in) {
 		char buf[4];
-		char serial;
-		in.read(&serial, 1);
-		switch (serial) {
+		auto load = moporgic::make_load(in, buf);
+		switch (*load(1)) {
 		case 0:
-			in.read(buf, 4);
-			for (u32 size = r32(buf).le(); size; size--) {
-				feats().push_back(feature());
-				feats().back() << in;
+			for (u32 size = r32(load(4)).le(); size; size--) {
+				feature f; f << in;
+				feats().push_back(f);
 			}
 			break;
 		default:
@@ -337,7 +347,7 @@ public:
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end() { return feats().end(); }
 	static inline iter find(const u32& wgt, const u32& idx) {
-		const u32 sign = make_sign(wgt, idx);
+		const auto sign = make_sign(wgt, idx);
 		return std::find_if(begin(), end(), [=](const feature& f) { return f.signature() == sign; });
 	}
 
@@ -427,6 +437,28 @@ u64 index8t(const board& b) {
 	index += b.at(p5) << 20;
 	index += b.at(p6) << 24;
 	index += b.at(p7) << 28;
+	return index;
+}
+template<int p0, int p1, int p2, int p3, int p4, int p5, int p6>
+u64 index7t(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	index += b.at(p5) << 20;
+	index += b.at(p6) << 24;
+	return index;
+}
+template<int p0, int p1, int p2, int p3, int p4>
+u64 index5t(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
 	return index;
 }
 
@@ -697,6 +729,38 @@ void make_indexers(const std::string& res = "") {
 	imake(0x89ab4567, utils::index8t<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
 	imake(0x048c159d, utils::index8t<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
 	imake(0x159d26ae, utils::index8t<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
+	imake(0x00123456, utils::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>);
+	imake(0x037bf26a, utils::index7t<0x3,0x7,0xb,0xf,0x2,0x6,0xa>);
+	imake(0x0fedcba9, utils::index7t<0xf,0xe,0xd,0xc,0xb,0xa,0x9>);
+	imake(0x0c840d95, utils::index7t<0xc,0x8,0x4,0x0,0xd,0x9,0x5>);
+	imake(0x03210765, utils::index7t<0x3,0x2,0x1,0x0,0x7,0x6,0x5>);
+	imake(0x0fb73ea6, utils::index7t<0xf,0xb,0x7,0x3,0xe,0xa,0x6>);
+	imake(0x0cdef89a, utils::index7t<0xc,0xd,0xe,0xf,0x8,0x9,0xa>);
+	imake(0x0048c159, utils::index7t<0x0,0x4,0x8,0xc,0x1,0x5,0x9>);
+	imake(0x0456789a, utils::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>);
+	imake(0x026ae159, utils::index7t<0x2,0x6,0xa,0xe,0x1,0x5,0x9>);
+	imake(0x0ba98765, utils::index7t<0xb,0xa,0x9,0x8,0x7,0x6,0x5>);
+	imake(0x0d951ea6, utils::index7t<0xd,0x9,0x5,0x1,0xe,0xa,0x6>);
+	imake(0x07654ba9, utils::index7t<0x7,0x6,0x5,0x4,0xb,0xa,0x9>);
+	imake(0x0ea62d95, utils::index7t<0xe,0xa,0x6,0x2,0xd,0x9,0x5>);
+	imake(0x089ab456, utils::index7t<0x8,0x9,0xa,0xb,0x4,0x5,0x6>);
+	imake(0x0159d26a, utils::index7t<0x1,0x5,0x9,0xd,0x2,0x6,0xa>);
+	imake(0x00001234, utils::index5t<0x0,0x1,0x2,0x3,0x4>);
+	imake(0x00037bf2, utils::index5t<0x3,0x7,0xb,0xf,0x2>);
+	imake(0x000fedcb, utils::index5t<0xf,0xe,0xd,0xc,0xb>);
+	imake(0x000c840d, utils::index5t<0xc,0x8,0x4,0x0,0xd>);
+	imake(0x00032107, utils::index5t<0x3,0x2,0x1,0x0,0x7>);
+	imake(0x000fb73e, utils::index5t<0xf,0xb,0x7,0x3,0xe>);
+	imake(0x000cdef8, utils::index5t<0xc,0xd,0xe,0xf,0x8>);
+	imake(0x000048c1, utils::index5t<0x0,0x4,0x8,0xc,0x1>);
+	imake(0x00045678, utils::index5t<0x4,0x5,0x6,0x7,0x8>);
+	imake(0x00026ae1, utils::index5t<0x2,0x6,0xa,0xe,0x1>);
+	imake(0x000ba987, utils::index5t<0xb,0xa,0x9,0x8,0x7>);
+	imake(0x000d951e, utils::index5t<0xd,0x9,0x5,0x1,0xe>);
+	imake(0x0007654b, utils::index5t<0x7,0x6,0x5,0x4,0xb>);
+	imake(0x000ea62d, utils::index5t<0xe,0xa,0x6,0x2,0xd>);
+	imake(0x00089ab4, utils::index5t<0x8,0x9,0xa,0xb,0x4>);
+	imake(0x000159d2, utils::index5t<0x1,0x5,0x9,0xd,0x2>);
 	imake(0xff000000, utils::indexmerge0);
 	imake(0xff000001, utils::indexmerge1<0>);
 	imake(0xff000011, utils::indexmerge1<1>);
@@ -953,10 +1017,17 @@ struct state {
 		}
 		return esti;
 	}
-	inline numeric update(const numeric& accu, const numeric& alpha = moporgic::alpha,
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	inline numeric update(const numeric& accu,
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
+			const numeric& alpha = moporgic::alpha) {
 		esti = score + utils::update(move, alpha * (accu - (esti - score)), begin, end);
 		return esti;
+	}
+	inline numeric optimize(const numeric& accu,
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
+			const numeric& alpha = moporgic::alpha) {
+		esti = score + utils::estimate(move, begin, end);
+		return update(accu, begin, end, alpha);
 	}
 
 	inline void operator <<(const board& b) {
