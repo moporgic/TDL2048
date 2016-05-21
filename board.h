@@ -567,27 +567,18 @@ public:
 		moporgic::read(in, raw_cast<u16>(ext, moporgic::endian::be));
 	}
 
-	void print(const bool& raw = true, std::ostream& out = std::cout) const {
-		auto wtmp = out.width();
-		auto ftmp = out.fill();
-
+	inline void print(const bool& raw = true, std::ostream& out = std::cout) const {
 		u32 delim = raw ? 4 : 6;
-		auto get = raw ? &board::at : &board::exact;
-
-		out.width(0); out << "+";
-		out.width(delim * 4); out.fill('-'); out << "";
-		out.width(0); out << "+" << std::endl;
-		for (int i = 0; i < 16; i++) {
-			if (i % 4 == 0) out << "|";
-			out.width(delim); out.fill(' ');
-			out << (this->*get)(i);
-			if (i % 4 == 3) out << "|" << std::endl;
+		char edge[32], line[32], buff[32];
+		snprintf(edge, sizeof(edge), "+%.*s+", delim * 4, "------------------------");
+		snprintf(line, sizeof(line), "|%%%uu%%%uu%%%uu%%%uu|", delim, delim, delim, delim);
+		out << edge << std::endl;
+		for (u32 i = 0, t[4]; i < 16; i += 4) {
+			for (u32 j = 0; j < 4; j++) t[j] = raw ? at(i+j) : exact(i+j);
+			snprintf(buff, sizeof(buff), line, t[0], t[1], t[2], t[3]);
+			out << buff << std::endl;
 		}
-		out.width(0); out << "+";
-		out.width(delim * 4); out.fill('-'); out << "";
-		out.width(0); out << "+" << std::endl;
-
-		out.width(wtmp); out.fill(ftmp);
+		out << edge << std::endl;
 	}
 
 };
