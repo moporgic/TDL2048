@@ -28,8 +28,8 @@ public:
 		inline operator bool() const { return size > 0; }
 		struct iter {
 			u64 raw;
-			u32 idx;
-			iter(const u64& raw, const u32& idx) : raw(raw), idx(idx) {}
+			i32 idx;
+			iter(const u64& raw, const i32& idx) : raw(raw), idx(idx) {}
 			inline u32 operator *() const { return (raw >> (idx << 2)) & 0x0f; }
 			inline bool operator==(const iter& i) const { return idx == i.idx; }
 			inline bool operator!=(const iter& i) const { return idx != i.idx; }
