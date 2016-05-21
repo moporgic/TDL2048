@@ -498,7 +498,19 @@ public:
 				 | trans.query(2).legal | trans.query(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
-	inline u32 actions() const { return operations(); }
+	inline list actions() const {
+		u32 o = operations();
+		using moporgic::math::ones32;
+		using moporgic::math::msb32;
+		using moporgic::math::log2;
+		u32 x = ones32(o);
+		u32 a = msb32(o);
+		u32 b = msb32(o & ~a);
+		u32 c = msb32(o & ~a & ~b);
+		u32 d = msb32(o & ~a & ~b & ~c);
+		u32 k = (log2(a) << 4*(x-1)) | (log2(b) << 4*(x-2)) | (log2(c) << 4*(x-3)) | (log2(d) << 4*(x-4));
+		return list(k, x);
+	}
 
 	inline bool operable() const {
 		if (this->query(0).moved == 0) return true;
