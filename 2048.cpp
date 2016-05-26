@@ -47,7 +47,6 @@ const u64 base = 16;
 
 namespace shm {
 std::string hook = "./2048";
-bool master = true;
 int shmid = 0;
 void* shmptr = nullptr;
 size_t shmtop = 0;
@@ -59,8 +58,6 @@ void init() {
 	shm::shmptr = shmat(shm::shmid, nullptr, 0);
 }
 void free() {
-	if (shm::master == false)
-		std::cerr << "only shm master can free the memory" << std::endl;
 	shmdt(shm::shmptr);
 	shmctl(shm::shmid, IPC_RMID, nullptr);
 }
@@ -1214,7 +1211,6 @@ int main(int argc, const char* argv[]) {
 	utils::options fopts;
 	utils::options opts;
 	u32 thdnum = 1;
-	u32 thdid = 0;
 
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
@@ -1313,10 +1309,6 @@ int main(int argc, const char* argv[]) {
 		case to_hash("--thd"):
 			thdnum = std::stod(valueof(i, nullptr));
 			break;
-		case to_hash("--slave"):
-			shm::master = false;
-			thdid = std::stod(valueof(i, nullptr));
-			break;
 		case to_hash("--shm"):
 			opts["shmres"] = valueof(i, "./2048");
 			shm::hook = opts["shmres"];
@@ -1334,91 +1326,51 @@ int main(int argc, const char* argv[]) {
 	}
 
 	std::srand(seed);
-	if (shm::master) {
-		std::cout << "TDL2048+ LOG" << std::endl;
-		std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
-		std::cout << std::endl;
-		std::cout << "timestamp = " << timestamp << std::endl;
-		std::cout << "srand = " << seed << std::endl;
-		std::cout << "alpha = " << alpha << std::endl;
-	//	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
-		std::cout << std::endl;
-	}
+	std::cout << "TDL2048+ LOG" << std::endl;
+	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
+	std::cout << std::endl;
+	std::cout << "timestamp = " << timestamp << std::endl;
+	std::cout << "srand = " << seed << std::endl;
+	std::cout << "alpha = " << alpha << std::endl;
+//	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
+	std::cout << std::endl;
 
 	shm::init();
 
 	utils::make_indexers();
 
-	if (shm::master) {
-		if (utils::load_weights(wopts["input"]) == false) {
-			if (wopts["input"].size())
-				std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
-			if (wopts["value"].empty())
-				wopts["value"] = "default";
-		}
-		utils::make_weights(wopts["value"]);
-
-		if (utils::load_features(fopts["input"]) == false) {
-			if (fopts["input"].size())
-				std::cerr << "warning: " << fopts["input"] << " not loaded!" << std::endl;
-			if (fopts["value"].empty())
-				fopts["value"] = "default";
-		}
-		utils::make_features(fopts["value"]);
-	} else {
-		if (wopts["value"].empty()) wopts["value"] = "default";
-		utils::make_weights(wopts["value"]);
-
-		if (fopts["value"].empty()) fopts["value"] = "default";
-		utils::make_features(fopts["value"]);
+	if (utils::load_weights(wopts["input"]) == false) {
+		if (wopts["input"].size())
+			std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
+		if (wopts["value"].empty())
+			wopts["value"] = "default";
 	}
+	utils::make_weights(wopts["value"]);
 
-	if (shm::master) utils::list_mapping();
+	if (utils::load_features(fopts["input"]) == false) {
+		if (fopts["input"].size())
+			std::cerr << "warning: " << fopts["input"] << " not loaded!" << std::endl;
+		if (fopts["value"].empty())
+			fopts["value"] = "default";
+	}
+	utils::make_features(fopts["value"]);
 
+	utils::list_mapping();
 
-	if (shm::master && train) {
-		std::string t = std::to_string(train);
-
-		std::string af = "-a/", a = "1";
-		if (opts["alpha-divide"].size()) {
-			af = "-a/";
-			a = opts["alpha-divide"];
-		} else if (opts["alpha"].size()) {
-			af = "-a";
-			a = opts["alpha"];
-		}
-
-		char buf[64];
-		std::string ws;
-		for (weight w : weight::list()) {
-			snprintf(buf, sizeof(buf), " %08x[%llu]", w.signature(), w.length());
-			ws += buf;
-		}
-		std::string fs;
-		for (feature f : feature::list()) {
-			snprintf(buf, sizeof(buf), " %08x:%08x", weight(f).signature(), indexer(f).signature());
-			fs += buf;
-		}
-		ws = ws.substr(1);
-		fs = fs.substr(1);
-
-		std::string shm = shm::hook;
-		shm += ':';
-		shm += std::to_string(shm::shmlen);
-
+	bool master = true;
+	u32 thdid = 0;
+	if (train) {
+		std::cout << std::endl << "start training..." << std::endl;
 		for (u32 i = 1; i < thdnum; i++) {
 			int rv = fork();
 			if (rv == -1) std::cerr << "fork error" << std::endl;
 			if (rv != 0) continue;
 
-			std::string thd = std::to_string(i);
-			return execlp(argv[0], argv[0], "-c", opts["comment"].c_str(),
-					"--slave", thd.c_str(),
-					"-t", t.c_str(), "-T", "0", af.c_str(), a.c_str(),
-					"-w", ws.c_str(), "-f", fs.c_str(),
-					"--shm", shm.c_str(), nullptr);
+
+			master = false;
+			thdid = i;
+			break;
 		}
-		std::cout << std::endl << "start training..." << std::endl;
 	}
 
 
@@ -1452,7 +1404,7 @@ int main(int argc, const char* argv[]) {
 		stats.update(score, b.hash(), opers, thdid);
 	}
 
-	if (shm::master) {
+	if (master) {
 		int wpid;
 		int status;
 		while ((wpid = wait(&status)) > 0) sleep(1);
