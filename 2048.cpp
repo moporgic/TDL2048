@@ -1211,6 +1211,7 @@ int main(int argc, const char* argv[]) {
 	utils::options fopts;
 	utils::options opts;
 	u32 thdnum = 1;
+	u32 thdid = 0;
 
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
@@ -1357,8 +1358,6 @@ int main(int argc, const char* argv[]) {
 
 	utils::list_mapping();
 
-	bool master = true;
-	u32 thdid = 0;
 	if (train) {
 		std::cout << std::endl << "start training..." << std::endl;
 		for (u32 i = 1; i < thdnum; i++) {
@@ -1366,8 +1365,6 @@ int main(int argc, const char* argv[]) {
 			if (rv == -1) std::cerr << "fork error" << std::endl;
 			if (rv != 0) continue;
 
-
-			master = false;
 			thdid = i;
 			break;
 		}
@@ -1404,17 +1401,14 @@ int main(int argc, const char* argv[]) {
 		stats.update(score, b.hash(), opers, thdid);
 	}
 
-	if (master) {
-		int wpid;
-		int status;
-		while ((wpid = wait(&status)) > 0) sleep(1);
-	} else {
-		return 0;
-	}
+	if (thdid != 0) return 0;
+
+	int wpid;
+	int status;
+	while ((wpid = wait(&status)) > 0) sleep(1);
 
 	utils::save_weights(wopts["output"]);
 	utils::save_features(fopts["output"]);
-
 
 
 
