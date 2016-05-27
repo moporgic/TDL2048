@@ -2,11 +2,12 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 2.6
+// Version     : 2.71
 // Description : bitboard of 2048
 //============================================================================
 #include "moporgic/type.h"
 #include "moporgic/util.h"
+#include "moporgic/math.h"
 #include "moporgic/io.h"
 #include <algorithm>
 #include <iostream>
@@ -17,14 +18,29 @@ namespace moporgic {
 
 class board {
 public:
-	struct tiles {
+	struct list {
 		u64 tile;
 		u32 size;
-		tiles(const u64& t, const u32& s) : tile(t), size(s) {}
-		tiles(const tiles& t) = default;
-		tiles() : tile(0), size(0) {}
-		~tiles() = default;
+		list(const u64& t, const u32& s) : tile(t), size(s) {}
+		list(const list& t) = default;
+		list() : tile(0), size(0) {}
+		~list() = default;
 		inline u32 operator[] (const u32& i) const { return (tile >> (i << 2)) & 0x0f; }
+		inline operator bool() const { return size > 0; }
+		struct iter {
+			u64 raw;
+			i32 idx;
+			iter(const u64& raw, const i32& idx) : raw(raw), idx(idx) {}
+			inline u32 operator *() const { return (raw >> (idx << 2)) & 0x0f; }
+			inline bool operator==(const iter& i) const { return idx == i.idx; }
+			inline bool operator!=(const iter& i) const { return idx != i.idx; }
+			inline iter& operator++() { ++idx; return *this; }
+			inline iter& operator--() { --idx; return *this; }
+			inline iter  operator++(int) { return iter(raw, ++idx - 1); }
+			inline iter  operator--(int) { return iter(raw, --idx + 1); }
+		};
+		inline iter begin() const { return iter(tile, 0); }
+		inline iter end() const { return iter(tile, size); }
 	};
 	class cache {
 	friend class board;
@@ -78,8 +94,9 @@ public:
 		const operation right; // right operation
 		const info count; // number of each tile-type
 		const info mask; // mask of each tile-type
-		const tiles pos; // layout of board-type
+		const list pos; // layout of board-type
 		const i32 moved; // moved or not
+		const u32 legal; // legal actions
 
 		cache(const cache& c) = default;
 		cache() = delete;
@@ -134,16 +151,19 @@ public:
 			for (int i = 0; i < 16; i++) {
 				if ((r >> i) & 1) ltile |= (u64(i) << ((lsize++) << 2));
 			}
-			tiles pos(ltile, lsize);
+			list pos(ltile, lsize);
 			moved = left.moved & right.moved;
+			u32 legal = 0;
+			if (mvL != r) legal |= (0x08 | 0x01);
+			if (mvR != r) legal |= (0x02 | 0x04);
 
-			return cache(raw, ext, hash, merge, left, right, count, mask, pos, moved);
+			return cache(raw, ext, hash, merge, left, right, count, mask, pos, moved, legal);
 		}
 	private:
-		cache(u32 raw, u32 ext, u32 hash, u32 merge,
-				operation left, operation right, info count, info mask, tiles pos, i32 moved)
-				: raw(raw), ext(ext), hash(hash), merge(merge),
-				  left(left), right(right), count(count), mask(mask), pos(pos), moved(moved) {}
+		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right,
+			info count, info mask, list pos, i32 moved, u32 legal)
+				: raw(raw), ext(ext), hash(hash), merge(merge), left(left), right(right),
+				  count(count), mask(mask), pos(pos), moved(moved), legal(legal) {}
 
 		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
 			for (u32 i = 0; i < 4; i++) {
@@ -199,18 +219,17 @@ public:
 	}
 
 	u64 raw;
-	u64 rawc;
 	u32 ext;
-	u32 extc;
+	u32 nul;
 
 public:
-	inline board(const u64& raw = 0) : raw(raw), rawc(0), ext(0), extc(0) {}
-	inline board(const u64& raw, const u32& ext) : raw(raw), rawc(0), ext(ext), extc(0) {}
+	inline board(const u64& raw = 0) : raw(raw), ext(0), nul(0) {}
+	inline board(const u64& raw, const u32& ext) : raw(raw), ext(ext), nul(0) {}
 	inline board(const u64& raw, const u16& ext) : board(raw, u32(ext) << 16) {}
 	inline board(const board& b) = default;
 	inline ~board() = default;
 	inline board& operator =(const u64& raw) { this->raw = raw; return *this; }
-	inline board& operator =(const board& b) { raw = b.raw, ext = b.ext; rawc = b.rawc, extc = b.extc; return *this; }
+	inline board& operator =(const board& b) { raw = b.raw, ext = b.ext; return *this; }
 	inline bool operator==(const board& b) const { return raw == b.raw && ext == b.ext; }
 	inline bool operator!=(const board& b) const { return raw != b.raw || ext != b.ext; }
 	inline bool operator==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
@@ -223,6 +242,7 @@ public:
 	inline void set(const u32& i, const u32& t) { set4(i, t); }
 	inline void mirror() { mirror64(); }
 	inline void flip() { flip64(); }
+	inline void reflect(const bool& hori = true) { if (hori) mirror(); else flip(); }
 	inline void transpose() { transpose64(); }
 
 	inline u32 fetch16(const u32& i) const {
@@ -278,9 +298,6 @@ public:
 	inline void transpose64() {
 		raw = (raw & 0xf0f00f0ff0f00f0fULL) | ((raw & 0x0000f0f00000f0f0ULL) << 12) | ((raw & 0x0f0f00000f0f0000ULL) >> 12);
 		raw = (raw & 0xff00ff0000ff00ffULL) | ((raw & 0x00000000ff00ff00ULL) << 24) | ((raw & 0x00ff00ff00000000ULL) >> 24);
-//		register u64 t;
-//		t = (raw ^ (raw >> 12)) & 0x0000f0f00000f0f0ULL; raw = raw ^ t ^ (t << 12);
-//		t = (raw ^ (raw >> 24)) & 0x00000000ff00ff00ULL; raw = raw ^ t ^ (t << 24);
 	}
 	inline void transpose80() {
 		transpose64();
@@ -294,21 +311,34 @@ public:
 	}
 
 	inline void init() {
-		const u32 k = rand();
-		const u32 i = (k) & 0x0f;
-		const u32 j = (i + (k >> 4) + 1) & 0x0f;
-		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
+		u32 k = std::rand();
+		u32 i = (k) & 0x0f;
+		u32 j = (i + (k >> 4) + 1) & 0x0f;
+//		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
+		u32 r = std::rand() % 100;
+		raw =  (r >=  1 ? 1ULL : 2ULL) << (i << 2);
+		raw |= (r >= 18 ? 1ULL : 2ULL) << (j << 2);
 		ext = 0;
 	}
-	inline tiles spaces() const {
+	inline void next() {
+		list empty = spaces();
+		u32 p = empty[std::rand() % empty.size];
+		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
+	}
+	inline list spaces() const {
 		return find(0);
 	}
-	inline bool next() {
-		tiles empty = spaces();
+
+	inline bool popup() {
+		list empty = spaces();
 		if (empty.size == 0) return false;
-		u32 p = empty[rand() % empty.size];
-		raw |= (rand() % 10 ? 1ULL : 2ULL) << (p << 2);
+		u32 p = empty[std::rand() % empty.size];
+		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
+	}
+	inline void clear() {
+		raw = 0;
+		ext = 0;
 	}
 
 	inline void rotate(const int& r = 1) {
@@ -327,6 +357,10 @@ public:
 	inline void rotleft() {
 		transpose();
 		flip();
+	}
+	inline void isomorphic(const int& i = 0) {
+		if ((i % 8) / 4) mirror();
+		rotate(i);
 	}
 
 	inline i32 left() {
@@ -384,14 +418,26 @@ public:
 		return score | moved;
 	}
 
-	inline void mark() {
-		rawc = raw;
-		extc = ext;
+	class optype {
+	public:
+		optype() = delete;
+		typedef i32 oper;
+		static constexpr oper up = 0;
+		static constexpr oper right = 1;
+		static constexpr oper down = 2;
+		static constexpr oper left = 3;
+		static constexpr oper illegal = -1;
+	};
+	inline i32 operate(const optype::oper& op) {
+		switch (op) {
+		case optype::up:    return up();
+		case optype::right: return right();
+		case optype::down:  return down();
+		case optype::left:  return left();
+		default:            return -1;
+		}
 	}
-	inline void reset() {
-		raw = rawc;
-		ext = extc;
-	}
+	inline i32 move(const optype::oper& op) { return operate(op); }
 
 	inline u32 hash() const {
 		return query(0).hash | query(1).hash | query(2).hash | query(3).hash;
@@ -403,7 +449,7 @@ public:
 	inline u32 count(const u32& t) const {
 		return query(0).count[t] + query(1).count[t] + query(2).count[t] + query(3).count[t];
 	}
-	inline void count(u16 num[32], const u32& min = 0, const u32& max = 32) const {
+	inline void count(u16* num, const u32& min = 0, const u32& max = 16) const {
 		const cache::info& count0 = query(0).count;
 		const cache::info& count1 = query(1).count;
 		const cache::info& count2 = query(2).count;
@@ -417,7 +463,7 @@ public:
 		return (query(0).mask[t] << 0) | (query(1).mask[t] << 4)
 			 | (query(2).mask[t] << 8) | (query(3).mask[t] << 12);
 	}
-	inline void mask(u16 msk[32], const u32& min = 0, const u32& max = 32) const {
+	inline void mask(u16* msk, const u32& min = 0, const u32& max = 16) const {
 		const cache::info& mask0 = query(0).mask;
 		const cache::info& mask1 = query(1).mask;
 		const cache::info& mask2 = query(2).mask;
@@ -437,12 +483,34 @@ public:
 		}
 	}
 
-	inline tiles find(const u32& t) const {
+	inline list find(const u32& t) const {
 		return board::lookup(mask(t)).pos;
 	}
 
 	inline const cache& query(const u32& r) const {
 		return board::lookup(fetch(r));
+	}
+
+	inline u32 operations() const {
+		board trans(*this); trans.transpose();
+		u32 hori = this->query(0).legal | this->query(1).legal
+				 | this->query(2).legal | this->query(3).legal;
+		u32 vert = trans.query(0).legal | trans.query(1).legal
+				 | trans.query(2).legal | trans.query(3).legal;
+		return (hori & 0x0a) | (vert & 0x05);
+	}
+	inline list actions() const {
+		u32 o = operations();
+		using moporgic::math::ones32;
+		using moporgic::math::msb32;
+		using moporgic::math::log2;
+		u32 x = ones32(o);
+		u32 a = msb32(o);
+		u32 b = msb32(o & ~a);
+		u32 c = msb32(o & ~a & ~b);
+		u32 d = msb32(o & ~a & ~b & ~c);
+		u32 k = (log2(a) << 4*(x-1)) | (log2(b) << 4*(x-2)) | (log2(c) << 4*(x-3)) | (log2(d) << 4*(x-4));
+		return list(k, x);
 	}
 
 	inline bool operable() const {
@@ -457,6 +525,7 @@ public:
 		if (trans.query(3).moved == 0) return true;
 		return false;
 	}
+	inline bool movable() const { return operable(); }
 
 	class tile {
 	friend class board;
@@ -498,28 +567,20 @@ public:
 		moporgic::read(in, raw_cast<u16>(ext, moporgic::endian::be));
 	}
 
-	void print(const bool& raw = true, std::ostream& out = std::cout) const {
-		auto wtmp = out.width();
-		auto ftmp = out.fill();
-
+	inline void print(const bool& raw = true, std::ostream& out = std::cout) const {
 		u32 delim = raw ? 4 : 6;
-		auto get = raw ? &board::at : &board::exact;
-
-		out.width(0); out << "+";
-		out.width(delim * 4); out.fill('-'); out << "";
-		out.width(0); out << "+" << std::endl;
-		for (int i = 0; i < 16; i++) {
-			if (i % 4 == 0) out << "|";
-			out.width(delim); out.fill(' ');
-			out << (this->*get)(i);
-			if (i % 4 == 3) out << "|" << std::endl;
+		char edge[32], line[32], buff[32];
+		snprintf(edge, sizeof(edge), "+%.*s+", delim * 4, "------------------------");
+		snprintf(line, sizeof(line), "|%%%uu%%%uu%%%uu%%%uu|", delim, delim, delim, delim);
+		out << edge << std::endl;
+		for (u32 i = 0, t[4]; i < 16; i += 4) {
+			for (u32 j = 0; j < 4; j++) t[j] = raw ? at(i+j) : exact(i+j);
+			snprintf(buff, sizeof(buff), line, t[0], t[1], t[2], t[3]);
+			out << buff << std::endl;
 		}
-		out.width(0); out << "+";
-		out.width(delim * 4); out.fill('-'); out << "";
-		out.width(0); out << "+" << std::endl;
-
-		out.width(wtmp); out.fill(ftmp);
+		out << edge << std::endl;
 	}
+
 };
 
 } // namespace moporgic

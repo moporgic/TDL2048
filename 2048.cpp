@@ -23,7 +23,6 @@
 #include <tuple>
 #include <string>
 #include <numeric>
-#include <string>
 #include <thread>
 #include <limits>
 #include <cctype>
@@ -35,37 +34,45 @@ namespace moporgic {
 
 typedef double numeric;
 numeric alpha = 0.0025;
+const u64 base = 16;
 
 class weight {
 public:
-	weight() : sign(0), value(nullptr), size(0) {}
-	weight(const weight& w) : sign(w.sign), value(w.value), size(w.size) {}
+	weight() : sign(0), size(0), value(nullptr) {}
+	weight(const weight& w) : sign(w.sign), size(w.size), value(w.value) {}
 	~weight() {}
 
 	inline u32 signature() const { return sign; }
-	inline numeric& operator [](const u64& i) { return value.get()[i]; }
-	inline bool operator ==(const u32& s) const { return sign == s; }
 	inline size_t length() const { return size; }
+	inline numeric& operator [](const u64& i) { return value[i]; }
+
+	inline bool operator ==(const weight& w) const { return sign == w.sign; }
+	inline bool operator !=(const weight& w) const { return sign != w.sign; }
 
 	void operator >>(std::ostream& out) const {
-		const int LE = moporgic::endian::le;
 		const char serial = 1;
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(sign).endian(LE), 4);
-			out.write(r64(size).endian(LE), 8);
-			for (u64 i = 0; i < size; i++)
-				out.write(r32(value.get()[i]).endian(LE), 4);
+			out.write(r32(sign).le(), 4);
+			out.write(r64(size).le(), 8);
+			write<r32>(out);
 			break;
 		case 1:
 			out.write(r32(sign).le(), 4);
 			out.write(r64(size).le(), 8);
 			switch (sizeof(numeric)) {
-			case 4: write<r32>(out);
-				break;
-			case 8: write<r64>(out);
-				break;
+			case 4: write<r32>(out); break;
+			case 8: write<r64>(out); break;
+			}
+			break;
+		case 2:
+			out.write(r32(sign).le(), 4);
+			out.write(r64(size).le(), 8);
+			out.write(r16(sizeof(numeric)).le(), 2);
+			switch (sizeof(numeric)) {
+			case 4: write<r32>(out); break;
+			case 8: write<r64>(out); break;
 			}
 			break;
 		default:
@@ -76,24 +83,29 @@ public:
 	void operator <<(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		const int LE = moporgic::endian::le;
 		switch (*load(1)) {
 		case 0:
-			sign = r32(load(4), LE);
-			size = r64(load(8), LE);
-			value = std::shared_ptr<numeric>(new numeric[size]());
-			for (u64 i = 0; i < size; i++)
-				value.get()[i] = r32(load(4), LE);
+			sign = r32(load(4)).le();
+			size = r64(load(8)).le();
+			value = alloc(size);
+			read<r32>(in);
 			break;
 		case 1:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
-			value = std::shared_ptr<numeric>(new numeric[size]());
+			value = alloc(size);
 			switch (sizeof(numeric)) {
-			case 4: read<r32>(in);
-				break;
-			case 8: read<r64>(in);
-				break;
+			case 4: read<r32>(in); break;
+			case 8: read<r64>(in); break;
+			}
+			break;
+		case 2:
+			sign = r32(load(4)).le();
+			size = r64(load(8)).le();
+			value = alloc(size);
+			switch (u32(r64(load(2)).le())) {
+			case 4: read<r32>(in); break;
+			case 8: read<r64>(in); break;
 			}
 			break;
 		default:
@@ -103,13 +115,12 @@ public:
 	}
 
 	static void save(std::ostream& out) {
-		const int LE = moporgic::endian::le;
 		const char serial = 0;
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(u32(weights().size())).endian(LE), 4);
-			for (weight w : weights())
+			out.write(r32(u32(wghts().size())).le(), 4);
+			for (weight w : wghts())
 				w >> out;
 			break;
 		default:
@@ -118,18 +129,14 @@ public:
 		}
 		out.flush();
 	}
-
 	static void load(std::istream& in) {
-		const int LE = moporgic::endian::le;
 		char buf[8];
-		char serial;
-		in.read(&serial, 1);
-		switch (serial) {
+		auto load = moporgic::make_load(in, buf);
+		switch (*load(1)) {
 		case 0:
-			in.read(buf, 4);
-			for (u32 size = r32(buf, LE); size; size--) {
-				weights().push_back(weight());
-				weights().back() << in;
+			for (u32 size = r32(load(4)).le(); size; size--) {
+				weight w; w << in;
+				wghts().push_back(w);
 			}
 			break;
 		default:
@@ -138,63 +145,44 @@ public:
 		}
 	}
 
-	static bool save(const std::string& path) {
-		std::ofstream out;
-		char buf[1 << 20];
-		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
-		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-		if (!out.is_open()) return false;
-		weight::save(out);
-		out.flush();
-		out.close();
-		return true;
-	}
-	static bool load(const std::string& path) {
-		std::ifstream in;
-		char buf[1 << 20];
-		in.rdbuf()->pubsetbuf(buf, sizeof(buf));
-		in.open(path, std::ios::in | std::ios::binary);
-		if (!in.is_open()) return false;
-		weight::load(in);
-		in.close();
-		return true;
-	}
-
-	static weight make(const u32& sign, const u64& size) {
-		weights().push_back(weight(sign, size));
-		return weights().back();
+	static weight make(const u32& sign, const size_t& size) {
+		wghts().push_back(weight(sign, size));
+		return wghts().back();
 	}
 	static inline weight at(const u32& sign) {
-		for (weight w : weights())
-			if (w.signature() == sign) return w;
-		return weights().at(-1);
+		const auto it = find(sign);
+		if (it != end()) return (*it);
+		throw std::out_of_range("weight::at");
 	}
 	typedef std::vector<weight>::iterator iter;
-	static inline iter begin() { return weights().begin(); }
-	static inline iter end() { return weights().end(); }
+	static inline const std::vector<weight>& list() { return wghts(); }
+	static inline iter begin() { return wghts().begin(); }
+	static inline iter end() { return wghts().end(); }
 	static inline iter find(const u32& sign) {
-		return std::find(begin(), end(), sign);
+		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
 	}
 private:
-	weight(const u32& sign, const u64& size) : sign(sign), value(new numeric[size]()), size(size) {}
-	static inline std::vector<weight>& weights() { static std::vector<weight> w; return w; }
+	weight(const u32& sign, const size_t& size) : sign(sign), size(size), value(alloc(size)) {}
+	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
+
+	static inline numeric* alloc(const size_t& size) {
+		return new numeric[size]();
+	}
 
 	template<typename rxx> void write(std::ostream& out) const {
-		numeric *v = value.get();
-		for (u64 i = 0; i < size; i++)
-			out.write(rxx(v[i]).le(), sizeof(rxx));
+		for (size_t i = 0; i < size; i++)
+			out.write(rxx(value[i]).le(), sizeof(rxx));
 	}
 	template<typename rxx> void read(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		numeric *v = value.get();
-		for (u64 i = 0; i < size; i++)
-			v[i] = rxx(load(sizeof(rxx))).le();
+		for (size_t i = 0; i < size; i++)
+			value[i] = rxx(load(sizeof(rxx))).le();
 	}
 
 	u32 sign;
-	std::shared_ptr<numeric> value;
-	u64 size;
+	size_t size;
+	numeric* value;
 };
 
 class indexer {
@@ -203,29 +191,34 @@ public:
 	indexer(const indexer& i) : sign(i.sign), map(i.map) {}
 	~indexer() {}
 
-	inline u32 signature() const { return sign; }
-	inline u64 operator ()(const board& b) const { return map(b); }
-	inline bool operator ==(const u32& s) const { return sign == s; }
-
 	typedef std::function<u64(const board&)> mapper;
+
+	inline u32 signature() const { return sign; }
+	inline mapper index() const { return map; }
+	inline u64 operator ()(const board& b) const { return map(b); }
+
+	inline bool operator ==(const indexer& i) const { return sign == i.sign; }
+	inline bool operator !=(const indexer& i) const { return sign != i.sign; }
+
 	static indexer make(const u32& sign, mapper map) {
-		indexers().push_back(indexer(sign, map));
-		return indexers().back();
+		idxrs().push_back(indexer(sign, map));
+		return idxrs().back();
 	}
 	static inline indexer at(const u32& sign) {
-		for (indexer i : indexers())
-			if (i.signature() == sign) return i;
-		return indexers().at(-1);
+		const auto it = find(sign);
+		if (it != end()) return (*it);
+		throw std::out_of_range("indexer::at");
 	}
 	typedef std::vector<indexer>::iterator iter;
-	static inline iter begin() { return indexers().begin(); }
-	static inline iter end() { return indexers().end(); }
+	static inline const std::vector<indexer>& list() { return idxrs(); }
+	static inline iter begin() { return idxrs().begin(); }
+	static inline iter end() { return idxrs().end(); }
 	static inline iter find(const u32& sign) {
-		return std::find(begin(), end(), sign);
+		return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign == sign; });
 	}
 private:
 	indexer(const u32& sign, mapper map) : sign(sign), map(map) {}
-	static inline std::vector<indexer>& indexers() { static std::vector<indexer> i; return i; }
+	static inline std::vector<indexer>& idxrs() { static std::vector<indexer> i; return i; }
 
 	u32 sign;
 	mapper map;
@@ -237,29 +230,23 @@ public:
 	feature(const feature& t) : index(t.index), value(t.value) {}
 	~feature() {}
 
-	template<numeric* value, u64 (*index)(const board&)>
-	static inline numeric& pass(const board& b) { return value[index(b)]; }
-	template<weight& value, indexer& index>
-	static inline numeric& pass(const board& b) { return value[index(b)]; }
-
-	inline u64 signature() const {
-		return (u64(value.signature()) << 32) | index.signature();
-	}
+	inline u64 signature() const { return make_sign(value.signature(), index.signature()); }
+	inline operator indexer() const { return index; }
+	inline operator weight() const { return value; }
 	inline numeric& operator [](const board& b) { return value[index(b)]; }
 	inline numeric& operator [](const u64& idx) { return value[idx]; }
 	inline u64 operator ()(const board& b) const { return index(b); }
-	inline bool operator ==(const u64& s) const { return signature() == s; }
-	inline operator indexer() const { return index; }
-	inline operator weight() const { return value; }
+
+	inline bool operator ==(const feature& f) const { return signature() == f.signature(); }
+	inline bool operator !=(const feature& f) const { return signature() != f.signature(); }
 
 	void operator >>(std::ostream& out) const {
-		const int LE = moporgic::endian::le;
 		const char serial = 0;
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(index.signature()).endian(LE), 4);
-			out.write(r32(value.signature()).endian(LE), 4);
+			out.write(r32(index.signature()).le(), 4);
+			out.write(r32(value.signature()).le(), 4);
 			break;
 		default:
 			std::cerr << "unknown serial at feature::>>" << std::endl;
@@ -269,11 +256,10 @@ public:
 	void operator <<(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		const int LE = moporgic::endian::le;
 		switch (*load(1)) {
 		case 0:
-			index = indexer::at(r32(load(4), LE));
-			value = weight::at(r32(load(4), LE));
+			index = indexer::at(r32(load(4)).le());
+			value = weight::at(r32(load(4)).le());
 			break;
 		default:
 			std::cerr << "unknown serial at feature::<<" << std::endl;
@@ -282,14 +268,13 @@ public:
 	}
 
 	static void save(std::ostream& out) {
-		const int LE = moporgic::endian::le;
 		const char serial = 0;
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r32(u32(feats().size())).endian(LE), 4);
-			for (u32 i = 0, size = feats().size(); i < size; i++)
-				feats()[i] >> out;
+			out.write(r32(u32(feats().size())).le(), 4);
+			for (feature f : feature::list())
+				f >> out;
 			break;
 		default:
 			std::cerr << "unknown serial at feature::save" << std::endl;
@@ -298,16 +283,13 @@ public:
 		out.flush();
 	}
 	static void load(std::istream& in) {
-		const int LE = moporgic::endian::le;
 		char buf[4];
-		char serial;
-		in.read(&serial, 1);
-		switch (serial) {
+		auto load = moporgic::make_load(in, buf);
+		switch (*load(1)) {
 		case 0:
-			in.read(buf, 4);
-			for (u32 size = r32(buf, LE); size; size--) {
-				feats().push_back(feature());
-				feats().back() << in;
+			for (u32 size = r32(load(4)).le(); size; size--) {
+				feature f; f << in;
+				feats().push_back(f);
 			}
 			break;
 		default:
@@ -316,45 +298,28 @@ public:
 		}
 	}
 
-	static bool save(const std::string& path) {
-		std::ofstream out;
-		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-		if (!out.is_open()) return false;
-		feature::save(out);
-		out.flush();
-		out.close();
-		return true;
-	}
-	static bool load(const std::string& path) {
-		std::ifstream in;
-		in.open(path, std::ios::in | std::ios::binary);
-		if (!in.is_open()) return false;
-		feature::load(in);
-		in.close();
-		return true;
-	}
-
 	static feature make(const u32& wgt, const u32& idx) {
 		feats().push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
 	static feature at(const u32& wgt, const u32& idx) {
-		for (auto feat : feats()) {
-			if (weight(feat).signature() == wgt && indexer(feat).signature() == idx)
-				return feat;
-		}
-		return feats().at(-1);
+		const auto it = find(wgt, idx);
+		if (it != end()) return (*it);
+		throw std::out_of_range("feature::at");
 	}
 	typedef std::vector<feature>::iterator iter;
+	static inline const std::vector<feature>& list() { return feats(); }
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end() { return feats().end(); }
 	static inline iter find(const u32& wgt, const u32& idx) {
-		return std::find(begin(), end(), (u64(wgt) << 32) | idx);
+		const auto sign = make_sign(wgt, idx);
+		return std::find_if(begin(), end(), [=](const feature& f) { return f.signature() == sign; });
 	}
 
 private:
 	feature(const weight& value, const indexer& index) : index(index), value(value) {}
 	static inline std::vector<feature>& feats() { static std::vector<feature> f; return f; }
+	static inline u64 make_sign(const u32& wgt, const u32& idx) { return (u64(wgt) << 32) | idx; }
 
 	indexer index;
 	weight value;
@@ -470,39 +435,24 @@ struct options : public std::list<std::string> {
 		std::stringstream ss;
 		std::copy(begin(), end(), std::ostream_iterator<std::string>(ss, " "));
 		return ss.str();
-	}};
+	}
+};
 
-inline void rotfx(int& i) {
-	i = (3 - (i >> 2)) + ((i % 4) << 2);
+inline u32 hashpatt(const std::vector<int>& patt) {
+	u32 hash = 0;
+	for (auto tile : patt) hash = (hash << 4) | tile;
+	return hash;
 }
-inline void mirfx(int& s) {
-	s = ((s >> 2) << 2) + (3 - (s % 4));
-}
-std::vector<std::function<void(int&)>> mapfx = { rotfx, rotfx, rotfx, mirfx, rotfx, rotfx, rotfx, mirfx };
-std::vector<std::vector<int>> patt6t =
-	{ { 0, 1, 2, 3, 6, 7 }, { 4, 5, 6, 7, 10, 11 }, { 0, 1, 2, 4, 5, 6 }, { 4, 5, 6, 8, 9, 10 }, };
-inline u32 hashfx(std::vector<int>& p) {
-	u32 h = 0; for (int t : p) h = (h << 4) | t; return h;
+inline std::vector<int> hashpatt(const std::string& hashs) {
+	u32 hash; std::stringstream(hashs) >> std::hex >> hash;
+	std::vector<int> patt(hashs.size());
+	for (auto it = patt.rbegin(); it != patt.rend(); it++, hash >>= 4)
+		(*it) = hash & 0x0f;
+	return patt;
 }
 
-
-const u32 base = 16;
 template<int p0, int p1, int p2, int p3, int p4, int p5>
 u64 index6t(const board& b) {
-//	std::cout << p0 << "\t" << p1 << "\t" << p2 << "\t" << p3 << "\t" << p4 << "\t" << p5 << std::endl;
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	return index;
-}
-u64 index6t(const board& b,
-		const int& p0, const int& p1, const int& p2,
-		const int& p3, const int& p4, const int& p5) {
-//	std::cout << p0 << "\t" << p1 << "\t" << p2 << "\t" << p3 << "\t" << p4 << "\t" << p5 << std::endl;
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
 	index += b.at(p1) <<  4;
@@ -521,44 +471,89 @@ u64 index4t(const board& b) {
 	index += b.at(p3) << 12;
 	return index;
 }
-u64 index4t(const board& b, const int& p0, const int& p1, const int& p2, const int& p3) {
+template<int p0, int p1, int p2, int p3, int p4, int p5, int p6, int p7>
+u64 index8t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
 	index += b.at(p1) <<  4;
 	index += b.at(p2) <<  8;
 	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	index += b.at(p5) << 20;
+	index += b.at(p6) << 24;
+	index += b.at(p7) << 28;
+	return index;
+}
+template<int p0, int p1, int p2, int p3, int p4, int p5, int p6>
+u64 index7t(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	index += b.at(p5) << 20;
+	index += b.at(p6) << 24;
+	return index;
+}
+template<int p0, int p1, int p2, int p3, int p4>
+u64 index5t(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
 	return index;
 }
 
-u64 indexmerge(const board& b) {
+u64 indexnta(const board& b, const std::vector<int>& p) {
+	register u64 index = 0;
+	for (size_t i = 0; i < p.size(); i++)
+		index += b.at(p[i]) << (i << 2);
+	return index;
+}
+
+u64 indexmerge0(const board& b) { // 16-bit
 	board q = b; q.transpose();
-	u32 hori = 0, vert = 0;
-	hori += b.query(0).merge << 0;
-	hori += b.query(1).merge << 2;
-	hori += b.query(2).merge << 4;
-	hori += b.query(3).merge << 6;
-	vert += q.query(0).merge << 0;
-	vert += q.query(1).merge << 2;
-	vert += q.query(2).merge << 4;
-	vert += q.query(3).merge << 6;
+	register u32 hori = 0, vert = 0;
+	hori |= b.query(0).merge << 0;
+	hori |= b.query(1).merge << 2;
+	hori |= b.query(2).merge << 4;
+	hori |= b.query(3).merge << 6;
+	vert |= q.query(0).merge << 0;
+	vert |= q.query(1).merge << 2;
+	vert |= q.query(2).merge << 4;
+	vert |= q.query(3).merge << 6;
 	return hori | (vert << 8);
+}
+
+template<int transpose>
+u64 indexmerge1(const board& b) { // 8-bit
+	register u32 merge = 0;
+	board k = b; if (transpose) k.transpose();
+	merge |= k.query(0).merge << 0;
+	merge |= k.query(1).merge << 2;
+	merge |= k.query(2).merge << 4;
+	merge |= k.query(3).merge << 6;
+	return merge;
 }
 
 u64 indexnum0(const board& b) { // 10-bit
 	// 2k ~ 32k, 2-bit ea.
-	static u16 num[32];
+	u16 num[16];
 	b.count(num, 11, 16);
 	register u64 index = 0;
 	index += (num[11] & 0x03) << 0;
-	index += (num[12] & 0x03) << 0;
-	index += (num[13] & 0x03) << 0;
-	index += (num[14] & 0x03) << 0;
-	index += (num[15] & 0x03) << 0;
+	index += (num[12] & 0x03) << 2;
+	index += (num[13] & 0x03) << 4;
+	index += (num[14] & 0x03) << 6;
+	index += (num[15] & 0x03) << 8;
 	return index;
 }
 
 u64 indexnum1(const board& b) { // 25-bit
-	static u16 num[32];
+	u16 num[16];
 	b.count(num, 5, 16);
 	register u64 index = 0;
 	index += ((num[5] + num[6]) & 0x0f) << 0; // 32 & 64, 4-bit
@@ -575,8 +570,8 @@ u64 indexnum1(const board& b) { // 25-bit
 }
 
 u64 indexnum2(const board& b) { // 25-bit
-	static u16 num[32];
-	b.count(num);
+	u16 num[16];
+	b.count(num, 0, 16);
 	register u64 index = 0;
 	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-bit
 	index += ((num[3] + num[4]) & 0x07) << 3; // 8 & 16, 3-bit
@@ -592,7 +587,7 @@ u64 indexnum2(const board& b) { // 25-bit
 	return index;
 }
 
-template<bool transpose, int qu0, int qu1>
+template<int transpose, int qu0, int qu1>
 u64 indexnum2x(const board& b) { // 25-bit
 	board o = b;
 	if (transpose) o.transpose();
@@ -614,209 +609,506 @@ u64 indexnum2x(const board& b) { // 25-bit
 	return index;
 }
 
-template<bool transpose, bool isleft>
+u64 indexnum3(const board& b) { // 28-bit
+	u16 num[16];
+	b.count(num, 0, 16);
+	register u64 index = 0;
+	index += ((num[0] + num[1] + num[2]) & 0x0f) << 0; // 0 & 2 & 4, 4-bit
+	index += ((num[3] + num[4]) & 0x07) << 4; // 8 & 16, 3-bit
+	index += ((num[5] + num[6]) & 0x07) << 7; // 32 & 64, 3-bit
+	index += (num[7] & 0x03) << 10; // 128, 2-bit
+	index += (num[8] & 0x03) << 12; // 256, 2-bit
+	index += (num[9] & 0x03) << 14; // 512, 2-bit
+	index += (num[10] & 0x03) << 16; // 1k ~ 32k, 2-bit ea.
+	index += (num[11] & 0x03) << 18;
+	index += (num[12] & 0x03) << 20;
+	index += (num[13] & 0x03) << 22;
+	index += (num[14] & 0x03) << 24;
+	index += (num[15] & 0x03) << 26;
+	return index;
+}
+
+template<int isomorphic>
 u64 indexmono(const board& b) { // 24-bit
-	if (transpose) {
-		board o = b;
-		o.transpose();
-		return o.mono(isleft);
+	board k = b;
+	k.rotate(isomorphic);
+	if (isomorphic >= 4) k.mirror();
+	return k.mono();
+}
+
+template<u32 tile, int isomorphic>
+u64 indexmask(const board& b) { // 16-bit
+	board k = b;
+	k.rotate(isomorphic);
+	if (isomorphic >= 4) k.mirror();
+	return k.mask(tile);
+}
+
+template<int isomorphic>
+u64 indexmax(const board& b) { // 16-bit
+	board k = b;
+	k.rotate(isomorphic);
+	if (isomorphic >= 4) k.mirror();
+	return k.mask(k.max());
+}
+
+void make_indexers(const std::string& res = "") {
+	auto imake = [](u32 sign, indexer::mapper func) {
+		if (indexer::find(sign) == indexer::end()) indexer::make(sign, func);
+	};
+
+	imake(0x00012367, utils::index6t<0x0,0x1,0x2,0x3,0x6,0x7>);
+	imake(0x0037bfae, utils::index6t<0x3,0x7,0xb,0xf,0xa,0xe>);
+	imake(0x00fedc98, utils::index6t<0xf,0xe,0xd,0xc,0x9,0x8>);
+	imake(0x00c84051, utils::index6t<0xc,0x8,0x4,0x0,0x5,0x1>);
+	imake(0x00fb7362, utils::index6t<0xf,0xb,0x7,0x3,0x6,0x2>);
+	imake(0x00cdefab, utils::index6t<0xc,0xd,0xe,0xf,0xa,0xb>);
+	imake(0x00048c9d, utils::index6t<0x0,0x4,0x8,0xc,0x9,0xd>);
+	imake(0x00321054, utils::index6t<0x3,0x2,0x1,0x0,0x5,0x4>);
+	imake(0x004567ab, utils::index6t<0x4,0x5,0x6,0x7,0xa,0xb>);
+	imake(0x0026ae9d, utils::index6t<0x2,0x6,0xa,0xe,0x9,0xd>);
+	imake(0x00ba9854, utils::index6t<0xb,0xa,0x9,0x8,0x5,0x4>);
+	imake(0x00d95162, utils::index6t<0xd,0x9,0x5,0x1,0x6,0x2>);
+	imake(0x00ea6251, utils::index6t<0xe,0xa,0x6,0x2,0x5,0x1>);
+	imake(0x0089ab67, utils::index6t<0x8,0x9,0xa,0xb,0x6,0x7>);
+	imake(0x00159dae, utils::index6t<0x1,0x5,0x9,0xd,0xa,0xe>);
+	imake(0x00765498, utils::index6t<0x7,0x6,0x5,0x4,0x9,0x8>);
+	imake(0x00012345, utils::index6t<0x0,0x1,0x2,0x3,0x4,0x5>);
+	imake(0x0037bf26, utils::index6t<0x3,0x7,0xb,0xf,0x2,0x6>);
+	imake(0x00fedcba, utils::index6t<0xf,0xe,0xd,0xc,0xb,0xa>);
+	imake(0x00c840d9, utils::index6t<0xc,0x8,0x4,0x0,0xd,0x9>);
+	imake(0x00321076, utils::index6t<0x3,0x2,0x1,0x0,0x7,0x6>);
+	imake(0x00fb73ea, utils::index6t<0xf,0xb,0x7,0x3,0xe,0xa>);
+	imake(0x00cdef89, utils::index6t<0xc,0xd,0xe,0xf,0x8,0x9>);
+	imake(0x00048c15, utils::index6t<0x0,0x4,0x8,0xc,0x1,0x5>);
+	imake(0x00456789, utils::index6t<0x4,0x5,0x6,0x7,0x8,0x9>);
+	imake(0x0026ae15, utils::index6t<0x2,0x6,0xa,0xe,0x1,0x5>);
+	imake(0x00ba9876, utils::index6t<0xb,0xa,0x9,0x8,0x7,0x6>);
+	imake(0x00d951ea, utils::index6t<0xd,0x9,0x5,0x1,0xe,0xa>);
+	imake(0x007654ba, utils::index6t<0x7,0x6,0x5,0x4,0xb,0xa>);
+	imake(0x00ea62d9, utils::index6t<0xe,0xa,0x6,0x2,0xd,0x9>);
+	imake(0x0089ab45, utils::index6t<0x8,0x9,0xa,0xb,0x4,0x5>);
+	imake(0x00159d26, utils::index6t<0x1,0x5,0x9,0xd,0x2,0x6>);
+	imake(0x00012456, utils::index6t<0x0,0x1,0x2,0x4,0x5,0x6>);
+	imake(0x0037b26a, utils::index6t<0x3,0x7,0xb,0x2,0x6,0xa>);
+	imake(0x00fedba9, utils::index6t<0xf,0xe,0xd,0xb,0xa,0x9>);
+	imake(0x00c84d95, utils::index6t<0xc,0x8,0x4,0xd,0x9,0x5>);
+	imake(0x00fb7ea6, utils::index6t<0xf,0xb,0x7,0xe,0xa,0x6>);
+	imake(0x00cde89a, utils::index6t<0xc,0xd,0xe,0x8,0x9,0xa>);
+	imake(0x00048159, utils::index6t<0x0,0x4,0x8,0x1,0x5,0x9>);
+	imake(0x00321765, utils::index6t<0x3,0x2,0x1,0x7,0x6,0x5>);
+	imake(0x0045689a, utils::index6t<0x4,0x5,0x6,0x8,0x9,0xa>);
+	imake(0x0026a159, utils::index6t<0x2,0x6,0xa,0x1,0x5,0x9>);
+	imake(0x00ba9765, utils::index6t<0xb,0xa,0x9,0x7,0x6,0x5>);
+	imake(0x00d95ea6, utils::index6t<0xd,0x9,0x5,0xe,0xa,0x6>);
+	imake(0x00ea6d95, utils::index6t<0xe,0xa,0x6,0xd,0x9,0x5>);
+	imake(0x0089a456, utils::index6t<0x8,0x9,0xa,0x4,0x5,0x6>);
+	imake(0x0015926a, utils::index6t<0x1,0x5,0x9,0x2,0x6,0xa>);
+	imake(0x00765ba9, utils::index6t<0x7,0x6,0x5,0xb,0xa,0x9>);
+	imake(0x00123567, utils::index6t<0x1,0x2,0x3,0x5,0x6,0x7>);
+	imake(0x007bf6ae, utils::index6t<0x7,0xb,0xf,0x6,0xa,0xe>);
+	imake(0x00edca98, utils::index6t<0xe,0xd,0xc,0xa,0x9,0x8>);
+	imake(0x00840951, utils::index6t<0x8,0x4,0x0,0x9,0x5,0x1>);
+	imake(0x00210654, utils::index6t<0x2,0x1,0x0,0x6,0x5,0x4>);
+	imake(0x00b73a62, utils::index6t<0xb,0x7,0x3,0xa,0x6,0x2>);
+	imake(0x00def9ab, utils::index6t<0xd,0xe,0xf,0x9,0xa,0xb>);
+	imake(0x0048c59d, utils::index6t<0x4,0x8,0xc,0x5,0x9,0xd>);
+	imake(0x005679ab, utils::index6t<0x5,0x6,0x7,0x9,0xa,0xb>);
+	imake(0x006ae59d, utils::index6t<0x6,0xa,0xe,0x5,0x9,0xd>);
+	imake(0x00a98654, utils::index6t<0xa,0x9,0x8,0x6,0x5,0x4>);
+	imake(0x00951a62, utils::index6t<0x9,0x5,0x1,0xa,0x6,0x2>);
+	imake(0x00654a98, utils::index6t<0x6,0x5,0x4,0xa,0x9,0x8>);
+	imake(0x00a62951, utils::index6t<0xa,0x6,0x2,0x9,0x5,0x1>);
+	imake(0x009ab567, utils::index6t<0x9,0xa,0xb,0x5,0x6,0x7>);
+	imake(0x0059d6ae, utils::index6t<0x5,0x9,0xd,0x6,0xa,0xe>);
+	imake(0x0001237b, utils::index6t<0x0,0x1,0x2,0x3,0x7,0xb>);
+	imake(0x0037bfed, utils::index6t<0x3,0x7,0xb,0xf,0xe,0xd>);
+	imake(0x00fedc84, utils::index6t<0xf,0xe,0xd,0xc,0x8,0x4>);
+	imake(0x00c84012, utils::index6t<0xc,0x8,0x4,0x0,0x1,0x2>);
+	imake(0x00321048, utils::index6t<0x3,0x2,0x1,0x0,0x4,0x8>);
+	imake(0x00fb7321, utils::index6t<0xf,0xb,0x7,0x3,0x2,0x1>);
+	imake(0x00cdefb7, utils::index6t<0xc,0xd,0xe,0xf,0xb,0x7>);
+	imake(0x00048cde, utils::index6t<0x0,0x4,0x8,0xc,0xd,0xe>);
+	imake(0x00012348, utils::index6t<0x0,0x1,0x2,0x3,0x4,0x8>);
+	imake(0x0037bf21, utils::index6t<0x3,0x7,0xb,0xf,0x2,0x1>);
+	imake(0x00fedcb7, utils::index6t<0xf,0xe,0xd,0xc,0xb,0x7>);
+	imake(0x00c840de, utils::index6t<0xc,0x8,0x4,0x0,0xd,0xe>);
+	imake(0x0032107b, utils::index6t<0x3,0x2,0x1,0x0,0x7,0xb>);
+	imake(0x00fb73ed, utils::index6t<0xf,0xb,0x7,0x3,0xe,0xd>);
+	imake(0x00cdef84, utils::index6t<0xc,0xd,0xe,0xf,0x8,0x4>);
+	imake(0x00048c12, utils::index6t<0x0,0x4,0x8,0xc,0x1,0x2>);
+	imake(0x00000123, utils::index4t<0x0,0x1,0x2,0x3>);
+	imake(0x00004567, utils::index4t<0x4,0x5,0x6,0x7>);
+	imake(0x000089ab, utils::index4t<0x8,0x9,0xa,0xb>);
+	imake(0x0000cdef, utils::index4t<0xc,0xd,0xe,0xf>);
+	imake(0x000037bf, utils::index4t<0x3,0x7,0xb,0xf>);
+	imake(0x000026ae, utils::index4t<0x2,0x6,0xa,0xe>);
+	imake(0x0000159d, utils::index4t<0x1,0x5,0x9,0xd>);
+	imake(0x0000048c, utils::index4t<0x0,0x4,0x8,0xc>);
+	imake(0x0000fedc, utils::index4t<0xf,0xe,0xd,0xc>);
+	imake(0x0000ba98, utils::index4t<0xb,0xa,0x9,0x8>);
+	imake(0x00007654, utils::index4t<0x7,0x6,0x5,0x4>);
+	imake(0x00003210, utils::index4t<0x3,0x2,0x1,0x0>);
+	imake(0x0000c840, utils::index4t<0xc,0x8,0x4,0x0>);
+	imake(0x0000d951, utils::index4t<0xd,0x9,0x5,0x1>);
+	imake(0x0000ea62, utils::index4t<0xe,0xa,0x6,0x2>);
+	imake(0x0000fb73, utils::index4t<0xf,0xb,0x7,0x3>);
+	imake(0x00000145, utils::index4t<0x0,0x1,0x4,0x5>);
+	imake(0x00001256, utils::index4t<0x1,0x2,0x5,0x6>);
+	imake(0x00002367, utils::index4t<0x2,0x3,0x6,0x7>);
+	imake(0x00004589, utils::index4t<0x4,0x5,0x8,0x9>);
+	imake(0x0000569a, utils::index4t<0x5,0x6,0x9,0xa>);
+	imake(0x000067ab, utils::index4t<0x6,0x7,0xa,0xb>);
+	imake(0x000089cd, utils::index4t<0x8,0x9,0xc,0xd>);
+	imake(0x00009ade, utils::index4t<0x9,0xa,0xd,0xe>);
+	imake(0x0000abef, utils::index4t<0xa,0xb,0xe,0xf>);
+	imake(0x00003726, utils::index4t<0x3,0x7,0x2,0x6>);
+	imake(0x00007b6a, utils::index4t<0x7,0xb,0x6,0xa>);
+	imake(0x0000bfae, utils::index4t<0xb,0xf,0xa,0xe>);
+	imake(0x00002615, utils::index4t<0x2,0x6,0x1,0x5>);
+	imake(0x00006a59, utils::index4t<0x6,0xa,0x5,0x9>);
+	imake(0x0000ae9d, utils::index4t<0xa,0xe,0x9,0xd>);
+	imake(0x00001504, utils::index4t<0x1,0x5,0x0,0x4>);
+	imake(0x00005948, utils::index4t<0x5,0x9,0x4,0x8>);
+	imake(0x00009d8c, utils::index4t<0x9,0xd,0x8,0xc>);
+	imake(0x0000feba, utils::index4t<0xf,0xe,0xb,0xa>);
+	imake(0x0000eda9, utils::index4t<0xe,0xd,0xa,0x9>);
+	imake(0x0000dc98, utils::index4t<0xd,0xc,0x9,0x8>);
+	imake(0x0000ba76, utils::index4t<0xb,0xa,0x7,0x6>);
+	imake(0x0000a965, utils::index4t<0xa,0x9,0x6,0x5>);
+	imake(0x00009854, utils::index4t<0x9,0x8,0x5,0x4>);
+	imake(0x00007632, utils::index4t<0x7,0x6,0x3,0x2>);
+	imake(0x00006521, utils::index4t<0x6,0x5,0x2,0x1>);
+	imake(0x00005410, utils::index4t<0x5,0x4,0x1,0x0>);
+	imake(0x0000c8d9, utils::index4t<0xc,0x8,0xd,0x9>);
+	imake(0x00008495, utils::index4t<0x8,0x4,0x9,0x5>);
+	imake(0x00004051, utils::index4t<0x4,0x0,0x5,0x1>);
+	imake(0x0000d9ea, utils::index4t<0xd,0x9,0xe,0xa>);
+	imake(0x000095a6, utils::index4t<0x9,0x5,0xa,0x6>);
+	imake(0x00005162, utils::index4t<0x5,0x1,0x6,0x2>);
+	imake(0x0000eafb, utils::index4t<0xe,0xa,0xf,0xb>);
+	imake(0x0000a6b7, utils::index4t<0xa,0x6,0xb,0x7>);
+	imake(0x00006273, utils::index4t<0x6,0x2,0x7,0x3>);
+	imake(0x00003276, utils::index4t<0x3,0x2,0x7,0x6>);
+	imake(0x00002165, utils::index4t<0x2,0x1,0x6,0x5>);
+	imake(0x00001054, utils::index4t<0x1,0x0,0x5,0x4>);
+	imake(0x000076ba, utils::index4t<0x7,0x6,0xb,0xa>);
+	imake(0x000065a9, utils::index4t<0x6,0x5,0xa,0x9>);
+	imake(0x00005498, utils::index4t<0x5,0x4,0x9,0x8>);
+	imake(0x0000bafe, utils::index4t<0xb,0xa,0xf,0xe>);
+	imake(0x0000a9ed, utils::index4t<0xa,0x9,0xe,0xd>);
+	imake(0x000098dc, utils::index4t<0x9,0x8,0xd,0xc>);
+	imake(0x0000fbea, utils::index4t<0xf,0xb,0xe,0xa>);
+	imake(0x0000b7a6, utils::index4t<0xb,0x7,0xa,0x6>);
+	imake(0x00007362, utils::index4t<0x7,0x3,0x6,0x2>);
+	imake(0x0000ead9, utils::index4t<0xe,0xa,0xd,0x9>);
+	imake(0x0000a695, utils::index4t<0xa,0x6,0x9,0x5>);
+	imake(0x00006251, utils::index4t<0x6,0x2,0x5,0x1>);
+	imake(0x0000d9c8, utils::index4t<0xd,0x9,0xc,0x8>);
+	imake(0x00009584, utils::index4t<0x9,0x5,0x8,0x4>);
+	imake(0x00005140, utils::index4t<0x5,0x1,0x4,0x0>);
+	imake(0x0000cd89, utils::index4t<0xc,0xd,0x8,0x9>);
+	imake(0x0000de9a, utils::index4t<0xd,0xe,0x9,0xa>);
+	imake(0x0000efab, utils::index4t<0xe,0xf,0xa,0xb>);
+	imake(0x00008945, utils::index4t<0x8,0x9,0x4,0x5>);
+	imake(0x00009a56, utils::index4t<0x9,0xa,0x5,0x6>);
+	imake(0x0000ab67, utils::index4t<0xa,0xb,0x6,0x7>);
+	imake(0x00004501, utils::index4t<0x4,0x5,0x0,0x1>);
+	imake(0x00005612, utils::index4t<0x5,0x6,0x1,0x2>);
+	imake(0x00006723, utils::index4t<0x6,0x7,0x2,0x3>);
+	imake(0x00000415, utils::index4t<0x0,0x4,0x1,0x5>);
+	imake(0x00004859, utils::index4t<0x4,0x8,0x5,0x9>);
+	imake(0x00008c9d, utils::index4t<0x8,0xc,0x9,0xd>);
+	imake(0x00001526, utils::index4t<0x1,0x5,0x2,0x6>);
+	imake(0x0000596a, utils::index4t<0x5,0x9,0x6,0xa>);
+	imake(0x00009dae, utils::index4t<0x9,0xd,0xa,0xe>);
+	imake(0x00002637, utils::index4t<0x2,0x6,0x3,0x7>);
+	imake(0x00006a7b, utils::index4t<0x6,0xa,0x7,0xb>);
+	imake(0x0000aebf, utils::index4t<0xa,0xe,0xb,0xf>);
+	imake(0x01234567, utils::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
+	imake(0x456789ab, utils::index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
+	imake(0x37bf26ae, utils::index8t<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
+	imake(0x26ae159d, utils::index8t<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
+	imake(0xfedcba98, utils::index8t<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
+	imake(0xba987654, utils::index8t<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
+	imake(0xc840d951, utils::index8t<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
+	imake(0xd951ea62, utils::index8t<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
+	imake(0x32107654, utils::index8t<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
+	imake(0x7654ba98, utils::index8t<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
+	imake(0xfb73ea62, utils::index8t<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
+	imake(0xea62d951, utils::index8t<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
+	imake(0xcdef89ab, utils::index8t<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
+	imake(0x89ab4567, utils::index8t<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
+	imake(0x048c159d, utils::index8t<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
+	imake(0x159d26ae, utils::index8t<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
+	imake(0x00123456, utils::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>);
+	imake(0x037bf26a, utils::index7t<0x3,0x7,0xb,0xf,0x2,0x6,0xa>);
+	imake(0x0fedcba9, utils::index7t<0xf,0xe,0xd,0xc,0xb,0xa,0x9>);
+	imake(0x0c840d95, utils::index7t<0xc,0x8,0x4,0x0,0xd,0x9,0x5>);
+	imake(0x03210765, utils::index7t<0x3,0x2,0x1,0x0,0x7,0x6,0x5>);
+	imake(0x0fb73ea6, utils::index7t<0xf,0xb,0x7,0x3,0xe,0xa,0x6>);
+	imake(0x0cdef89a, utils::index7t<0xc,0xd,0xe,0xf,0x8,0x9,0xa>);
+	imake(0x0048c159, utils::index7t<0x0,0x4,0x8,0xc,0x1,0x5,0x9>);
+	imake(0x0456789a, utils::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>);
+	imake(0x026ae159, utils::index7t<0x2,0x6,0xa,0xe,0x1,0x5,0x9>);
+	imake(0x0ba98765, utils::index7t<0xb,0xa,0x9,0x8,0x7,0x6,0x5>);
+	imake(0x0d951ea6, utils::index7t<0xd,0x9,0x5,0x1,0xe,0xa,0x6>);
+	imake(0x07654ba9, utils::index7t<0x7,0x6,0x5,0x4,0xb,0xa,0x9>);
+	imake(0x0ea62d95, utils::index7t<0xe,0xa,0x6,0x2,0xd,0x9,0x5>);
+	imake(0x089ab456, utils::index7t<0x8,0x9,0xa,0xb,0x4,0x5,0x6>);
+	imake(0x0159d26a, utils::index7t<0x1,0x5,0x9,0xd,0x2,0x6,0xa>);
+	imake(0x00123567, utils::index7t<0x0,0x1,0x2,0x3,0x5,0x6,0x7>);
+	imake(0x037bf6ae, utils::index7t<0x3,0x7,0xb,0xf,0x6,0xa,0xe>);
+	imake(0x0fedca98, utils::index7t<0xf,0xe,0xd,0xc,0xa,0x9,0x8>);
+	imake(0x0c840951, utils::index7t<0xc,0x8,0x4,0x0,0x9,0x5,0x1>);
+	imake(0x03210654, utils::index7t<0x3,0x2,0x1,0x0,0x6,0x5,0x4>);
+	imake(0x0fb73a62, utils::index7t<0xf,0xb,0x7,0x3,0xa,0x6,0x2>);
+	imake(0x0cdef9ab, utils::index7t<0xc,0xd,0xe,0xf,0x9,0xa,0xb>);
+	imake(0x0048c59d, utils::index7t<0x0,0x4,0x8,0xc,0x5,0x9,0xd>);
+	imake(0x045679ab, utils::index7t<0x4,0x5,0x6,0x7,0x9,0xa,0xb>);
+	imake(0x026ae59d, utils::index7t<0x2,0x6,0xa,0xe,0x5,0x9,0xd>);
+	imake(0x0ba98654, utils::index7t<0xb,0xa,0x9,0x8,0x6,0x5,0x4>);
+	imake(0x0d951a62, utils::index7t<0xd,0x9,0x5,0x1,0xa,0x6,0x2>);
+	imake(0x07654a98, utils::index7t<0x7,0x6,0x5,0x4,0xa,0x9,0x8>);
+	imake(0x0ea62951, utils::index7t<0xe,0xa,0x6,0x2,0x9,0x5,0x1>);
+	imake(0x089ab567, utils::index7t<0x8,0x9,0xa,0xb,0x5,0x6,0x7>);
+	imake(0x0159d6ae, utils::index7t<0x1,0x5,0x9,0xd,0x6,0xa,0xe>);
+	imake(0x001237bf, utils::index7t<0x0,0x1,0x2,0x3,0x7,0xb,0xf>);
+	imake(0x037bfedc, utils::index7t<0x3,0x7,0xb,0xf,0xe,0xd,0xc>);
+	imake(0x0fedc840, utils::index7t<0xf,0xe,0xd,0xc,0x8,0x4,0x0>);
+	imake(0x0c840123, utils::index7t<0xc,0x8,0x4,0x0,0x1,0x2,0x3>);
+	imake(0x0321048c, utils::index7t<0x3,0x2,0x1,0x0,0x4,0x8,0xc>);
+	imake(0x0fb73210, utils::index7t<0xf,0xb,0x7,0x3,0x2,0x1,0x0>);
+	imake(0x0cdefb73, utils::index7t<0xc,0xd,0xe,0xf,0xb,0x7,0x3>);
+	imake(0x0048cdef, utils::index7t<0x0,0x4,0x8,0xc,0xd,0xe,0xf>);
+	imake(0x0012348c, utils::index7t<0x0,0x1,0x2,0x3,0x4,0x8,0xc>);
+	imake(0x037bf210, utils::index7t<0x3,0x7,0xb,0xf,0x2,0x1,0x0>);
+	imake(0x0fedcb73, utils::index7t<0xf,0xe,0xd,0xc,0xb,0x7,0x3>);
+	imake(0x0c840def, utils::index7t<0xc,0x8,0x4,0x0,0xd,0xe,0xf>);
+	imake(0x032107bf, utils::index7t<0x3,0x2,0x1,0x0,0x7,0xb,0xf>);
+	imake(0x0fb73edc, utils::index7t<0xf,0xb,0x7,0x3,0xe,0xd,0xc>);
+	imake(0x0cdef840, utils::index7t<0xc,0xd,0xe,0xf,0x8,0x4,0x0>);
+	imake(0x0048c123, utils::index7t<0x0,0x4,0x8,0xc,0x1,0x2,0x3>);
+	imake(0x00123458, utils::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x8>);
+	imake(0x037bf261, utils::index7t<0x3,0x7,0xb,0xf,0x2,0x6,0x1>);
+	imake(0x0fedcba7, utils::index7t<0xf,0xe,0xd,0xc,0xb,0xa,0x7>);
+	imake(0x0c840d9e, utils::index7t<0xc,0x8,0x4,0x0,0xd,0x9,0xe>);
+	imake(0x0321076b, utils::index7t<0x3,0x2,0x1,0x0,0x7,0x6,0xb>);
+	imake(0x0fb73ead, utils::index7t<0xf,0xb,0x7,0x3,0xe,0xa,0xd>);
+	imake(0x0cdef894, utils::index7t<0xc,0xd,0xe,0xf,0x8,0x9,0x4>);
+	imake(0x0048c152, utils::index7t<0x0,0x4,0x8,0xc,0x1,0x5,0x2>);
+	imake(0x0012367b, utils::index7t<0x0,0x1,0x2,0x3,0x6,0x7,0xb>);
+	imake(0x037bfaed, utils::index7t<0x3,0x7,0xb,0xf,0xa,0xe,0xd>);
+	imake(0x0fedc984, utils::index7t<0xf,0xe,0xd,0xc,0x9,0x8,0x4>);
+	imake(0x0c840512, utils::index7t<0xc,0x8,0x4,0x0,0x5,0x1,0x2>);
+	imake(0x03210548, utils::index7t<0x3,0x2,0x1,0x0,0x5,0x4,0x8>);
+	imake(0x0fb73621, utils::index7t<0xf,0xb,0x7,0x3,0x6,0x2,0x1>);
+	imake(0x0cdefab7, utils::index7t<0xc,0xd,0xe,0xf,0xa,0xb,0x7>);
+	imake(0x0048c9de, utils::index7t<0x0,0x4,0x8,0xc,0x9,0xd,0xe>);
+	imake(0x00001234, utils::index5t<0x0,0x1,0x2,0x3,0x4>);
+	imake(0x00037bf2, utils::index5t<0x3,0x7,0xb,0xf,0x2>);
+	imake(0x000fedcb, utils::index5t<0xf,0xe,0xd,0xc,0xb>);
+	imake(0x000c840d, utils::index5t<0xc,0x8,0x4,0x0,0xd>);
+	imake(0x00032107, utils::index5t<0x3,0x2,0x1,0x0,0x7>);
+	imake(0x000fb73e, utils::index5t<0xf,0xb,0x7,0x3,0xe>);
+	imake(0x000cdef8, utils::index5t<0xc,0xd,0xe,0xf,0x8>);
+	imake(0x000048c1, utils::index5t<0x0,0x4,0x8,0xc,0x1>);
+	imake(0x00045678, utils::index5t<0x4,0x5,0x6,0x7,0x8>);
+	imake(0x00026ae1, utils::index5t<0x2,0x6,0xa,0xe,0x1>);
+	imake(0x000ba987, utils::index5t<0xb,0xa,0x9,0x8,0x7>);
+	imake(0x000d951e, utils::index5t<0xd,0x9,0x5,0x1,0xe>);
+	imake(0x0007654b, utils::index5t<0x7,0x6,0x5,0x4,0xb>);
+	imake(0x000ea62d, utils::index5t<0xe,0xa,0x6,0x2,0xd>);
+	imake(0x00089ab4, utils::index5t<0x8,0x9,0xa,0xb,0x4>);
+	imake(0x000159d2, utils::index5t<0x1,0x5,0x9,0xd,0x2>);
+	imake(0xff000000, utils::indexmerge0);
+	imake(0xff000001, utils::indexmerge1<0>);
+	imake(0xff000011, utils::indexmerge1<1>);
+	imake(0xfe000000, utils::indexnum0);
+	imake(0xfe000001, utils::indexnum1);
+	imake(0xfe000002, utils::indexnum2);
+	imake(0xfe000082, utils::indexnum2x<0, 0, 1>);
+	imake(0xfe000092, utils::indexnum2x<0, 2, 3>);
+	imake(0xfe0000c2, utils::indexnum2x<1, 0, 1>);
+	imake(0xfe0000d2, utils::indexnum2x<1, 2, 3>);
+	imake(0xfe000003, utils::indexnum3);
+	imake(0xfd000000, utils::indexmono<0>);
+	imake(0xfd000010, utils::indexmono<1>);
+	imake(0xfd000020, utils::indexmono<2>);
+	imake(0xfd000030, utils::indexmono<3>);
+	imake(0xfd000040, utils::indexmono<4>);
+	imake(0xfd000050, utils::indexmono<5>);
+	imake(0xfd000060, utils::indexmono<6>);
+	imake(0xfd000070, utils::indexmono<7>);
+	imake(0xfc000000, utils::indexmax<0>);
+	imake(0xfc000010, utils::indexmax<1>);
+	imake(0xfc000020, utils::indexmax<2>);
+	imake(0xfc000030, utils::indexmax<3>);
+	imake(0xfc000040, utils::indexmax<4>);
+	imake(0xfc000050, utils::indexmax<5>);
+	imake(0xfc000060, utils::indexmax<6>);
+	imake(0xfc000070, utils::indexmax<7>);
+
+	// patt(012367) num(-)
+	std::string in(res);
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
+	if (in.find("default") != std::string::npos)
+		in.replace(in.find("default"), 7, "");
+	std::stringstream idxin(in);
+	std::string type, sign;
+	while (idxin >> type && idxin >> sign) {
+		u32 idxr = 0;
+		using moporgic::to_hash;
+		switch (to_hash(type)) {
+		case to_hash("p"):
+		case to_hash("patt"):
+		case to_hash("pattern"):
+		case to_hash("tuple"):
+			std::stringstream(sign) >> std::hex >> idxr;
+			if (indexer::find(idxr) == indexer::end()) {
+				auto patt = new std::vector<int>(hashpatt(sign)); // will NOT be deleted
+				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+			} else {
+				std::cerr << "warning: redefined indexer " << sign << std::endl;
+			}
+			break;
+		case to_hash("n"):
+		case to_hash("num"):
+		case to_hash("count"):
+			std::cerr << "error: unsupported custom indexer type " << type << std::endl;
+			break;
+		default:
+			std::cerr << "error: unknown custom indexer type " << type << std::endl;
+			break;
+		}
 	}
-	return b.mono(isleft);
 }
 
-void make_indexers() {
-
-	indexer::make(0x00012367, utils::index6t<0,1,2,3,6,7>);
-	indexer::make(0x0037bfae, utils::index6t<3,7,11,15,10,14>);
-	indexer::make(0x00fedc98, utils::index6t<15,14,13,12,9,8>);
-	indexer::make(0x00c84051, utils::index6t<12,8,4,0,5,1>);
-	indexer::make(0x00fb7362, utils::index6t<15,11,7,3,6,2>);
-	indexer::make(0x00cdefab, utils::index6t<12,13,14,15,10,11>);
-	indexer::make(0x00048c9d, utils::index6t<0,4,8,12,9,13>);
-	indexer::make(0x00321054, utils::index6t<3,2,1,0,5,4>);
-	indexer::make(0x004567ab, utils::index6t<4,5,6,7,10,11>);
-	indexer::make(0x0026ae9d, utils::index6t<2,6,10,14,9,13>);
-	indexer::make(0x00ba9854, utils::index6t<11,10,9,8,5,4>);
-	indexer::make(0x00d95162, utils::index6t<13,9,5,1,6,2>);
-	indexer::make(0x00ea6251, utils::index6t<14,10,6,2,5,1>);
-	indexer::make(0x0089ab67, utils::index6t<8,9,10,11,6,7>);
-	indexer::make(0x00159dae, utils::index6t<1,5,9,13,10,14>);
-	indexer::make(0x00765498, utils::index6t<7,6,5,4,9,8>);
-	indexer::make(0x00012456, utils::index6t<0,1,2,4,5,6>);
-	indexer::make(0x0037b26a, utils::index6t<3,7,11,2,6,10>);
-	indexer::make(0x00fedba9, utils::index6t<15,14,13,11,10,9>);
-	indexer::make(0x00c84d95, utils::index6t<12,8,4,13,9,5>);
-	indexer::make(0x00fb7ea6, utils::index6t<15,11,7,14,10,6>);
-	indexer::make(0x00cde89a, utils::index6t<12,13,14,8,9,10>);
-	indexer::make(0x00048159, utils::index6t<0,4,8,1,5,9>);
-	indexer::make(0x00321765, utils::index6t<3,2,1,7,6,5>);
-	indexer::make(0x0045689a, utils::index6t<4,5,6,8,9,10>);
-	indexer::make(0x0026a159, utils::index6t<2,6,10,1,5,9>);
-	indexer::make(0x00ba9765, utils::index6t<11,10,9,7,6,5>);
-	indexer::make(0x00d95ea6, utils::index6t<13,9,5,14,10,6>);
-	indexer::make(0x00ea6d95, utils::index6t<14,10,6,13,9,5>);
-	indexer::make(0x0089a456, utils::index6t<8,9,10,4,5,6>);
-	indexer::make(0x0015926a, utils::index6t<1,5,9,2,6,10>);
-	indexer::make(0x00765ba9, utils::index6t<7,6,5,11,10,9>);
-	indexer::make(0x00000123, utils::index4t<0,1,2,3>);
-	indexer::make(0x00004567, utils::index4t<4,5,6,7>);
-	indexer::make(0x000089ab, utils::index4t<8,9,10,11>);
-	indexer::make(0x0000cdef, utils::index4t<12,13,14,15>);
-	indexer::make(0x000037bf, utils::index4t<3,7,11,15>);
-	indexer::make(0x000026ae, utils::index4t<2,6,10,14>);
-	indexer::make(0x0000159d, utils::index4t<1,5,9,13>);
-	indexer::make(0x0000048c, utils::index4t<0,4,8,12>);
-	indexer::make(0x0000fedc, utils::index4t<15,14,13,12>);
-	indexer::make(0x0000ba98, utils::index4t<11,10,9,8>);
-	indexer::make(0x00007654, utils::index4t<7,6,5,4>);
-	indexer::make(0x00003210, utils::index4t<3,2,1,0>);
-	indexer::make(0x0000c840, utils::index4t<12,8,4,0>);
-	indexer::make(0x0000d951, utils::index4t<13,9,5,1>);
-	indexer::make(0x0000ea62, utils::index4t<14,10,6,2>);
-	indexer::make(0x0000fb73, utils::index4t<15,11,7,3>);
-	indexer::make(0x00000145, utils::index4t<0,1,4,5>);
-	indexer::make(0x00001256, utils::index4t<1,2,5,6>);
-	indexer::make(0x00002367, utils::index4t<2,3,6,7>);
-	indexer::make(0x00004589, utils::index4t<4,5,8,9>);
-	indexer::make(0x0000569a, utils::index4t<5,6,9,10>);
-	indexer::make(0x000067ab, utils::index4t<6,7,10,11>);
-	indexer::make(0x000089cd, utils::index4t<8,9,12,13>);
-	indexer::make(0x00009ade, utils::index4t<9,10,13,14>);
-	indexer::make(0x0000abef, utils::index4t<10,11,14,15>);
-	indexer::make(0x00003726, utils::index4t<3,7,2,6>);
-	indexer::make(0x00007b6a, utils::index4t<7,11,6,10>);
-	indexer::make(0x0000bfae, utils::index4t<11,15,10,14>);
-	indexer::make(0x00002615, utils::index4t<2,6,1,5>);
-	indexer::make(0x00006a59, utils::index4t<6,10,5,9>);
-	indexer::make(0x0000ae9d, utils::index4t<10,14,9,13>);
-	indexer::make(0x00001504, utils::index4t<1,5,0,4>);
-	indexer::make(0x00005948, utils::index4t<5,9,4,8>);
-	indexer::make(0x00009d8c, utils::index4t<9,13,8,12>);
-	indexer::make(0x0000feba, utils::index4t<15,14,11,10>);
-	indexer::make(0x0000eda9, utils::index4t<14,13,10,9>);
-	indexer::make(0x0000dc98, utils::index4t<13,12,9,8>);
-	indexer::make(0x0000ba76, utils::index4t<11,10,7,6>);
-	indexer::make(0x0000a965, utils::index4t<10,9,6,5>);
-	indexer::make(0x00009854, utils::index4t<9,8,5,4>);
-	indexer::make(0x00007632, utils::index4t<7,6,3,2>);
-	indexer::make(0x00006521, utils::index4t<6,5,2,1>);
-	indexer::make(0x00005410, utils::index4t<5,4,1,0>);
-	indexer::make(0x0000c8d9, utils::index4t<12,8,13,9>);
-	indexer::make(0x00008495, utils::index4t<8,4,9,5>);
-	indexer::make(0x00004051, utils::index4t<4,0,5,1>);
-	indexer::make(0x0000d9ea, utils::index4t<13,9,14,10>);
-	indexer::make(0x000095a6, utils::index4t<9,5,10,6>);
-	indexer::make(0x00005162, utils::index4t<5,1,6,2>);
-	indexer::make(0x0000eafb, utils::index4t<14,10,15,11>);
-	indexer::make(0x0000a6b7, utils::index4t<10,6,11,7>);
-	indexer::make(0x00006273, utils::index4t<6,2,7,3>);
-	indexer::make(0x00003276, utils::index4t<3,2,7,6>);
-	indexer::make(0x00002165, utils::index4t<2,1,6,5>);
-	indexer::make(0x00001054, utils::index4t<1,0,5,4>);
-	indexer::make(0x000076ba, utils::index4t<7,6,11,10>);
-	indexer::make(0x000065a9, utils::index4t<6,5,10,9>);
-	indexer::make(0x00005498, utils::index4t<5,4,9,8>);
-	indexer::make(0x0000bafe, utils::index4t<11,10,15,14>);
-	indexer::make(0x0000a9ed, utils::index4t<10,9,14,13>);
-	indexer::make(0x000098dc, utils::index4t<9,8,13,12>);
-	indexer::make(0x0000fbea, utils::index4t<15,11,14,10>);
-	indexer::make(0x0000b7a6, utils::index4t<11,7,10,6>);
-	indexer::make(0x00007362, utils::index4t<7,3,6,2>);
-	indexer::make(0x0000ead9, utils::index4t<14,10,13,9>);
-	indexer::make(0x0000a695, utils::index4t<10,6,9,5>);
-	indexer::make(0x00006251, utils::index4t<6,2,5,1>);
-	indexer::make(0x0000d9c8, utils::index4t<13,9,12,8>);
-	indexer::make(0x00009584, utils::index4t<9,5,8,4>);
-	indexer::make(0x00005140, utils::index4t<5,1,4,0>);
-	indexer::make(0x0000cd89, utils::index4t<12,13,8,9>);
-	indexer::make(0x0000de9a, utils::index4t<13,14,9,10>);
-	indexer::make(0x0000efab, utils::index4t<14,15,10,11>);
-	indexer::make(0x00008945, utils::index4t<8,9,4,5>);
-	indexer::make(0x00009a56, utils::index4t<9,10,5,6>);
-	indexer::make(0x0000ab67, utils::index4t<10,11,6,7>);
-	indexer::make(0x00004501, utils::index4t<4,5,0,1>);
-	indexer::make(0x00005612, utils::index4t<5,6,1,2>);
-	indexer::make(0x00006723, utils::index4t<6,7,2,3>);
-	indexer::make(0x00000415, utils::index4t<0,4,1,5>);
-	indexer::make(0x00004859, utils::index4t<4,8,5,9>);
-	indexer::make(0x00008c9d, utils::index4t<8,12,9,13>);
-	indexer::make(0x00001526, utils::index4t<1,5,2,6>);
-	indexer::make(0x0000596a, utils::index4t<5,9,6,10>);
-	indexer::make(0x00009dae, utils::index4t<9,13,10,14>);
-	indexer::make(0x00002637, utils::index4t<2,6,3,7>);
-	indexer::make(0x00006a7b, utils::index4t<6,10,7,11>);
-	indexer::make(0x0000aebf, utils::index4t<10,14,11,15>);
-	indexer::make(0xfe000000, utils::indexnum0);
-	indexer::make(0xfe000001, utils::indexnum1);
-	indexer::make(0xfe000002, utils::indexnum2);
-	indexer::make(0xfe800002, utils::indexnum2x<false, 0, 1>);
-	indexer::make(0xfe900002, utils::indexnum2x<false, 2, 3>);
-	indexer::make(0xfec00002, utils::indexnum2x<true, 0, 1>);
-	indexer::make(0xfed00002, utils::indexnum2x<true, 2, 3>);
-	indexer::make(0xfd000000, utils::indexmono<false, false>);
-	indexer::make(0xfd000001, utils::indexmono<false, true>);
-	indexer::make(0xfd000002, utils::indexmono<true, false>);
-	indexer::make(0xfd000003, utils::indexmono<true, true>);
-	indexer::make(0xff000000, utils::indexmerge);
+bool save_weights(const std::string& path) {
+	std::ofstream out;
+	char buf[1 << 20];
+	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out.is_open()) return false;
+	weight::save(out);
+	out.flush();
+	out.close();
+	return true;
 }
+bool load_weights(const std::string& path) {
+	std::ifstream in;
+	char buf[1 << 20];
+	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	in.open(path, std::ios::in | std::ios::binary);
+	if (!in.is_open()) return false;
+	weight::load(in);
+	in.close();
+	return true;
+}
+void make_weights(const std::string& res = "") {
+	auto wmake = [](u32 sign, u64 size) {
+		if (weight::find(sign) == weight::end()) weight::make(sign, size);
+	};
 
-void make_weights(const std::string& value = "") {
+	// weight:size weight(size) weight[size]
+	std::string in(res);
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
+	if (in.find("default") != std::string::npos) {
+		in.replace(in.find("default"), 7, "");
 
-	if (value.empty()) {
 		// make default weights
-		for (auto& p : utils::patt6t) {
-			weight::make(utils::hashfx(p), std::pow(utils::base, 6));
+		std::vector<std::vector<int>> defpatt = {
+			{ 0x0, 0x1, 0x2, 0x3, 0x6, 0x7 },
+			{ 0x4, 0x5, 0x6, 0x7, 0xa, 0xb },
+			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
+			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
+		};
+		for (const auto& patt : defpatt) {
+			wmake(utils::hashpatt(patt), std::pow(u64(base), patt.size()));
 		}
-		weight::make(0xfe000001, 1 << 25);
-//		weight::make(0xfe000002, 1 << 25);
-//		weight::make(0xfd000000, 1 << 24);
-		weight::make(0xff000000, 1 << 16);
-
-	} else {
-		// 0x0a:100 0xab(10) 0x123456a[100]
-		std::string in(value);
-		while (in.find_first_of(":()[],") != std::string::npos)
-			in[in.find_first_of(":()[],")] = ' ';
-		std::stringstream wghtin(in);
-		u32 sign, size;
-		while (wghtin >> std::hex >> sign && wghtin >> std::dec >> size) {
-			weight::make(sign, size);
-		}
+		wmake(0xfe000001, 1 << 25);
+		wmake(0xff000000, 1 << 16);
 	}
-
+	std::stringstream wghtin(in);
+	std::string signs, sizes;
+	while (wghtin >> signs && wghtin >> sizes) {
+		u32 sign = 0; u64 size = 0;
+		std::stringstream(signs) >> std::hex >> sign;
+		std::stringstream(sizes) >> std::dec >> size;
+		wmake(sign, size);
+	}
 }
-void make_features(const std::string& value = "") {
 
-	if (value.empty()) {
+bool save_features(const std::string& path) {
+	std::ofstream out;
+	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out.is_open()) return false;
+	feature::save(out);
+	out.flush();
+	out.close();
+	return true;
+}
+bool load_features(const std::string& path) {
+	std::ifstream in;
+	in.open(path, std::ios::in | std::ios::binary);
+	if (!in.is_open()) return false;
+	feature::load(in);
+	in.close();
+	return true;
+}
+void make_features(const std::string& res = "") {
+	auto fmake = [](u32 wght, u32 idxr) {
+		if (feature::find(wght, idxr) == feature::end()) feature::make(wght, idxr);
+	};
+
+	// weight:indexer weight(indexer) weight[indexer]
+	std::string in(res);
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
+	if (in.find("default") != std::string::npos) {
+		in.replace(in.find("default"), 7, "");
+
 		// make default features
-		for (auto& p : utils::patt6t) {
-			const u32 wsign = utils::hashfx(p);
-			for (auto fx : utils::mapfx) {
-				feature::make(wsign, utils::hashfx(p));
-				std::for_each(p.begin(), p.end(), fx);
+		std::vector<std::vector<int>> defpatt = {
+			{ 0x0, 0x1, 0x2, 0x3, 0x6, 0x7 },
+			{ 0x4, 0x5, 0x6, 0x7, 0xa, 0xb },
+			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
+			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
+		};
+		for (const auto& patt : defpatt) {
+			auto xpatt = patt;
+			for (u32 iso = 0; iso < 8; iso++) {
+				std::transform(patt.begin(), patt.end(), xpatt.begin(), [=](int i) -> int {
+					board x(0xfedcba9876543210);
+					x.isomorphic(-iso);
+					return x[i];
+				});
+				fmake(utils::hashpatt(patt), utils::hashpatt(xpatt));
 			}
 		}
-		feature::make(0xfe000001, 0xfe000001);
-//		feature::make(0xfe000002, 0xfe000002);
-//		feature::make(0xfe000002, 0xfe800002);
-//		feature::make(0xfe000002, 0xfe900002);
-//		feature::make(0xfe000002, 0xfec00002);
-//		feature::make(0xfe000002, 0xfed00002);
-//		feature::make(0xfd000000, 0xfd000000);
-//		feature::make(0xfd000000, 0xfd000001);
-//		feature::make(0xfd000000, 0xfd000002);
-//		feature::make(0xfd000000, 0xfd000003);
-		feature::make(0xff000000, 0xff000000);
-	} else {
-		// weight:indexer weight(indexer) weight[indexer]
-		std::string in(value);
-		while (in.find_first_of(":()[],") != std::string::npos)
-			in[in.find_first_of(":()[],")] = ' ';
-		std::stringstream featin(in);
-		u32 wght, idxr;
-		while (featin >> std::hex >> wght && featin >> std::hex >> idxr) {
-			feature::make(wght, idxr);
+		fmake(0xfe000001, 0xfe000001);
+		fmake(0xff000000, 0xff000000);
+	}
+	std::stringstream featin(in);
+	std::string wghts, idxrs;
+	while (featin >> wghts && featin >> idxrs) {
+		u32 wght = 0, idxr = 0;
+		std::stringstream(wghts) >> std::hex >> wght;
+		std::stringstream(idxrs) >> std::hex >> idxr;
+		if (weight::find(wght) == weight::end()) {
+			std::cerr << "warning: undefined weight " << wghts;
+			std::cerr << " [assume " << (wghts.size()) << "-tile pattern]" << std::endl;
+			weight::make(wght, std::pow(u64(base), wghts.size()));
 		}
+		if (indexer::find(idxr) == indexer::end()) {
+			std::cerr << "warning: undefined indexer " << idxrs;
+			std::cerr << " [assume " << (idxrs.size()) << "-tile pattern]" << std::endl;
+			auto patt = new std::vector<int>(hashpatt(idxrs)); // will NOT be deleted
+			indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+		}
+		fmake(wght, idxr);
 	}
 }
 
@@ -854,14 +1146,13 @@ numeric search_expt(const board& after, const i32& depth) {
 	const auto spaces = after.spaces();
 	numeric expt = 0;
 	board before = after;
-	before.mark();
 	for (u32 i = 0; i < spaces.size; i++) {
 		const u32 pos = spaces[i];
 		before.set(pos, 1);
 		expt += 9 * search_max(before, depth - 1);
 		before.set(pos, 2);
 		expt += 1 * search_max(before, depth - 1);
-		before.reset();
+		before = after;
 	}
 	ca.depth = cb.depth = depth;
 	ca.value = cb.value = expt / (10 * spaces.size);
@@ -871,42 +1162,42 @@ numeric search_expt(const board& after, const i32& depth) {
 numeric search_max(const board& before, const i32& depth) {
 	numeric expt = -std::numeric_limits<numeric>::max();
 	board after = before;
-	after.mark();
 	register i32 reward;
 	if ((reward = after.up()) != -1) {
 		expt = std::max(expt, reward + search_expt(after, depth - 1));
-		after.reset();
+		after = before;
 	}
 	if ((reward = after.right()) != -1) {
 		expt = std::max(expt, reward + search_expt(after, depth - 1));
-		after.reset();
+		after = before;
 	}
 	if ((reward = after.down()) != -1) {
 		expt = std::max(expt, reward + search_expt(after, depth - 1));
-		after.reset();
+		after = before;
 	}
 	if ((reward = after.left()) != -1) {
 		expt = std::max(expt, reward + search_expt(after, depth - 1));
-		after.reset();
+		after = before;
 	}
 	return expt;
 }
 
 void list_mapping() {
-	for (auto it = weight::begin(); it != weight::end(); it++) {
-		u32 usageK = ((sizeof(numeric) * it->length()) >> 10);
+	for (weight w : weight::list()) {
+		u32 usageK = (sizeof(numeric) * w.length()) >> 10;
 		u32 usageM = usageK >> 10;
-		printf("weight(%08x)[%llu] = %d%c", it->signature(), it->length(),
+		char buf[64];
+		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c", w.signature(), w.length(),
 				usageM ? usageM : usageK, usageM ? 'M' : 'K');
-		std::vector<u32> feats;
-		for (auto ft = feature::begin(); ft != feature::end(); ft++) {
-			if (weight(*ft).signature() == it->signature())
-				feats.push_back(feature(*ft).signature());
+		std::cout << buf;
+		std::string feats;
+		for (feature f : feature::list()) {
+			if (weight(f) == w) {
+				snprintf(buf, sizeof(buf), " %08x", indexer(f).signature());
+				feats += buf;
+			}
 		}
-		if (feats.size()) {
-			std::cout << " :";
-			for (auto f : feats) printf(" %08x", f);
-		}
+		if (feats.size()) std::cout << " :" << feats;
 		std::cout << std::endl;
 	}
 }
@@ -935,10 +1226,17 @@ struct state {
 		}
 		return esti;
 	}
-	inline numeric update(const numeric& accu, const numeric& alpha = moporgic::alpha,
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	inline numeric update(const numeric& accu,
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
+			const numeric& alpha = moporgic::alpha) {
 		esti = score + utils::update(move, alpha * (accu - (esti - score)), begin, end);
 		return esti;
+	}
+	inline numeric optimize(const numeric& accu,
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
+			const numeric& alpha = moporgic::alpha) {
+		esti = score + utils::estimate(move, begin, end);
+		return update(accu, begin, end, alpha);
 	}
 
 	inline void operator <<(const board& b) {
@@ -946,7 +1244,6 @@ struct state {
 		estimate();
 	}
 	inline numeric operator +=(const numeric& v) {
-		estimate();
 		return update(v);
 	}
 	inline numeric operator +=(const state& s) {
@@ -1041,23 +1338,23 @@ struct search {
 		static int depthres[16] = { 9, 9, 5, 5, 3, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1 };
 		const int depth = depthres[before.spaces().size];
 		clear();
-		board after = before; after.mark();
+		board after = before;
 		register i32 reward;
 		if ((reward = after.up()) != -1) {
 			update(reward + utils::search_expt(after, depth - 1), after, reward);
-			after.reset();
+			after = before;
 		}
 		if ((reward = after.right()) != -1) {
 			update(reward + utils::search_expt(after, depth - 1), after, reward);
-			after.reset();
+			after = before;
 		}
 		if ((reward = after.down()) != -1) {
 			update(reward + utils::search_expt(after, depth - 1), after, reward);
-			after.reset();
+			after = before;
 		}
 		if ((reward = after.left()) != -1) {
 			update(reward + utils::search_expt(after, depth - 1), after, reward);
-			after.reset();
+			after = before;
 		}
 		return (*this);
 	}
@@ -1130,12 +1427,8 @@ struct statistic {
 				total.win * 100.0 / loop);
 		std::cout << buf << std::endl;
 
-		local.score = 0;
-		local.win = 0;
+		local = {};
 		local.time = currtimept;
-		local.opers = 0;
-		local.hash = 0;
-		local.max = 0;
 	}
 
 	inline void updatec(const u32& score, const u32& hash, const u32& opers) {
@@ -1189,7 +1482,8 @@ int main(int argc, const char* argv[]) {
 			break;
 		case to_hash("-a/"):
 		case to_hash("--alpha-divide"):
-			alpha /= std::stod(valueof(i, nullptr));
+			opts["alpha-divide"] = valueof(i, nullptr);
+			alpha /= std::stod(opts["alpha-divide"]);
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
@@ -1242,7 +1536,9 @@ int main(int argc, const char* argv[]) {
 			for (std::string f; (f = valueof(i, "")).size(); )
 				fopts["value"] += (f += ',');
 			break;
-		case to_hash("--modify"):
+		case to_hash("-u"):
+		case to_hash("--util"):
+		case to_hash("--utils"):
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
@@ -1259,6 +1555,10 @@ int main(int argc, const char* argv[]) {
 		case to_hash("-TT"):
 		case to_hash("--test-type"):
 			opts["test-type"] = valueof(i, "");
+			break;
+		case to_hash("-c"):
+		case to_hash("--comment"):
+			opts["comment"] = valueof(i, "");
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1280,17 +1580,21 @@ int main(int argc, const char* argv[]) {
 
 	utils::make_indexers();
 
-	if (weight::load(wopts["input"]) == false) {
+	if (utils::load_weights(wopts["input"]) == false) {
 		if (wopts["input"].size())
 			std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
-		utils::make_weights(wopts["value"]);
+		if (wopts["value"].empty())
+			wopts["value"] = "default";
 	}
+	utils::make_weights(wopts["value"]);
 
-	if (feature::load(fopts["input"]) == false) {
+	if (utils::load_features(fopts["input"]) == false) {
 		if (fopts["input"].size())
 			std::cerr << "warning: " << fopts["input"] << " not loaded!" << std::endl;
-		utils::make_features(fopts["value"]);
+		if (fopts["value"].empty())
+			fopts["value"] = "default";
 	}
+	utils::make_features(fopts["value"]);
 
 	utils::list_mapping();
 
@@ -1305,12 +1609,8 @@ int main(int argc, const char* argv[]) {
 	if (train) std::cout << std::endl << "start training..." << std::endl;
 	switch (to_hash(opts["train-type"])) {
 
-	case to_hash("backward/online"):
-		std::cerr << "warning: use backward/offline instead" << std::endl;
-		// no break
-	default:
-	case to_hash("backward/offline"):
 	case to_hash("backward"):
+	case to_hash("backward-reesti"):
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
@@ -1324,15 +1624,16 @@ int main(int argc, const char* argv[]) {
 			}
 
 			for (numeric v = 0; path.size(); path.pop_back()) {
-				v = (path.back() += v);
+				v = path.back().optimize(v);
 			}
 
 			stats.update(score, b.hash(), opers);
 		}
 		break;
 
+	default:
+	case to_hash("online"):
 	case to_hash("forward"):
-	case to_hash("forward/online"):
 		for (stats.init(train); stats; stats++) {
 
 			register u32 score = 0;
@@ -1358,162 +1659,10 @@ int main(int argc, const char* argv[]) {
 			stats.update(score, b.hash(), opers);
 		}
 		break;
-
-	case to_hash("forward/offline"):
-		for (stats.init(train); stats; stats++) {
-
-			register u32 score = 0;
-			register u32 opers = 0;
-
-			for (b.init(); best << b; b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> path;
-				best >> b;
-			}
-
-			u32 n = path.size();
-			path.push_back(state());
-			for (u32 i = 0; i < n; i++) {
-				if (path[i + 1].move != 0) path[i + 1].estimate();
-				path[i] += path[i + 1];
-			}
-			path.clear();
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
-
-	case to_hash("random/mem"):
-	case to_hash("random/mem/offline"):
-	{
-		if (opts["history-size"].empty()) opts["history-size"] = "200000";
-		if (opts["training-batch"].empty()) opts["training-batch"] = "1";
-		u32 memsize = std::stol(opts["history-size"]);
-		u32 batch = std::stol(opts["training-batch"]);
-
-		auto *history = new std::pair<state, state>[memsize]();
-		u32 size = 0;
-
-		for (stats.init(train); stats; stats++) {
-
-			register u32 score = 0;
-			register u32 opers = 0;
-
-			b.init();
-			best << b;
-			score += best.score();
-			opers += 1;
-			best >> last;
-			best >> b;
-			for (b.next(); best << b; b.next()) {
-				history[(size++) % memsize] = std::make_pair(last, *(best.best));
-				score += best.score();
-				opers += 1;
-				best >> last;
-				best >> b;
-			}
-			history[(size++) % memsize] = std::make_pair(last, state());
-
-			u32 range = std::min(size, memsize);
-			for (u32 s = batch * opers; s; --s) {
-				auto& pair = history[randx() % range];
-				if (pair.second.move != 0) pair.second.estimate();
-				pair.first += pair.second;
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
-
-		delete[] history;
-
-		break;
-	}
-	case to_hash("random/mem/online"):
-	{
-		if (opts["history-size"].empty()) opts["history-size"] = "200000";
-		if (opts["training-batch"].empty()) opts["training-batch"] = "1";
-		u32 memsize = std::stol(opts["history-size"]);
-		u32 batch = std::stol(opts["training-batch"]);
-
-		auto *history = new std::pair<state, state>[memsize]();
-		u32 size = 0;
-
-		for (stats.init(train); stats; stats++) {
-
-			register u32 score = 0;
-			register u32 opers = 0;
-
-			b.init();
-			best << b;
-			score += best.score();
-			opers += 1;
-			best >> last;
-			best >> b;
-			for (b.next(); best << b; b.next()) {
-				history[(size++) % memsize] = std::make_pair(last, *(best.best));
-				u32 range = std::min(size, memsize);
-				for (u32 s = batch; s; --s) {
-					auto& pair = history[randx() % range];
-					pair.first += pair.second;
-				}
-				score += best.score();
-				opers += 1;
-				best >> last;
-				best >> b;
-			}
-			history[(size++) % memsize] = std::make_pair(last, state());
-			u32 range = std::min(size, memsize);
-			for (u32 s = batch; s; --s) {
-				auto& pair = history[randx() % range];
-				pair.first += pair.second;
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
-
-		delete[] history;
-
-		break;
 	}
 
-	case to_hash("random/online"):
-		std::cerr << "warning: use random/offline instead" << std::endl;
-		// no break
-	case to_hash("random/offline"):
-	case to_hash("random"):
-		std::vector<u32> seq;
-		seq.reserve(20000);
-
-		for (stats.init(train); stats; stats++) {
-
-			register u32 score = 0;
-			register u32 opers = 0;
-
-			for (b.init(); best << b; b.next()) {
-				seq.push_back(opers);
-				score += best.score();
-				opers += 1;
-				best >> path;
-				best >> b;
-			}
-
-			path.push_back(state());
-			std::random_shuffle(seq.begin(), seq.end());
-			for (u32 i : seq) {
-				if (path[i + 1].move != 0) path[i + 1].estimate();
-				path[i] += path[i + 1];
-			}
-			path.clear();
-			seq.clear();
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
-	}
-
-	weight::save(wopts["output"]);
-	feature::save(fopts["output"]);
+	utils::save_weights(wopts["output"]);
+	utils::save_features(fopts["output"]);
 
 
 
