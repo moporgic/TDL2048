@@ -529,6 +529,25 @@ u64 indexnum2x(const board& b) { // 25-bit
 	return index;
 }
 
+u64 indexnum3(const board& b) { // 28-bit
+	u16 num[16];
+	b.count(num, 0, 16);
+	register u64 index = 0;
+	index += ((num[0] + num[1] + num[2]) & 0x0f) << 0; // 0 & 2 & 4, 4-bit
+	index += ((num[3] + num[4]) & 0x07) << 4; // 8 & 16, 3-bit
+	index += ((num[5] + num[6]) & 0x07) << 7; // 32 & 64, 3-bit
+	index += (num[7] & 0x03) << 10; // 128, 2-bit
+	index += (num[8] & 0x03) << 12; // 256, 2-bit
+	index += (num[9] & 0x03) << 14; // 512, 2-bit
+	index += (num[10] & 0x03) << 16; // 1k ~ 32k, 2-bit ea.
+	index += (num[11] & 0x03) << 18;
+	index += (num[12] & 0x03) << 20;
+	index += (num[13] & 0x03) << 22;
+	index += (num[14] & 0x03) << 24;
+	index += (num[15] & 0x03) << 26;
+	return index;
+}
+
 template<int isomorphic>
 u64 indexmono(const board& b) { // 24-bit
 	board k = b;
@@ -832,6 +851,7 @@ void make_indexers(const std::string& res = "") {
 	imake(0xfe000092, utils::indexnum2x<0, 2, 3>);
 	imake(0xfe0000c2, utils::indexnum2x<1, 0, 1>);
 	imake(0xfe0000d2, utils::indexnum2x<1, 2, 3>);
+	imake(0xfe000003, utils::indexnum3);
 	imake(0xfd000000, utils::indexmono<0>);
 	imake(0xfd000010, utils::indexmono<1>);
 	imake(0xfd000020, utils::indexmono<2>);
