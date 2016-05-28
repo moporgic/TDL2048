@@ -1521,7 +1521,7 @@ int main(int argc, const char* argv[]) {
 
 	int wpid;
 	int status;
-	while ((wpid = wait(&status)) > 0) sleep(1);
+	while ((wpid = wait(&status)) > 0);
 
 	utils::save_weights(wopts["output"]);
 	utils::save_features(fopts["output"]);
