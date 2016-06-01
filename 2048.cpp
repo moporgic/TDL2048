@@ -1137,6 +1137,15 @@ numeric search_expt(const board& after, const i32& depth,
 numeric search_max(const board& before, const i32& depth,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end());
 
+inline numeric search(const board& after, const i32& depth,
+		const feature::iter begin, const feature::iter end) {
+	auto& t = tp[after];
+	if (t.depth >= depth) return t.esti;
+	t.esti = utils::search_expt(after, depth, begin, end);
+	t.depth = depth;
+	return t.esti;
+}
+
 numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin, const feature::iter end) {
 	if (depth <= 0) return utils::estimate(after);
@@ -1237,11 +1246,7 @@ struct state {
 	inline numeric search(const i32& depth,
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		if (score >= 0) {
-			auto& t = tp[move];
-			if (t.depth >= depth) return t.esti + score;
-			esti = score + utils::search_expt(move, depth, begin, end);
-			t.depth = depth;
-			t.esti = esti - score;
+			esti = score + utils::search(move, depth, begin, end);
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
