@@ -401,7 +401,7 @@ private:
 	size_t size;
 	size_t limit;
 };
-transposition tp(1 << 25, 32);
+transposition tp(1 << 26, 8);
 
 namespace utils {
 
@@ -1137,30 +1137,25 @@ numeric search_expt(const board& after, const i32& depth,
 numeric search_max(const board& before, const i32& depth,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end());
 
-inline numeric search(const board& after, const i32& depth,
-		const feature::iter begin, const feature::iter end) {
-	auto& t = tp[after];
-	if (t.depth >= depth) return t.esti;
-	t.esti = utils::search_expt(after, depth, begin, end);
-	t.depth = depth;
-	return t.esti;
-}
-
 numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin, const feature::iter end) {
 	if (depth <= 0) return utils::estimate(after, begin, end);
+	auto& t = tp[after];
+	if (t.depth >= depth) return t.esti;
 	const auto spaces = after.spaces();
 	numeric expt = 0;
 	board before = after;
 	for (u32 i = 0; i < spaces.size; i++) {
 		const u32 pos = spaces[i];
 		before.set(pos, 1);
-		expt += 9 * search_max(before, depth - 1);
+		expt += 9 * search_max(before, depth - 1, begin, end);
 		before.set(pos, 2);
-		expt += 1 * search_max(before, depth - 1);
+		expt += 1 * search_max(before, depth - 1, begin, end);
 		before = after;
 	}
-	return expt / (10 * spaces.size);
+	t.esti = expt / (10 * spaces.size);
+	t.depth = depth;
+	return t.esti;
 }
 
 numeric search_max(const board& before, const i32& depth,
@@ -1169,19 +1164,19 @@ numeric search_max(const board& before, const i32& depth,
 	board after = before;
 	register i32 reward;
 	if ((reward = after.up()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, begin, end));
 		after = before;
 	}
 	if ((reward = after.right()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, begin, end));
 		after = before;
 	}
 	if ((reward = after.down()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, begin, end));
 		after = before;
 	}
 	if ((reward = after.left()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, begin, end));
 		after = before;
 	}
 	return expt;
@@ -1246,7 +1241,7 @@ struct state {
 	inline numeric search(const i32& depth,
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		if (score >= 0) {
-			esti = score + utils::search(move, depth, begin, end);
+			esti = score + utils::search_expt(move, depth, begin, end);
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
@@ -1335,7 +1330,7 @@ struct search : select {
 		return operator ()(b, feature::begin(), feature::end());
 	}
 	inline select& operator ()(const board& b, const feature::iter begin, const feature::iter end) {
-		static u32 depthpolicy[16] = { 5, 5, 5, 5, 5, 5, 5, 5, 3, 3, 3, 3, 1, 1, 1, 1 };
+		static u32 depthpolicy[16] = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 1, 1, 1, 1 };
 		u32 depth = depthpolicy[b.spaces().size] - 1;
 		move[0].assign(b);
 		move[1].assign(b);
@@ -1660,7 +1655,7 @@ int main(int argc, const char* argv[]) {
 	search xbest;
 
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
-	for (stats.init(test, 1); stats; stats++) {
+	for (stats.init(test, 10); stats; stats++) {
 
 		register u32 score = 0;
 		register u32 opers = 0;
@@ -1671,8 +1666,9 @@ int main(int argc, const char* argv[]) {
 			xbest >> b;
 		}
 
-		stats.update(score, b.hash(), opers);
+		stats.updatec(score, b.hash(), opers);
 	}
+	if (test) stats.summary();
 
 	return 0;
 }
