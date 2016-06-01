@@ -327,11 +327,10 @@ private:
 
 class zhasher {
 public:
-	zhasher(const u32& sign, const u64& mask,
+	zhasher(const u32& sign,
 			const u64& seeda = 0x0000000000000000ULL,
-			const u64& seedb = 0xffffffffffffffffULL)
-	: sign(sign), mask(mask), seeda(seeda), seedb(seedb) {
-		for (auto& row : z) {
+			const u64& seedb = 0xffffffffffffffffULL) : sign(sign), seeda(seeda), seedb(seedb) {
+		for (auto& row : map) {
 			for (auto& entry : row)
 				entry = rand64();
 		}
@@ -340,10 +339,10 @@ public:
 	~zhasher() = default;
 	inline u64 operator ()(const board& b, const bool& after = true) const {
 		register u64 hash = after ? seeda : seedb;
-		hash ^= z[0][b.fetch(0)];
-		hash ^= z[1][b.fetch(1)];
-		hash ^= z[2][b.fetch(2)];
-		hash ^= z[3][b.fetch(3)];
+		hash ^= map[0][b.fetch(0)];
+		hash ^= map[1][b.fetch(1)];
+		hash ^= map[2][b.fetch(2)];
+		hash ^= map[3][b.fetch(3)];
 		return hash;
 	}
 //	inline indexer::mapper build() const {
@@ -354,8 +353,7 @@ public:
 //	}
 private:
 	u32 sign;
-	std::array<std::array<u64, 1 << 20>, 4> z;
-	u64 mask;
+	std::array<std::array<u64, 1 << 20>, 4> map;
 	u64 seeda;
 	u64 seedb;
 };
@@ -370,7 +368,7 @@ public:
 	private:
 		entry(numeric& value, i8& depth) : value(value), depth(depth) {}
 	};
-	transposition(const u64& size) : zhasher(0xffff0001, -1), value(new numeric[size]()), depth(new i8[size]()) {}
+	transposition(const u64& size) : zhash(0xffff0001), value(new numeric[size]()), depth(new i8[size]()) {}
 	inline entry operator[] (const board& b) {
 		struct om {
 			int weight;
@@ -378,21 +376,21 @@ public:
 		};
 
 		board isomo = b;
-		u64 hash = zhasher(isomo);
+		u64 hash = zhash(isomo);
 		isomo.rotate();
-		hash = std::min(hash, zhasher(isomo));
+		hash = std::min(hash, zhash(isomo));
 		isomo.rotate();
-		hash = std::min(hash, zhasher(isomo));
+		hash = std::min(hash, zhash(isomo));
 		isomo.rotate();
-		hash = std::min(hash, zhasher(isomo));
+		hash = std::min(hash, zhash(isomo));
 		isomo.mirror();
-		hash = std::min(hash, zhasher(isomo));
+		hash = std::min(hash, zhash(isomo));
 		isomo.rotate();
-		hash = std::min(hash, zhasher(isomo));
+		hash = std::min(hash, zhash(isomo));
 		isomo.rotate();
-		hash = std::min(hash, zhasher(isomo));
+		hash = std::min(hash, zhash(isomo));
 		isomo.rotate();
-		hash = std::min(hash, zhasher(isomo));
+		hash = std::min(hash, zhash(isomo));
 
 		hash &= 0x01ffffff;
 
@@ -406,7 +404,7 @@ public:
 		return w;
 	}
 private:
-	zhasher zhasher;
+	zhasher zhash;
 	numeric* value;
 	i8* depth;
 };
@@ -1675,16 +1673,18 @@ int main(int argc, const char* argv[]) {
 
 
 
+	search xbest;
+
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
 	for (stats.init(test, 1); stats; stats++) {
 
 		register u32 score = 0;
 		register u32 opers = 0;
 
-		for (b.init(); best << b; b.next()) {
-			score += best.score();
+		for (b.init(); xbest << b; b.next()) {
+			score += xbest.score();
 			opers += 1;
-			best >> b;
+			xbest >> b;
 		}
 
 		stats.update(score, b.hash(), opers);
