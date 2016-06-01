@@ -360,56 +360,48 @@ private:
 
 class transposition {
 public:
+	typedef float numeric;
 	class entry {
 	friend class transposition;
 	public:
-		numeric& value;
-		i8& depth;
-	private:
-		entry(numeric& value, i8& depth) : value(value), depth(depth) {}
+		u64 raw;
+		i32 depth;
+		f32 value;
+		inline operator bool() const { return depth > 0; }
+		inline entry(const entry& e) = default;
+		inline entry(const u64& raw = 0) : raw(raw), depth(0), value(0) {}
 	};
-	transposition(const u64& size) : zhash(0xffff0001), value(new numeric[size]()), depth(new i8[size]()) {}
-	inline entry operator[] (const board& b) {
-		struct om {
-			int weight;
-			u64 hash;
-		};
+	transposition(const u64& size, const u64& limit)
+		: zhash(0xffff0001), cache(new std::vector<entry>[size]()), size(size), limit(limit) {}
 
-		board isomo = b;
-		u64 hash = zhash(isomo);
-		isomo.rotate();
-		hash = std::min(hash, zhash(isomo));
-		isomo.rotate();
-		hash = std::min(hash, zhash(isomo));
-		isomo.rotate();
-		hash = std::min(hash, zhash(isomo));
-		isomo.mirror();
-		hash = std::min(hash, zhash(isomo));
-		isomo.rotate();
-		hash = std::min(hash, zhash(isomo));
-		isomo.rotate();
-		hash = std::min(hash, zhash(isomo));
-		isomo.rotate();
-		hash = std::min(hash, zhash(isomo));
+	inline entry& operator[] (const board& b) {
 
-		hash &= 0x01ffffff;
-
-		return entry(value[hash], depth[hash]);
-	}
-	inline int weight(const board& b) {
-		int w = 0;
-		for (u32 i = 0; i < 16; i++) {
-			w += b.at(i) * (i + 1);
+		board min = b;
+		u64 hash = zhash(min);
+		for (u32 is = 1; is < 8; is++) {
+			board isomo = b;
+			isomo.isomorphic(is);
+			auto h = zhash(isomo);
+			if (h < hash) {
+				hash = h;
+				min = isomo;
+			}
 		}
-		return w;
+
+		std::vector<entry>& line = cache[hash % size];
+		for (auto it = line.begin(); it != line.end(); it++)
+			if (it->raw == min.raw) return *it;
+		if (line.size() == limit) line.erase(line.begin());
+		line.push_back(entry(min.raw));
+		return line.back();
 	}
 private:
 	zhasher zhash;
-	numeric* value;
-	i8* depth;
+	std::vector<entry>* cache;
+	size_t size;
+	size_t limit;
 };
-transposition tpa(1 << 25);
-transposition tpb(1 << 25);
+transposition tp(1 << 25, 32);
 
 namespace utils {
 
@@ -1148,10 +1140,9 @@ numeric search_max(const board& before, const i32& depth,
 numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin, const feature::iter end) {
 	if (depth <= 0) return utils::estimate(after);
-	auto ca = tpa[after], cb = tpb[after];
-	if (ca.depth >= depth && cb.depth >= depth) {
-		if (ca.value == cb.value) return ca.value;
-	}
+	auto& t = tp[after];
+	if (t.depth >= depth) return t.value;
+
 	const auto spaces = after.spaces();
 	numeric expt = 0;
 	board before = after;
@@ -1163,8 +1154,8 @@ numeric search_expt(const board& after, const i32& depth,
 		expt += 1 * search_max(before, depth - 1);
 		before = after;
 	}
-	ca.depth = cb.depth = depth;
-	ca.value = cb.value = expt / (10 * spaces.size);
+	t.depth = depth;
+	t.value = expt / (10 * spaces.size);
 	return expt / (10 * spaces.size);
 }
 
@@ -1354,7 +1345,7 @@ struct search {
 	}
 	search& operator >>(board& after) { after = this->after; return *this; }
 	search& operator <<(const board& before) {
-		static int depthres[16] = { 9, 9, 5, 5, 3, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1 };
+		static int depthres[16] = { 9, 9, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
 		const int depth = depthres[before.spaces().size];
 		clear();
 		board after = before;
