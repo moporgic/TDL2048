@@ -1148,7 +1148,7 @@ inline numeric search(const board& after, const i32& depth,
 
 numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin, const feature::iter end) {
-	if (depth <= 0) return utils::estimate(after);
+	if (depth <= 0) return utils::estimate(after, begin, end);
 	const auto spaces = after.spaces();
 	numeric expt = 0;
 	board before = after;
