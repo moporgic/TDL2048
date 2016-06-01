@@ -327,18 +327,24 @@ private:
 
 class zhasher {
 public:
-	zhasher(const u32& sign, const u64& mask) : sign(sign), mask(mask) {
-		for (auto& pos : z)
-			for (auto& hv : pos)
-				hv = rand64();
+	zhasher(const u32& sign, const u64& mask,
+			const u64& seeda = 0x0000000000000000ULL,
+			const u64& seedb = 0xffffffffffffffffULL)
+	: sign(sign), mask(mask), seeda(seeda), seedb(seedb) {
+		for (auto& row : z) {
+			for (auto& entry : row)
+				entry = rand64();
+		}
 	}
 	zhasher(const zhasher& z) = default;
 	~zhasher() = default;
-	inline u64 operator ()(const board& b) const { // TODO: after of before
-		register u64 v = 0;
-		for (u32 i = 0; i < 16; i++)
-			v ^= z[i][b.at(i)];
-		return v & mask;
+	inline u64 operator ()(const board& b, const bool& after = true) const {
+		register u64 hash = after ? seeda : seedb;
+		hash ^= z[0][b.fetch(0)];
+		hash ^= z[1][b.fetch(1)];
+		hash ^= z[2][b.fetch(2)];
+		hash ^= z[3][b.fetch(3)];
+		return hash;
 	}
 //	inline indexer::mapper build() const {
 //		if (indexer::find(sign) != indexer::end())
@@ -348,8 +354,10 @@ public:
 //	}
 private:
 	u32 sign;
-	std::array<std::array<u64, 32>, 16> z;
+	std::array<std::array<u64, 1 << 20>, 4> z;
 	u64 mask;
+	u64 seeda;
+	u64 seedb;
 };
 
 class transposition {
