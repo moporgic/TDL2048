@@ -1238,10 +1238,10 @@ struct state {
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		if (score >= 0) {
 			auto& t = tp[move];
-			if (t.depth >= depth) return t.esti;
+			if (t.depth >= depth) return t.esti + score;
 			esti = score + utils::search_expt(move, depth, begin, end);
 			t.depth = depth;
-			t.esti = esti;
+			t.esti = esti - score;
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
@@ -1330,7 +1330,7 @@ struct search : select {
 		return operator ()(b, feature::begin(), feature::end());
 	}
 	inline select& operator ()(const board& b, const feature::iter begin, const feature::iter end) {
-		static u32 depthpolicy[16] = { 9, 9, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 1, 1, 1, 1 };
+		static u32 depthpolicy[16] = { 5, 5, 5, 5, 5, 5, 5, 5, 3, 3, 3, 3, 1, 1, 1, 1 };
 		u32 depth = depthpolicy[b.spaces().size] - 1;
 		move[0].assign(b);
 		move[1].assign(b);
