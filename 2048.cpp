@@ -366,10 +366,10 @@ public:
 	public:
 		u64 raw;
 		i32 depth;
-		f32 value;
+		f32 esti;
 		inline operator bool() const { return depth > 0; }
 		inline entry(const entry& e) = default;
-		inline entry(const u64& raw = 0) : raw(raw), depth(0), value(0) {}
+		inline entry(const u64& raw = 0) : raw(raw), depth(0), esti(0) {}
 	};
 	transposition(const u64& size, const u64& limit)
 		: zhash(0xffff0001), cache(new std::vector<entry>[size]()), size(size), limit(limit) {}
@@ -1140,9 +1140,6 @@ numeric search_max(const board& before, const i32& depth,
 numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin, const feature::iter end) {
 	if (depth <= 0) return utils::estimate(after);
-	auto& t = tp[after];
-	if (t.depth >= depth) return t.value;
-
 	const auto spaces = after.spaces();
 	numeric expt = 0;
 	board before = after;
@@ -1154,8 +1151,6 @@ numeric search_expt(const board& after, const i32& depth,
 		expt += 1 * search_max(before, depth - 1);
 		before = after;
 	}
-	t.depth = depth;
-	t.value = expt / (10 * spaces.size);
 	return expt / (10 * spaces.size);
 }
 
@@ -1242,7 +1237,11 @@ struct state {
 	inline numeric search(const i32& depth,
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		if (score >= 0) {
+			auto& t = tp[move];
+			if (t.depth >= depth) return t.esti;
 			esti = score + utils::search_expt(move, depth, begin, end);
+			t.depth = depth;
+			t.esti = esti;
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
@@ -1325,49 +1324,25 @@ struct select {
 	inline i32 score() const { return best->score; }
 	inline numeric esti() const { return best->esti; }
 };
-struct search {
-	numeric expt;
-	board after;
-	i32 reward;
-	inline operator bool() const { return reward != -1; }
-	inline i32 score() const { return reward; }
-	inline void clear() {
-		this->expt = -std::numeric_limits<numeric>::max();
-		this->after = 0;
-		this->reward = -1;
+struct search : select {
+	search() : select() {}
+	inline select& operator ()(const board& b) {
+		return operator ()(b, feature::begin(), feature::end());
 	}
-	inline void update(const numeric& expt, const board& after, const i32& score) {
-		if (expt > this->expt) {
-			this->expt = expt;
-			this->after = after;
-			this->reward = score;
-		}
+	inline select& operator ()(const board& b, const feature::iter begin, const feature::iter end) {
+		static u32 depthpolicy[16] = { 9, 9, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 1, 1, 1, 1 };
+		u32 depth = depthpolicy[b.spaces().size] - 1;
+		move[0].assign(b);
+		move[1].assign(b);
+		move[2].assign(b);
+		move[3].assign(b);
+		move[0].search(depth, begin, end);
+		move[1].search(depth, begin, end);
+		move[2].search(depth, begin, end);
+		move[3].search(depth, begin, end);
+		return update();
 	}
-	search& operator >>(board& after) { after = this->after; return *this; }
-	search& operator <<(const board& before) {
-		static int depthres[16] = { 9, 9, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
-		const int depth = depthres[before.spaces().size];
-		clear();
-		board after = before;
-		register i32 reward;
-		if ((reward = after.up()) != -1) {
-			update(reward + utils::search_expt(after, depth - 1), after, reward);
-			after = before;
-		}
-		if ((reward = after.right()) != -1) {
-			update(reward + utils::search_expt(after, depth - 1), after, reward);
-			after = before;
-		}
-		if ((reward = after.down()) != -1) {
-			update(reward + utils::search_expt(after, depth - 1), after, reward);
-			after = before;
-		}
-		if ((reward = after.left()) != -1) {
-			update(reward + utils::search_expt(after, depth - 1), after, reward);
-			after = before;
-		}
-		return (*this);
-	}
+	inline select& operator <<(const board& b) { return operator ()(b); }
 };
 struct statistic {
 	u64 limit;
