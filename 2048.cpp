@@ -1141,12 +1141,12 @@ inline numeric update(const board& state,
 }
 
 numeric search_expt(const board& after, const i32& depth,
-		const feature::iter begin, const feature::iter end);
+		const feature::iter begin = feature::begin(), const feature::iter end = feature::end());
 numeric search_max(const board& before, const i32& depth,
-		const feature::iter begin, const feature::iter end);
+		const feature::iter begin = feature::begin(), const feature::iter end = feature::end());
 
 numeric search_expt(const board& after, const i32& depth,
-		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+		const feature::iter begin, const feature::iter end) {
 	if (depth <= 0) return utils::estimate(after);
 	auto ca = tpa[after], cb = tpb[after];
 	if (ca.depth >= depth && cb.depth >= depth) {
@@ -1169,7 +1169,7 @@ numeric search_expt(const board& after, const i32& depth,
 }
 
 numeric search_max(const board& before, const i32& depth,
-		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+		const feature::iter begin, const feature::iter end) {
 	numeric expt = -std::numeric_limits<numeric>::max();
 	board after = before;
 	register i32 reward;
