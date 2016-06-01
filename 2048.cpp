@@ -327,12 +327,13 @@ private:
 
 class zhasher {
 public:
-	zhasher(const u32& sign,
-			const u64& seeda = 0x0000000000000000ULL,
-			const u64& seedb = 0xffffffffffffffffULL) : sign(sign), seeda(seeda), seedb(seedb) {
+	zhasher(const u64& seeda = 0x0000000000000000ULL,
+			const u64& seedb = 0xffffffffffffffffULL) : sign(seeda ^ seedb), seeda(seeda), seedb(seedb) {
 		for (auto& row : map) {
-			for (auto& entry : row)
+			for (auto& entry : row) {
 				entry = rand64();
+				sign ^= entry;
+			}
 		}
 	}
 	zhasher(const zhasher& z) = default;
@@ -345,6 +346,7 @@ public:
 		hash ^= map[3][b.fetch(3)];
 		return hash;
 	}
+	inline u64 signature() const { return sign; }
 //	inline indexer::mapper build() const {
 //		if (indexer::find(sign) != indexer::end())
 //			return indexer::at(sign);
@@ -352,7 +354,7 @@ public:
 //		return indexer::make(sign, mapper);
 //	}
 private:
-	u32 sign;
+	u64 sign;
 	std::array<std::array<u64, 1 << 20>, 4> map;
 	u64 seeda;
 	u64 seedb;
@@ -372,7 +374,7 @@ public:
 		inline entry(const u64& raw = 0) : raw(raw), depth(0), esti(0) {}
 	};
 	transposition(const u64& size, const u64& limit)
-		: zhash(0xffff0001), cache(new std::vector<entry>[size]()), size(size), limit(limit) {}
+		: zhash(), cache(new std::vector<entry>[size]()), size(size), limit(limit) {}
 
 	inline entry& operator[] (const board& b) {
 
