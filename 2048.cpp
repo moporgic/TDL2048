@@ -366,12 +366,12 @@ public:
 	class entry {
 	friend class transposition;
 	public:
-		u64 raw;
+		u64 sign;
 		i32 depth;
 		f32 esti;
 		inline operator bool() const { return depth > 0; }
 		inline entry(const entry& e) = default;
-		inline entry(const u64& raw = 0) : raw(raw), depth(0), esti(0) {}
+		inline entry(const u64& sign = 0) : sign(sign), depth(0), esti(0) {}
 	};
 	transposition(const u64& size, const u64& limit)
 		: zhash(), cache(new std::vector<entry>[size]()), size(size), limit(limit) {}
@@ -392,7 +392,7 @@ public:
 
 		std::vector<entry>& line = cache[hash % size];
 		for (auto it = line.begin(); it != line.end(); it++)
-			if (it->raw == min.raw) return *it;
+			if (it->sign == min.raw) return *it;
 		if (line.size() == limit) line.erase(line.begin());
 		line.push_back(entry(min.raw));
 		return line.back();
