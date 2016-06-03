@@ -88,7 +88,7 @@ public:
 		typedef std::array<u16, 32> info;
 		const u32 raw; // base row (16-bit raw)
 		const u32 ext; // base row (4-bit extra)
-		const u32 hash; // hash of this row
+		const u32 scale; // hash of this row
 		const u32 merge; // number of merged tiles
 		const operation left; // left operation
 		const operation right; // right operation
@@ -137,11 +137,11 @@ public:
 			map(vraw, vext, Rl, Rh, 12, 8, 4, 0);
 			operation right(hraw, hext, vraw, vext, score, moved, mono);
 
-			u32 hash = 0;
+			u32 scale = 0;
 			info count = {};
 			info mask = {};
 			for (int i = 0; i < 4; i++) {
-				hash |= (1 << V[i]);
+				scale |= (1 << V[i]);
 				count[V[i]]++;
 				mask[V[i]] |= (1 << i);
 			}
@@ -157,12 +157,12 @@ public:
 			if (mvL != r) legal |= (0x08 | 0x01);
 			if (mvR != r) legal |= (0x02 | 0x04);
 
-			return cache(raw, ext, hash, merge, left, right, count, mask, pos, moved, legal);
+			return cachscalew, ext, scale, merge, left, right, count, mask, pos, moved, legal);
 		}
 	private:
-		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right,
+		cache(u32 raw, u32 ext, u32 scale, u32 merge, operation left, operation right,
 			info count, info mask, list pos, i32 moved, u32 legal)
-				: raw(raw), ext(ext), hash(hash), merge(merge), left(left), right(right),
+				: raw(raw), ext(ext), scale(scale), merge(merge), left(left), right(right),
 				  count(count), mask(mask), pos(pos), moved(moved), legal(legal) {}
 
 		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
@@ -439,11 +439,12 @@ public:
 	}
 	inline i32 move(const optype::oper& op) { return operate(op); }
 
-	inline u32 hash() const {
-		return query(0).hash | query(1).hash | query(2).hash | query(3).hash;
+	inline u32 scale() const {
+		return query(0).scale | query(1).scale | query(2).scale | query(3).scale;
 	}
+	inline u32 hash() const { return scale(); }
 	inline u32 max() const {
-		return math::log2(hash());
+		return math::log2(scale());
 	}
 
 	inline u32 count(const u32& t) const {
