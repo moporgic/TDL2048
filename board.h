@@ -157,7 +157,7 @@ public:
 			if (mvL != r) legal |= (0x08 | 0x01);
 			if (mvR != r) legal |= (0x02 | 0x04);
 
-			return cachscalew, ext, scale, merge, left, right, count, mask, pos, moved, legal);
+			return cache(raw, ext, scale, merge, left, right, count, mask, pos, moved, legal);
 		}
 	private:
 		cache(u32 raw, u32 ext, u32 scale, u32 merge, operation left, operation right,
