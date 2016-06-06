@@ -450,7 +450,8 @@ public:
 	inline u32 count(const u32& t) const {
 		return query(0).count[t] + query(1).count[t] + query(2).count[t] + query(3).count[t];
 	}
-	inline void count(u16* num, const u32& min = 0, const u32& max = 16) const {
+	template<typename numa>
+	inline void count(numa num, const u32& min, const u32& max) const {
 		const cache::info& count0 = query(0).count;
 		const cache::info& count1 = query(1).count;
 		const cache::info& count2 = query(2).count;
@@ -464,7 +465,8 @@ public:
 		return (query(0).mask[t] << 0) | (query(1).mask[t] << 4)
 			 | (query(2).mask[t] << 8) | (query(3).mask[t] << 12);
 	}
-	inline void mask(u16* msk, const u32& min = 0, const u32& max = 16) const {
+	template<typename numa>
+	inline void mask(numa msk, const u32& min, const u32& max) const {
 		const cache::info& mask0 = query(0).mask;
 		const cache::info& mask1 = query(1).mask;
 		const cache::info& mask2 = query(2).mask;
