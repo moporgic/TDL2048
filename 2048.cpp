@@ -1058,9 +1058,12 @@ void list_mapping() {
 	for (weight w : weight::list()) {
 		u32 usageK = (sizeof(numeric) * w.length()) >> 10;
 		u32 usageM = usageK >> 10;
+		u32 usageG = usageM >> 10;
 		char buf[64];
-		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c", w.signature(), w.length(),
-				usageM ? usageM : usageK, usageM ? 'M' : 'K');
+		u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
+		char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
+		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c",
+			w.signature(), w.length(), usage, scale);
 		std::cout << buf;
 		std::string feats;
 		for (feature f : feature::list()) {
