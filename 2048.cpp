@@ -38,13 +38,20 @@ const u64 base = 16;
 
 class weight {
 public:
-	weight() : sign(0), size(0), value(nullptr) {}
-	weight(const weight& w) : sign(w.sign), size(w.size), value(w.value) {}
+	weight() : sign(0), size(0), value(nullptr), accum(nullptr), updvu(nullptr) {}
+	weight(const weight& w) = default;
 	~weight() {}
 
 	inline u32 signature() const { return sign; }
 	inline size_t length() const { return size; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
+	inline numeric& operator ()(const u64& i, const numeric& updv) {
+		numeric cupdv = (std::abs(accum[i]) / updvu[i]) * updv;
+		value[i] += cupdv;
+		accum[i] += cupdv;
+		updvu[i] += std::abs(cupdv);
+		return value[i];
+	}
 
 	inline bool operator ==(const weight& w) const { return sign == w.sign; }
 	inline bool operator !=(const weight& w) const { return sign != w.sign; }
@@ -147,6 +154,7 @@ public:
 
 	static weight make(const u32& sign, const size_t& size) {
 		wghts().push_back(weight(sign, size));
+		wghts().back().init_coherence();
 		return wghts().back();
 	}
 	static inline weight at(const u32& sign) {
@@ -169,6 +177,13 @@ protected:
 		return new numeric[size]();
 	}
 
+	void init_coherence() {
+		accum = alloc(size);
+		updvu = alloc(size);
+		std::fill_n(accum, size, alpha);
+		std::fill_n(updvu, size, alpha);
+	}
+
 	template<typename rxx> void write(std::ostream& out) const {
 		for (size_t i = 0; i < size; i++)
 			out.write(rxx(value[i]).le(), sizeof(rxx));
@@ -183,172 +198,15 @@ protected:
 	u32 sign;
 	size_t size;
 	numeric* value;
-};
-
-class coherence : public weight {
-public:
-	coherence() : weight(), accum(nullptr) {}
-	coherence(const coherence& c) : weight(c), accum(c.accum) {}
-	~coherence() {}
-
-	class coheref {
-	public:
-		inline coheref(const coheref& ref) = default;
-		inline coheref(numeric& value, numeric& accum) : value(value), accum(accum) {}
-		inline operator numeric() const { return std::abs(accum) / value; }
-		inline coheref& operator +=(const numeric& off) {
-			value += std::abs(off);
-			accum += off;
-			return *this;
-		}
-		inline coheref& operator -=(const numeric& off) { return operator +=(-off); }
-	private:
-		numeric& value;
-		numeric& accum;
-	};
-	inline coheref operator [](const u64& i) { return coheref(value[i], accum[i]); }
-
-	void operator >>(std::ostream& out) const {
-		const char serial = 1;
-		out.write(&serial, 1);
-		switch (serial) {
-		case 0:
-			out.write(r32(sign).le(), 4);
-			out.write(r64(size).le(), 8);
-			write<r32>(out);
-			break;
-		case 1:
-			out.write(r32(sign).le(), 4);
-			out.write(r64(size).le(), 8);
-			switch (sizeof(numeric)) {
-			case 4: write<r32>(out); break;
-			case 8: write<r64>(out); break;
-			}
-			break;
-		case 2:
-			out.write(r32(sign).le(), 4);
-			out.write(r64(size).le(), 8);
-			out.write(r16(sizeof(numeric)).le(), 2);
-			switch (sizeof(numeric)) {
-			case 4: write<r32>(out); break;
-			case 8: write<r64>(out); break;
-			}
-			break;
-		default:
-			std::cerr << "unknown serial at weight::>>" << std::endl;
-			break;
-		}
-	}
-	void operator <<(std::istream& in) {
-		char buf[8];
-		auto load = moporgic::make_load(in, buf);
-		switch (*load(1)) {
-		case 0:
-			sign = r32(load(4)).le();
-			size = r64(load(8)).le();
-			value = alloc(size);
-			accum = alloc(size);
-			read<r32>(in);
-			break;
-		case 1:
-			sign = r32(load(4)).le();
-			size = r64(load(8)).le();
-			value = alloc(size);
-			accum = alloc(size);
-			switch (sizeof(numeric)) {
-			case 4: read<r32>(in); break;
-			case 8: read<r64>(in); break;
-			}
-			break;
-		case 2:
-			sign = r32(load(4)).le();
-			size = r64(load(8)).le();
-			value = alloc(size);
-			accum = alloc(size);
-			switch (u32(r64(load(2)).le())) {
-			case 4: read<r32>(in); break;
-			case 8: read<r64>(in); break;
-			}
-			break;
-		default:
-			std::cerr << "unknown serial at weight::<<" << std::endl;
-			break;
-		}
-	}
-
-	static void save(std::ostream& out) {
-		const char serial = 0;
-		out.write(&serial, 1);
-		switch (serial) {
-		case 0:
-			out.write(r32(u32(cohes().size())).le(), 4);
-			for (coherence c : cohes())
-				c >> out;
-			break;
-		default:
-			std::cerr << "unknown serial at weight::save" << std::endl;
-			break;
-		}
-		out.flush();
-	}
-	static void load(std::istream& in) {
-		char buf[8];
-		auto load = moporgic::make_load(in, buf);
-		switch (*load(1)) {
-		case 0:
-			for (u32 size = r32(load(4)).le(); size; size--) {
-				coherence c; c << in;
-				cohes().push_back(c);
-			}
-			break;
-		default:
-			std::cerr << "unknown serial at weight::load" << std::endl;
-			break;
-		}
-	}
-
-	static coherence make(const u32& sign, const size_t& size) {
-		cohes().push_back(coherence(sign, size));
-		return cohes().back();
-	}
-	static inline coherence at(const u32& sign) {
-		const auto it = find(sign);
-		if (it != end()) return (*it);
-		throw std::out_of_range("weight::at");
-	}
-	typedef std::vector<coherence>::iterator iter;
-	static inline const std::vector<coherence>& list() { return cohes(); }
-	static inline iter begin() { return cohes().begin(); }
-	static inline iter end() { return cohes().end(); }
-	static inline iter find(const u32& sign) {
-		return std::find_if(begin(), end(), [=](const coherence& w) { return w.sign == sign; });
-	}
-protected:
-	coherence(const u32& sign, const size_t& size) : weight(sign, size), accum(alloc(size)) {}
-	static inline std::vector<coherence>& cohes() { static std::vector<coherence> c; return c; }
-
-	template<typename rxx> void write(std::ostream& out) const {
-		for (size_t i = 0; i < size; i++) {
-			out.write(rxx(value[i]).le(), sizeof(rxx));
-			out.write(rxx(accum[i]).le(), sizeof(rxx));
-		}
-	}
-	template<typename rxx> void read(std::istream& in) {
-		char buf[8];
-		auto load = moporgic::make_load(in, buf);
-		for (size_t i = 0; i < size; i++) {
-			value[i] = rxx(load(sizeof(rxx))).le();
-			accum[i] = rxx(load(sizeof(rxx))).le();
-		}
-	}
 
 	numeric* accum;
+	numeric* updvu;
 };
 
 class indexer {
 public:
 	indexer() : sign(0), map(nullptr) {}
-	indexer(const indexer& i) : sign(i.sign), map(i.map) {}
+	indexer(const indexer& i) = default;
 	~indexer() {}
 
 	typedef std::function<u64(const board&)> mapper;
@@ -387,7 +245,7 @@ private:
 class feature {
 public:
 	feature() {}
-	feature(const feature& t) : index(t.index), value(t.value) {}
+	feature(const feature& t) = default;
 	~feature() {}
 
 	inline u64 signature() const { return make_sign(value.signature(), index.signature()); }
@@ -1203,8 +1061,10 @@ inline numeric estimate(const board& state,
 inline numeric update(const board& state, const numeric& updv,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 	register numeric esti = 0;
-	for (auto f = begin; f != end; f++)
-		esti += ((*f)[state] += updv);
+	for (auto f = begin; f != end; f++) {
+		u64 idx = (*f)(state);
+		esti += weight(*f)(idx, updv);
+	}
 	return esti;
 }
 
