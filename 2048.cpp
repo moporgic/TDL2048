@@ -417,7 +417,6 @@ private:
 	size_t size;
 	size_t limit;
 };
-cache tp(1 << 25, 8);
 
 namespace utils {
 
@@ -1153,6 +1152,8 @@ numeric search_expt(const board& after, const i32& depth,
 numeric search_max(const board& before, const i32& depth,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end());
 
+cache tp(1 << 25, 8);
+
 numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin, const feature::iter end) {
 	if (depth <= 0) return utils::estimate(after, begin, end);
@@ -1671,7 +1672,7 @@ int main(int argc, const char* argv[]) {
 	search xbest;
 
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
-	for (stats.init(test, 10); stats; stats++) {
+	for (stats.init(test, 1); stats; stats++) {
 
 		register u32 score = 0;
 		register u32 opers = 0;
