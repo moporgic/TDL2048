@@ -360,11 +360,11 @@ private:
 	u64 seedb;
 };
 
-class transposition {
+class cache {
 public:
 	typedef float numeric;
 	class entry {
-	friend class transposition;
+	friend class cache;
 	public:
 		u64 sign;
 		i32 depth;
@@ -373,8 +373,18 @@ public:
 		inline entry(const entry& e) = default;
 		inline entry(const u64& sign = 0) : sign(sign), depth(0), esti(0) {}
 	};
-	transposition(const u64& size, const u64& limit)
-		: zhash(), cache(new std::vector<entry>[size]()), size(size), limit(limit) {}
+	class line {
+	friend class cache;
+	public:
+		entry* mem;
+		size_t idx;
+		inline line(size_t lim) : mem(new entry[lim]()), idx(0) {}
+		inline line() : mem(nullptr), idx(0) {}
+	};
+	cache(const u64& size, const u64& limit)
+		: zhash(), memory(new line[size]()), size(size), limit(limit) {
+		for (size_t i = 0; i < size; i++) memory[i].mem = new entry[limit]();
+	}
 
 	inline entry& operator[] (const board& b) {
 
@@ -390,20 +400,24 @@ public:
 			}
 		}
 
-		std::vector<entry>& line = cache[hash % size];
-		for (auto it = line.begin(); it != line.end(); it++)
-			if (it->sign == min.raw) return *it;
-		if (line.size() == limit) line.erase(line.begin());
-		line.push_back(entry(min.raw));
-		return line.back();
+		line& ln = memory[hash % size];
+		entry* mem = ln.mem;
+		size_t len = std::min(ln.idx, limit);
+		for (size_t i = 0; i < len; i++)
+			if (mem[i].sign == min.raw)
+				return mem[i];
+		entry& en = mem[ln.idx++ % limit];
+		en = entry(min.raw);
+		return en;
+
 	}
 private:
 	zhasher zhash;
-	std::vector<entry>* cache;
+	line* memory;
 	size_t size;
 	size_t limit;
 };
-transposition tp(1 << 26, 8);
+cache tp(1 << 25, 8);
 
 namespace utils {
 
@@ -1162,7 +1176,7 @@ numeric search_expt(const board& after, const i32& depth,
 
 numeric search_max(const board& before, const i32& depth,
 		const feature::iter begin, const feature::iter end) {
-	numeric expt = -std::numeric_limits<numeric>::max();
+	numeric expt = 0;
 	board after = before;
 	register i32 reward;
 	if ((reward = after.up()) != -1) {
@@ -1332,7 +1346,7 @@ struct search : select {
 		return operator ()(b, feature::begin(), feature::end());
 	}
 	inline select& operator ()(const board& b, const feature::iter begin, const feature::iter end) {
-		static u32 depthpolicy[16] = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 1, 1, 1, 1 };
+		static u32 depthpolicy[16] = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
 		u32 depth = depthpolicy[b.spaces().size] - 1;
 		move[0].assign(b);
 		move[1].assign(b);
