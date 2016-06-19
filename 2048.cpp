@@ -32,7 +32,7 @@
 
 namespace moporgic {
 
-typedef double numeric;
+typedef float numeric;
 numeric alpha = 0.0025;
 const u64 base = 16;
 
@@ -161,7 +161,7 @@ public:
 	static inline iter find(const u32& sign) {
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
 	}
-private:
+protected:
 	weight(const u32& sign, const size_t& size) : sign(sign), size(size), value(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
@@ -183,6 +183,166 @@ private:
 	u32 sign;
 	size_t size;
 	numeric* value;
+};
+
+class coherence : public weight {
+public:
+	coherence() : weight(), accum(nullptr) {}
+	coherence(const coherence& c) : weight(c), accum(c.accum) {}
+	~coherence() {}
+
+	class coheref {
+	public:
+		inline coheref(const coheref& ref) = default;
+		inline coheref(numeric& value, numeric& accum) : value(value), accum(accum) {}
+		inline operator numeric() const { return std::abs(accum) / value; }
+		inline coheref& operator +=(const numeric& off) {
+			value += std::abs(off);
+			accum += off;
+			return *this;
+		}
+		inline coheref& operator -=(const numeric& off) { return operator +=(-off); }
+	private:
+		numeric& value;
+		numeric& accum;
+	};
+	inline coheref operator [](const u64& i) { return coheref(value[i], accum[i]); }
+
+	void operator >>(std::ostream& out) const {
+		const char serial = 1;
+		out.write(&serial, 1);
+		switch (serial) {
+		case 0:
+			out.write(r32(sign).le(), 4);
+			out.write(r64(size).le(), 8);
+			write<r32>(out);
+			break;
+		case 1:
+			out.write(r32(sign).le(), 4);
+			out.write(r64(size).le(), 8);
+			switch (sizeof(numeric)) {
+			case 4: write<r32>(out); break;
+			case 8: write<r64>(out); break;
+			}
+			break;
+		case 2:
+			out.write(r32(sign).le(), 4);
+			out.write(r64(size).le(), 8);
+			out.write(r16(sizeof(numeric)).le(), 2);
+			switch (sizeof(numeric)) {
+			case 4: write<r32>(out); break;
+			case 8: write<r64>(out); break;
+			}
+			break;
+		default:
+			std::cerr << "unknown serial at weight::>>" << std::endl;
+			break;
+		}
+	}
+	void operator <<(std::istream& in) {
+		char buf[8];
+		auto load = moporgic::make_load(in, buf);
+		switch (*load(1)) {
+		case 0:
+			sign = r32(load(4)).le();
+			size = r64(load(8)).le();
+			value = alloc(size);
+			accum = alloc(size);
+			read<r32>(in);
+			break;
+		case 1:
+			sign = r32(load(4)).le();
+			size = r64(load(8)).le();
+			value = alloc(size);
+			accum = alloc(size);
+			switch (sizeof(numeric)) {
+			case 4: read<r32>(in); break;
+			case 8: read<r64>(in); break;
+			}
+			break;
+		case 2:
+			sign = r32(load(4)).le();
+			size = r64(load(8)).le();
+			value = alloc(size);
+			accum = alloc(size);
+			switch (u32(r64(load(2)).le())) {
+			case 4: read<r32>(in); break;
+			case 8: read<r64>(in); break;
+			}
+			break;
+		default:
+			std::cerr << "unknown serial at weight::<<" << std::endl;
+			break;
+		}
+	}
+
+	static void save(std::ostream& out) {
+		const char serial = 0;
+		out.write(&serial, 1);
+		switch (serial) {
+		case 0:
+			out.write(r32(u32(cohes().size())).le(), 4);
+			for (coherence c : cohes())
+				c >> out;
+			break;
+		default:
+			std::cerr << "unknown serial at weight::save" << std::endl;
+			break;
+		}
+		out.flush();
+	}
+	static void load(std::istream& in) {
+		char buf[8];
+		auto load = moporgic::make_load(in, buf);
+		switch (*load(1)) {
+		case 0:
+			for (u32 size = r32(load(4)).le(); size; size--) {
+				coherence c; c << in;
+				cohes().push_back(c);
+			}
+			break;
+		default:
+			std::cerr << "unknown serial at weight::load" << std::endl;
+			break;
+		}
+	}
+
+	static coherence make(const u32& sign, const size_t& size) {
+		cohes().push_back(coherence(sign, size));
+		return cohes().back();
+	}
+	static inline coherence at(const u32& sign) {
+		const auto it = find(sign);
+		if (it != end()) return (*it);
+		throw std::out_of_range("weight::at");
+	}
+	typedef std::vector<coherence>::iterator iter;
+	static inline const std::vector<coherence>& list() { return cohes(); }
+	static inline iter begin() { return cohes().begin(); }
+	static inline iter end() { return cohes().end(); }
+	static inline iter find(const u32& sign) {
+		return std::find_if(begin(), end(), [=](const coherence& w) { return w.sign == sign; });
+	}
+protected:
+	coherence(const u32& sign, const size_t& size) : weight(sign, size), accum(alloc(size)) {}
+	static inline std::vector<coherence>& cohes() { static std::vector<coherence> c; return c; }
+
+	template<typename rxx> void write(std::ostream& out) const {
+		for (size_t i = 0; i < size; i++) {
+			out.write(rxx(value[i]).le(), sizeof(rxx));
+			out.write(rxx(accum[i]).le(), sizeof(rxx));
+		}
+	}
+	template<typename rxx> void read(std::istream& in) {
+		char buf[8];
+		auto load = moporgic::make_load(in, buf);
+		for (size_t i = 0; i < size; i++) {
+			value[i] = rxx(load(sizeof(rxx))).le();
+			accum[i] = rxx(load(sizeof(rxx))).le();
+		}
+	}
+
+	numeric* accum;
 };
 
 class indexer {
