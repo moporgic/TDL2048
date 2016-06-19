@@ -103,7 +103,7 @@ public:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
 			value = alloc(size);
-			switch (u32(r64(load(2)).le())) {
+			switch (u32(r16(load(2)).le())) {
 			case 4: read<r32>(in); break;
 			case 8: read<r64>(in); break;
 			}
