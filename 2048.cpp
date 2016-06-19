@@ -32,7 +32,7 @@
 
 namespace moporgic {
 
-typedef double numeric;
+typedef float numeric;
 numeric alpha = 0.0025;
 const u64 base = 16;
 
@@ -57,26 +57,12 @@ public:
 	inline bool operator !=(const weight& w) const { return sign != w.sign; }
 
 	void operator >>(std::ostream& out) const {
-		const char serial = 1;
+		const char serial = 127;
 		out.write(&serial, 1);
 		switch (serial) {
-		case 0:
+		case 127:
 			out.write(r32(sign).le(), 4);
 			out.write(r64(size).le(), 8);
-			write<r32>(out);
-			break;
-		case 1:
-			out.write(r32(sign).le(), 4);
-			out.write(r64(size).le(), 8);
-			switch (sizeof(numeric)) {
-			case 4: write<r32>(out); break;
-			case 8: write<r64>(out); break;
-			}
-			break;
-		case 2:
-			out.write(r32(sign).le(), 4);
-			out.write(r64(size).le(), 8);
-			out.write(r16(sizeof(numeric)).le(), 2);
 			switch (sizeof(numeric)) {
 			case 4: write<r32>(out); break;
 			case 8: write<r64>(out); break;
@@ -91,26 +77,13 @@ public:
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
 		switch (*load(1)) {
-		case 0:
+		case 127:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
 			value = alloc(size);
-			read<r32>(in);
-			break;
-		case 1:
-			sign = r32(load(4)).le();
-			size = r64(load(8)).le();
-			value = alloc(size);
+			accum = alloc(size);
+			updvu = alloc(size);
 			switch (sizeof(numeric)) {
-			case 4: read<r32>(in); break;
-			case 8: read<r64>(in); break;
-			}
-			break;
-		case 2:
-			sign = r32(load(4)).le();
-			size = r64(load(8)).le();
-			value = alloc(size);
-			switch (u32(r64(load(2)).le())) {
 			case 4: read<r32>(in); break;
 			case 8: read<r64>(in); break;
 			}
@@ -185,14 +158,20 @@ protected:
 	}
 
 	template<typename rxx> void write(std::ostream& out) const {
-		for (size_t i = 0; i < size; i++)
+		for (size_t i = 0; i < size; i++) {
 			out.write(rxx(value[i]).le(), sizeof(rxx));
+			out.write(rxx(accum[i]).le(), sizeof(rxx));
+			out.write(rxx(updvu[i]).le(), sizeof(rxx));
+		}
 	}
 	template<typename rxx> void read(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		for (size_t i = 0; i < size; i++)
+		for (size_t i = 0; i < size; i++) {
 			value[i] = rxx(load(sizeof(rxx))).le();
+			accum[i] = rxx(load(sizeof(rxx))).le();
+			updvu[i] = rxx(load(sizeof(rxx))).le();
+		}
 	}
 
 	u32 sign;
