@@ -1345,13 +1345,15 @@ struct select {
 	inline numeric esti() const { return best->esti; }
 };
 struct search : select {
-	search() : select() {}
+	std::array<u32, 16> policy;
+	search(const std::array<u32, 16>& p = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 })
+		: select(), policy(p) {}
+
 	inline select& operator ()(const board& b) {
 		return operator ()(b, feature::begin(), feature::end());
 	}
 	inline select& operator ()(const board& b, const feature::iter begin, const feature::iter end) {
-		static u32 depthpolicy[16] = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
-		u32 depth = depthpolicy[b.spaces().size] - 1;
+		u32 depth = policy[b.spaces().size] - 1;
 		move[0].assign(b);
 		move[1].assign(b);
 		move[2].assign(b);
@@ -1471,6 +1473,7 @@ int main(int argc, const char* argv[]) {
 	utils::options wopts;
 	utils::options fopts;
 	utils::options opts;
+	std::array<u32, 16> depthp = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
 
 
 	auto valueof = [&](int& i, const char* def) -> const char* {
@@ -1565,6 +1568,15 @@ int main(int argc, const char* argv[]) {
 		case to_hash("--comment"):
 			opts["comment"] = valueof(i, "");
 			break;
+		case to_hash("-d"):
+		case to_hash("--depth"):
+			depthp.fill(std::stol(valueof(i, nullptr)));
+			break;
+		case to_hash("-dd"):
+		case to_hash("--depth-dynamic"):
+			for (u32 e = 0; e < 16; e++)
+				depthp[e] = std::stol(valueof(i, nullptr));
+			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
 			std::exit(1);
@@ -1579,6 +1591,9 @@ int main(int argc, const char* argv[]) {
 	std::cout << "timestamp = " << timestamp << std::endl;
 	std::cout << "srand = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
+	std::cout << "depth = ";
+	std::copy(depthp.begin(), depthp.end(), std::ostream_iterator<u32>(std::cout, " "));
+	std::cout << std::endl;
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
@@ -1672,7 +1687,7 @@ int main(int argc, const char* argv[]) {
 
 
 
-	search xbest;
+	search xbest(depthp);
 
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
 	for (stats.init(test, 1); stats; stats++) {
