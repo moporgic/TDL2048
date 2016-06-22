@@ -89,11 +89,11 @@ public:
 		typedef std::array<u16, 32> info;
 		const u32 raw; // base row (16-bit raw)
 		const u32 ext; // base row (4-bit extra)
-		const u32 hash; // hash of this row
+		const u32 scale; // hash of this row
 		const u32 merge; // number of merged tiles
 		const operation left; // left operation
 		const operation right; // right operation
-		const info count; // number of each tile-type
+		const info numof; // number of each tile-type
 		const info mask; // mask of each tile-type
 		const list pos; // layout of board-type
 		const i32 moved; // moved or not
@@ -138,12 +138,12 @@ public:
 			map(vraw, vext, Rl, Rh, 12, 8, 4, 0);
 			operation right(hraw, hext, vraw, vext, score, moved, mono);
 
-			u32 hash = 0;
-			info count = {};
+			u32 scale = 0;
+			info numof = {};
 			info mask = {};
 			for (int i = 0; i < 4; i++) {
-				hash |= (1 << V[i]);
-				count[V[i]]++;
+				scale |= (1 << V[i]);
+				numof[V[i]]++;
 				mask[V[i]] |= (1 << i);
 			}
 
@@ -158,13 +158,13 @@ public:
 			if (mvL != r) legal |= (0x08 | 0x01);
 			if (mvR != r) legal |= (0x02 | 0x04);
 
-			return cache(raw, ext, hash, merge, left, right, count, mask, pos, moved, legal);
+			return cache(raw, ext, scale, merge, left, right, numof, mask, pos, moved, legal);
 		}
 	private:
-		cache(u32 raw, u32 ext, u32 hash, u32 merge, operation left, operation right,
-			info count, info mask, list pos, i32 moved, u32 legal)
-				: raw(raw), ext(ext), hash(hash), merge(merge), left(left), right(right),
-				  count(count), mask(mask), pos(pos), moved(moved), legal(legal) {}
+		cache(u32 raw, u32 ext, u32 scale, u32 merge, operation left, operation right,
+			info numof, info mask, list pos, i32 moved, u32 legal)
+				: raw(raw), ext(ext), scale(scale), merge(merge), left(left), right(right),
+				  numof(numof), mask(mask), pos(pos), moved(moved), legal(legal) {}
 
 		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
 			for (u32 i = 0; i < 4; i++) {
@@ -440,31 +440,47 @@ public:
 	}
 	inline i32 move(const optype::oper& op) { return operate(op); }
 
-	inline u32 hash() const {
-		return query(0).hash | query(1).hash | query(2).hash | query(3).hash;
+	inline u32 scale() const {
+		return query(0).scale | query(1).scale | query(2).scale | query(3).scale;
 	}
+	inline u32 hash() const { return scale(); }
 	inline u32 max() const {
-		return math::log2(hash());
+		return math::log2(scale());
+	}
+
+	inline u32 numof(const u32& t) const {
+		return query(0).numof[t] + query(1).numof[t] + query(2).numof[t] + query(3).numof[t];
+	}
+	template<typename numa>
+	inline void numof(numa num, const u32& min, const u32& max) const {
+		const cache::info& numof0 = query(0).numof;
+		const cache::info& numof1 = query(1).numof;
+		const cache::info& numof2 = query(2).numof;
+		const cache::info& numof3 = query(3).numof;
+		for (u32 i = min; i < max; i++) {
+			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
+		}
 	}
 
 	inline u32 count(const u32& t) const {
-		return query(0).count[t] + query(1).count[t] + query(2).count[t] + query(3).count[t];
+		register u32 num = 0;
+		for (u32 i = 0; i < 16; i++)
+			if (at(i) == t) num++;
+		return num;
 	}
-	inline void count(u16* num, const u32& min = 0, const u32& max = 16) const {
-		const cache::info& count0 = query(0).count;
-		const cache::info& count1 = query(1).count;
-		const cache::info& count2 = query(2).count;
-		const cache::info& count3 = query(3).count;
-		for (u32 i = min; i < max; i++) {
-			num[i] = count0[i] + count1[i] + count2[i] + count3[i];
-		}
+	template<typename numa>
+	inline void count(numa num, const u32& min, const u32& max) const {
+		std::fill(num + min, num + max, 0);
+		for (u32 i = 0; i < 16; i++)
+			num[at(i)]++;
 	}
 
 	inline u32 mask(const u32& t) const {
 		return (query(0).mask[t] << 0) | (query(1).mask[t] << 4)
 			 | (query(2).mask[t] << 8) | (query(3).mask[t] << 12);
 	}
-	inline void mask(u16* msk, const u32& min = 0, const u32& max = 16) const {
+	template<typename numa>
+	inline void mask(numa msk, const u32& min, const u32& max) const {
 		const cache::info& mask0 = query(0).mask;
 		const cache::info& mask1 = query(1).mask;
 		const cache::info& mask2 = query(2).mask;
