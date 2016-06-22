@@ -461,6 +461,19 @@ public:
 		}
 	}
 
+	inline u32 count(const u32& t) const {
+		register u32 num = 0;
+		for (u32 i = 0; i < 16; i++)
+			if (at(i) == t) num++;
+		return num;
+	}
+	template<typename numa>
+	inline void count(numa num, const u32& min, const u32& max) const {
+		std::fill(num + min, num + max, 0);
+		for (u32 i = 0; i < 16; i++)
+			num[at(i)]++;
+	}
+
 	inline u32 mask(const u32& t) const {
 		return (query(0).mask[t] << 0) | (query(1).mask[t] << 4)
 			 | (query(2).mask[t] << 8) | (query(3).mask[t] << 12);
