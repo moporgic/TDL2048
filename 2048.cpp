@@ -1281,7 +1281,7 @@ struct statistic {
 			snprintf(buf, sizeof(buf), "%d:\t%8d%8.2f%%%8.2f%%",
 					(1 << i) & 0xfffffffeu, total.count[i],
 					(total.count[i] * 100.0 / sum),
-					(std::accumulate(iter + begin, iter + i + 1, 0) * 100.0 / sum));
+					(std::accumulate(iter + i, iter + end, 0) * 100.0 / sum));
 			std::cout << buf << std::endl;
 		}
 	}
