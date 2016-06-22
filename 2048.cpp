@@ -378,13 +378,9 @@ public:
 	public:
 		entry* mem;
 		size_t idx;
-		inline line(size_t lim) : mem(new entry[lim]()), idx(0) {}
 		inline line() : mem(nullptr), idx(0) {}
 	};
-	cache(const u64& size, const u64& limit)
-		: zhash(), memory(new line[size]()), size(size), limit(limit) {
-		for (size_t i = 0; i < size; i++) memory[i].mem = new entry[limit]();
-	}
+	cache() : zhash(), memory(nullptr), size(0), limit(0) {}
 
 	inline entry& operator[] (const board& b) {
 
@@ -410,6 +406,14 @@ public:
 		en = entry(min.raw);
 		return en;
 
+	}
+
+	void init(const u64& s, const u64& lim) {
+		size = s;
+		limit = lim;
+		memory = new line[size]();
+		for (size_t i = 0; i < s; i++)
+			memory[i].mem = new entry[limit]();
 	}
 private:
 	zhasher zhash;
@@ -1147,12 +1151,13 @@ inline numeric update(const board& state,
 	return update(state, alpha * (accu - curr), begin, end);
 }
 
+cache tp;
+void init_cache(u64 size, u32 limit) { tp.init(size, limit); }
+
 numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end());
 numeric search_max(const board& before, const i32& depth,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end());
-
-cache tp(1 << 25, 8);
 
 numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin, const feature::iter end) {
@@ -1474,7 +1479,8 @@ int main(int argc, const char* argv[]) {
 	utils::options fopts;
 	utils::options opts;
 	std::array<u32, 16> depthp = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
-
+	u64 tpsize = 1 << 25;
+	u64 tplimit = 8;
 
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
@@ -1577,6 +1583,11 @@ int main(int argc, const char* argv[]) {
 			for (u32 e = 0; e < 16; e++)
 				depthp[e] = std::stol(valueof(i, nullptr));
 			break;
+		case to_hash("-tp"):
+		case to_hash("--cache"):
+			tpsize = std::stoll(valueof(i, nullptr));
+			tplimit = std::stoll(valueof(i, nullptr));
+			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
 			std::exit(1);
@@ -1597,7 +1608,7 @@ int main(int argc, const char* argv[]) {
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
-
+	utils::init_cache(tpsize, tplimit);
 	utils::make_indexers();
 
 	if (utils::load_weights(wopts["input"]) == false) {
