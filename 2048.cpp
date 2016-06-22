@@ -462,7 +462,7 @@ u64 indexmerge1(const board& b) { // 8-bit
 u64 indexnum0(const board& b) { // 10-bit
 	// 2k ~ 32k, 2-bit ea.
 	u16 num[16];
-	b.count(num, 11, 16);
+	b.numof(num, 11, 16);
 	register u64 index = 0;
 	index += (num[11] & 0x03) << 0;
 	index += (num[12] & 0x03) << 2;
@@ -474,7 +474,7 @@ u64 indexnum0(const board& b) { // 10-bit
 
 u64 indexnum1(const board& b) { // 25-bit
 	u16 num[16];
-	b.count(num, 5, 16);
+	b.numof(num, 5, 16);
 	register u64 index = 0;
 	index += ((num[5] + num[6]) & 0x0f) << 0; // 32 & 64, 4-bit
 	index += (num[7] & 0x07) << 4; // 128, 3-bit
@@ -491,7 +491,7 @@ u64 indexnum1(const board& b) { // 25-bit
 
 u64 indexnum2(const board& b) { // 25-bit
 	u16 num[16];
-	b.count(num, 0, 16);
+	b.numof(num, 0, 16);
 	register u64 index = 0;
 	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-bit
 	index += ((num[3] + num[4]) & 0x07) << 3; // 8 & 16, 3-bit
@@ -511,8 +511,8 @@ template<int transpose, int qu0, int qu1>
 u64 indexnum2x(const board& b) { // 25-bit
 	board o = b;
 	if (transpose) o.transpose();
-	auto& m = o.query(qu0).count;
-	auto& n = o.query(qu1).count;
+	auto& m = o.query(qu0).numof;
+	auto& n = o.query(qu1).numof;
 
 	register u64 index = 0;
 	index += ((m[1] + n[1] + m[2] + n[2]) & 0x07) << 0; // 2 & 4, 3-bit
@@ -531,7 +531,7 @@ u64 indexnum2x(const board& b) { // 25-bit
 
 u64 indexnum3(const board& b) { // 28-bit
 	u16 num[16];
-	b.count(num, 0, 16);
+	b.numof(num, 0, 16);
 	register u64 index = 0;
 	index += ((num[0] + num[1] + num[2]) & 0x0f) << 0; // 0 & 2 & 4, 4-bit
 	index += ((num[3] + num[4]) & 0x07) << 4; // 8 & 16, 3-bit
