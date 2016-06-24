@@ -94,6 +94,7 @@ public:
 		const operation right; // right operation
 		const info numof; // number of each tile-type
 		const info mask; // mask of each tile-type
+		const list num; // number of 0~f tile-type
 		const list pos; // layout of board-type
 		const i32 moved; // moved or not
 		const u32 legal; // legal actions
@@ -140,10 +141,12 @@ public:
 			u32 scale = 0;
 			info numof = {};
 			info mask = {};
+			u64 numv = 0;
 			for (int i = 0; i < 4; i++) {
 				scale |= (1 << V[i]);
 				numof[V[i]]++;
 				mask[V[i]] |= (1 << i);
+				numv += (1ULL << (V[i] << 2));
 			}
 
 			u64 ltile = 0;
@@ -156,14 +159,15 @@ public:
 			u32 legal = 0;
 			if (mvL != r) legal |= (0x08 | 0x01);
 			if (mvR != r) legal |= (0x02 | 0x04);
+			list num(numv, 16);
 
-			return cache(raw, ext, scale, merge, left, right, numof, mask, pos, moved, legal);
+			return cache(raw, ext, scale, merge, left, right, numof, mask, num, pos, moved, legal);
 		}
 	private:
 		cache(u32 raw, u32 ext, u32 scale, u32 merge, operation left, operation right,
-			info numof, info mask, list pos, i32 moved, u32 legal)
+			  info numof, info mask, list num, list pos, i32 moved, u32 legal)
 				: raw(raw), ext(ext), scale(scale), merge(merge), left(left), right(right),
-				  numof(numof), mask(mask), pos(pos), moved(moved), legal(legal) {}
+				  numof(numof), mask(mask), num(num), pos(pos), moved(moved), legal(legal) {}
 
 		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
 			for (u32 i = 0; i < 4; i++) {
@@ -463,6 +467,10 @@ public:
 		for (u32 i = min; i < max; i++) {
 			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 		}
+	}
+	inline list numof() const {
+		u64 num = query(0).num.tile + query(1).num.tile + query(2).num.tile + query(3).num.tile;
+		return list(num, 16);
 	}
 
 	inline u32 count(const u32& t) const {
