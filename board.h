@@ -442,7 +442,11 @@ public:
 	inline u32 scale() const {
 		return query(0).scale | query(1).scale | query(2).scale | query(3).scale;
 	}
-	inline u32 hash() const { return scale(); }
+	inline u32 hash() const {
+		u32 h = 0;
+		for (u32 i = 0; i < 16; i++) h |= (1 << at(i));
+		return h;
+	}
 	inline u32 max() const {
 		return math::log2(scale());
 	}
