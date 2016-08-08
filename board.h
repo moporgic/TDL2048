@@ -91,8 +91,8 @@ public:
 		typedef std::array<u16, 32> info;
 		const u32 raw; // base row (16-bit raw)
 		const u32 ext; // base row (4-bit extra)
-		const u32 scale; // hash of this row
 		const u32 merge; // number of merged tiles
+		const u32 species; // species of this row
 		const operation left; // left operation
 		const operation right; // right operation
 		const info numof; // number of each tile-type
@@ -141,12 +141,12 @@ public:
 			map(vraw, vext, Rl, Rh, 12, 8, 4, 0);
 			operation right(hraw, hext, vraw, vext, score, moved, mono);
 
-			u32 scale = 0;
+			u32 species = 0;
 			info numof = {};
 			info mask = {};
 			u64 numv = 0;
 			for (int i = 0; i < 4; i++) {
-				scale |= (1 << V[i]);
+				species |= (1 << V[i]);
 				numof[V[i]]++;
 				mask[V[i]] |= (1 << i);
 				numv += (1ULL << (V[i] << 2));
@@ -164,12 +164,12 @@ public:
 			if (mvR != r) legal |= (0x02 | 0x04);
 			list num(numv, 16);
 
-			return cache(raw, ext, scale, merge, left, right, numof, mask, num, pos, moved, legal);
+			return cache(raw, ext, species, merge, left, right, numof, mask, num, pos, moved, legal);
 		}
 	private:
-		cache(u32 raw, u32 ext, u32 scale, u32 merge, operation left, operation right,
+		cache(u32 raw, u32 ext, u32 species, u32 merge, operation left, operation right,
 			  info numof, info mask, list num, list pos, i32 moved, u32 legal)
-				: raw(raw), ext(ext), scale(scale), merge(merge), left(left), right(right),
+				: raw(raw), ext(ext), species(species), merge(merge), left(left), right(right),
 				  numof(numof), mask(mask), num(num), pos(pos), moved(moved), legal(legal) {}
 
 		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
@@ -498,8 +498,8 @@ public:
 	}
 	inline i32 move(const optype::oper& op) { return operate(op); }
 
-	inline u32 scale() const {
-		return query(0).scale | query(1).scale | query(2).scale | query(3).scale;
+	inline u32 species() const {
+		return query(0).species | query(1).species | query(2).species | query(3).species;
 	}
 	inline u32 hash() const {
 		u32 h = 0;
@@ -507,7 +507,7 @@ public:
 		return h;
 	}
 	inline u32 max() const {
-		return math::log2(scale());
+		return math::log2(species());
 	}
 
 	inline u32 numof(const u32& t) const {
