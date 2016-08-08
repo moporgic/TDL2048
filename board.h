@@ -91,8 +91,8 @@ public:
 		typedef std::array<u16, 32> info;
 		const u32 raw; // base row (16-bit raw)
 		const u32 ext; // base row (4-bit extra)
-		const u32 merge; // number of merged tiles
 		const u32 species; // species of this row
+		const u32 merge; // number of merged tiles
 		const operation left; // left operation
 		const operation right; // right operation
 		const info numof; // number of each tile-type
@@ -130,15 +130,15 @@ public:
 			mvleft(L, score, merge, mono);
 			u32 mvL = assign(L, Ll, Lh, hraw, hext);
 			std::reverse(Ll, Ll + 4); std::reverse(Lh, Lh + 4);
-			moved = mvL == r ? -1 : 0;
-			map(vraw, vext, Ll, Lh, 12, 8, 4, 0);
+			moved = (mvL == r) ? -1 : 0;
+			map(vraw, vext, Ll, Lh);
 			operation left(hraw, hext, vraw, vext, score, moved, mono);
 
 			mvleft(R, score, merge, mono); std::reverse(R, R + 4);
 			u32 mvR = assign(R, Rl, Rh, hraw, hext);
 			std::reverse(Rl, Rl + 4); std::reverse(Rh, Rh + 4);
-			moved = mvR == r ? -1 : 0;
-			map(vraw, vext, Rl, Rh, 12, 8, 4, 0);
+			moved = (mvR == r) ? -1 : 0;
+			map(vraw, vext, Rl, Rh);
 			operation right(hraw, hext, vraw, vext, score, moved, mono);
 
 			u32 species = 0;
@@ -181,10 +181,10 @@ public:
 			ext = ((hi[0] << 0) | (hi[1] << 1) | (hi[2] << 2) | (hi[3] << 3)) << 16;
 			return raw | ext;
 		}
-		static void map(u64& raw, u32& ext, u32 lo[], u32 hi[], int s0, int s1, int s2, int s3) {
-			raw = (u64(lo[0]) << (s0 << 2)) | (u64(lo[1]) << (s1 << 2))
-				| (u64(lo[2]) << (s2 << 2)) | (u64(lo[3]) << (s3 << 2));
-			ext = ((hi[0] << s0) | (hi[1] << s1) | (hi[2] << s2) | (hi[3] << s3)) << 16;
+		static void map(u64& raw, u32& ext, u32 lo[], u32 hi[]) {
+			raw = (u64(lo[0]) << 48) | (u64(lo[1]) << 32)
+				| (u64(lo[2]) << 16) | (u64(lo[3]) << 0);
+			ext = ((hi[0] << 12) | (hi[1] << 8) | (hi[2] << 4) | (hi[3] << 0)) << 16;
 		}
 		static void mvleft(u32 row[], u32& score, u32& merge, u32& mono) {
 			u32 top = 0;
@@ -242,10 +242,10 @@ public:
 	inline bool operator==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
 	inline bool operator!=(const u64& raw) const { return this->raw != raw || this->ext != 0; }
 
-	inline u32 fetch(const u32& i) const { return fetch16(i); }
+	inline u32  fetch(const u32& i) const { return fetch16(i); }
 	inline void place(const u32& i, const u32& r) { place16(i, r); }
-	inline u32 at(const u32& i) const { return at4(i); }
-	inline u32 exact(const u32& i) const { return (1 << at(i)) & 0xfffffffe; }
+	inline u32  at(const u32& i) const { return at4(i); }
+	inline u32  exact(const u32& i) const { return (1 << at(i)) & 0xfffffffe; }
 	inline void set(const u32& i, const u32& t) { set4(i, t); }
 	inline void mirror() { mirror64(); }
 	inline void flip() { flip64(); }
@@ -319,8 +319,8 @@ public:
 
 	inline void init() {
 		u32 k = std::rand();
-		u32 i = (k) & 0x0f;
-		u32 j = (i + (k >> 4) + 1) & 0x0f;
+		u32 i = (k) % 16;
+		u32 j = (i + 1 + (k >> 4) % 15) % 16;
 //		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
 		u32 r = std::rand() % 100;
 		raw =  (r >=  1 ? 1ULL : 2ULL) << (i << 2);
@@ -501,13 +501,14 @@ public:
 	inline u32 species() const {
 		return query(0).species | query(1).species | query(2).species | query(3).species;
 	}
+	inline u32 scale() const { return species(); }
 	inline u32 hash() const {
 		u32 h = 0;
 		for (u32 i = 0; i < 16; i++) h |= (1 << at(i));
 		return h;
 	}
 	inline u32 max() const {
-		return math::log2(species());
+		return math::log2(scale());
 	}
 
 	inline u32 numof(const u32& t) const {
