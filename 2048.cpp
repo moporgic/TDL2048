@@ -56,14 +56,14 @@ public:
 		case 0:
 			out.write(r32(sign).le(), 4);
 			out.write(r64(size).le(), 8);
-			write<r32>(out);
+			write<r32, f32>(out);
 			break;
 		case 1:
 			out.write(r32(sign).le(), 4);
 			out.write(r64(size).le(), 8);
 			switch (sizeof(numeric)) {
-			case 4: write<r32>(out); break;
-			case 8: write<r64>(out); break;
+			case 4: write<r32, f32>(out); break;
+			case 8: write<r64, f64>(out); break;
 			}
 			break;
 		case 2:
@@ -71,8 +71,8 @@ public:
 			out.write(r64(size).le(), 8);
 			out.write(r16(sizeof(numeric)).le(), 2);
 			switch (sizeof(numeric)) {
-			case 4: write<r32>(out); break;
-			case 8: write<r64>(out); break;
+			case 4: write<r32, f32>(out); break;
+			case 8: write<r64, f64>(out); break;
 			}
 			break;
 		default:
@@ -88,15 +88,15 @@ public:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
 			value = alloc(size);
-			read<r32>(in);
+			read<r32, f32>(in);
 			break;
 		case 1:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
 			value = alloc(size);
 			switch (sizeof(numeric)) {
-			case 4: read<r32>(in); break;
-			case 8: read<r64>(in); break;
+			case 4: read<r32, f32>(in); break;
+			case 8: read<r64, f64>(in); break;
 			}
 			break;
 		case 2:
@@ -104,8 +104,8 @@ public:
 			size = r64(load(8)).le();
 			value = alloc(size);
 			switch (u32(r16(load(2)).le())) {
-			case 4: read<r32>(in); break;
-			case 8: read<r64>(in); break;
+			case 4: read<r32, f32>(in); break;
+			case 8: read<r64, f64>(in); break;
 			}
 			break;
 		default:
@@ -169,15 +169,21 @@ private:
 		return new numeric[size]();
 	}
 
-	template<typename rxx> void write(std::ostream& out) const {
-		for (size_t i = 0; i < size; i++)
-			out.write(rxx(value[i]).le(), sizeof(rxx));
+	template<typename rawx = r64, typename cast = double>
+	void write(std::ostream& out) const {
+		for (size_t i = 0; i < size; i++) {
+			rawx raw(cast(value[i]));
+			out.write(raw.le(), sizeof(rawx));
+		}
 	}
-	template<typename rxx> void read(std::istream& in) {
+	template<typename rawx = r64, typename cast = double>
+	void read(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		for (size_t i = 0; i < size; i++)
-			value[i] = rxx(load(sizeof(rxx))).le();
+		for (size_t i = 0; i < size; i++) {
+			rawx raw(load(sizeof(rawx)));
+			value[i] = cast(raw.le());
+		}
 	}
 
 	u32 sign;
