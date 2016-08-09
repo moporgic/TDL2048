@@ -1050,12 +1050,6 @@ inline numeric update(const board& state, const numeric& updv,
 	return esti;
 }
 
-inline numeric update(const board& state,
-		const numeric& curr, const numeric& accu, const numeric& alpha = moporgic::alpha,
-		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
-	return update(state, alpha * (accu - curr), begin, end);
-}
-
 void list_mapping() {
 	for (weight w : weight::list()) {
 		u32 usageK = (sizeof(numeric) * w.length()) >> 10;
