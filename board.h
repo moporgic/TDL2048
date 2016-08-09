@@ -88,6 +88,7 @@ public:
 			operation(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved, u32 mono)
 				: rawh(rawh), exth(exth), rawv(rawv), extv(extv), score(score), moved(moved), mono(mono) {}
 		};
+
 		typedef std::array<u16, 32> info;
 		const u32 raw; // base row (16-bit raw)
 		const u32 ext; // base row (4-bit extra)
@@ -98,7 +99,7 @@ public:
 		const info numof; // number of each tile-type
 		const info mask; // mask of each tile-type
 		const list num; // number of 0~f tile-type
-		const list pos; // layout of board-type
+		const list layout; // layout of board-type
 		const i32 moved; // moved or not
 		const u32 legal; // legal actions
 
@@ -109,16 +110,15 @@ public:
 		static cache make(const u32& r) {
 			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
 
+			u32 raw = r & 0x0ffff;
+			u32 ext = r & 0xf0000;
+
 			u32 V[4] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
 						((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
-			u32 L[4] = { V[0], V[1], V[2], V[3] }, Ll[4], Lh[4];
-			u32 R[4] = { V[3], V[2], V[1], V[0] }, Rl[4], Rh[4]; // mirrored
-
-			u32 raw, ext;
-			assign(L, Ll, Lh, raw, ext);
+			u32 L[4] = { V[0], V[1], V[2], V[3] };
+			u32 R[4] = { V[3], V[2], V[1], V[0] }; // mirrored
 
 			u32 merge;
-
 			u32 hraw;
 			u32 hext;
 			u64 vraw;
@@ -128,63 +128,58 @@ public:
 			u32 mono;
 
 			mvleft(L, score, merge, mono);
-			u32 mvL = assign(L, Ll, Lh, hraw, hext);
-			std::reverse(Ll, Ll + 4); std::reverse(Lh, Lh + 4);
-			moved = (mvL == r) ? -1 : 0;
-			map(vraw, vext, Ll, Lh);
+			assign(L, hraw, hext, vraw, vext);
+			moved = ((hraw | hext) == r) ? -1 : 0;
 			operation left(hraw, hext, vraw, vext, score, moved, mono);
 
 			mvleft(R, score, merge, mono); std::reverse(R, R + 4);
-			u32 mvR = assign(R, Rl, Rh, hraw, hext);
-			std::reverse(Rl, Rl + 4); std::reverse(Rh, Rh + 4);
-			moved = (mvR == r) ? -1 : 0;
-			map(vraw, vext, Rl, Rh);
+			assign(R, hraw, hext, vraw, vext);
+			moved = ((hraw | hext) == r) ? -1 : 0;
 			operation right(hraw, hext, vraw, vext, score, moved, mono);
 
 			u32 species = 0;
 			info numof = {};
 			info mask = {};
-			u64 numv = 0;
+			list num(0, 16);
 			for (int i = 0; i < 4; i++) {
 				species |= (1 << V[i]);
 				numof[V[i]]++;
 				mask[V[i]] |= (1 << i);
-				numv += (1ULL << (V[i] << 2));
+				num.tile += (1ULL << (V[i] << 2));
 			}
 
-			u64 ltile = 0;
-			u32 lsize = 0;
+			list layout;
+			auto tilemask = r;
 			for (int i = 0; i < 16; i++) {
-				if ((r >> i) & 1) ltile |= (u64(i) << ((lsize++) << 2));
+				if ((tilemask >> i) & 1) // map bit-location to index
+					layout.tile |= (u64(i) << ((layout.size++) << 2));
 			}
-			list pos(ltile, lsize);
-			moved = left.moved & right.moved;
-			u32 legal = 0;
-			if (mvL != r) legal |= (0x08 | 0x01);
-			if (mvR != r) legal |= (0x02 | 0x04);
-			list num(numv, 16);
 
-			return cache(raw, ext, species, merge, left, right, numof, mask, num, pos, moved, legal);
+			moved = left.moved & right.moved;
+
+			u32 legal = 0;
+			if (left.moved == 0)  legal |= (0x08 | 0x01);
+			if (right.moved == 0) legal |= (0x02 | 0x04);
+
+			return cache(raw, ext, species, merge, left, right, numof, mask, num, layout, moved, legal);
 		}
 	private:
 		cache(u32 raw, u32 ext, u32 species, u32 merge, operation left, operation right,
-			  info numof, info mask, list num, list pos, i32 moved, u32 legal)
-				: raw(raw), ext(ext), species(species), merge(merge), left(left), right(right),
-				  numof(numof), mask(mask), num(num), pos(pos), moved(moved), legal(legal) {}
+			  info numof, info mask, list num, list layout, i32 moved, u32 legal)
+		: raw(raw), ext(ext), species(species), merge(merge), left(left), right(right),
+		  numof(numof), mask(mask), num(num), layout(layout), moved(moved), legal(legal) {}
 
-		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
+		static void assign(u32 src[], u32& raw, u32& ext, u64& vraw, u32& vext) {
+			u32 lo[4], hi[4];
 			for (u32 i = 0; i < 4; i++) {
 				hi[i] = (src[i] & 0x10) >> 4;
 				lo[i] = (src[i] & 0x0f);
 			}
 			raw = ((lo[0] << 0) | (lo[1] << 4) | (lo[2] << 8) | (lo[3] << 12));
 			ext = ((hi[0] << 0) | (hi[1] << 1) | (hi[2] << 2) | (hi[3] << 3)) << 16;
-			return raw | ext;
-		}
-		static void map(u64& raw, u32& ext, u32 lo[], u32 hi[]) {
-			raw = (u64(lo[0]) << 48) | (u64(lo[1]) << 32)
-				| (u64(lo[2]) << 16) | (u64(lo[3]) << 0);
-			ext = ((hi[0] << 12) | (hi[1] << 8) | (hi[2] << 4) | (hi[3] << 0)) << 16;
+
+			vraw = (u64(lo[0]) << 0) | (u64(lo[1]) << 16) | (u64(lo[2]) << 32) | (u64(lo[3]) << 48);
+			vext = ((hi[0] << 0) | (hi[1] << 4) | (hi[2] << 8) | (hi[3] << 12)) << 16;
 		}
 		static void mvleft(u32 row[], u32& score, u32& merge, u32& mono) {
 			u32 top = 0;
@@ -557,6 +552,10 @@ public:
 		}
 	}
 
+	inline list find(const u32& t) const {
+		return board::lookup(mask(t)).layout;
+	}
+
 	inline u32 mono(const bool& left = true) const {
 		if (left) {
 			return (query(0).left.mono << 0)  | (query(1).left.mono << 6)
@@ -565,10 +564,6 @@ public:
 			return (query(0).right.mono << 0)  | (query(1).right.mono << 6)
 				 | (query(2).right.mono << 12) | (query(3).right.mono << 18);
 		}
-	}
-
-	inline list find(const u32& t) const {
-		return board::lookup(mask(t)).pos;
 	}
 
 	inline const cache& query(const u32& r) const {
