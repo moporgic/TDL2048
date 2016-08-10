@@ -47,10 +47,12 @@ public:
 	inline numeric& operator [](const u64& i) { return value[i]; }
 	inline numeric& operator ()(const u64& i, const numeric& updv) {
 		numeric cupdv = lasta[i] * updv;
-		value[i] += cupdv;
-		accum[i] += cupdv;
-		updvu[i] += std::abs(cupdv);
-		lasta[i] = std::abs(accum[i]) / updvu[i];
+		if (cupdv != 0) {
+			value[i] += cupdv;
+			accum[i] += cupdv;
+			updvu[i] += std::abs(cupdv);
+			lasta[i] = std::abs(accum[i]) / updvu[i];
+		}
 		return value[i];
 	}
 
