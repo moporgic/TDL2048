@@ -2,7 +2,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 2.71
+// Version     : 3.0
 // Description : bitboard of 2048
 //============================================================================
 #include "moporgic/type.h"
@@ -57,27 +57,30 @@ public:
 			const i32 moved; // moved or not (moved: 0, otherwise -1)
 			const u32 mono; // monotonic decreasing value (6-bit)
 
-			inline void moveh(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { moveh64(raw, ext, sc, mv, i); }
-			inline void movev(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const { movev64(raw, ext, sc, mv, i); }
-
-			inline void moveh64(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
+			template<int i>
+			inline void moveh64(u64& raw, u32& sc, i32& mv) const {
 				raw |= u64(rawh) << (i << 4);
 				sc += score;
 				mv &= moved;
 			}
-			inline void moveh80(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
-				moveh64(raw, ext, sc, mv, i);
+			template<int i>
+			inline void moveh80(u64& raw, u32& ext, u32& sc, i32& mv) const {
+				moveh64<i>(raw, sc, mv);
 				ext |= exth << (i << 2);
 			}
-			inline void movev64(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
+
+			template<int i>
+			inline void movev64(u64& raw, u32& sc, i32& mv) const {
 				raw |= rawv << (i << 2);
 				sc += score;
 				mv &= moved;
 			}
-			inline void movev80(u64& raw, u32& ext, u32& sc, i32& mv, const int& i) const {
-				movev64(raw, ext, sc, mv, i);
+			template<int i>
+			inline void movev80(u64& raw, u32& ext, u32& sc, i32& mv) const {
+				movev64<i>(raw, sc, mv);
 				ext |= extv << i;
 			}
+
 			operation(const operation& op) = default;
 			operation() = delete;
 			~operation() = default;
@@ -85,16 +88,18 @@ public:
 			operation(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved, u32 mono)
 				: rawh(rawh), exth(exth), rawv(rawv), extv(extv), score(score), moved(moved), mono(mono) {}
 		};
+
 		typedef std::array<u16, 32> info;
 		const u32 raw; // base row (16-bit raw)
 		const u32 ext; // base row (4-bit extra)
-		const u32 scale; // hash of this row
+		const u32 species; // species of this row
 		const u32 merge; // number of merged tiles
 		const operation left; // left operation
 		const operation right; // right operation
-		const info count; // number of each tile-type
+		const info numof; // number of each tile-type
 		const info mask; // mask of each tile-type
-		const list pos; // layout of board-type
+		const list num; // number of 0~f tile-type
+		const list layout; // layout of board-type
 		const i32 moved; // moved or not
 		const u32 legal; // legal actions
 
@@ -105,16 +110,15 @@ public:
 		static cache make(const u32& r) {
 			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
 
+			u32 raw = r & 0x0ffff;
+			u32 ext = r & 0xf0000;
+
 			u32 V[4] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
 						((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
-			u32 L[4] = { V[0], V[1], V[2], V[3] }, Ll[4], Lh[4];
-			u32 R[4] = { V[3], V[2], V[1], V[0] }, Rl[4], Rh[4]; // mirrored
-
-			u32 raw, ext;
-			assign(L, Ll, Lh, raw, ext);
+			u32 L[4] = { V[0], V[1], V[2], V[3] };
+			u32 R[4] = { V[3], V[2], V[1], V[0] }; // mirrored
 
 			u32 merge;
-
 			u32 hraw;
 			u32 hext;
 			u64 vraw;
@@ -124,60 +128,58 @@ public:
 			u32 mono;
 
 			mvleft(L, score, merge, mono);
-			u32 mvL = assign(L, Ll, Lh, hraw, hext);
-			std::reverse(Ll, Ll + 4); std::reverse(Lh, Lh + 4);
-			moved = mvL == r ? -1 : 0;
-			map(vraw, vext, Ll, Lh, 12, 8, 4, 0);
+			assign(L, hraw, hext, vraw, vext);
+			moved = ((hraw | hext) == r) ? -1 : 0;
 			operation left(hraw, hext, vraw, vext, score, moved, mono);
 
 			mvleft(R, score, merge, mono); std::reverse(R, R + 4);
-			u32 mvR = assign(R, Rl, Rh, hraw, hext);
-			std::reverse(Rl, Rl + 4); std::reverse(Rh, Rh + 4);
-			moved = mvR == r ? -1 : 0;
-			map(vraw, vext, Rl, Rh, 12, 8, 4, 0);
+			assign(R, hraw, hext, vraw, vext);
+			moved = ((hraw | hext) == r) ? -1 : 0;
 			operation right(hraw, hext, vraw, vext, score, moved, mono);
 
-			u32 scale = 0;
-			info count = {};
+			u32 species = 0;
+			info numof = {};
 			info mask = {};
+			list num(0, 16);
 			for (int i = 0; i < 4; i++) {
-				scale |= (1 << V[i]);
-				count[V[i]]++;
+				species |= (1 << V[i]);
+				numof[V[i]]++;
 				mask[V[i]] |= (1 << i);
+				num.tile += (1ULL << (V[i] << 2));
 			}
 
-			u64 ltile = 0;
-			u32 lsize = 0;
+			list layout;
+			auto tilemask = r;
 			for (int i = 0; i < 16; i++) {
-				if ((r >> i) & 1) ltile |= (u64(i) << ((lsize++) << 2));
+				if ((tilemask >> i) & 1) // map bit-location to index
+					layout.tile |= (u64(i) << ((layout.size++) << 2));
 			}
-			list pos(ltile, lsize);
-			moved = left.moved & right.moved;
-			u32 legal = 0;
-			if (mvL != r) legal |= (0x08 | 0x01);
-			if (mvR != r) legal |= (0x02 | 0x04);
 
-			return cache(raw, ext, scale, merge, left, right, count, mask, pos, moved, legal);
+			moved = left.moved & right.moved;
+
+			u32 legal = 0;
+			if (left.moved == 0)  legal |= (0x08 | 0x01);
+			if (right.moved == 0) legal |= (0x02 | 0x04);
+
+			return cache(raw, ext, species, merge, left, right, numof, mask, num, layout, moved, legal);
 		}
 	private:
-		cache(u32 raw, u32 ext, u32 scale, u32 merge, operation left, operation right,
-			info count, info mask, list pos, i32 moved, u32 legal)
-				: raw(raw), ext(ext), scale(scale), merge(merge), left(left), right(right),
-				  count(count), mask(mask), pos(pos), moved(moved), legal(legal) {}
+		cache(u32 raw, u32 ext, u32 species, u32 merge, operation left, operation right,
+			  info numof, info mask, list num, list layout, i32 moved, u32 legal)
+		: raw(raw), ext(ext), species(species), merge(merge), left(left), right(right),
+		  numof(numof), mask(mask), num(num), layout(layout), moved(moved), legal(legal) {}
 
-		static u32 assign(u32 src[], u32 lo[], u32 hi[], u32& raw, u32& ext) {
+		static void assign(u32 src[], u32& raw, u32& ext, u64& vraw, u32& vext) {
+			u32 lo[4], hi[4];
 			for (u32 i = 0; i < 4; i++) {
 				hi[i] = (src[i] & 0x10) >> 4;
 				lo[i] = (src[i] & 0x0f);
 			}
 			raw = ((lo[0] << 0) | (lo[1] << 4) | (lo[2] << 8) | (lo[3] << 12));
 			ext = ((hi[0] << 0) | (hi[1] << 1) | (hi[2] << 2) | (hi[3] << 3)) << 16;
-			return raw | ext;
-		}
-		static void map(u64& raw, u32& ext, u32 lo[], u32 hi[], int s0, int s1, int s2, int s3) {
-			raw = (u64(lo[0]) << (s0 << 2)) | (u64(lo[1]) << (s1 << 2))
-				| (u64(lo[2]) << (s2 << 2)) | (u64(lo[3]) << (s3 << 2));
-			ext = ((hi[0] << s0) | (hi[1] << s1) | (hi[2] << s2) | (hi[3] << s3)) << 16;
+
+			vraw = (u64(lo[0]) << 0) | (u64(lo[1]) << 16) | (u64(lo[2]) << 32) | (u64(lo[3]) << 48);
+			vext = ((hi[0] << 0) | (hi[1] << 4) | (hi[2] << 8) | (hi[3] << 12)) << 16;
 		}
 		static void mvleft(u32 row[], u32& score, u32& merge, u32& mono) {
 			u32 top = 0;
@@ -235,10 +237,10 @@ public:
 	inline bool operator==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
 	inline bool operator!=(const u64& raw) const { return this->raw != raw || this->ext != 0; }
 
-	inline u32 fetch(const u32& i) const { return fetch16(i); }
+	inline u32  fetch(const u32& i) const { return fetch16(i); }
 	inline void place(const u32& i, const u32& r) { place16(i, r); }
-	inline u32 at(const u32& i) const { return at4(i); }
-	inline u32 exact(const u32& i) const { return (1 << at(i)) & 0xfffffffe; }
+	inline u32  at(const u32& i) const { return at4(i); }
+	inline u32  exact(const u32& i) const { return (1 << at(i)) & 0xfffffffe; }
 	inline void set(const u32& i, const u32& t) { set4(i, t); }
 	inline void mirror() { mirror64(); }
 	inline void flip() { flip64(); }
@@ -312,8 +314,8 @@ public:
 
 	inline void init() {
 		u32 k = std::rand();
-		u32 i = (k) & 0x0f;
-		u32 j = (i + (k >> 4) + 1) & 0x0f;
+		u32 i = (k) % 16;
+		u32 j = (i + 1 + (k >> 4) % 15) % 16;
 //		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
 		u32 r = std::rand() % 100;
 		raw =  (r >=  1 ? 1ULL : 2ULL) << (i << 2);
@@ -363,56 +365,108 @@ public:
 		rotate(i);
 	}
 
-	inline i32 left() {
+	inline i32 left() { return left64(); }
+	inline i32 right() { return right64(); }
+	inline i32 up() { return up64(); }
+	inline i32 down() { return down64(); }
+
+	inline i32 left64() {
+		register u64 rawn = 0;
+		register u32 score = 0;
+		register i32 moved = -1;
+		query(0).left.moveh64<0>(rawn, score, moved);
+		query(1).left.moveh64<1>(rawn, score, moved);
+		query(2).left.moveh64<2>(rawn, score, moved);
+		query(3).left.moveh64<3>(rawn, score, moved);
+		raw = rawn;
+		return score | moved;
+	}
+	inline i32 right64() {
+		register u64 rawn = 0;
+		register u32 score = 0;
+		register i32 moved = -1;
+		query(0).right.moveh64<0>(rawn, score, moved);
+		query(1).right.moveh64<1>(rawn, score, moved);
+		query(2).right.moveh64<2>(rawn, score, moved);
+		query(3).right.moveh64<3>(rawn, score, moved);
+		raw = rawn;
+		return score | moved;
+	}
+	inline i32 up64() {
+		transpose();
+		register u64 rawn = 0;
+		register u32 score = 0;
+		register i32 moved = -1;
+		query(0).left.movev64<0>(rawn, score, moved);
+		query(1).left.movev64<1>(rawn, score, moved);
+		query(2).left.movev64<2>(rawn, score, moved);
+		query(3).left.movev64<3>(rawn, score, moved);
+		raw = rawn;
+		return score | moved;
+	}
+	inline i32 down64() {
+		transpose();
+		register u64 rawn = 0;
+		register u32 score = 0;
+		register i32 moved = -1;
+		query(0).right.movev64<0>(rawn, score, moved);
+		query(1).right.movev64<1>(rawn, score, moved);
+		query(2).right.movev64<2>(rawn, score, moved);
+		query(3).right.movev64<3>(rawn, score, moved);
+		raw = rawn;
+		return score | moved;
+	}
+
+	inline i32 left80() {
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.moveh(rawn, extn, score, moved, 0);
-		query(1).left.moveh(rawn, extn, score, moved, 1);
-		query(2).left.moveh(rawn, extn, score, moved, 2);
-		query(3).left.moveh(rawn, extn, score, moved, 3);
+		query(0).left.moveh80<0>(rawn, extn, score, moved);
+		query(1).left.moveh80<1>(rawn, extn, score, moved);
+		query(2).left.moveh80<2>(rawn, extn, score, moved);
+		query(3).left.moveh80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
 	}
-	inline i32 right() {
+	inline i32 right80() {
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.moveh(rawn, extn, score, moved, 0);
-		query(1).right.moveh(rawn, extn, score, moved, 1);
-		query(2).right.moveh(rawn, extn, score, moved, 2);
-		query(3).right.moveh(rawn, extn, score, moved, 3);
+		query(0).right.moveh80<0>(rawn, extn, score, moved);
+		query(1).right.moveh80<1>(rawn, extn, score, moved);
+		query(2).right.moveh80<2>(rawn, extn, score, moved);
+		query(3).right.moveh80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
 	}
-	inline i32 up() {
+	inline i32 up80() {
 		transpose();
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.movev(rawn, extn, score, moved, 0);
-		query(1).left.movev(rawn, extn, score, moved, 1);
-		query(2).left.movev(rawn, extn, score, moved, 2);
-		query(3).left.movev(rawn, extn, score, moved, 3);
+		query(0).left.movev80<0>(rawn, extn, score, moved);
+		query(1).left.movev80<1>(rawn, extn, score, moved);
+		query(2).left.movev80<2>(rawn, extn, score, moved);
+		query(3).left.movev80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
 	}
-	inline i32 down() {
+	inline i32 down80() {
 		transpose();
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.movev(rawn, extn, score, moved, 0);
-		query(1).right.movev(rawn, extn, score, moved, 1);
-		query(2).right.movev(rawn, extn, score, moved, 2);
-		query(3).right.movev(rawn, extn, score, moved, 3);
+		query(0).right.movev80<0>(rawn, extn, score, moved);
+		query(1).right.movev80<1>(rawn, extn, score, moved);
+		query(2).right.movev80<2>(rawn, extn, score, moved);
+		query(3).right.movev80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -439,26 +493,48 @@ public:
 	}
 	inline i32 move(const optype::oper& op) { return operate(op); }
 
-	inline u32 scale() const {
-		return query(0).scale | query(1).scale | query(2).scale | query(3).scale;
+	inline u32 species() const {
+		return query(0).species | query(1).species | query(2).species | query(3).species;
 	}
-	inline u32 hash() const { return scale(); }
+	inline u32 scale() const { return species(); }
+	inline u32 hash() const {
+		u32 h = 0;
+		for (u32 i = 0; i < 16; i++) h |= (1 << at(i));
+		return h;
+	}
 	inline u32 max() const {
 		return math::log2(scale());
 	}
 
+	inline u32 numof(const u32& t) const {
+		return query(0).numof[t] + query(1).numof[t] + query(2).numof[t] + query(3).numof[t];
+	}
+	template<typename numa>
+	inline void numof(numa num, const u32& min, const u32& max) const {
+		const cache::info& numof0 = query(0).numof;
+		const cache::info& numof1 = query(1).numof;
+		const cache::info& numof2 = query(2).numof;
+		const cache::info& numof3 = query(3).numof;
+		for (u32 i = min; i < max; i++) {
+			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
+		}
+	}
+	inline list numof() const {
+		u64 num = query(0).num.tile + query(1).num.tile + query(2).num.tile + query(3).num.tile;
+		return list(num, 16);
+	}
+
 	inline u32 count(const u32& t) const {
-		return query(0).count[t] + query(1).count[t] + query(2).count[t] + query(3).count[t];
+		register u32 num = 0;
+		for (u32 i = 0; i < 16; i++)
+			if (at(i) == t) num++;
+		return num;
 	}
 	template<typename numa>
 	inline void count(numa num, const u32& min, const u32& max) const {
-		const cache::info& count0 = query(0).count;
-		const cache::info& count1 = query(1).count;
-		const cache::info& count2 = query(2).count;
-		const cache::info& count3 = query(3).count;
-		for (u32 i = min; i < max; i++) {
-			num[i] = count0[i] + count1[i] + count2[i] + count3[i];
-		}
+		std::fill(num + min, num + max, 0);
+		for (u32 i = 0; i < 16; i++)
+			num[at(i)]++;
 	}
 
 	inline u32 mask(const u32& t) const {
@@ -476,6 +552,10 @@ public:
 		}
 	}
 
+	inline list find(const u32& t) const {
+		return board::lookup(mask(t)).layout;
+	}
+
 	inline u32 mono(const bool& left = true) const {
 		if (left) {
 			return (query(0).left.mono << 0)  | (query(1).left.mono << 6)
@@ -484,10 +564,6 @@ public:
 			return (query(0).right.mono << 0)  | (query(1).right.mono << 6)
 				 | (query(2).right.mono << 12) | (query(3).right.mono << 18);
 		}
-	}
-
-	inline list find(const u32& t) const {
-		return board::lookup(mask(t)).pos;
 	}
 
 	inline const cache& query(const u32& r) const {
