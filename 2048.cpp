@@ -396,10 +396,10 @@ private:
 	u64 seedb;
 };
 
-class cache {
+class transposition {
 public:
 	class entry {
-	friend class cache;
+	friend class transposition;
 	public:
 		u64 sign;
 		i32 depth;
@@ -415,18 +415,17 @@ public:
 			esti = 0;
 		}
 	};
-	class line {
-	friend class cache;
+	class hashed {
+	friend class transposition;
 	public:
-		entry* mem;
-		size_t idx;
-		inline line() : mem(nullptr), idx(0) {}
+		entry* pool;
+		size_t hit;
+		inline line() : pool(nullptr), hit(0) {}
 
-		inline void init(size_t limit) { mem = new entry[limit](); }
-		inline entry& operator [](const int& i) { return mem[i]; }
+		inline entry& operator [](const int& i) { return pool[i]; }
 	};
 
-	cache() : zhash(), memory(nullptr), size(0), limit(0) {}
+	transposition() : zhash(), cache(nullptr), size(0), limit(0) {}
 
 	inline entry& operator[] (const board& b) {
 
@@ -442,12 +441,12 @@ public:
 			}
 		}
 
-		line& ln = memory[hash % size];
-		size_t valid = std::min(ln.idx, limit);
+		hashed& ln = cache[hash % size];
+		size_t valid = std::min(ln.hit, limit);
 		for (size_t i = 0; i < valid; i++)
 			if (ln[i] == min) return ln[i];
 
-		entry& en = ln[ln.idx++ % limit];
+		entry& en = ln[ln.hit++ % limit];
 		en.reset(min.raw);
 		return en;
 
@@ -456,9 +455,7 @@ public:
 	void init(const u64& len, const u64& lim) {
 		size = len;
 		limit = lim;
-		memory = new line[size]();
-		for (size_t i = 0; i < size; i++)
-			memory[i].init(limit);
+		cache = alloc(size, limit);
 	}
 
 	void operator >>(std::ostream& out) const {
@@ -470,11 +467,11 @@ public:
 			out.write(r64(u64(size)).le(), 8);
 			out.write(r64(u64(limit)).le(), 8);
 			for (size_t s = 0; s < size; s++) {
-				line& ln = memory[s];
-				out.write(r64(u64(ln.idx)).le(), 8);
-				u32 valid = std::min(ln.idx, limit);
+				hashed& ln = cache[s];
+				out.write(r64(u64(ln.hit)).le(), 8);
+				u32 valid = std::min(ln.hit, limit);
 				for (u32 v = 0; v < valid; v++) {
-					entry& en = ln.mem[v];
+					entry& en = ln[v];
 					out.write(r64(en.sign).le(), 8);
 					out.write(r32(en.depth).le(), 4);
 					out.write(r32(en.esti).le(), 4);
@@ -482,7 +479,7 @@ public:
 			}
 			break;
 		default:
-			std::cerr << "unknown serial at cache::>>" << std::endl;
+			std::cerr << "unknown serial at transposition::>>" << std::endl;
 			break;
 		}
 	}
@@ -494,14 +491,13 @@ public:
 			zhash << in;
 			size = u64(r64(load(8)).le());
 			limit = u64(r64(load(8)).le());
-			memory = new line[size]();
+			cache = alloc(size, limit);
 			for (size_t s = 0; s < size; s++) {
-				line& ln = memory[s];
-				ln.mem = new entry[limit]();
-				ln.idx = u64(r64(load(8)).le());
-				u32 valid = std::min(ln.idx, limit);
+				hashed& ln = cache[s];
+				ln.hit = u64(r64(load(8)).le());
+				u32 valid = std::min(ln.hit, limit);
 				for (u32 v = 0; v < valid; v++) {
-					entry& en = ln.mem[v];
+					entry& en = ln[v];
 					en.sign = r64(load(8)).le();
 					en.depth = r32(load(4)).le();
 					en.esti = r32(load(4)).le();
@@ -509,13 +505,21 @@ public:
 			}
 			break;
 		default:
-			std::cerr << "unknown serial at cache::<<" << std::endl;
+			std::cerr << "unknown serial at transposition::<<" << std::endl;
 			break;
 		}
 	}
+
+	static inline hashed* alloc(size_t size, size_t limit) {
+		hashed* ln = new hashed[size]();
+		for (size_t i = 0; i < size; i++)
+			ln[i].pool = new entry[limit]();
+		return ln;
+	}
+
 private:
 	zhasher zhash;
-	line* memory;
+	hashed* cache;
 	size_t size;
 	size_t limit;
 };
@@ -1239,8 +1243,8 @@ inline numeric update(const board& state, const numeric& updv,
 	return esti;
 }
 
-cache tp;
-void init_cache(u64 size, u32 limit) { tp.init(size, limit); }
+transposition tp;
+void init_transposition(u64 size, u32 limit) { tp.init(size, limit); }
 
 numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end());
@@ -1698,7 +1702,7 @@ int main(int argc, const char* argv[]) {
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
-	utils::init_cache(tpsize, tplimit);
+	utils::init_transposition(tpsize, tplimit);
 	utils::make_indexers();
 
 	if (utils::load_weights(wopts["input"]) == false) {
