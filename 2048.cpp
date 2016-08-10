@@ -335,8 +335,8 @@ class zhasher {
 public:
 	zhasher(const u64& seeda = 0x0000000000000000ULL,
 			const u64& seedb = 0xffffffffffffffffULL) : sign(seeda ^ seedb), seeda(seeda), seedb(seedb) {
-		for (auto& row : map) {
-			for (auto& entry : row) {
+		for (auto& zrow : zhash) {
+			for (auto& entry : zrow) {
 				entry = rand64();
 				sign ^= entry;
 			}
@@ -344,40 +344,76 @@ public:
 	}
 	zhasher(const zhasher& z) = default;
 	~zhasher() = default;
+	inline u64 signature() const { return sign; }
+
 	inline u64 operator ()(const board& b, const bool& after = true) const {
 		register u64 hash = after ? seeda : seedb;
-		hash ^= map[0][b.fetch(0)];
-		hash ^= map[1][b.fetch(1)];
-		hash ^= map[2][b.fetch(2)];
-		hash ^= map[3][b.fetch(3)];
+		hash ^= zhash[0][b.fetch(0)];
+		hash ^= zhash[1][b.fetch(1)];
+		hash ^= zhash[2][b.fetch(2)];
+		hash ^= zhash[3][b.fetch(3)];
 		return hash;
 	}
-	inline u64 signature() const { return sign; }
-//	inline indexer::mapper build() const {
-//		if (indexer::find(sign) != indexer::end())
-//			return indexer::at(sign);
-//		indexer::mapper mapper = std::bind(zhasher::operator (), this);
-//		return indexer::make(sign, mapper);
-//	}
+
+	void operator >>(std::ostream& out) const {
+		const char serial = 0;
+		out.write(&serial, 1);
+		switch (serial) {
+		case 0:
+			out.write(r64(sign).le(), 8);
+			out.write(r64(seeda).le(), 8);
+			out.write(r64(seedb).le(), 8);
+			for (auto& zrow : zhash)
+				for (auto& entry : zrow)
+					out.write(r64(entry).le(), 8);
+			break;
+		default:
+			std::cerr << "unknown serial at zhasher::>>" << std::endl;
+			break;
+		}
+	}
+	void operator <<(std::istream& in) {
+		char buf[8];
+		auto load = moporgic::make_load(in, buf);
+		switch (*load(1)) {
+		case 0:
+			sign = r64(load(8)).le();
+			seeda = r64(load(8)).le();
+			seedb = r64(load(8)).le();
+			for (auto& zrow : zhash)
+				for (auto& entry : zrow)
+					entry = r64(load(8)).le();
+			break;
+		default:
+			std::cerr << "unknown serial at zhasher::<<" << std::endl;
+			break;
+		}
+	}
 private:
 	u64 sign;
-	std::array<std::array<u64, 1 << 20>, 4> map;
+	std::array<std::array<u64, 1 << 20>, 4> zhash;
 	u64 seeda;
 	u64 seedb;
 };
 
 class cache {
 public:
-	typedef float numeric;
 	class entry {
 	friend class cache;
 	public:
 		u64 sign;
 		i32 depth;
 		f32 esti;
-		inline operator bool() const { return depth > 0; }
 		inline entry(const entry& e) = default;
 		inline entry(const u64& sign = 0) : sign(sign), depth(0), esti(0) {}
+
+		inline operator bool() const { return depth > 0; }
+		inline bool operator ==(const board& b) const { return sign == b.raw; }
+		inline void reset(const board& b) {
+			sign = b.raw;
+			depth = 0;
+			esti = 0;
+		}
 	};
 	class line {
 	friend class cache;
@@ -385,7 +421,11 @@ public:
 		entry* mem;
 		size_t idx;
 		inline line() : mem(nullptr), idx(0) {}
+
+		inline void init(size_t limit) { mem = new entry[limit](); }
+		inline entry& operator [](const int& i) { return mem[i]; }
 	};
+
 	cache() : zhash(), memory(nullptr), size(0), limit(0) {}
 
 	inline entry& operator[] (const board& b) {
@@ -395,7 +435,7 @@ public:
 		for (u32 is = 1; is < 8; is++) {
 			board isomo = b;
 			isomo.isomorphic(is);
-			auto h = zhash(isomo);
+			u64 h = zhash(isomo);
 			if (h < hash) {
 				hash = h;
 				min = isomo;
@@ -403,23 +443,75 @@ public:
 		}
 
 		line& ln = memory[hash % size];
-		entry* mem = ln.mem;
-		size_t len = std::min(ln.idx, limit);
-		for (size_t i = 0; i < len; i++)
-			if (mem[i].sign == min.raw)
-				return mem[i];
-		entry& en = mem[ln.idx++ % limit];
-		en = entry(min.raw);
+		size_t valid = std::min(ln.idx, limit);
+		for (size_t i = 0; i < valid; i++)
+			if (ln[i] == min) return ln[i];
+
+		entry& en = ln[ln.idx++ % limit];
+		en.reset(min.raw);
 		return en;
 
 	}
 
-	void init(const u64& s, const u64& lim) {
-		size = s;
+	void init(const u64& len, const u64& lim) {
+		size = len;
 		limit = lim;
 		memory = new line[size]();
-		for (size_t i = 0; i < s; i++)
-			memory[i].mem = new entry[limit]();
+		for (size_t i = 0; i < size; i++)
+			memory[i].init(limit);
+	}
+
+	void operator >>(std::ostream& out) const {
+		const char serial = 0;
+		out.write(&serial, 1);
+		switch (serial) {
+		case 0:
+			zhash >> out;
+			out.write(r64(u64(size)).le(), 8);
+			out.write(r64(u64(limit)).le(), 8);
+			for (size_t s = 0; s < size; s++) {
+				line& ln = memory[s];
+				out.write(r64(u64(ln.idx)).le(), 8);
+				u32 valid = std::min(ln.idx, limit);
+				for (u32 v = 0; v < valid; v++) {
+					entry& en = ln.mem[v];
+					out.write(r64(en.sign).le(), 8);
+					out.write(r32(en.depth).le(), 4);
+					out.write(r32(en.esti).le(), 4);
+				}
+			}
+			break;
+		default:
+			std::cerr << "unknown serial at cache::>>" << std::endl;
+			break;
+		}
+	}
+	void operator <<(std::istream& in) {
+		char buf[8];
+		auto load = moporgic::make_load(in, buf);
+		switch (*load(1)) {
+		case 0:
+			zhash << in;
+			size = u64(r64(load(8)).le());
+			limit = u64(r64(load(8)).le());
+			memory = new line[size]();
+			for (size_t s = 0; s < size; s++) {
+				line& ln = memory[s];
+				ln.mem = new entry[limit]();
+				ln.idx = u64(r64(load(8)).le());
+				u32 valid = std::min(ln.idx, limit);
+				for (u32 v = 0; v < valid; v++) {
+					entry& en = ln.mem[v];
+					en.sign = r64(load(8)).le();
+					en.depth = r32(load(4)).le();
+					en.esti = r32(load(4)).le();
+				}
+			}
+			break;
+		default:
+			std::cerr << "unknown serial at cache::<<" << std::endl;
+			break;
+		}
 	}
 private:
 	zhasher zhash;
