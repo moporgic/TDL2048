@@ -162,11 +162,9 @@ protected:
 			rawx raw(cast(value[i]));
 			rawx acc(cast(accum[i]));
 			rawx upd(cast(updvu[i]));
-			rawx lst(cast(lasta[i]));
 			out.write(raw.le(), sizeof(rawx));
 			out.write(acc.le(), sizeof(rawx));
 			out.write(upd.le(), sizeof(rawx));
-			out.write(lst.le(), sizeof(rawx));
 		}
 	}
 	template<typename rawx = r64, typename cast = double>
@@ -177,11 +175,10 @@ protected:
 			rawx raw(load(sizeof(rawx)));
 			rawx acc(load(sizeof(rawx)));
 			rawx upd(load(sizeof(rawx)));
-			rawx lst(load(sizeof(rawx)));
 			value[i] = cast(raw.le());
 			accum[i] = cast(acc.le());
 			updvu[i] = cast(upd.le());
-			lasta[i] = cast(lst.le());
+			lasta[i] = std::abs(accum[i]) / updvu[i];
 		}
 	}
 
