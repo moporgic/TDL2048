@@ -335,7 +335,8 @@ private:
 class zhasher {
 public:
 	zhasher(const u64& seeda = 0x0000000000000000ULL,
-			const u64& seedb = 0xffffffffffffffffULL) : sign(seeda ^ seedb), seeda(seeda), seedb(seedb) {
+			const u64& seedb = 0xffffffffffffffffULL)
+	: sign(seeda ^ seedb), seeda(seeda), seedb(seedb) {
 		for (auto& zrow : zhash) {
 			for (auto& entry : zrow) {
 				entry = rand64();
@@ -414,10 +415,10 @@ public:
 
 		inline operator bool() const { return depth > 0; }
 		inline bool operator ==(const board& b) const { return sign == b.raw; }
-		inline void reset(const board& b) {
+		inline void init(const board& b, const i32& d = 0, const f32& e = 0) {
 			sign = b.raw;
-			depth = 0;
-			esti = 0;
+			depth = d;
+			esti = e;
 		}
 	};
 	class hashed {
@@ -429,6 +430,8 @@ public:
 		~hashed() { if (pool) delete[] pool; }
 
 		inline entry& operator [](const int& i) { return pool[i]; }
+		inline entry& alloc(const size_t& limit) { return pool[hit++ % limit]; }
+		inline size_t valid(const size_t& limit) const { return std::min(hit, limit); }
 	};
 
 	transposition() : zhash(), cache(nullptr), tpbit(0), limit(0), mask(-1) {}
@@ -449,12 +452,13 @@ public:
 		}
 
 		hashed& ln = cache[hash & mask];
-		size_t valid = std::min(ln.hit, limit);
+		size_t valid = ln.valid(limit);
 		for (size_t i = 0; i < valid; i++)
-			if (ln[i] == min) return ln[i];
+			if (ln[i] == min)
+				return ln[i];
 
-		entry& en = ln[ln.hit++ % limit];
-		en.reset(min.raw);
+		entry& en = ln.alloc(limit);
+		en.init(min.raw);
 		return en;
 
 	}
