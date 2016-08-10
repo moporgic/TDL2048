@@ -33,7 +33,7 @@
 namespace moporgic {
 
 typedef float numeric;
-numeric alpha = 0.1;
+numeric alpha = 0.01;
 const u64 base = 16;
 
 class weight {
