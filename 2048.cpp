@@ -56,14 +56,14 @@ public:
 		case 0:
 			out.write(r32(sign).le(), 4);
 			out.write(r64(size).le(), 8);
-			write<r32>(out);
+			write<r32, f32>(out);
 			break;
 		case 1:
 			out.write(r32(sign).le(), 4);
 			out.write(r64(size).le(), 8);
 			switch (sizeof(numeric)) {
-			case 4: write<r32>(out); break;
-			case 8: write<r64>(out); break;
+			case 4: write<r32, f32>(out); break;
+			case 8: write<r64, f64>(out); break;
 			}
 			break;
 		case 2:
@@ -71,8 +71,8 @@ public:
 			out.write(r64(size).le(), 8);
 			out.write(r16(sizeof(numeric)).le(), 2);
 			switch (sizeof(numeric)) {
-			case 4: write<r32>(out); break;
-			case 8: write<r64>(out); break;
+			case 4: write<r32, f32>(out); break;
+			case 8: write<r64, f64>(out); break;
 			}
 			break;
 		default:
@@ -88,15 +88,15 @@ public:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
 			value = alloc(size);
-			read<r32>(in);
+			read<r32, f32>(in);
 			break;
 		case 1:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
 			value = alloc(size);
 			switch (sizeof(numeric)) {
-			case 4: read<r32>(in); break;
-			case 8: read<r64>(in); break;
+			case 4: read<r32, f32>(in); break;
+			case 8: read<r64, f64>(in); break;
 			}
 			break;
 		case 2:
@@ -104,8 +104,8 @@ public:
 			size = r64(load(8)).le();
 			value = alloc(size);
 			switch (u32(r16(load(2)).le())) {
-			case 4: read<r32>(in); break;
-			case 8: read<r64>(in); break;
+			case 4: read<r32, f32>(in); break;
+			case 8: read<r64, f64>(in); break;
 			}
 			break;
 		default:
@@ -169,15 +169,21 @@ private:
 		return new numeric[size]();
 	}
 
-	template<typename rxx> void write(std::ostream& out) const {
-		for (size_t i = 0; i < size; i++)
-			out.write(rxx(value[i]).le(), sizeof(rxx));
+	template<typename rawx = r64, typename cast = double>
+	void write(std::ostream& out) const {
+		for (size_t i = 0; i < size; i++) {
+			rawx raw(cast(value[i]));
+			out.write(raw.le(), sizeof(rawx));
+		}
 	}
-	template<typename rxx> void read(std::istream& in) {
+	template<typename rawx = r64, typename cast = double>
+	void read(std::istream& in) {
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
-		for (size_t i = 0; i < size; i++)
-			value[i] = rxx(load(sizeof(rxx))).le();
+		for (size_t i = 0; i < size; i++) {
+			rawx raw(load(sizeof(rawx)));
+			value[i] = cast(raw.le());
+		}
 	}
 
 	u32 sign;
@@ -558,8 +564,7 @@ u64 indexmerge1(const board& b) { // 8-bit
 
 u64 indexnum0(const board& b) { // 10-bit
 	// 2k ~ 32k, 2-bit ea.
-	u16 num[16];
-	b.numof(num, 11, 16);
+	auto num = b.numof();
 	register u64 index = 0;
 	index += (num[11] & 0x03) << 0;
 	index += (num[12] & 0x03) << 2;
@@ -570,8 +575,7 @@ u64 indexnum0(const board& b) { // 10-bit
 }
 
 u64 indexnum1(const board& b) { // 25-bit
-	u16 num[16];
-	b.numof(num, 5, 16);
+	auto num = b.numof();
 	register u64 index = 0;
 	index += ((num[5] + num[6]) & 0x0f) << 0; // 32 & 64, 4-bit
 	index += (num[7] & 0x07) << 4; // 128, 3-bit
@@ -587,8 +591,7 @@ u64 indexnum1(const board& b) { // 25-bit
 }
 
 u64 indexnum2(const board& b) { // 25-bit
-	u16 num[16];
-	b.numof(num, 0, 16);
+	auto num = b.numof();
 	register u64 index = 0;
 	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-bit
 	index += ((num[3] + num[4]) & 0x07) << 3; // 8 & 16, 3-bit
@@ -627,8 +630,7 @@ u64 indexnum2x(const board& b) { // 25-bit
 }
 
 u64 indexnum3(const board& b) { // 28-bit
-	u16 num[16];
-	b.numof(num, 0, 16);
+	auto num = b.numof();
 	register u64 index = 0;
 	index += ((num[0] + num[1] + num[2]) & 0x0f) << 0; // 0 & 2 & 4, 4-bit
 	index += ((num[3] + num[4]) & 0x07) << 4; // 8 & 16, 3-bit
@@ -1037,8 +1039,8 @@ void make_weights(const std::string& res = "") {
 
 		// make default weights
 		std::vector<std::vector<int>> defpatt = {
-			{ 0x0, 0x1, 0x2, 0x3, 0x6, 0x7 },
-			{ 0x4, 0x5, 0x6, 0x7, 0xa, 0xb },
+			{ 0x0, 0x1, 0x2, 0x3, 0x4, 0x5 },
+			{ 0x4, 0x5, 0x6, 0x7, 0x8, 0x9 },
 			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
 			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
 		};
@@ -1089,8 +1091,8 @@ void make_features(const std::string& res = "") {
 
 		// make default features
 		std::vector<std::vector<int>> defpatt = {
-			{ 0x0, 0x1, 0x2, 0x3, 0x6, 0x7 },
-			{ 0x4, 0x5, 0x6, 0x7, 0xa, 0xb },
+			{ 0x0, 0x1, 0x2, 0x3, 0x4, 0x5 },
+			{ 0x4, 0x5, 0x6, 0x7, 0x8, 0x9 },
 			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
 			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
 		};
@@ -1098,7 +1100,7 @@ void make_features(const std::string& res = "") {
 			auto xpatt = patt;
 			for (u32 iso = 0; iso < 8; iso++) {
 				std::transform(patt.begin(), patt.end(), xpatt.begin(), [=](int i) -> int {
-					board x(0xfedcba9876543210);
+					board x(0xfedcba9876543210ull);
 					x.isomorphic(-iso);
 					return x[i];
 				});
@@ -1143,12 +1145,6 @@ inline numeric update(const board& state, const numeric& updv,
 	for (auto f = begin; f != end; f++)
 		esti += ((*f)[state] += updv);
 	return esti;
-}
-
-inline numeric update(const board& state,
-		const numeric& curr, const numeric& accu, const numeric& alpha = moporgic::alpha,
-		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
-	return update(state, alpha * (accu - curr), begin, end);
 }
 
 cache tp;
@@ -1325,14 +1321,16 @@ struct select {
 		return update();
 	}
 	inline select& update() {
-		return update_rand();
+		return update_random();
+	}
+	inline select& update_fixed() {
 		best = move;
 		if (move[1] > *best) best = move + 1;
 		if (move[2] > *best) best = move + 2;
 		if (move[3] > *best) best = move + 3;
 		return *this;
 	}
-	inline select& update_rand() {
+	inline select& update_random() {
 		const u32 i = std::rand() % 4;
 		best = move + i;
 		if (move[(i + 1) % 4] > *best) best = move + ((i + 1) % 4);
