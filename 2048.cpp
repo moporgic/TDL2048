@@ -1162,14 +1162,16 @@ struct select {
 		return update();
 	}
 	inline select& update() {
-		return update_rand();
+		return update_random();
+	}
+	inline select& update_fixed() {
 		best = move;
 		if (move[1] > *best) best = move + 1;
 		if (move[2] > *best) best = move + 2;
 		if (move[3] > *best) best = move + 3;
 		return *this;
 	}
-	inline select& update_rand() {
+	inline select& update_random() {
 		const u32 i = std::rand() % 4;
 		best = move + i;
 		if (move[(i + 1) % 4] > *best) best = move + ((i + 1) % 4);
