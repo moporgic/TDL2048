@@ -546,35 +546,53 @@ private:
 
 namespace utils {
 
-struct options : public std::list<std::string> {
-	options() : std::list<std::string>() {}
-	options(const std::list<std::string>& opts) : std::list<std::string>(opts) {}
+class options {
+public:
+	options() {}
+	options(const options& opts) : opts(opts.opts), extra(opts.extra) {}
 
-	options& operator +=(const std::string& opt) {
-		push_back(opt);
-		return *this;
-	}
-	options& operator -=(const std::string& opt) {
-		auto it = std::find(begin(), end(), opt);
-		if (it != end()) this->erase(it);
-		return *this;
-	}
-
-	bool exists(const std::string& opt) const {
-		return std::find(begin(), end(), opt) != end();
-	}
 	std::string& operator [](const std::string& opt) {
-		auto it = std::find(begin(), end(), opt);
-		if (it == end()) return (operator +=(opt))[opt];
-		if (++it == end()) return (operator +=(""))[opt];
-		return (*it);
+		if (opts.find(opt) == opts.end()) {
+			auto it = std::find(extra.begin(), extra.end(), opt);
+			if (it != extra.end()) extra.erase(it);
+			opts[opt] = "";
+		}
+		return opts[opt];
+	}
+
+	bool contains(const std::string& opt) {
+		if (opts.find(opt) != opts.end()) return true;
+		if (std::find(extra.begin(), extra.end(), opt) != extra.end()) return true;
+		return false;
+	}
+
+	bool operator +=(const std::string& opt) {
+		if (contains(opt)) return false;
+		extra.push_back(opt);
+		return true;
+	}
+	bool operator -=(const std::string& opt) {
+		if (contains(opt) == false) return false;
+		if (opts.find(opt) != opts.end()) opts.erase(opts.find(opt));
+		auto it = std::find(extra.begin(), extra.end(), opt);
+		if (it != extra.end()) extra.erase(it);
+		return true;
 	}
 
 	operator std::string() const {
-		std::stringstream ss;
-		std::copy(begin(), end(), std::ostream_iterator<std::string>(ss, " "));
-		return ss.str();
+		std::string res;
+		for (auto v : opts) {
+			res.append(v.first).append("=").append(v.second).append(" ");
+		}
+		for (auto s : extra) {
+			res.append(s).append(" ");
+		}
+		return res;
 	}
+
+private:
+	std::map<std::string, std::string> opts;
+	std::list<std::string> extra;
 };
 
 inline u32 hashpatt(const std::vector<int>& patt) {
@@ -1625,9 +1643,6 @@ int main(int argc, const char* argv[]) {
 	u32 seed = timestamp;
 	numeric& alpha = moporgic::alpha;
 	auto& depthp = moporgic::depthp;
-	utils::options wopts;
-	utils::options fopts;
-	utils::options xopts;
 	utils::options opts;
 
 	auto valueof = [&](int& i, const char* def) -> const char* {
@@ -1640,7 +1655,8 @@ int main(int argc, const char* argv[]) {
 		switch (to_hash(argv[i])) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
-			alpha = std::stod(valueof(i, nullptr));
+			opts["alpha"] = valueof(i, nullptr);
+			alpha = std::stod(opts["alpha"]);
 			break;
 		case to_hash("-a/"):
 		case to_hash("--alpha-divide"):
@@ -1649,58 +1665,57 @@ int main(int argc, const char* argv[]) {
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
-			train = u32(std::stod(valueof(i, nullptr)));
+			opts["train"] = valueof(i, nullptr);
+			train = u32(std::stod(opts["train"]));
 			break;
 		case to_hash("-T"):
 		case to_hash("--test"):
-			test = u32(std::stod(valueof(i, nullptr)));
+			opts["test"] = valueof(i, nullptr);
+			test = u32(std::stod(opts["test"]));
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
 		case to_hash("--srand"):
-			seed = u32(std::stod(valueof(i, nullptr)));
+			opts["seed"] = valueof(i, nullptr);
+			seed = u32(std::stod(opts["seed"]));
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
-			wopts["input"] = valueof(i, "tdl2048.weight");
-			wopts["output"] = wopts["input"];
+			opts["weight-input"] = valueof(i, "tdl2048.weight");
+			opts["weight-output"] = opts["weight-input"];
 			break;
 		case to_hash("-wi"):
 		case to_hash("--weight-input"):
-			wopts["input"] = valueof(i, "tdl2048.weight");
+			opts["weight-input"] = valueof(i, "tdl2048.weight");
 			break;
 		case to_hash("-wo"):
 		case to_hash("--weight-output"):
-			wopts["output"] = valueof(i, "tdl2048.weight");
+			opts["weight-output"] = valueof(i, "tdl2048.weight");
 			break;
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			fopts["input"] = valueof(i, "tdl2048.feature");
-			fopts["output"] = fopts["input"];
+			opts["feature-input"] = valueof(i, "tdl2048.feature");
+			opts["feature-output"] = opts["feature-input"];
 			break;
 		case to_hash("-fi"):
 		case to_hash("--feature-input"):
-			fopts["input"] = valueof(i, "tdl2048.feature");
+			opts["feature-input"] = valueof(i, "tdl2048.feature");
 			break;
 		case to_hash("-fo"):
 		case to_hash("--feature-output"):
-			fopts["output"] = valueof(i, "tdl2048.feature");
+			opts["feature-output"] = valueof(i, "tdl2048.feature");
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
 		case to_hash("--weight-value"):
 			for (std::string w; (w = valueof(i, "")).size(); )
-				wopts["value"] += (w += ',');
+				opts["weight-value"] += (w += ',');
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
 		case to_hash("--feature-value"):
 			for (std::string f; (f = valueof(i, "")).size(); )
-				fopts["value"] += (f += ',');
-			break;
-		case to_hash("-u"):
-		case to_hash("--util"):
-		case to_hash("--utils"):
+				opts["feature-value"] += (f += ',');
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
@@ -1724,14 +1739,14 @@ int main(int argc, const char* argv[]) {
 			break;
 		case to_hash("-d"):
 		case to_hash("--depth"):
-			xopts["depth"] = valueof(i, nullptr);
-			depthp.fill(std::stol(xopts["depth"]));
+			opts["depth"] = valueof(i, nullptr);
+			depthp.fill(std::stol(opts["depth"]));
 			break;
 		case to_hash("-dd"):
 		case to_hash("--depth-dynamic"):
 			for (u32 e = 0; e < 16; e++) {
 				std::string d = valueof(i, nullptr);
-				xopts["depth-dynamic"] += (d += ',');
+				opts["depth-dynamic"] += (d += ',');
 				depthp[e] = std::stol(d);
 			}
 			break;
@@ -1740,23 +1755,23 @@ int main(int argc, const char* argv[]) {
 		case to_hash("--cache-value"):
 		case to_hash("--transposition"):
 		case to_hash("--transposition-value"):
-			xopts["value"] = valueof(i, "");
+			opts["cache-value"] = valueof(i, "");
 			break;
 		case to_hash("-tpio"):
 		case to_hash("--cache-input-output"):
 		case to_hash("--transposition-input-output"):
-			xopts["input"] = valueof(i, "tdl2048.cache");
-			xopts["output"] = xopts["input"];
+			opts["cache-input"] = valueof(i, "tdl2048.cache");
+			opts["cache-output"] = opts["cache-input"];
 			break;
 		case to_hash("-tpi"):
 		case to_hash("--cache-input"):
 		case to_hash("--transposition-input"):
-			xopts["input"] = valueof(i, "tdl2048.cache");
+			opts["cache-input"] = valueof(i, "tdl2048.cache");
 			break;
 		case to_hash("-tpo"):
 		case to_hash("--cache-output"):
 		case to_hash("--transposition-output"):
-			xopts["output"] = valueof(i, "tdl2048.cache");
+			opts["cache-output"] = valueof(i, "tdl2048.cache");
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1769,8 +1784,9 @@ int main(int argc, const char* argv[]) {
 	std::cout << "TDL2048+ LOG" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
-	std::cout << "timestamp = " << timestamp << std::endl;
-	std::cout << "srand = " << seed << std::endl;
+//	std::cout << "options = " << std::string(opts) << std::endl;
+	std::cout << "time = " << timestamp << std::endl;
+	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
 	std::cout << "depth = ";
 	std::copy(depthp.begin(), depthp.end(), std::ostream_iterator<u32>(std::cout, " "));
@@ -1780,21 +1796,21 @@ int main(int argc, const char* argv[]) {
 
 	utils::make_indexers();
 
-	if (utils::load_weights(wopts["input"]) == false) {
-		if (wopts["input"].size())
-			std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
-		if (wopts["value"].empty())
-			wopts["value"] = "default";
+	if (utils::load_weights(opts["weight-input"]) == false) {
+		if (opts["weight-input"].size())
+			std::cerr << "warning: " << opts["weight-input"] << " not loaded!" << std::endl;
+		if (opts["weight-value"].empty())
+			opts["weight-value"] = "default";
 	}
-	utils::make_weights(wopts["value"]);
+	utils::make_weights(opts["weight-value"]);
 
-	if (utils::load_features(fopts["input"]) == false) {
-		if (fopts["input"].size())
-			std::cerr << "warning: " << fopts["input"] << " not loaded!" << std::endl;
-		if (fopts["value"].empty())
-			fopts["value"] = "default";
+	if (utils::load_features(opts["feature-input"]) == false) {
+		if (opts["feature-input"].size())
+			std::cerr << "warning: " << opts["feature-input"] << " not loaded!" << std::endl;
+		if (opts["feature-value"].empty())
+			opts["feature-value"] = "default";
 	}
-	utils::make_features(fopts["value"]);
+	utils::make_features(opts["feature-value"]);
 
 	utils::list_mapping();
 
@@ -1861,19 +1877,19 @@ int main(int argc, const char* argv[]) {
 		break;
 	}
 
-	utils::save_weights(wopts["output"]);
-	utils::save_features(fopts["output"]);
+	utils::save_weights(opts["weight-output"]);
+	utils::save_features(opts["feature-output"]);
 
 
 
 
-	if (utils::load_transposition(xopts["input"]) == false) {
-		if (xopts["input"].size())
-			std::cerr << "warning: " << xopts["input"] << " not loaded!" << std::endl;
-		if (xopts["value"].empty())
-			xopts["value"] = "default";
+	if (utils::load_transposition(opts["cache-input"]) == false) {
+		if (opts["cache-input"].size())
+			std::cerr << "warning: " << opts["cache-input"] << " not loaded!" << std::endl;
+		if (opts["cache-value"].empty())
+			opts["cache-value"] = "default";
 	}
-	utils::make_transposition(xopts["value"]);
+	utils::make_transposition(opts["cache-value"]);
 
 	search xbest;
 
@@ -1893,7 +1909,7 @@ int main(int argc, const char* argv[]) {
 	}
 	if (test) stats.summary();
 
-	utils::save_transposition(xopts["output"]);
+	utils::save_transposition(opts["cache-output"]);
 
 	return 0;
 }
