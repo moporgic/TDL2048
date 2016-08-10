@@ -1467,6 +1467,8 @@ int main(int argc, const char* argv[]) {
 			std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
 		if (wopts["value"].empty())
 			wopts["value"] = "default";
+		if (shm::shminit == false)
+			std::cerr << "warning: weights will be created without --init" << std::endl;
 	}
 	utils::make_weights(wopts["value"]);
 
