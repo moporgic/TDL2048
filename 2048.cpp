@@ -361,12 +361,12 @@ public:
 		out.write(&serial, 1);
 		switch (serial) {
 		case 0:
-			out.write(r64(sign).le(), 8);
 			out.write(r64(seeda).le(), 8);
 			out.write(r64(seedb).le(), 8);
 			for (auto& zrow : zhash)
 				for (auto& entry : zrow)
 					out.write(r64(entry).le(), 8);
+			out.write(r64(sign).le(), 8);
 			break;
 		default:
 			std::cerr << "unknown serial at zhasher::>>" << std::endl;
@@ -378,12 +378,16 @@ public:
 		auto load = moporgic::make_load(in, buf);
 		switch (*load(1)) {
 		case 0:
-			sign = r64(load(8)).le();
 			seeda = r64(load(8)).le();
 			seedb = r64(load(8)).le();
+			sign = seeda ^ seedb;
 			for (auto& zrow : zhash)
-				for (auto& entry : zrow)
+				for (auto& entry : zrow) {
 					entry = r64(load(8)).le();
+					sign ^= entry;
+				}
+			if (sign != u64(r64(load(8)).le()))
+				std::cerr << "warning: signature mismatch at zhasher::<<" << std::endl;
 			break;
 		default:
 			std::cerr << "unknown serial at zhasher::<<" << std::endl;
@@ -405,8 +409,8 @@ public:
 		u64 sign;
 		i32 depth;
 		f32 esti;
-		inline entry(const entry& e) = default;
-		inline entry(const u64& sign = 0) : sign(sign), depth(0), esti(0) {}
+		entry(const entry& e) = default;
+		entry(const u64& sign = 0) : sign(sign), depth(0), esti(0) {}
 
 		inline operator bool() const { return depth > 0; }
 		inline bool operator ==(const board& b) const { return sign == b.raw; }
@@ -421,12 +425,14 @@ public:
 	public:
 		entry* pool;
 		size_t hit;
-		inline hashed() : pool(nullptr), hit(0) {}
+		hashed() : pool(nullptr), hit(0) {}
+		~hashed() { if (pool) delete[] pool; }
 
 		inline entry& operator [](const int& i) { return pool[i]; }
 	};
 
-	transposition() : zhash(), cache(nullptr), mask(-1), tpbit(0), limit(0) {}
+	transposition() : zhash(), cache(nullptr), tpbit(0), limit(0), mask(-1) {}
+	~transposition() { if (cache) delete[] cache; }
 
 	inline entry& operator[] (const board& b) {
 
@@ -455,8 +461,9 @@ public:
 
 	void init(const u32& bit, const u32& lim) {
 		tpbit = bit;
-		mask = ~(0xffffffffffffffffull << bit);
 		limit = lim;
+		mask = ~(0xffffffffffffffffull << bit);
+		if (cache) delete[] cache;
 		cache = alloc(1ULL << bit, limit);
 	}
 
@@ -468,7 +475,7 @@ public:
 			zhash >> out;
 			out.write(r32(u32(tpbit)).le(), 4);
 			out.write(r32(u32(limit)).le(), 4);
-			for (size_t s = 0; s < (1ULL << tpbit); s++) {
+			for (size_t size = 1ull << tpbit, s = 0; s < size; s++) {
 				hashed& ln = cache[s];
 				out.write(r64(u64(ln.hit)).le(), 8);
 				u32 valid = std::min(ln.hit, limit);
@@ -493,8 +500,9 @@ public:
 			zhash << in;
 			tpbit = u32(r32(load(4)).le());
 			limit = u32(r32(load(4)).le());
+			mask = ~(0xffffffffffffffffull << tpbit);
 			cache = alloc(1ULL << tpbit, limit);
-			for (size_t s = 0; s < (1ULL << tpbit); s++) {
+			for (size_t size = 1ull << tpbit, s = 0; s < size; s++) {
 				hashed& ln = cache[s];
 				ln.hit = u64(r64(load(8)).le());
 				u32 valid = std::min(ln.hit, limit);
@@ -531,9 +539,9 @@ public:
 private:
 	zhasher zhash;
 	hashed* cache;
-	u64 mask;
 	u64 tpbit;
 	u64 limit;
+	u64 mask;
 };
 
 namespace utils {
@@ -1256,9 +1264,9 @@ inline numeric update(const board& state, const numeric& updv,
 }
 
 void make_transposition(const std::string& res = "") {
-	u32 bit = 25;
-	u32 lim = 8;
 	if (res.size()) {
+		u32 bit;
+		u32 lim;
 		std::string tpres = res;
 		if (tpres == "default") tpres = "25x8";
 		auto it = tpres.find_first_of("x/|");
@@ -1269,8 +1277,8 @@ void make_transposition(const std::string& res = "") {
 			lim = 1;
 		}
 		bit = std::stol(tpres);
+		transposition::instance().init(bit, lim);
 	}
-	transposition::instance().init(bit, lim);
 }
 bool load_transposition(const std::string& path) {
 	std::ifstream in;
