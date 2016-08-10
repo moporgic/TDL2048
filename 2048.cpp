@@ -33,12 +33,12 @@
 namespace moporgic {
 
 typedef float numeric;
-numeric alpha = 0.0025;
+numeric alpha = 0.1;
 const u64 base = 16;
 
 class weight {
 public:
-	weight() : sign(0), size(0), value(nullptr), accum(nullptr), updvu(nullptr) {}
+	weight() : sign(0), size(0), value(nullptr), accum(nullptr), updvu(nullptr), lasta(nullptr) {}
 	weight(const weight& w) = default;
 	~weight() {}
 
@@ -46,10 +46,11 @@ public:
 	inline size_t length() const { return size; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
 	inline numeric& operator ()(const u64& i, const numeric& updv) {
-		numeric cupdv = (std::abs(accum[i]) / updvu[i]) * updv;
+		numeric cupdv = lasta[i] * updv;
 		value[i] += cupdv;
 		accum[i] += cupdv;
 		updvu[i] += std::abs(cupdv);
+		lasta[i] = std::abs(accum[i]) / updvu[i];
 		return value[i];
 	}
 
@@ -83,9 +84,10 @@ public:
 			value = alloc(size);
 			accum = alloc(size);
 			updvu = alloc(size);
+			lasta = alloc(size);
 			switch (sizeof(numeric)) {
-			case 4: read<r32>(in); break;
-			case 8: read<r64>(in); break;
+			case 4: read<r32, f32>(in); break;
+			case 8: read<r64, f64>(in); break;
 			}
 			break;
 		default:
@@ -127,7 +129,6 @@ public:
 
 	static weight make(const u32& sign, const size_t& size) {
 		wghts().push_back(weight(sign, size));
-		wghts().back().init_coherence();
 		return wghts().back();
 	}
 	static inline weight at(const u32& sign) {
@@ -143,24 +144,29 @@ public:
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
 	}
 protected:
-	weight(const u32& sign, const size_t& size) : sign(sign), size(size), value(alloc(size)) {}
+	weight(const u32& sign, const size_t& size) : sign(sign), size(size), value(alloc(size)) {
+		accum = alloc(size);
+		updvu = alloc(size);
+		lasta = alloc(size);
+		std::fill_n(lasta, size, 1);
+	}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
 		return new numeric[size]();
-	}
-	void init_coherence() {
-		accum = alloc(size);
-		updvu = alloc(size);
-		std::fill_n(accum, size, alpha);
-		std::fill_n(updvu, size, alpha);
 	}
 
 	template<typename rawx = r64, typename cast = double>
 	void write(std::ostream& out) const {
 		for (size_t i = 0; i < size; i++) {
 			rawx raw(cast(value[i]));
+			rawx acc(cast(accum[i]));
+			rawx upd(cast(updvu[i]));
+			rawx lst(cast(lasta[i]));
 			out.write(raw.le(), sizeof(rawx));
+			out.write(acc.le(), sizeof(rawx));
+			out.write(upd.le(), sizeof(rawx));
+			out.write(lst.le(), sizeof(rawx));
 		}
 	}
 	template<typename rawx = r64, typename cast = double>
@@ -169,7 +175,13 @@ protected:
 		auto load = moporgic::make_load(in, buf);
 		for (size_t i = 0; i < size; i++) {
 			rawx raw(load(sizeof(rawx)));
+			rawx acc(load(sizeof(rawx)));
+			rawx upd(load(sizeof(rawx)));
+			rawx lst(load(sizeof(rawx)));
 			value[i] = cast(raw.le());
+			accum[i] = cast(acc.le());
+			updvu[i] = cast(upd.le());
+			lasta[i] = cast(lst.le());
 		}
 	}
 
@@ -179,6 +191,7 @@ protected:
 
 	numeric* accum;
 	numeric* updvu;
+	numeric* lasta;
 };
 
 class indexer {
