@@ -32,7 +32,7 @@
 
 namespace moporgic {
 
-typedef float numeric;
+typedef double numeric;
 numeric alpha = 0.01;
 const u64 base = 16;
 
