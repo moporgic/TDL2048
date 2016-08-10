@@ -38,7 +38,7 @@ const u64 base = 16;
 
 class weight {
 public:
-	weight() : sign(0), size(0), value(nullptr), accum(nullptr), updvu(nullptr), lasta(nullptr) {}
+	weight() : sign(0), size(0), value(nullptr), accum(nullptr), updvu(nullptr) {}
 	weight(const weight& w) = default;
 	~weight() {}
 
@@ -46,13 +46,11 @@ public:
 	inline size_t length() const { return size; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
 	inline numeric& operator ()(const u64& i, const numeric& updv) {
-		numeric cupdv = lasta[i] * updv;
-		if (cupdv != 0) {
-			value[i] += cupdv;
-			accum[i] += cupdv;
-			updvu[i] += std::abs(cupdv);
-			lasta[i] = std::abs(accum[i]) / updvu[i];
-		}
+		numeric coher = std::abs(accum[i]) / updvu[i];
+		numeric cupdv = std::isnan(coher) ? updv : (coher * updv);
+		value[i] += cupdv;
+		accum[i] += cupdv;
+		updvu[i] += std::abs(cupdv);
 		return value[i];
 	}
 
@@ -86,7 +84,6 @@ public:
 			value = alloc(size);
 			accum = alloc(size);
 			updvu = alloc(size);
-			lasta = alloc(size);
 			switch (sizeof(numeric)) {
 			case 4: read<r32, f32>(in); break;
 			case 8: read<r64, f64>(in); break;
@@ -146,12 +143,8 @@ public:
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
 	}
 protected:
-	weight(const u32& sign, const size_t& size) : sign(sign), size(size), value(alloc(size)) {
-		accum = alloc(size);
-		updvu = alloc(size);
-		lasta = alloc(size);
-		std::fill_n(lasta, size, 1);
-	}
+	weight(const u32& sign, const size_t& size) : sign(sign), size(size),
+		value(alloc(size)), accum(alloc(size)), updvu(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
@@ -180,7 +173,6 @@ protected:
 			value[i] = cast(raw.le());
 			accum[i] = cast(acc.le());
 			updvu[i] = cast(upd.le());
-			lasta[i] = std::abs(accum[i]) / updvu[i];
 		}
 	}
 
@@ -190,7 +182,6 @@ protected:
 
 	numeric* accum;
 	numeric* updvu;
-	numeric* lasta;
 };
 
 class indexer {
