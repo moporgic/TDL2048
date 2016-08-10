@@ -35,6 +35,7 @@ namespace moporgic {
 typedef double numeric;
 numeric alpha = 0.0025;
 const u64 base = 16;
+std::array<u32, 16> depthp = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
 
 class weight {
 public:
@@ -420,12 +421,12 @@ public:
 	public:
 		entry* pool;
 		size_t hit;
-		inline line() : pool(nullptr), hit(0) {}
+		inline hashed() : pool(nullptr), hit(0) {}
 
 		inline entry& operator [](const int& i) { return pool[i]; }
 	};
 
-	transposition() : zhash(), cache(nullptr), size(0), limit(0) {}
+	transposition() : zhash(), cache(nullptr), mask(-1), tpbit(0), limit(0) {}
 
 	inline entry& operator[] (const board& b) {
 
@@ -441,7 +442,7 @@ public:
 			}
 		}
 
-		hashed& ln = cache[hash % size];
+		hashed& ln = cache[hash & mask];
 		size_t valid = std::min(ln.hit, limit);
 		for (size_t i = 0; i < valid; i++)
 			if (ln[i] == min) return ln[i];
@@ -452,10 +453,11 @@ public:
 
 	}
 
-	void init(const u64& len, const u64& lim) {
-		size = len;
+	void init(const u32& bit, const u32& lim) {
+		tpbit = bit;
+		mask = ~(0xffffffffffffffffull << bit);
 		limit = lim;
-		cache = alloc(size, limit);
+		cache = alloc(1ULL << bit, limit);
 	}
 
 	void operator >>(std::ostream& out) const {
@@ -464,9 +466,9 @@ public:
 		switch (serial) {
 		case 0:
 			zhash >> out;
-			out.write(r64(u64(size)).le(), 8);
-			out.write(r64(u64(limit)).le(), 8);
-			for (size_t s = 0; s < size; s++) {
+			out.write(r32(u32(tpbit)).le(), 4);
+			out.write(r32(u32(limit)).le(), 4);
+			for (size_t s = 0; s < (1ULL << tpbit); s++) {
 				hashed& ln = cache[s];
 				out.write(r64(u64(ln.hit)).le(), 8);
 				u32 valid = std::min(ln.hit, limit);
@@ -489,10 +491,10 @@ public:
 		switch (*load(1)) {
 		case 0:
 			zhash << in;
-			size = u64(r64(load(8)).le());
-			limit = u64(r64(load(8)).le());
-			cache = alloc(size, limit);
-			for (size_t s = 0; s < size; s++) {
+			tpbit = u32(r32(load(4)).le());
+			limit = u32(r32(load(4)).le());
+			cache = alloc(1ULL << tpbit, limit);
+			for (size_t s = 0; s < (1ULL << tpbit); s++) {
 				hashed& ln = cache[s];
 				ln.hit = u64(r64(load(8)).le());
 				u32 valid = std::min(ln.hit, limit);
@@ -510,6 +512,15 @@ public:
 		}
 	}
 
+	static void load(std::istream& in) { instance() << in; }
+	static void save(std::ostream& out) { instance() >> out; }
+
+	static inline transposition& instance() {
+		static transposition tp; return tp;
+	}
+
+	static inline entry& find(const board& b) { return instance()[b]; }
+
 	static inline hashed* alloc(size_t size, size_t limit) {
 		hashed* ln = new hashed[size]();
 		for (size_t i = 0; i < size; i++)
@@ -520,8 +531,9 @@ public:
 private:
 	zhasher zhash;
 	hashed* cache;
-	size_t size;
-	size_t limit;
+	u64 mask;
+	u64 tpbit;
+	u64 limit;
 };
 
 namespace utils {
@@ -633,7 +645,7 @@ u64 indexnta(const board& b, const std::vector<int>& p) {
 	return index;
 }
 
-u64 indexmerge0(const board& b) { // 16-bit
+u64 indexmerge0(const board& b) { // 16-tpbit
 	board q = b; q.transpose();
 	register u32 hori = 0, vert = 0;
 	hori |= b.query(0).merge << 0;
@@ -648,7 +660,7 @@ u64 indexmerge0(const board& b) { // 16-bit
 }
 
 template<int transpose>
-u64 indexmerge1(const board& b) { // 8-bit
+u64 indexmerge1(const board& b) { // 8-tpbit
 	register u32 merge = 0;
 	board k = b; if (transpose) k.transpose();
 	merge |= k.query(0).merge << 0;
@@ -658,8 +670,8 @@ u64 indexmerge1(const board& b) { // 8-bit
 	return merge;
 }
 
-u64 indexnum0(const board& b) { // 10-bit
-	// 2k ~ 32k, 2-bit ea.
+u64 indexnum0(const board& b) { // 10-tpbit
+	// 2k ~ 32k, 2-tpbit ea.
 	auto num = b.numof();
 	register u64 index = 0;
 	index += (num[11] & 0x03) << 0;
@@ -670,14 +682,14 @@ u64 indexnum0(const board& b) { // 10-bit
 	return index;
 }
 
-u64 indexnum1(const board& b) { // 25-bit
+u64 indexnum1(const board& b) { // 25-tpbit
 	auto num = b.numof();
 	register u64 index = 0;
 	index += ((num[5] + num[6]) & 0x0f) << 0; // 32 & 64, 4-bit
 	index += (num[7] & 0x07) << 4; // 128, 3-bit
 	index += (num[8] & 0x07) << 7; // 256, 3-bit
-	index += (num[9] & 0x07) << 10; // 512, 3-bit
-	index += (num[10] & 0x03) << 13; // 1k ~ 32k, 2-bit ea.
+	index += (num[9] & 0x07) << 10; // 512, 3-tpbit
+	index += (num[10] & 0x03) << 13; // 1k ~ 32k, 2-tpbit ea.
 	index += (num[11] & 0x03) << 15;
 	index += (num[12] & 0x03) << 17;
 	index += (num[13] & 0x03) << 19;
@@ -686,15 +698,15 @@ u64 indexnum1(const board& b) { // 25-bit
 	return index;
 }
 
-u64 indexnum2(const board& b) { // 25-bit
+u64 indexnum2(const board& b) { // 25-tpbit
 	auto num = b.numof();
 	register u64 index = 0;
-	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-bit
-	index += ((num[3] + num[4]) & 0x07) << 3; // 8 & 16, 3-bit
-	index += ((num[5] + num[6]) & 0x07) << 6; // 32 & 64, 3-bit
-	index += ((num[7] + num[8]) & 0x07) << 9; // 126 & 256, 3-bit
-	index += ((num[9] + num[10]) & 0x07) << 12; // 512 & 1k, 3-bit
-	index += ((num[11]) & 0x03) << 15; // 2k ~ 32k, 2-bit ea.
+	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-tpbit
+	index += ((num[3] + num[4]) & 0x07) << 3; // 8 & 16, 3-tpbit
+	index += ((num[5] + num[6]) & 0x07) << 6; // 32 & 64, 3-tpbit
+	index += ((num[7] + num[8]) & 0x07) << 9; // 126 & 256, 3-tpbit
+	index += ((num[9] + num[10]) & 0x07) << 12; // 512 & 1k, 3-tpbit
+	index += ((num[11]) & 0x03) << 15; // 2k ~ 32k, 2-tpbit ea.
 	index += ((num[12]) & 0x03) << 17;
 	index += ((num[13]) & 0x03) << 19;
 	index += ((num[14]) & 0x03) << 21;
@@ -704,19 +716,19 @@ u64 indexnum2(const board& b) { // 25-bit
 }
 
 template<int transpose, int qu0, int qu1>
-u64 indexnum2x(const board& b) { // 25-bit
+u64 indexnum2x(const board& b) { // 25-tpbit
 	board o = b;
 	if (transpose) o.transpose();
 	auto& m = o.query(qu0).numof;
 	auto& n = o.query(qu1).numof;
 
 	register u64 index = 0;
-	index += ((m[1] + n[1] + m[2] + n[2]) & 0x07) << 0; // 2 & 4, 3-bit
-	index += ((m[3] + n[3] + m[4] + n[4]) & 0x07) << 3; // 8 & 16, 3-bit
-	index += ((m[5] + n[5] + m[6] + n[6]) & 0x07) << 6; // 32 & 64, 3-bit
-	index += ((m[7] + n[7] + m[8] + n[8]) & 0x07) << 9; // 126 & 256, 3-bit
-	index += ((m[9] + n[9] + m[10] + n[10]) & 0x07) << 12; // 512 & 1k, 3-bit
-	index += ((m[11] + n[11]) & 0x03) << 15; // 2k ~ 32k, 2-bit ea.
+	index += ((m[1] + n[1] + m[2] + n[2]) & 0x07) << 0; // 2 & 4, 3-tpbit
+	index += ((m[3] + n[3] + m[4] + n[4]) & 0x07) << 3; // 8 & 16, 3-tpbit
+	index += ((m[5] + n[5] + m[6] + n[6]) & 0x07) << 6; // 32 & 64, 3-tpbit
+	index += ((m[7] + n[7] + m[8] + n[8]) & 0x07) << 9; // 126 & 256, 3-tpbit
+	index += ((m[9] + n[9] + m[10] + n[10]) & 0x07) << 12; // 512 & 1k, 3-tpbit
+	index += ((m[11] + n[11]) & 0x03) << 15; // 2k ~ 32k, 2-tpbit ea.
 	index += ((m[12] + n[12]) & 0x03) << 17;
 	index += ((m[13] + n[13]) & 0x03) << 19;
 	index += ((m[14] + n[14]) & 0x03) << 21;
@@ -725,16 +737,16 @@ u64 indexnum2x(const board& b) { // 25-bit
 	return index;
 }
 
-u64 indexnum3(const board& b) { // 28-bit
+u64 indexnum3(const board& b) { // 28-tpbit
 	auto num = b.numof();
 	register u64 index = 0;
-	index += ((num[0] + num[1] + num[2]) & 0x0f) << 0; // 0 & 2 & 4, 4-bit
-	index += ((num[3] + num[4]) & 0x07) << 4; // 8 & 16, 3-bit
+	index += ((num[0] + num[1] + num[2]) & 0x0f) << 0; // 0 & 2 & 4, 4-tpbit
+	index += ((num[3] + num[4]) & 0x07) << 4; // 8 & 16, 3-tpbit
 	index += ((num[5] + num[6]) & 0x07) << 7; // 32 & 64, 3-bit
 	index += (num[7] & 0x03) << 10; // 128, 2-bit
 	index += (num[8] & 0x03) << 12; // 256, 2-bit
-	index += (num[9] & 0x03) << 14; // 512, 2-bit
-	index += (num[10] & 0x03) << 16; // 1k ~ 32k, 2-bit ea.
+	index += (num[9] & 0x03) << 14; // 512, 2-tpbit
+	index += (num[10] & 0x03) << 16; // 1k ~ 32k, 2-tpbit ea.
 	index += (num[11] & 0x03) << 18;
 	index += (num[12] & 0x03) << 20;
 	index += (num[13] & 0x03) << 22;
@@ -744,7 +756,7 @@ u64 indexnum3(const board& b) { // 28-bit
 }
 
 template<int isomorphic>
-u64 indexmono(const board& b) { // 24-bit
+u64 indexmono(const board& b) { // 24-tpbit
 	board k = b;
 	k.rotate(isomorphic);
 	if (isomorphic >= 4) k.mirror();
@@ -752,7 +764,7 @@ u64 indexmono(const board& b) { // 24-bit
 }
 
 template<u32 tile, int isomorphic>
-u64 indexmask(const board& b) { // 16-bit
+u64 indexmask(const board& b) { // 16-tpbit
 	board k = b;
 	k.rotate(isomorphic);
 	if (isomorphic >= 4) k.mirror();
@@ -760,7 +772,7 @@ u64 indexmask(const board& b) { // 16-bit
 }
 
 template<int isomorphic>
-u64 indexmax(const board& b) { // 16-bit
+u64 indexmax(const board& b) { // 16-tpbit
 	board k = b;
 	k.rotate(isomorphic);
 	if (isomorphic >= 4) k.mirror();
@@ -1243,8 +1255,44 @@ inline numeric update(const board& state, const numeric& updv,
 	return esti;
 }
 
-transposition tp;
-void init_transposition(u64 size, u32 limit) { tp.init(size, limit); }
+void make_transposition(const std::string& res = "") {
+	u32 bit = 25;
+	u32 lim = 8;
+	if (res.size()) {
+		std::string tpres = res;
+		if (tpres == "default") tpres = "25x8";
+		auto it = tpres.find_first_of("x/|");
+		if (it != std::string::npos) {
+			lim = std::stol(tpres.substr(it + 1));
+			tpres = tpres.substr(0, it);
+		} else {
+			lim = 1;
+		}
+		bit = std::stol(tpres);
+	}
+	transposition::instance().init(bit, lim);
+}
+bool load_transposition(const std::string& path) {
+	std::ifstream in;
+	char buf[1 << 20];
+	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	in.open(path, std::ios::in | std::ios::binary);
+	if (!in.is_open()) return false;
+	transposition::load(in);
+	in.close();
+	return true;
+}
+bool save_transposition(const std::string& path) {
+	std::ofstream out;
+	char buf[1 << 20];
+	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out.is_open()) return false;
+	transposition::save(out);
+	out.flush();
+	out.close();
+	return true;
+}
 
 numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end());
@@ -1254,7 +1302,7 @@ numeric search_max(const board& before, const i32& depth,
 numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin, const feature::iter end) {
 	if (depth <= 0) return utils::estimate(after, begin, end);
-	auto& t = tp[after];
+	auto& t = transposition::find(after);
 	if (t.depth >= depth) return t.esti;
 	const auto spaces = after.spaces();
 	numeric expt = 0;
@@ -1445,8 +1493,7 @@ struct select {
 };
 struct search : select {
 	std::array<u32, 16> policy;
-	search(const std::array<u32, 16>& p = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 })
-		: select(), policy(p) {}
+	search(const std::array<u32, 16>& p = moporgic::depthp) : select(), policy(p) {}
 
 	inline select& operator ()(const board& b) {
 		return operator ()(b, feature::begin(), feature::end());
@@ -1569,12 +1616,11 @@ int main(int argc, const char* argv[]) {
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = moporgic::alpha;
+	auto& depthp = moporgic::depthp;
 	utils::options wopts;
 	utils::options fopts;
+	utils::options xopts;
 	utils::options opts;
-	std::array<u32, 16> depthp = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
-	u64 tpsize = 1 << 25;
-	u64 tplimit = 8;
 
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
@@ -1670,17 +1716,39 @@ int main(int argc, const char* argv[]) {
 			break;
 		case to_hash("-d"):
 		case to_hash("--depth"):
-			depthp.fill(std::stol(valueof(i, nullptr)));
+			xopts["depth"] = valueof(i, nullptr);
+			depthp.fill(std::stol(xopts["depth"]));
 			break;
 		case to_hash("-dd"):
 		case to_hash("--depth-dynamic"):
-			for (u32 e = 0; e < 16; e++)
-				depthp[e] = std::stol(valueof(i, nullptr));
+			for (u32 e = 0; e < 16; e++) {
+				std::string d = valueof(i, nullptr);
+				xopts["depth-dynamic"] += (d += ',');
+				depthp[e] = std::stol(d);
+			}
 			break;
 		case to_hash("-tp"):
 		case to_hash("--cache"):
-			tpsize = std::stoll(valueof(i, nullptr));
-			tplimit = std::stoll(valueof(i, nullptr));
+		case to_hash("--cache-value"):
+		case to_hash("--transposition"):
+		case to_hash("--transposition-value"):
+			xopts["value"] = valueof(i, "");
+			break;
+		case to_hash("-tpio"):
+		case to_hash("--cache-input-output"):
+		case to_hash("--transposition-input-output"):
+			xopts["input"] = valueof(i, "tdl2048.cache");
+			xopts["output"] = xopts["input"];
+			break;
+		case to_hash("-tpi"):
+		case to_hash("--cache-input"):
+		case to_hash("--transposition-input"):
+			xopts["input"] = valueof(i, "tdl2048.cache");
+			break;
+		case to_hash("-tpo"):
+		case to_hash("--cache-output"):
+		case to_hash("--transposition-output"):
+			xopts["output"] = valueof(i, "tdl2048.cache");
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1702,7 +1770,6 @@ int main(int argc, const char* argv[]) {
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
-	utils::init_transposition(tpsize, tplimit);
 	utils::make_indexers();
 
 	if (utils::load_weights(wopts["input"]) == false) {
@@ -1792,7 +1859,15 @@ int main(int argc, const char* argv[]) {
 
 
 
-	search xbest(depthp);
+	if (utils::load_transposition(xopts["input"]) == false) {
+		if (xopts["input"].size())
+			std::cerr << "warning: " << xopts["input"] << " not loaded!" << std::endl;
+		if (xopts["value"].empty())
+			xopts["value"] = "default";
+	}
+	utils::make_transposition(xopts["value"]);
+
+	search xbest;
 
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
 	for (stats.init(test, 1); stats; stats++) {
@@ -1809,6 +1884,8 @@ int main(int argc, const char* argv[]) {
 		stats.updatec(score, b.hash(), opers);
 	}
 	if (test) stats.summary();
+
+	utils::save_transposition(xopts["output"]);
 
 	return 0;
 }
