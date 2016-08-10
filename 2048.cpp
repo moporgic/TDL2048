@@ -51,7 +51,6 @@ int shmid = 0;
 void* shmptr = nullptr;
 size_t shmtop = 0;
 size_t shmlen = 4096;
-bool shminit = false;
 
 void init() {
 	key_t shmkey = ftok(shm::hook.c_str(), 0x0f);
@@ -64,7 +63,7 @@ void free() {
 }
 numeric* alloc(size_t size) {
 	numeric* ptr = reinterpret_cast<numeric*>(shm::shmptr) + shm::shmtop;
-	if (shminit) std::fill_n(ptr, size, 0);
+	std::fill_n(ptr, size, 0);
 	shm::shmtop += size;
 	return ptr;
 }
@@ -1429,6 +1428,7 @@ int main(int argc, const char* argv[]) {
 		case to_hash("--thd"):
 			thdnum = std::stod(valueof(i, nullptr));
 			break;
+		case to_hash("-shm"):
 		case to_hash("--shm"):
 			opts["shmres"] = valueof(i, "./2048");
 			shm::hook = opts["shmres"];
@@ -1437,9 +1437,6 @@ int main(int argc, const char* argv[]) {
 				shm::shmlen = std::stol(shm::hook.substr(split + 1));
 				shm::hook = shm::hook.substr(0, split);
 			}
-			break;
-		case to_hash("--init"):
-			shm::shminit = true;
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1467,8 +1464,6 @@ int main(int argc, const char* argv[]) {
 			std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
 		if (wopts["value"].empty())
 			wopts["value"] = "default";
-		if (shm::shminit == false)
-			std::cerr << "warning: weights will be created without --init" << std::endl;
 	}
 	utils::make_weights(wopts["value"]);
 
