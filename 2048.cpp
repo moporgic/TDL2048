@@ -413,12 +413,18 @@ public:
 		entry(const entry& e) = default;
 		entry(const u64& sign = 0) : sign(sign), depth(0), esti(0) {}
 
-		inline operator bool() const { return depth > 0; }
+		inline operator numeric() const { return esti; }
 		inline bool operator ==(const board& b) const { return sign == b.raw; }
-		inline void init(const board& b, const i32& d = 0, const f32& e = 0) {
+		inline bool operator >=(const i32& d) const { return depth >= d; }
+
+		inline entry& init(const board& b, const i32& d = 0, const f32& e = 0) {
 			sign = b.raw;
-			depth = d;
+			return save(e, d);
+		}
+		inline entry& save(const f32& e, const i32& d) {
 			esti = e;
+			depth = d;
+			return *this;
 		}
 	};
 	class hashed {
@@ -1374,7 +1380,7 @@ numeric search_expt(const board& after, const i32& depth,
 		const feature::iter begin, const feature::iter end) {
 	if (depth <= 0) return utils::estimate(after, begin, end);
 	auto& t = transposition::find(after);
-	if (t.depth >= depth) return t.esti;
+	if (t >= depth) return t;
 	const auto spaces = after.spaces();
 	numeric expt = 0;
 	board before = after;
@@ -1386,9 +1392,8 @@ numeric search_expt(const board& after, const i32& depth,
 		expt += 1 * search_max(before, depth - 1, begin, end);
 		before = after;
 	}
-	t.esti = expt / (10 * spaces.size);
-	t.depth = depth;
-	return t.esti;
+	numeric esti = expt / (10 * spaces.size);
+	return t.save(esti, depth);
 }
 
 numeric search_max(const board& before, const i32& depth,
