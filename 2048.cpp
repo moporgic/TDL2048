@@ -347,19 +347,19 @@ public:
 		return opts[opt];
 	}
 
-	bool contains(const std::string& opt) {
+	bool operator ()(const std::string& opt) const {
 		if (opts.find(opt) != opts.end()) return true;
 		if (std::find(extra.begin(), extra.end(), opt) != extra.end()) return true;
 		return false;
 	}
 
 	bool operator +=(const std::string& opt) {
-		if (contains(opt)) return false;
+		if (operator ()(opt)) return false;
 		extra.push_back(opt);
 		return true;
 	}
 	bool operator -=(const std::string& opt) {
-		if (contains(opt) == false) return false;
+		if (operator ()(opt) == false) return false;
 		if (opts.find(opt) != opts.end()) opts.erase(opts.find(opt));
 		auto it = std::find(extra.begin(), extra.end(), opt);
 		if (it != extra.end()) extra.erase(it);
@@ -1303,15 +1303,8 @@ struct statistic {
 	}
 };
 
-int main(int argc, const char* argv[]) {
-	u32 train = 100;
-	u32 test = 10;
-	u32 timestamp = std::time(nullptr);
-	u32 seed = timestamp;
-	numeric& alpha = moporgic::alpha;
+inline utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
-
-
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
 		if (def != nullptr) return def;
@@ -1323,28 +1316,23 @@ int main(int argc, const char* argv[]) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
 			opts["alpha"] = valueof(i, nullptr);
-			alpha = std::stod(opts["alpha"]);
 			break;
 		case to_hash("-a/"):
 		case to_hash("--alpha-divide"):
 			opts["alpha-divide"] = valueof(i, nullptr);
-			alpha /= std::stod(opts["alpha-divide"]);
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
 			opts["train"] = valueof(i, nullptr);
-			train = u32(std::stod(opts["train"]));
 			break;
 		case to_hash("-T"):
 		case to_hash("--test"):
 			opts["test"] = valueof(i, nullptr);
-			test = u32(std::stod(opts["test"]));
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
 		case to_hash("--srand"):
 			opts["seed"] = valueof(i, nullptr);
-			seed = u32(std::stod(opts["seed"]));
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
@@ -1410,6 +1398,22 @@ int main(int argc, const char* argv[]) {
 			break;
 		}
 	}
+	return opts;
+}
+
+int main(int argc, const char* argv[]) {
+	u32 train = 100;
+	u32 test = 10;
+	u32 timestamp = std::time(nullptr);
+	u32 seed = timestamp;
+	numeric& alpha = moporgic::alpha;
+
+	utils::options opts = parse(argc, argv);
+	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
+	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
+	if (opts("train")) train = std::stol(opts["train"]);
+	if (opts("test")) test = std::stol(opts["test"]);
+	if (opts("seed")) seed = std::stol(opts["seed"]);
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
@@ -1426,7 +1430,7 @@ int main(int argc, const char* argv[]) {
 	utils::make_indexers();
 
 	if (utils::load_weights(opts["weight-input"]) == false) {
-		if (opts["weight-input"].size())
+		if (opts("weight-input"))
 			std::cerr << "warning: " << opts["weight-input"] << " not loaded!" << std::endl;
 		if (opts["weight-value"].empty())
 			opts["weight-value"] = "default";
@@ -1434,7 +1438,7 @@ int main(int argc, const char* argv[]) {
 	utils::make_weights(opts["weight-value"]);
 
 	if (utils::load_features(opts["feature-input"]) == false) {
-		if (opts["feature-input"].size())
+		if (opts("feature-input"))
 			std::cerr << "warning: " << opts["feature-input"] << " not loaded!" << std::endl;
 		if (opts["feature-value"].empty())
 			opts["feature-value"] = "default";
@@ -1526,6 +1530,8 @@ int main(int argc, const char* argv[]) {
 
 		stats.update(score, b.hash(), opers);
 	}
+
+	std::cout << std::endl;
 
 	return 0;
 }
