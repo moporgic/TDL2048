@@ -579,10 +579,10 @@ u64 indexnuma(const board& b, const std::vector<int>& n) {
 		u32 size = (code >> 16);
 		u32 tile = (code & 0xffff);
 		u32 msb = msb32(tile);
-		u32 var = num[log2[msb]];
+		u32 var = num[log2(msb)];
 		while ((tile &= ~msb) != 0) {
 			msb = msb32(tile);
-			var += num[log2[msb]];
+			var += num[log2(msb)];
 		}
 		index += (var & ~(-1 << size)) << offset;
 		offset += size;
