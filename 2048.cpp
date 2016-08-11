@@ -436,6 +436,9 @@ public:
 
 	transposition() : zhash(), cache(nullptr), tpbit(0), limit(0), mask(-1) {}
 	~transposition() { if (cache) delete[] cache; }
+	inline size_t length() const { return tpbit ? (1ull << tpbit) : 0; }
+	inline size_t bucket() const { return limit; }
+	inline size_t capacity() const { return length() * bucket(); }
 
 	inline entry& operator[] (const board& b) {
 
@@ -1322,19 +1325,21 @@ inline numeric update(const board& state, const numeric& updv,
 }
 
 void make_transposition(const std::string& res = "") {
-	if (res.size()) {
+	std::string in(res);
+	if (in.empty() && transposition::instance().capacity() == 0) in = "default";
+	if (in == "default") in = "25x8";
+
+	if (in.size()) {
 		u32 bit;
 		u32 lim;
-		std::string tpres = res;
-		if (tpres == "default") tpres = "25x8";
-		auto it = tpres.find_first_of("x/|");
+		auto it = in.find_first_of("x/|");
 		if (it != std::string::npos) {
-			lim = std::stol(tpres.substr(it + 1));
-			tpres = tpres.substr(0, it);
+			lim = std::stol(in.substr(it + 1));
+			in = in.substr(0, it);
 		} else {
 			lim = 1;
 		}
-		bit = std::stol(tpres);
+		bit = std::stol(in);
 		transposition::instance().init(bit, lim);
 	}
 }
@@ -1921,14 +1926,7 @@ int main(int argc, const char* argv[]) {
 	utils::save_features(opts["feature-output"]);
 
 
-
-
-	if (utils::load_transposition(opts["cache-input"]) == false) {
-		if (opts["cache-input"].size())
-			std::cerr << "warning: " << opts["cache-input"] << " not loaded!" << std::endl;
-		if (opts["cache-value"].empty())
-			opts["cache-value"] = "default";
-	}
+	utils::load_transposition(opts["cache-input"]);
 	utils::make_transposition(opts["cache-value"]);
 
 	search xbest;
