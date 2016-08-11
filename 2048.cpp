@@ -1430,7 +1430,7 @@ int main(int argc, const char* argv[]) {
 	utils::make_indexers();
 
 	if (utils::load_weights(opts["weight-input"]) == false) {
-		if (opts("weight-input"))
+		if (opts["weight-input"].size())
 			std::cerr << "warning: " << opts["weight-input"] << " not loaded!" << std::endl;
 		if (opts["weight-value"].empty())
 			opts["weight-value"] = "default";
@@ -1438,7 +1438,7 @@ int main(int argc, const char* argv[]) {
 	utils::make_weights(opts["weight-value"]);
 
 	if (utils::load_features(opts["feature-input"]) == false) {
-		if (opts("feature-input"))
+		if (opts["feature-input"].size())
 			std::cerr << "warning: " << opts["feature-input"] << " not loaded!" << std::endl;
 		if (opts["feature-value"].empty())
 			opts["feature-value"] = "default";
