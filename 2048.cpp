@@ -568,6 +568,28 @@ u64 indexnum3(const board& b) { // 28-bit
 	return index;
 }
 
+u64 indexnuma(const board& b, const std::vector<int>& n) {
+	auto num = b.numof();
+	register u64 index = 0;
+	register u32 offset = 0;
+	for (const int& code : n) {
+		using moporgic::math::msb32;
+		using moporgic::math::log2;
+		// code: 0x00SSTTTT
+		u32 size = (code >> 16);
+		u32 tile = (code & 0xffff);
+		u32 msb = msb32(tile);
+		u32 var = num[log2[msb]];
+		while ((tile &= ~msb) != 0) {
+			msb = msb32(tile);
+			var += num[log2[msb]];
+		}
+		index += (var & ~(-1 << size)) << offset;
+		offset += size;
+	}
+	return index;
+}
+
 template<int isomorphic>
 u64 indexmono(const board& b) { // 24-bit
 	board k = b;
@@ -889,7 +911,7 @@ void make_indexers(const std::string& res = "") {
 	imake(0xfc000060, utils::indexmax<6>);
 	imake(0xfc000070, utils::indexmax<7>);
 
-	// patt(012367) num(-)
+	// patt(012367) num(96b4/128b3/256b3)
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
@@ -898,25 +920,37 @@ void make_indexers(const std::string& res = "") {
 	std::stringstream idxin(in);
 	std::string type, sign;
 	while (idxin >> type && idxin >> sign) {
-		u32 idxr = 0;
+		u32 idxr;
+		std::stringstream(sign) >> std::hex >> idxr;
+		if (indexer::find(idxr) != indexer::end()) {
+			std::cerr << "redefined indexer " << sign << std::endl;
+			continue;
+		}
+
 		using moporgic::to_hash;
 		switch (to_hash(type)) {
 		case to_hash("p"):
 		case to_hash("patt"):
 		case to_hash("pattern"):
-		case to_hash("tuple"):
-			std::stringstream(sign) >> std::hex >> idxr;
-			if (indexer::find(idxr) == indexer::end()) {
+		case to_hash("tuple"): {
 				auto patt = new std::vector<int>(hashpatt(sign)); // will NOT be deleted
 				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
-			} else {
-				std::cerr << "redefined indexer " << sign << std::endl;
 			}
 			break;
 		case to_hash("n"):
 		case to_hash("num"):
-		case to_hash("count"):
-			std::cerr << "unsupported custom indexer type " << type << std::endl;
+		case to_hash("count"): {
+				auto code = new std::vector<int>; // will NOT be deleted;
+				while (sign.find_first_of("b/") != std::string::npos)
+					sign[sign.find_first_of("b/")] = ' ';
+				std::stringstream numin(sign);
+				std::string tile, size;
+				while (numin >> tile && numin >> size) {
+					u32 codev = std::stol(tile) | (std::stol(size) << 16);
+					code->push_back(codev);
+				}
+				indexer::make(idxr, std::bind(utils::indexnuma, std::placeholders::_1, std::cref(*code)));
+			}
 			break;
 		default:
 			std::cerr << "unknown custom indexer type " << type << std::endl;
