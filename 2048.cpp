@@ -910,16 +910,16 @@ void make_indexers(const std::string& res = "") {
 				auto patt = new std::vector<int>(hashpatt(sign)); // will NOT be deleted
 				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
 			} else {
-				std::cerr << "warning: redefined indexer " << sign << std::endl;
+				std::cerr << "redefined indexer " << sign << std::endl;
 			}
 			break;
 		case to_hash("n"):
 		case to_hash("num"):
 		case to_hash("count"):
-			std::cerr << "error: unsupported custom indexer type " << type << std::endl;
+			std::cerr << "unsupported custom indexer type " << type << std::endl;
 			break;
 		default:
-			std::cerr << "error: unknown custom indexer type " << type << std::endl;
+			std::cerr << "unknown custom indexer type " << type << std::endl;
 			break;
 		}
 	}
@@ -955,6 +955,8 @@ void make_weights(const std::string& res = "") {
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
+	if (in.empty() && weight::list().empty())
+		in = "default";
 	if (in.find("default") != std::string::npos) {
 		in.replace(in.find("default"), 7, "");
 
@@ -1007,6 +1009,8 @@ void make_features(const std::string& res = "") {
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
+	if (in.empty() && feature::list().empty())
+		in = "default";
 	if (in.find("default") != std::string::npos) {
 		in.replace(in.find("default"), 7, "");
 
@@ -1038,13 +1042,11 @@ void make_features(const std::string& res = "") {
 		std::stringstream(wghts) >> std::hex >> wght;
 		std::stringstream(idxrs) >> std::hex >> idxr;
 		if (weight::find(wght) == weight::end()) {
-			std::cerr << "warning: undefined weight " << wghts;
-			std::cerr << " [assume " << (wghts.size()) << "-tile pattern]" << std::endl;
+			std::cerr << "undefined weight " << wghts << " [assume pattern]" << std::endl;
 			weight::make(wght, std::pow(u64(base), wghts.size()));
 		}
 		if (indexer::find(idxr) == indexer::end()) {
-			std::cerr << "warning: undefined indexer " << idxrs;
-			std::cerr << " [assume " << (idxrs.size()) << "-tile pattern]" << std::endl;
+			std::cerr << "undefined indexer " << idxrs << " [assume pattern]" << std::endl;
 			auto patt = new std::vector<int>(hashpatt(idxrs)); // will NOT be deleted
 			indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
 		}
@@ -1076,8 +1078,7 @@ void list_mapping() {
 		char buf[64];
 		u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
 		char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c",
-			w.signature(), w.length(), usage, scale);
+		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c", w.signature(), w.length(), usage, scale);
 		std::cout << buf;
 		std::string feats;
 		for (feature f : feature::list()) {
@@ -1429,20 +1430,10 @@ int main(int argc, const char* argv[]) {
 
 	utils::make_indexers();
 
-	if (utils::load_weights(opts["weight-input"]) == false) {
-		if (opts["weight-input"].size())
-			std::cerr << "warning: " << opts["weight-input"] << " not loaded!" << std::endl;
-		if (opts["weight-value"].empty())
-			opts["weight-value"] = "default";
-	}
+	utils::load_weights(opts["weight-input"]);
 	utils::make_weights(opts["weight-value"]);
 
-	if (utils::load_features(opts["feature-input"]) == false) {
-		if (opts["feature-input"].size())
-			std::cerr << "warning: " << opts["feature-input"] << " not loaded!" << std::endl;
-		if (opts["feature-value"].empty())
-			opts["feature-value"] = "default";
-	}
+	utils::load_features(opts["feature-input"]);
 	utils::make_features(opts["feature-value"]);
 
 	utils::list_mapping();
