@@ -564,19 +564,19 @@ public:
 		return opts[opt];
 	}
 
-	bool contains(const std::string& opt) {
+	bool operator ()(const std::string& opt) const {
 		if (opts.find(opt) != opts.end()) return true;
 		if (std::find(extra.begin(), extra.end(), opt) != extra.end()) return true;
 		return false;
 	}
 
 	bool operator +=(const std::string& opt) {
-		if (contains(opt)) return false;
+		if (operator ()(opt)) return false;
 		extra.push_back(opt);
 		return true;
 	}
 	bool operator -=(const std::string& opt) {
-		if (contains(opt) == false) return false;
+		if (operator ()(opt) == false) return false;
 		if (opts.find(opt) != opts.end()) opts.erase(opts.find(opt));
 		auto it = std::find(extra.begin(), extra.end(), opt);
 		if (it != extra.end()) extra.erase(it);
@@ -782,6 +782,28 @@ u64 indexnum3(const board& b) { // 28-tpbit
 	index += (num[13] & 0x03) << 22;
 	index += (num[14] & 0x03) << 24;
 	index += (num[15] & 0x03) << 26;
+	return index;
+}
+
+u64 indexnuma(const board& b, const std::vector<int>& n) {
+	auto num = b.numof();
+	register u64 index = 0;
+	register u32 offset = 0;
+	for (const int& code : n) {
+		using moporgic::math::msb32;
+		using moporgic::math::log2;
+		// code: 0x00SSTTTT
+		u32 size = (code >> 16);
+		u32 tile = (code & 0xffff);
+		u32 msb = msb32(tile);
+		u32 var = num[log2(msb)];
+		while ((tile &= ~msb) != 0) {
+			msb = msb32(tile);
+			var += num[log2(msb)];
+		}
+		index += (var & ~(-1 << size)) << offset;
+		offset += size;
+	}
 	return index;
 }
 
@@ -1106,7 +1128,7 @@ void make_indexers(const std::string& res = "") {
 	imake(0xfc000060, utils::indexmax<6>);
 	imake(0xfc000070, utils::indexmax<7>);
 
-	// patt(012367) num(-)
+	// patt(012367) num(96b4/128b3/256b3)
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
@@ -1115,28 +1137,40 @@ void make_indexers(const std::string& res = "") {
 	std::stringstream idxin(in);
 	std::string type, sign;
 	while (idxin >> type && idxin >> sign) {
-		u32 idxr = 0;
+		u32 idxr;
+		std::stringstream(sign) >> std::hex >> idxr;
+		if (indexer::find(idxr) != indexer::end()) {
+			std::cerr << "redefined indexer " << sign << std::endl;
+			continue;
+		}
+
 		using moporgic::to_hash;
 		switch (to_hash(type)) {
 		case to_hash("p"):
 		case to_hash("patt"):
 		case to_hash("pattern"):
-		case to_hash("tuple"):
-			std::stringstream(sign) >> std::hex >> idxr;
-			if (indexer::find(idxr) == indexer::end()) {
+		case to_hash("tuple"): {
 				auto patt = new std::vector<int>(hashpatt(sign)); // will NOT be deleted
 				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
-			} else {
-				std::cerr << "warning: redefined indexer " << sign << std::endl;
 			}
 			break;
 		case to_hash("n"):
 		case to_hash("num"):
-		case to_hash("count"):
-			std::cerr << "error: unsupported custom indexer type " << type << std::endl;
+		case to_hash("count"): {
+				auto code = new std::vector<int>; // will NOT be deleted;
+				while (sign.find_first_of("b/") != std::string::npos)
+					sign[sign.find_first_of("b/")] = ' ';
+				std::stringstream numin(sign);
+				std::string tile, size;
+				while (numin >> tile && numin >> size) {
+					u32 codev = std::stol(tile) | (std::stol(size) << 16);
+					code->push_back(codev);
+				}
+				indexer::make(idxr, std::bind(utils::indexnuma, std::placeholders::_1, std::cref(*code)));
+			}
 			break;
 		default:
-			std::cerr << "error: unknown custom indexer type " << type << std::endl;
+			std::cerr << "unknown custom indexer type " << type << std::endl;
 			break;
 		}
 	}
@@ -1172,6 +1206,8 @@ void make_weights(const std::string& res = "") {
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
+	if (in.empty() && weight::list().empty())
+		in = "default";
 	if (in.find("default") != std::string::npos) {
 		in.replace(in.find("default"), 7, "");
 
@@ -1224,6 +1260,8 @@ void make_features(const std::string& res = "") {
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
+	if (in.empty() && feature::list().empty())
+		in = "default";
 	if (in.find("default") != std::string::npos) {
 		in.replace(in.find("default"), 7, "");
 
@@ -1255,13 +1293,11 @@ void make_features(const std::string& res = "") {
 		std::stringstream(wghts) >> std::hex >> wght;
 		std::stringstream(idxrs) >> std::hex >> idxr;
 		if (weight::find(wght) == weight::end()) {
-			std::cerr << "warning: undefined weight " << wghts;
-			std::cerr << " [assume " << (wghts.size()) << "-tile pattern]" << std::endl;
+			std::cerr << "undefined weight " << wghts << " [assume pattern]" << std::endl;
 			weight::make(wght, std::pow(u64(base), wghts.size()));
 		}
 		if (indexer::find(idxr) == indexer::end()) {
-			std::cerr << "warning: undefined indexer " << idxrs;
-			std::cerr << " [assume " << (idxrs.size()) << "-tile pattern]" << std::endl;
+			std::cerr << "undefined indexer " << idxrs << " [assume pattern]" << std::endl;
 			auto patt = new std::vector<int>(hashpatt(idxrs)); // will NOT be deleted
 			indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
 		}
@@ -1382,8 +1418,7 @@ void list_mapping() {
 		char buf[64];
 		u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
 		char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c",
-			w.signature(), w.length(), usage, scale);
+		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c", w.signature(), w.length(), usage, scale);
 		std::cout << buf;
 		std::string feats;
 		for (feature f : feature::list()) {
@@ -1640,15 +1675,8 @@ struct statistic {
 	}
 };
 
-int main(int argc, const char* argv[]) {
-	u32 train = 100;
-	u32 test = 10;
-	u32 timestamp = std::time(nullptr);
-	u32 seed = timestamp;
-	numeric& alpha = moporgic::alpha;
-	auto& depthp = moporgic::depthp;
+inline utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
-
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
 		if (def != nullptr) return def;
@@ -1660,28 +1688,23 @@ int main(int argc, const char* argv[]) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
 			opts["alpha"] = valueof(i, nullptr);
-			alpha = std::stod(opts["alpha"]);
 			break;
 		case to_hash("-a/"):
 		case to_hash("--alpha-divide"):
 			opts["alpha-divide"] = valueof(i, nullptr);
-			alpha /= std::stod(opts["alpha-divide"]);
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
 			opts["train"] = valueof(i, nullptr);
-			train = u32(std::stod(opts["train"]));
 			break;
 		case to_hash("-T"):
 		case to_hash("--test"):
 			opts["test"] = valueof(i, nullptr);
-			test = u32(std::stod(opts["test"]));
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
 		case to_hash("--srand"):
 			opts["seed"] = valueof(i, nullptr);
-			seed = u32(std::stod(opts["seed"]));
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
@@ -1744,15 +1767,11 @@ int main(int argc, const char* argv[]) {
 		case to_hash("-d"):
 		case to_hash("--depth"):
 			opts["depth"] = valueof(i, nullptr);
-			depthp.fill(std::stol(opts["depth"]));
 			break;
 		case to_hash("-dd"):
 		case to_hash("--depth-dynamic"):
-			for (u32 e = 0; e < 16; e++) {
-				std::string d = valueof(i, nullptr);
+			for (std::string d; (d = valueof(i, "")).size(); )
 				opts["depth-dynamic"] += (d += ',');
-				depthp[e] = std::stol(d);
-			}
 			break;
 		case to_hash("-tp"):
 		case to_hash("--cache"):
@@ -1783,6 +1802,33 @@ int main(int argc, const char* argv[]) {
 			break;
 		}
 	}
+	return opts;
+}
+
+int main(int argc, const char* argv[]) {
+	u32 train = 100;
+	u32 test = 10;
+	u32 timestamp = std::time(nullptr);
+	u32 seed = timestamp;
+	numeric& alpha = moporgic::alpha;
+	auto& depthp = moporgic::depthp;
+
+	utils::options opts = parse(argc, argv);
+	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
+	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
+	if (opts("train")) train = std::stol(opts["train"]);
+	if (opts("test")) test = std::stol(opts["test"]);
+	if (opts("seed")) seed = std::stol(opts["seed"]);
+	if (opts("depth")) depthp.fill(std::stol(opts["depth"]));
+	if (opts("depth-dynamic")) {
+		std::string dyndepth(opts["depth-dynamic"]);
+		for (u32 depth = 0, e = 0; e < 16; depthp[e++] = depth) {
+			if (dyndepth.empty()) continue;
+			auto it = dyndepth.find_first_of(", ");
+			depth = std::stol(dyndepth.substr(0, it));
+			dyndepth = dyndepth.substr(it + 1);
+		}
+	}
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
@@ -1800,20 +1846,10 @@ int main(int argc, const char* argv[]) {
 
 	utils::make_indexers();
 
-	if (utils::load_weights(opts["weight-input"]) == false) {
-		if (opts["weight-input"].size())
-			std::cerr << "warning: " << opts["weight-input"] << " not loaded!" << std::endl;
-		if (opts["weight-value"].empty())
-			opts["weight-value"] = "default";
-	}
+	utils::load_weights(opts["weight-input"]);
 	utils::make_weights(opts["weight-value"]);
 
-	if (utils::load_features(opts["feature-input"]) == false) {
-		if (opts["feature-input"].size())
-			std::cerr << "warning: " << opts["feature-input"] << " not loaded!" << std::endl;
-		if (opts["feature-value"].empty())
-			opts["feature-value"] = "default";
-	}
+	utils::load_features(opts["feature-input"]);
 	utils::make_features(opts["feature-value"]);
 
 	utils::list_mapping();
@@ -1914,6 +1950,8 @@ int main(int argc, const char* argv[]) {
 	if (test) stats.summary();
 
 	utils::save_transposition(opts["cache-output"]);
+
+	std::cout << std::endl;
 
 	return 0;
 }
