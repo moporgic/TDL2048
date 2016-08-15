@@ -26,7 +26,7 @@ public:
 		list() : tile(0), size(0) {}
 		~list() = default;
 		inline u32 operator[] (const u32& i) const { return (tile >> (i << 2)) & 0x0f; }
-		inline operator bool() const { return size > 0; }
+		inline operator u32() const { return size; }
 		struct iter {
 			u64 raw;
 			i32 idx;
