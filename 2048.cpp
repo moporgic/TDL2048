@@ -78,6 +78,17 @@ public:
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
 		switch (*load(1)) {
+		case 1:
+			sign = r32(load(4)).le();
+			size = r64(load(8)).le();
+			value = alloc(size);
+			accum = alloc(size);
+			updvu = alloc(size);
+			for (size_t i = 0; i < size; i++) {
+				r64 raw(load(sizeof(r64)));
+				value[i] = numeric(raw.le());
+			}
+			break;
 		case 127:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
