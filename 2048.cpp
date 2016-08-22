@@ -326,35 +326,53 @@ private:
 
 namespace utils {
 
-struct options : public std::list<std::string> {
-	options() : std::list<std::string>() {}
-	options(const std::list<std::string>& opts) : std::list<std::string>(opts) {}
+class options {
+public:
+	options() {}
+	options(const options& opts) : opts(opts.opts), extra(opts.extra) {}
 
-	options& operator +=(const std::string& opt) {
-		push_back(opt);
-		return *this;
-	}
-	options& operator -=(const std::string& opt) {
-		auto it = std::find(begin(), end(), opt);
-		if (it != end()) this->erase(it);
-		return *this;
-	}
-
-	bool exists(const std::string& opt) const {
-		return std::find(begin(), end(), opt) != end();
-	}
 	std::string& operator [](const std::string& opt) {
-		auto it = std::find(begin(), end(), opt);
-		if (it == end()) return (operator +=(opt))[opt];
-		if (++it == end()) return (operator +=(""))[opt];
-		return (*it);
+		if (opts.find(opt) == opts.end()) {
+			auto it = std::find(extra.begin(), extra.end(), opt);
+			if (it != extra.end()) extra.erase(it);
+			opts[opt] = "";
+		}
+		return opts[opt];
+	}
+
+	bool operator ()(const std::string& opt) const {
+		if (opts.find(opt) != opts.end()) return true;
+		if (std::find(extra.begin(), extra.end(), opt) != extra.end()) return true;
+		return false;
+	}
+
+	bool operator +=(const std::string& opt) {
+		if (operator ()(opt)) return false;
+		extra.push_back(opt);
+		return true;
+	}
+	bool operator -=(const std::string& opt) {
+		if (operator ()(opt) == false) return false;
+		if (opts.find(opt) != opts.end()) opts.erase(opts.find(opt));
+		auto it = std::find(extra.begin(), extra.end(), opt);
+		if (it != extra.end()) extra.erase(it);
+		return true;
 	}
 
 	operator std::string() const {
-		std::stringstream ss;
-		std::copy(begin(), end(), std::ostream_iterator<std::string>(ss, " "));
-		return ss.str();
+		std::string res;
+		for (auto v : opts) {
+			res.append(v.first).append("=").append(v.second).append(" ");
+		}
+		for (auto s : extra) {
+			res.append(s).append(" ");
+		}
+		return res;
 	}
+
+private:
+	std::map<std::string, std::string> opts;
+	std::list<std::string> extra;
 };
 
 inline u32 hashpatt(const std::vector<int>& patt) {
@@ -540,6 +558,28 @@ u64 indexnum3(const board& b) { // 28-bit
 	index += (num[13] & 0x03) << 22;
 	index += (num[14] & 0x03) << 24;
 	index += (num[15] & 0x03) << 26;
+	return index;
+}
+
+u64 indexnuma(const board& b, const std::vector<int>& n) {
+	auto num = b.numof();
+	register u64 index = 0;
+	register u32 offset = 0;
+	for (const int& code : n) {
+		using moporgic::math::msb32;
+		using moporgic::math::log2;
+		// code: 0x00SSTTTT
+		u32 size = (code >> 16);
+		u32 tile = (code & 0xffff);
+		u32 msb = msb32(tile);
+		u32 var = num[log2(msb)];
+		while ((tile &= ~msb) != 0) {
+			msb = msb32(tile);
+			var += num[log2(msb)];
+		}
+		index += (var & ~(-1 << size)) << offset;
+		offset += size;
+	}
 	return index;
 }
 
@@ -864,7 +904,7 @@ void make_indexers(const std::string& res = "") {
 	imake(0xfc000060, utils::indexmax<6>);
 	imake(0xfc000070, utils::indexmax<7>);
 
-	// patt(012367) num(-)
+	// patt(012367) num(96b4/128b3/256b3)
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
@@ -873,28 +913,40 @@ void make_indexers(const std::string& res = "") {
 	std::stringstream idxin(in);
 	std::string type, sign;
 	while (idxin >> type && idxin >> sign) {
-		u32 idxr = 0;
+		u32 idxr;
+		std::stringstream(sign) >> std::hex >> idxr;
+		if (indexer::find(idxr) != indexer::end()) {
+			std::cerr << "redefined indexer " << sign << std::endl;
+			continue;
+		}
+
 		using moporgic::to_hash;
 		switch (to_hash(type)) {
 		case to_hash("p"):
 		case to_hash("patt"):
 		case to_hash("pattern"):
-		case to_hash("tuple"):
-			std::stringstream(sign) >> std::hex >> idxr;
-			if (indexer::find(idxr) == indexer::end()) {
+		case to_hash("tuple"): {
 				auto patt = new std::vector<int>(hashpatt(sign)); // will NOT be deleted
 				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
-			} else {
-				std::cerr << "warning: redefined indexer " << sign << std::endl;
 			}
 			break;
 		case to_hash("n"):
 		case to_hash("num"):
-		case to_hash("count"):
-			std::cerr << "error: unsupported custom indexer type " << type << std::endl;
+		case to_hash("count"): {
+				auto code = new std::vector<int>; // will NOT be deleted;
+				while (sign.find_first_of("b/") != std::string::npos)
+					sign[sign.find_first_of("b/")] = ' ';
+				std::stringstream numin(sign);
+				std::string tile, size;
+				while (numin >> tile && numin >> size) {
+					u32 codev = std::stol(tile) | (std::stol(size) << 16);
+					code->push_back(codev);
+				}
+				indexer::make(idxr, std::bind(utils::indexnuma, std::placeholders::_1, std::cref(*code)));
+			}
 			break;
 		default:
-			std::cerr << "error: unknown custom indexer type " << type << std::endl;
+			std::cerr << "unknown custom indexer type " << type << std::endl;
 			break;
 		}
 	}
@@ -930,6 +982,8 @@ void make_weights(const std::string& res = "") {
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
+	if (in.empty() && weight::list().empty())
+		in = "default";
 	if (in.find("default") != std::string::npos) {
 		in.replace(in.find("default"), 7, "");
 
@@ -982,6 +1036,8 @@ void make_features(const std::string& res = "") {
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
+	if (in.empty() && feature::list().empty())
+		in = "default";
 	if (in.find("default") != std::string::npos) {
 		in.replace(in.find("default"), 7, "");
 
@@ -1013,13 +1069,11 @@ void make_features(const std::string& res = "") {
 		std::stringstream(wghts) >> std::hex >> wght;
 		std::stringstream(idxrs) >> std::hex >> idxr;
 		if (weight::find(wght) == weight::end()) {
-			std::cerr << "warning: undefined weight " << wghts;
-			std::cerr << " [assume " << (wghts.size()) << "-tile pattern]" << std::endl;
+			std::cerr << "undefined weight " << wghts << " [assume pattern]" << std::endl;
 			weight::make(wght, std::pow(u64(base), wghts.size()));
 		}
 		if (indexer::find(idxr) == indexer::end()) {
-			std::cerr << "warning: undefined indexer " << idxrs;
-			std::cerr << " [assume " << (idxrs.size()) << "-tile pattern]" << std::endl;
+			std::cerr << "undefined indexer " << idxrs << " [assume pattern]" << std::endl;
 			auto patt = new std::vector<int>(hashpatt(idxrs)); // will NOT be deleted
 			indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
 		}
@@ -1053,8 +1107,7 @@ void list_mapping() {
 		char buf[64];
 		u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
 		char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c",
-			w.signature(), w.length(), usage, scale);
+		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c", w.signature(), w.length(), usage, scale);
 		std::cout << buf;
 		std::string feats;
 		for (feature f : feature::list()) {
@@ -1280,17 +1333,8 @@ struct statistic {
 	}
 };
 
-int main(int argc, const char* argv[]) {
-	u32 train = 100;
-	u32 test = 10;
-	u32 timestamp = std::time(nullptr);
-	u32 seed = timestamp;
-	numeric& alpha = moporgic::alpha;
-	utils::options wopts;
-	utils::options fopts;
+inline utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
-
-
 	auto valueof = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
 		if (def != nullptr) return def;
@@ -1301,67 +1345,62 @@ int main(int argc, const char* argv[]) {
 		switch (to_hash(argv[i])) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
-			alpha = std::stod(valueof(i, nullptr));
+			opts["alpha"] = valueof(i, nullptr);
 			break;
 		case to_hash("-a/"):
 		case to_hash("--alpha-divide"):
 			opts["alpha-divide"] = valueof(i, nullptr);
-			alpha /= std::stod(opts["alpha-divide"]);
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
-			train = u32(std::stod(valueof(i, nullptr)));
+			opts["train"] = valueof(i, nullptr);
 			break;
 		case to_hash("-T"):
 		case to_hash("--test"):
-			test = u32(std::stod(valueof(i, nullptr)));
+			opts["test"] = valueof(i, nullptr);
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
 		case to_hash("--srand"):
-			seed = u32(std::stod(valueof(i, nullptr)));
+			opts["seed"] = valueof(i, nullptr);
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
-			wopts["input"] = valueof(i, "tdl2048.weight");
-			wopts["output"] = wopts["input"];
+			opts["weight-input"] = valueof(i, "tdl2048.weight");
+			opts["weight-output"] = opts["weight-input"];
 			break;
 		case to_hash("-wi"):
 		case to_hash("--weight-input"):
-			wopts["input"] = valueof(i, "tdl2048.weight");
+			opts["weight-input"] = valueof(i, "tdl2048.weight");
 			break;
 		case to_hash("-wo"):
 		case to_hash("--weight-output"):
-			wopts["output"] = valueof(i, "tdl2048.weight");
+			opts["weight-output"] = valueof(i, "tdl2048.weight");
 			break;
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			fopts["input"] = valueof(i, "tdl2048.feature");
-			fopts["output"] = fopts["input"];
+			opts["feature-input"] = valueof(i, "tdl2048.feature");
+			opts["feature-output"] = opts["feature-input"];
 			break;
 		case to_hash("-fi"):
 		case to_hash("--feature-input"):
-			fopts["input"] = valueof(i, "tdl2048.feature");
+			opts["feature-input"] = valueof(i, "tdl2048.feature");
 			break;
 		case to_hash("-fo"):
 		case to_hash("--feature-output"):
-			fopts["output"] = valueof(i, "tdl2048.feature");
+			opts["feature-output"] = valueof(i, "tdl2048.feature");
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
 		case to_hash("--weight-value"):
 			for (std::string w; (w = valueof(i, "")).size(); )
-				wopts["value"] += (w += ',');
+				opts["weight-value"] += (w += ',');
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
 		case to_hash("--feature-value"):
 			for (std::string f; (f = valueof(i, "")).size(); )
-				fopts["value"] += (f += ',');
-			break;
-		case to_hash("-u"):
-		case to_hash("--util"):
-		case to_hash("--utils"):
+				opts["feature-value"] += (f += ',');
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
@@ -1389,13 +1428,30 @@ int main(int argc, const char* argv[]) {
 			break;
 		}
 	}
+	return opts;
+}
+
+int main(int argc, const char* argv[]) {
+	u32 train = 100;
+	u32 test = 10;
+	u32 timestamp = std::time(nullptr);
+	u32 seed = timestamp;
+	numeric& alpha = moporgic::alpha;
+
+	utils::options opts = parse(argc, argv);
+	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
+	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
+	if (opts("train")) train = std::stol(opts["train"]);
+	if (opts("test")) test = std::stol(opts["test"]);
+	if (opts("seed")) seed = std::stol(opts["seed"]);
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
-	std::cout << "timestamp = " << timestamp << std::endl;
-	std::cout << "srand = " << seed << std::endl;
+//	std::cout << "options = " << std::string(opts) << std::endl;
+	std::cout << "time = " << timestamp << std::endl;
+	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
@@ -1403,21 +1459,11 @@ int main(int argc, const char* argv[]) {
 
 	utils::make_indexers();
 
-	if (utils::load_weights(wopts["input"]) == false) {
-		if (wopts["input"].size())
-			std::cerr << "warning: " << wopts["input"] << " not loaded!" << std::endl;
-		if (wopts["value"].empty())
-			wopts["value"] = "default";
-	}
-	utils::make_weights(wopts["value"]);
+	utils::load_weights(opts["weight-input"]);
+	utils::make_weights(opts["weight-value"]);
 
-	if (utils::load_features(fopts["input"]) == false) {
-		if (fopts["input"].size())
-			std::cerr << "warning: " << fopts["input"] << " not loaded!" << std::endl;
-		if (fopts["value"].empty())
-			fopts["value"] = "default";
-	}
-	utils::make_features(fopts["value"]);
+	utils::load_features(opts["feature-input"]);
+	utils::make_features(opts["feature-value"]);
 
 	utils::list_mapping();
 
@@ -1484,8 +1530,8 @@ int main(int argc, const char* argv[]) {
 		break;
 	}
 
-	utils::save_weights(wopts["output"]);
-	utils::save_features(fopts["output"]);
+	utils::save_weights(opts["weight-output"]);
+	utils::save_features(opts["feature-output"]);
 
 
 
@@ -1504,6 +1550,8 @@ int main(int argc, const char* argv[]) {
 
 		stats.update(score, b.hash(), opers);
 	}
+
+	std::cout << std::endl;
 
 	return 0;
 }
