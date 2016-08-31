@@ -50,22 +50,22 @@ public:
 	inline bool operator !=(const weight& w) const { return sign != w.sign; }
 
 	void operator >>(std::ostream& out) const {
-		const char serial = 1;
+		const char serial = 2;
 		out.write(&serial, 1);
 		switch (serial) {
-		case 0:
-			out.write(r32(sign).le(), 4);
-			out.write(r64(size).le(), 8);
-			write<r32, f32>(out);
-			break;
-		case 1:
-			out.write(r32(sign).le(), 4);
-			out.write(r64(size).le(), 8);
-			switch (sizeof(numeric)) {
-			case 4: write<r32, f32>(out); break;
-			case 8: write<r64, f64>(out); break;
-			}
-			break;
+//		case 0:
+//			out.write(r32(sign).le(), 4);
+//			out.write(r64(size).le(), 8);
+//			write<r32, f32>(out);
+//			break;
+//		case 1:
+//			out.write(r32(sign).le(), 4);
+//			out.write(r64(size).le(), 8);
+//			switch (sizeof(numeric)) {
+//			case 4: write<r32, f32>(out); break;
+//			case 8: write<r64, f64>(out); break;
+//			}
+//			break;
 		case 2:
 			out.write(r32(sign).le(), 4);
 			out.write(r64(size).le(), 8);
@@ -88,16 +88,13 @@ public:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
 			value = alloc(size);
-			read<r32, f32>(in);
+			read<r32, numeric>(in);
 			break;
 		case 1:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
 			value = alloc(size);
-			switch (sizeof(numeric)) {
-			case 4: read<r32, f32>(in); break;
-			case 8: read<r64, f64>(in); break;
-			}
+			read<r64, numeric>(in);
 			break;
 		case 2:
 			sign = r32(load(4)).le();
@@ -1487,8 +1484,8 @@ int main(int argc, const char* argv[]) {
 	case to_hash("backward-reesti"):
 		for (stats.init(train); stats; stats++) {
 
-			register u32 score = 0;
-			register u32 opers = 0;
+			u32 score = 0;
+			u32 opers = 0;
 
 			for (b.init(); best << b; b.next()) {
 				score += best.score();
@@ -1510,8 +1507,8 @@ int main(int argc, const char* argv[]) {
 	case to_hash("forward"):
 		for (stats.init(train); stats; stats++) {
 
-			register u32 score = 0;
-			register u32 opers = 0;
+			u32 score = 0;
+			u32 opers = 0;
 
 			b.init();
 			best << b;
@@ -1544,8 +1541,8 @@ int main(int argc, const char* argv[]) {
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
 	for (stats.init(test); stats; stats++) {
 
-		register u32 score = 0;
-		register u32 opers = 0;
+		u32 score = 0;
+		u32 opers = 0;
 
 		for (b.init(); best << b; b.next()) {
 			score += best.score();
