@@ -11,12 +11,12 @@
 #ifndef DEBUG
 
 #define DLOG(msg,...)
-#define __constexpr constexpr
+#define constexpr constexpr
 
 #else /* DEBUG */
 
 #define DLOG(msg,...) printf(msg, ##__VA_ARGS__)
-#define __constexpr
+#define constexpr
 
 #endif /* DEBUG */
 
@@ -62,12 +62,12 @@ const uint64_t seq64_static(const int& i = 0) {
 	return seq[i]++;
 }
 
-__constexpr
+constexpr
 uint32_t to_hash_tail(const char* str, const uint32_t& hash) noexcept {
 	if (*str) return to_hash_tail(str + 1, (hash << 5) - hash + (*str));
 	return hash;
 }
-__constexpr inline
+constexpr inline
 uint32_t to_hash(const char* str) noexcept {
 	return to_hash_tail(str, 0); // i' = 31 * i + c
 }
@@ -157,6 +157,26 @@ uint64_t rand64() {
 #endif
 }
 
+#if   RAND_MAX == 0x7fffffff
+#define RANDX_MAX RAND_MAX
+#elif RAND_MAX == 0xffffffff
+#define RANDX_MAX RAND_MAX
+#elif RAND_MAX == 0x7fff
+#define RANDX_MAX 0x3fffffff
+#elif RAND_MAX == 0xffff
+#define RANDX_MAX 0xffffffff
+#else
+#define RANDX_MAX RAND_MAX
+#endif
+
+#if   RAND_MAX == 0x7fff
+#define RANDX_MAX 0x3fffffff
+#elif RAND_MAX == 0xffff
+#define RANDX_MAX 0xffffffff
+#else
+#define RANDX_MAX RAND_MAX
+#endif
+
 inline
 uint32_t randx() {
 #if   RAND_MAX == 0x7fffffff
@@ -172,7 +192,7 @@ uint32_t randx() {
 #endif
 }
 
-#undef __constexpr
+#undef constexpr
 
 } /* moporgic */
 

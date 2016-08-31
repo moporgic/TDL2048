@@ -26,7 +26,7 @@ public:
 		list() : tile(0), size(0) {}
 		~list() = default;
 		inline u32 operator[] (const u32& i) const { return (tile >> (i << 2)) & 0x0f; }
-		inline operator bool() const { return size > 0; }
+		inline operator u32() const { return size; }
 		struct iter {
 			u64 raw;
 			i32 idx;
@@ -646,18 +646,41 @@ public:
 		moporgic::read(in, raw_cast<u16>(ext, moporgic::endian::be));
 	}
 
-	inline void print(const bool& raw = true, std::ostream& out = std::cout) const {
-		u32 delim = raw ? 4 : 6;
-		char edge[32], line[32], buff[32];
-		snprintf(edge, sizeof(edge), "+%.*s+", delim * 4, "------------------------");
-		snprintf(line, sizeof(line), "|%%%uu%%%uu%%%uu%%%uu|", delim, delim, delim, delim);
+	inline void print(const bool& isat = true, std::ostream& out = std::cout) const {
+		if (isat)
+			printat(out);
+		else
+			printexact(out);
+	}
+
+	inline void printat(std::ostream& out = std::cout) const {
+		const char* edge = "+----------------+";
+		const char* line = "|%4u%4u%4u%4u|";
+		char buff[32];
 		out << edge << std::endl;
-		for (u32 i = 0, t[4]; i < 16; i += 4) {
-			for (u32 j = 0; j < 4; j++) t[j] = raw ? at(i+j) : exact(i+j);
-			snprintf(buff, sizeof(buff), line, t[0], t[1], t[2], t[3]);
+		for (u32 i = 0; i < 16; i += 4) {
+			snprintf(buff, sizeof(buff), line, at(i + 0), at(i + 1), at(i + 2), at(i + 3));
 			out << buff << std::endl;
 		}
 		out << edge << std::endl;
+	}
+
+	inline void printexact(std::ostream& out = std::cout) const {
+		const char* edge = "+------------------------+";
+		const char* line = "|%6u%6u%6u%6u|";
+		char buff[32];
+		out << edge << std::endl;
+		for (u32 i = 0; i < 16; i += 4) {
+			snprintf(buff, sizeof(buff), line, exact(i + 0), exact(i + 1), exact(i + 2), exact(i + 3));
+			out << buff << std::endl;
+		}
+		out << edge << std::endl;
+	}
+
+	inline void printraw(std::ostream& out = std::cout) const {
+		char buf[24];
+		snprintf(buf, sizeof(buf), "[%016llx|%04x]", raw, ext >> 16);
+		out << buf << std::endl;
 	}
 
 };
