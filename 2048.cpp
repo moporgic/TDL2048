@@ -78,6 +78,17 @@ public:
 		char buf[8];
 		auto load = moporgic::make_load(in, buf);
 		switch (*load(1)) {
+		case 0:
+			sign = r32(load(4)).le();
+			size = r64(load(8)).le();
+			value = alloc(size);
+			accum = alloc(size);
+			updvu = alloc(size);
+			for (size_t i = 0; i < size; i++) {
+				r32 raw(load(sizeof(r32)));
+				value[i] = numeric(raw.le());
+			}
+			break;
 		case 1:
 			sign = r32(load(4)).le();
 			size = r64(load(8)).le();
@@ -1504,8 +1515,8 @@ int main(int argc, const char* argv[]) {
 	case to_hash("backward-reesti"):
 		for (stats.init(train); stats; stats++) {
 
-			register u32 score = 0;
-			register u32 opers = 0;
+			u32 score = 0;
+			u32 opers = 0;
 
 			for (b.init(); best << b; b.next()) {
 				score += best.score();
@@ -1527,8 +1538,8 @@ int main(int argc, const char* argv[]) {
 	case to_hash("forward"):
 		for (stats.init(train); stats; stats++) {
 
-			register u32 score = 0;
-			register u32 opers = 0;
+			u32 score = 0;
+			u32 opers = 0;
 
 			b.init();
 			best << b;
@@ -1561,8 +1572,8 @@ int main(int argc, const char* argv[]) {
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
 	for (stats.init(test); stats; stats++) {
 
-		register u32 score = 0;
-		register u32 opers = 0;
+		u32 score = 0;
+		u32 opers = 0;
 
 		for (b.init(); best << b; b.next()) {
 			score += best.score();
