@@ -1111,16 +1111,6 @@ inline numeric estimate(const board& state,
 	return esti;
 }
 
-inline numeric update(const board& state, const numeric& updv,
-		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
-	register numeric esti = 0;
-	for (auto f = begin; f != end; f++) {
-		u64 idx = (*f)(state);
-		esti += weight(*f)(idx, updv);
-	}
-	return esti;
-}
-
 inline numeric update(const board& state, const numeric& alpha, const numeric& error,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 	register numeric esti = 0;
