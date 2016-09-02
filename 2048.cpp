@@ -45,12 +45,12 @@ public:
 	inline u32 signature() const { return sign; }
 	inline size_t length() const { return size; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
-	inline numeric& operator ()(const u64& i, const numeric& updv) {
+	inline numeric& operator ()(const u64& i, const numeric& alpha, const numeric& error) {
+		numeric aupdv = alpha * error;
 		numeric coher = std::abs(accum[i]) / updvu[i];
-		numeric cupdv = std::isnan(coher) ? updv : (coher * updv);
-		value[i] += cupdv;
-		accum[i] += cupdv;
-		updvu[i] += std::abs(cupdv);
+		value[i] += std::isnan(coher) ? aupdv : (coher * aupdv);
+		accum[i] += error;
+		updvu[i] += std::abs(error);
 		return value[i];
 	}
 
@@ -1110,6 +1110,16 @@ inline numeric update(const board& state, const numeric& updv,
 	return esti;
 }
 
+inline numeric update(const board& state, const numeric& alpha, const numeric& error,
+		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	register numeric esti = 0;
+	for (auto f = begin; f != end; f++) {
+		u64 idx = (*f)(state);
+		esti += weight(*f)(idx, alpha, error);
+	}
+	return esti;
+}
+
 void list_mapping() {
 	for (weight w : weight::list()) {
 		u32 usageK = (sizeof(numeric) * w.length()) >> 10;
@@ -1159,7 +1169,8 @@ struct state {
 	inline numeric update(const numeric& accu,
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
 			const numeric& alpha = moporgic::alpha) {
-		esti = score + utils::update(move, alpha * (accu - (esti - score)), begin, end);
+//		esti = score + utils::update(move, alpha * (accu - (esti - score)), begin, end);
+		esti = score + utils::update(move, alpha, accu - (esti - score), begin, end);
 		return esti;
 	}
 	inline numeric optimize(const numeric& accu,
