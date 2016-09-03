@@ -1449,6 +1449,8 @@ int main(int argc, const char* argv[]) {
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
+	std::cout << "develop" << " build C++" << __cplusplus;
+	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 //	std::cout << "options = " << std::string(opts) << std::endl;
