@@ -47,8 +47,9 @@ public:
 	inline numeric& operator [](const u64& i) { return value[i]; }
 	inline numeric& operator ()(const u64& i, const numeric& alpha, const numeric& error) {
 		numeric aupdv = alpha * error;
-		numeric coher = std::abs(accum[i]) / updvu[i];
-		value[i] += std::isnan(coher) ? aupdv : (coher * aupdv);
+//		numeric coher = std::abs(accum[i]) / updvu[i];
+//		value[i] += std::isnan(coher) ? aupdv : (coher * aupdv);
+		value[i] += updvu[i] ? (std::abs(accum[i]) / updvu[i]) * aupdv : aupdv;
 		accum[i] += error;
 		updvu[i] += std::abs(error);
 		return value[i];
