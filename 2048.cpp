@@ -1139,7 +1139,9 @@ struct state {
 		move = b;
 		score = (move.*oper)();
 	}
-	inline numeric estimate(const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+
+	inline numeric estimate(
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		if (score >= 0) {
 			esti = score + utils::estimate(move, begin, end);
 		} else {
@@ -1152,12 +1154,6 @@ struct state {
 			const numeric& alpha = moporgic::alpha) {
 		esti = score + utils::update(move, alpha * (accu - (esti - score)), begin, end);
 		return esti;
-	}
-	inline numeric optimize(const numeric& accu,
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
-			const numeric& alpha = moporgic::alpha) {
-		esti = score + utils::estimate(move, begin, end);
-		return update(accu, begin, end, alpha);
 	}
 
 	inline void operator <<(const board& b) {
@@ -1173,6 +1169,7 @@ struct state {
 
 	inline void operator >>(board& b) const { b = move; }
 	inline bool operator >(const state& s) const { return esti > s.esti; }
+	inline operator bool() const { return score >= 0; }
 
 	void operator >>(std::ostream& out) const {
 		move >> out;
@@ -1182,7 +1179,6 @@ struct state {
 		move << in;
 		moporgic::read(in, score);
 	}
-	inline operator bool() const { return score >= 0; }
 };
 struct select {
 	state move[4];
@@ -1214,7 +1210,7 @@ struct select {
 	inline select& update() {
 		return update_random();
 	}
-	inline select& update_fixed() {
+	inline select& update_ordered() {
 		best = move;
 		if (move[1] > *best) best = move + 1;
 		if (move[2] > *best) best = move + 2;
@@ -1229,7 +1225,6 @@ struct select {
 		if (move[(i + 3) % 4] > *best) best = move + ((i + 3) % 4);
 		return *this;
 	}
-	inline void shuffle() { std::random_shuffle(move, move + 4); }
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
@@ -1310,7 +1305,7 @@ struct statistic {
 		local.time = currtimept;
 	}
 
-	inline void updatec(const u32& score, const u32& hash, const u32& opers) {
+	void updatec(const u32& score, const u32& hash, const u32& opers) {
 		update(score, hash, opers);
 		u32 max = std::log2(hash);
 		local.count[max]++;
@@ -1497,7 +1492,9 @@ int main(int argc, const char* argv[]) {
 			}
 
 			for (numeric v = 0; path.size(); path.pop_back()) {
-				v = path.back().optimize(v);
+				state& s = path.back();
+				s.estimate();
+				v = s.update(v);
 			}
 
 			stats.update(score, b.hash(), opers);
