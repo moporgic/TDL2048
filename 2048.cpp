@@ -34,7 +34,6 @@ namespace moporgic {
 
 typedef double numeric;
 numeric alpha = 0.0025;
-const u64 base = 16;
 
 class weight {
 public:
@@ -999,7 +998,7 @@ void make_weights(const std::string& res = "") {
 			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
 		};
 		for (const auto& patt : defpatt) {
-			wmake(utils::hashpatt(patt), std::pow(u64(base), patt.size()));
+			wmake(utils::hashpatt(patt), std::pow(16ull, patt.size()));
 		}
 		wmake(0xfe000001, 1 << 25);
 		wmake(0xff000000, 1 << 16);
@@ -1074,7 +1073,7 @@ void make_features(const std::string& res = "") {
 		std::stringstream(idxrs) >> std::hex >> idxr;
 		if (weight::find(wght) == weight::end()) {
 			std::cerr << "undefined weight " << wghts << " [assume pattern]" << std::endl;
-			weight::make(wght, std::pow(u64(base), wghts.size()));
+			weight::make(wght, std::pow(16ull, wghts.size()));
 		}
 		if (indexer::find(idxr) == indexer::end()) {
 			std::cerr << "undefined indexer " << idxrs << " [assume pattern]" << std::endl;
@@ -1478,7 +1477,7 @@ int main(int argc, const char* argv[]) {
 	switch (to_hash(opts["train-type"])) {
 
 	case to_hash("backward"):
-	case to_hash("backward-reesti"):
+	case to_hash("backward-optimize"):
 		for (stats.init(train); stats; stats++) {
 
 			u32 score = 0;
@@ -1551,6 +1550,7 @@ int main(int argc, const char* argv[]) {
 
 		stats.update(score, b.hash(), opers);
 	}
+
 
 	std::cout << std::endl;
 
