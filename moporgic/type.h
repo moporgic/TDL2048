@@ -25,6 +25,8 @@ typedef char     byte;
 
 typedef __int128          i128;
 typedef unsigned __int128 u128;
+typedef unsigned char     uchar;
+typedef unsigned long int ulint;
 
 typedef short life; // life is short
 typedef long double llf;
@@ -37,13 +39,19 @@ typedef float  f32;
 typedef intptr_t  iptr;
 typedef uintptr_t uptr;
 
-//#define raw_cast(type, var) (*(type*)(&var))
+#define constexpr constexpr
 
 template<typename dst, typename src> inline constexpr
-dst ptr_cast(src p) { return (dst) p; /*return reinterpret_cast<dst>(p);*/ }
+dst  cast(src ptr) { return (dst) ptr; /*return reinterpret_cast<dst>(p);*/ }
 
 template<typename dst, typename src> inline constexpr
-dst& raw_cast(src& v, const int off = 0) { return *(ptr_cast<dst*>(&v) + off); }
+dst* pointer_cast(src* ptr) { return cast<dst*>(ptr); }
+
+template<typename dst, uint32_t off = 0, typename src> inline constexpr
+dst& reference_cast(src& ref) { return *(pointer_cast<dst>(&ref) + off); }
+
+template<typename dst, typename src> inline constexpr
+dst& raw_cast(src& ref, const int off = 0) { return *(pointer_cast<dst>(&ref) + off); }
 
 struct u8c {
 	byte v;
@@ -108,10 +116,14 @@ union r16 {
 	inline constexpr u8c& operator[](const int& i);
 	inline constexpr operator u8*() const;
 	inline constexpr operator i8*() const;
-	inline constexpr operator u16() const;
-	inline constexpr operator i16() const;
+	inline constexpr operator u64() const;
+	inline constexpr operator i64() const;
+	inline constexpr operator f64() const;
 	inline constexpr operator u32() const;
 	inline constexpr operator i32() const;
+	inline constexpr operator f32() const;
+	inline constexpr operator u16() const;
+	inline constexpr operator i16() const;
 	inline constexpr operator u8() const;
 	inline constexpr operator i8() const;
 	inline constexpr operator bool() const;
@@ -153,6 +165,9 @@ union r32 {
 	inline constexpr u8c& operator[](const int& i);
 	inline constexpr operator u8*() const;
 	inline constexpr operator i8*() const;
+	inline constexpr operator u64() const;
+	inline constexpr operator i64() const;
+	inline constexpr operator f64() const;
 	inline constexpr operator u32() const;
 	inline constexpr operator i32() const;
 	inline constexpr operator f32() const;
@@ -236,8 +251,8 @@ inline u64 to_le(const u64& v) { return is_le() ? v : swpos(v, 0, 7) | swpos(v, 
 inline u16 to_be(const u16& v) { return is_be() ? v : swpos(v, 0, 1); }
 inline u32 to_be(const u32& v) { return is_be() ? v : swpos(v, 0, 3) | swpos(v, 1, 2); }
 inline u64 to_be(const u64& v) { return is_be() ? v : swpos(v, 0, 7) | swpos(v, 1, 6) | swpos(v, 2, 5) | swpos(v, 3, 4); }
-}
-}
+} // namespace endian
+} // namespace moporgic
 
 inline constexpr u8c::u8c(const u32& b) : v(b) {}
 inline constexpr u8c::u8c(const u8c& b) : v(b.v) {}
@@ -269,9 +284,9 @@ inline constexpr u32 u8c::operator --() { return ++v; }
 inline constexpr u8c::operator u32() const { return v; }
 inline constexpr u8c::operator i32() const { return v; }
 inline constexpr u8c::operator bool() const { return (v & 0xff) != 0; }
-inline constexpr u8c::operator u8*() const { return ptr_cast<u8*>(&v); }
-inline constexpr u8c::operator i8*() const { return ptr_cast<i8*>(&v); }
-inline constexpr u8c::operator byte*() const { return ptr_cast<byte*>(&v); }
+inline constexpr u8c::operator u8*() const { return cast<u8*>(&v); }
+inline constexpr u8c::operator i8*() const { return cast<i8*>(&v); }
+inline constexpr u8c::operator byte*() const { return cast<byte*>(&v); }
 
 inline constexpr r16::r16(const u16& v) : v_u16(v) {}
 inline constexpr r16::r16(const i16& v) : v_u16(v) {}
@@ -286,10 +301,10 @@ inline constexpr r16::r16(const u8* b)  : r16(const_cast<u8*>(b)) {}
 inline constexpr r16::r16(const i8* b)  : r16(const_cast<i8*>(b)) {};
 inline r16::r16(const u8* b, const int& e) : r16(const_cast<u8*>(b), e) {}
 inline r16::r16(const i8* b, const int& e) : r16(const_cast<i8*>(b), e) {}
-inline constexpr r16::r16(const byte* b)  : r16(ptr_cast<i8*>(b)) {};
-inline r16::r16(const byte* b, const int& e) : r16(ptr_cast<i8*>(b), e) {}
-inline constexpr r16::r16(u8* b)  : v_u16(*ptr_cast<u16*>(b)) {}
-inline constexpr r16::r16(i8* b)  : v_u16(*ptr_cast<u16*>(b)) {}
+inline constexpr r16::r16(const byte* b)  : r16(cast<i8*>(b)) {};
+inline r16::r16(const byte* b, const int& e) : r16(cast<i8*>(b), e) {}
+inline constexpr r16::r16(u8* b)  : v_u16(*cast<u16*>(b)) {}
+inline constexpr r16::r16(i8* b)  : v_u16(*cast<u16*>(b)) {}
 inline r16::r16(u8* b, const int& e) {
 	const int* endian = moporgic::endian::b2endian[e];
 	for (int i = 0; i < 2; i++) v_u8c[i] = b[endian[i]];
@@ -300,16 +315,20 @@ inline r16::r16(i8* b, const int& e) {
 }
 //inline constexpr r16::r16(const size_t& v) : v_u16(v) {}
 inline constexpr u8c& r16::operator[](const int& i) { return v_u8c[i]; }
-inline constexpr r16::operator u8*() const { return ptr_cast<u8*>(v_u8); }
-inline constexpr r16::operator i8*() const { return ptr_cast<i8*>(v_u8); }
-inline constexpr r16::operator u16() const { return v_u16; }
-inline constexpr r16::operator i16() const { return v_u16; }
+inline constexpr r16::operator u8*() const { return cast<u8*>(v_u8); }
+inline constexpr r16::operator i8*() const { return cast<i8*>(v_u8); }
+inline constexpr r16::operator u64() const { return v_u16; }
+inline constexpr r16::operator i64() const { return v_u16; }
+inline constexpr r16::operator f64() const { return v_u16; }
 inline constexpr r16::operator u32() const { return v_u16; }
 inline constexpr r16::operator i32() const { return v_u16; }
+inline constexpr r16::operator f32() const { return v_u16; }
+inline constexpr r16::operator u16() const { return v_u16; }
+inline constexpr r16::operator i16() const { return v_u16; }
 inline constexpr r16::operator u8() const { return v_u8[0]; }
 inline constexpr r16::operator i8() const { return v_u8[0]; }
 inline constexpr r16::operator bool() const { return static_cast<bool>(v_u16); }
-inline constexpr r16::operator byte*() const { return ptr_cast<byte*>(v_u8); }
+inline constexpr r16::operator byte*() const { return cast<byte*>(v_u8); }
 inline r16 r16::endian(const int& e) const { return r16(operator u8*(), e); }
 inline r16 r16::le() const { return moporgic::endian::to_le(v_u16); }
 inline r16 r16::be() const { return moporgic::endian::to_be(v_u16); }
@@ -330,10 +349,10 @@ inline constexpr r32::r32(const i8* b)  : r32(const_cast<i8*>(b)) {}
 inline r32::r32(const r16* v, const int& e) : r32(const_cast<r16*>(v), e) {}
 inline r32::r32(const u8* b,  const int& e) : r32(const_cast<u8*>(b),  e) {}
 inline r32::r32(const i8* b,  const int& e) : r32(const_cast<i8*>(b),  e) {}
-inline constexpr r32::r32(const byte* b)  : r32(ptr_cast<i8*>(b)) {};
-inline r32::r32(const byte* b, const int& e) : r32(ptr_cast<i8*>(b), e) {}
-inline constexpr r32::r32(u8* b)  : v_u32(*ptr_cast<u32*>(b)) {}
-inline constexpr r32::r32(i8* b)  : v_u32(*ptr_cast<u32*>(b)) {}
+inline constexpr r32::r32(const byte* b)  : r32(cast<i8*>(b)) {};
+inline r32::r32(const byte* b, const int& e) : r32(cast<i8*>(b), e) {}
+inline constexpr r32::r32(u8* b)  : v_u32(*cast<u32*>(b)) {}
+inline constexpr r32::r32(i8* b)  : v_u32(*cast<u32*>(b)) {}
 inline r32::r32(r16* v, const int& e) {
 	const int* endian = moporgic::endian::b2endian[e];
 	for (int i = 0; i < 2; i++) v_r16[i] = v[endian[i]];
@@ -348,8 +367,11 @@ inline r32::r32(i8* b, const int& e) {
 }
 //inline constexpr r32::r32(const size_t& v) : v_u32(v) {}
 inline constexpr u8c& r32::operator[](const int& i) { return v_u8c[i]; }
-inline constexpr r32::operator u8*() const { return ptr_cast<u8*>(v_u8); }
-inline constexpr r32::operator i8*() const { return ptr_cast<i8*>(v_u8); }
+inline constexpr r32::operator u8*() const { return cast<u8*>(v_u8); }
+inline constexpr r32::operator i8*() const { return cast<i8*>(v_u8); }
+inline constexpr r32::operator u64() const { return v_u32; }
+inline constexpr r32::operator i64() const { return v_u32; }
+inline constexpr r32::operator f64() const { return v_f32; }
 inline constexpr r32::operator u32() const { return v_u32; }
 inline constexpr r32::operator i32() const { return v_u32; }
 inline constexpr r32::operator f32() const { return v_f32; }
@@ -358,7 +380,7 @@ inline constexpr r32::operator i16() const { return v_r16[0]; }
 inline constexpr r32::operator u8() const { return v_u8[0]; }
 inline constexpr r32::operator i8() const { return v_u8[0]; }
 inline constexpr r32::operator bool() const { return static_cast<bool>(v_u32); }
-inline constexpr r32::operator byte*() const { return ptr_cast<byte*>(v_u8); }
+inline constexpr r32::operator byte*() const { return cast<byte*>(v_u8); }
 inline r32 r32::endian(const int& e) const { return r32(operator u8*(), e); }
 inline r32 r32::le() const { return moporgic::endian::to_le(v_u32); }
 inline r32 r32::be() const { return moporgic::endian::to_be(v_u32); }
@@ -380,10 +402,10 @@ inline r64::r64(const r16* v, const int& e) : r64(const_cast<r16*>(v), e) {}
 inline r64::r64(const r32* v, const int& e) : r64(const_cast<r32*>(v), e) {}
 inline r64::r64(const u8* b, const int& e)  : r64(const_cast<u8*>(b), e) {}
 inline r64::r64(const i8* b, const int& e)  : r64(const_cast<i8*>(b), e) {}
-inline constexpr r64::r64(const byte* b)  : r64(ptr_cast<i8*>(b)) {};
-inline r64::r64(const byte* b, const int& e) : r64(ptr_cast<i8*>(b), e) {}
-inline constexpr r64::r64(u8* b)  : v_u64(*ptr_cast<u64*>(b)) {}
-inline constexpr r64::r64(i8* b)  : v_u64(*ptr_cast<u64*>(b)) {}
+inline constexpr r64::r64(const byte* b)  : r64(cast<i8*>(b)) {};
+inline r64::r64(const byte* b, const int& e) : r64(cast<i8*>(b), e) {}
+inline constexpr r64::r64(u8* b)  : v_u64(*cast<u64*>(b)) {}
+inline constexpr r64::r64(i8* b)  : v_u64(*cast<u64*>(b)) {}
 inline r64::r64(r16* v, const int& e) {
 	const int* endian = moporgic::endian::b4endian[e];
 	for (int i = 0; i < 4; i++) v_r16[i] = v[endian[i]];
@@ -402,8 +424,8 @@ inline r64::r64(i8* b, const int& e) {
 }
 //inline constexpr r64::r64(const size_t& v) : v_u64(v) {}
 inline constexpr u8c& r64::operator[](const int& i) { return v_u8c[i]; }
-inline constexpr r64::operator u8*() const { return ptr_cast<u8*>(v_u8); }
-inline constexpr r64::operator i8*() const { return ptr_cast<i8*>(v_u8); }
+inline constexpr r64::operator u8*() const { return cast<u8*>(v_u8); }
+inline constexpr r64::operator i8*() const { return cast<i8*>(v_u8); }
 inline constexpr r64::operator u64() const { return v_u64; }
 inline constexpr r64::operator i64() const { return v_u64; }
 inline constexpr r64::operator f64() const { return v_f64; }
@@ -415,13 +437,9 @@ inline constexpr r64::operator i16() const { return v_r32[0]; }
 inline constexpr r64::operator u8() const { return v_u8[0]; }
 inline constexpr r64::operator i8() const { return v_u8[0]; }
 inline constexpr r64::operator bool() const { return static_cast<bool>(v_u64); }
-inline constexpr r64::operator byte*() const { return ptr_cast<byte*>(v_u8); }
+inline constexpr r64::operator byte*() const { return cast<byte*>(v_u8); }
 inline r64 r64::endian(const int& e) const { return r64(operator u8*(), e); }
 inline r64 r64::le() const { return moporgic::endian::to_le(v_u64); }
 inline r64 r64::be() const { return moporgic::endian::to_le(v_u64); }
 
-#ifdef MOPORGIC_MACRO
-#define DECLARE_OP_TCMP(T, op, v) inline bool operator op(const T& t) const { return v op t.v; }
-#define DECLARE_OP_NEQ(T) inline bool operator !=(const T& t) const { return !(operator ==(t)); }
-#define DECLARE_OP_CMP(T, op) inline bool operator op(const T& v) const { return operator T() op v; }
-#endif
+#undef constexpr

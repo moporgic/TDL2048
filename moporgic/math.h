@@ -8,14 +8,15 @@
  *      Author: moporgic
  */
 
+#include "type.h"
 #include "half.h"
 #include <math.h>
 #include <cmath>
 
 #ifndef DEBUG
-#define __constexpr constexpr
+#define constexpr constexpr
 #else /* DEBUG */
-#define __constexpr
+#define constexpr
 #endif /* DEBUG */
 
 namespace moporgic {
@@ -27,7 +28,7 @@ namespace math {
  * Bit Reversal
  * Reversing the bits in an integer x is somewhat painful, but here's a SWAR algorithm for a 32-bit value
  */
-static inline __constexpr
+static inline constexpr
 unsigned int reverse(register unsigned int x) {
 	x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1));
 	x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2));
@@ -39,7 +40,7 @@ unsigned int reverse(register unsigned int x) {
  * Bit Reversal (re-write Bit Reversal algorithm to use 4 instead of 8 constants)
  * Reversing the bits in an integer x is somewhat painful, but here's a SWAR algorithm for a 32-bit value
  */
-static inline __constexpr
+static inline constexpr
 unsigned int reverse_v2(register unsigned int x) {
 	register unsigned int y = 0x55555555;
 	x = (((x >> 1) & y) | ((x & y) << 1));
@@ -55,7 +56,7 @@ unsigned int reverse_v2(register unsigned int x) {
  * Is Power of 2
  * A non-negative binary integer value x is a power of 2 iff (x&(x-1)) is 0 using 2's complement arithmetic.
  */
-static inline __constexpr
+static inline constexpr
 bool ispw2(register unsigned int x) {
 	return (x & (x - 1)) == 0;
 }
@@ -69,7 +70,7 @@ bool ispw2(register unsigned int x) {
  * The following code uses a variable-precision SWAR algorithm to perform a tree
  * reduction adding the bits in a 32-bit value:
  */
-static inline __constexpr
+static inline constexpr
 unsigned int ones32(register unsigned int x) {
 	x -= ((x >> 1) & 0x55555555);
 	x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
@@ -79,7 +80,7 @@ unsigned int ones32(register unsigned int x) {
 	return (x & 0x0000003f);
 }
 
-static inline __constexpr
+static inline constexpr
 unsigned int ones64(register unsigned long long x) {
 	x = (x & 0x5555555555555555ull) + ((x >> 1) & 0x5555555555555555ull);
 	x = (x & 0x3333333333333333ull) + ((x >> 2) & 0x3333333333333333ull);
@@ -93,7 +94,7 @@ unsigned int ones64(register unsigned long long x) {
  * floor of base 2 log of x is (WORDBITS-lzc(x)). In any case, this operation has found its way
  * into quite a few algorithms, so it is useful to have an efficient implementation:
  */
-static inline __constexpr
+static inline constexpr
 unsigned int lzc(register unsigned int x) {
 	x |= (x >> 1);
 	x |= (x >> 2);
@@ -114,7 +115,7 @@ unsigned int lzc(register unsigned int x) {
  * the least significant 1 bit is also (x^(x&(x-1))).
  *
  */
-static inline __constexpr
+static inline constexpr
 unsigned int lsb32(register unsigned int x) {
 	return (x ^ (x & (x - 1)));
 }
@@ -127,7 +128,7 @@ unsigned int lsb32(register unsigned int x) {
  * the same most significant 1 as x, but all 1's below it. Bitwise AND of the original value with
  * the complement of the "folded" value shifted down by one yields the most significant bit. For a 32-bit value:
  */
-static inline __constexpr
+static inline constexpr
 unsigned int msb32(register unsigned int x) {
 	x |= (x >> 1);
 	x |= (x >> 2);
@@ -149,7 +150,7 @@ unsigned int msb32(register unsigned int x) {
  * if LOG0UNDEFINED, this code returns -1 for log2(0); otherwise, it returns 0 for log2(0). For a 32-bit value:
  *
  */
-static inline __constexpr
+static inline constexpr
 unsigned int log2(register unsigned int x) {
 	x |= (x >> 1);
 	x |= (x >> 2);
@@ -163,7 +164,7 @@ unsigned int log2(register unsigned int x) {
 #endif
 }
 
-static inline __constexpr
+static inline constexpr
 unsigned int lg(register unsigned int x) {
 	return log2(x);
 }
@@ -176,7 +177,7 @@ unsigned int lg(register unsigned int x) {
  * followed with the comparison-to-mask shift used in integer minimum/maximum.
  * The result is:
  */
-static inline __constexpr
+static inline constexpr
 unsigned int log2_unstable(register unsigned int x) {
 	register int y = (x & (x - 1));
 
@@ -201,7 +202,7 @@ unsigned int log2_unstable(register unsigned int x) {
  *  This process yields a bit vector with the same most significant 1 as x, but all 1's below it.
  *  Adding 1 to that value yields the next largest power of 2. For a 32-bit value:
  */
-static inline __constexpr
+static inline constexpr
 unsigned int nlpo2(register unsigned int x) {
 	x |= (x >> 1);
 	x |= (x >> 2);
@@ -238,10 +239,16 @@ void swap_v2(T& x, T& y) {
  * Given the Least Significant 1 Bit and Population Count (Ones Count) algorithms,
  * it is trivial to combine them to construct a trailing zero count (as pointed-out by Joe Bowbeer):
  */
-static inline __constexpr
+static inline constexpr
 unsigned int tzc(register int x) {
 	return (ones32((x & -x) - 1));
 }
+
+template<typename N, typename P> constexpr
+N pow_tail(N v, N b, P p) noexcept { return p ? pow_tail(v * b, b, p - 1) : v; }
+
+template<typename N, typename P> constexpr inline
+N pow(N b, P p) noexcept { return pow_tail(1, b, p); }
 
 
 class half {
@@ -256,29 +263,26 @@ public:
 	half(const u16& raw);
 	half(const i16& raw);
 	inline operator f32() const;
-	template<typename N> inline f32 operator +(const N& f) const;
-	template<typename N> inline f32 operator -(const N& f) const;
-	template<typename N> inline f32 operator *(const N& f) const;
-	template<typename N> inline f32 operator /(const N& f) const;
+	inline f32 operator +(const f32& f) const;
+	inline f32 operator -(const f32& f) const;
+	inline f32 operator *(const f32& f) const;
+	inline f32 operator /(const f32& f) const;
 	inline f32 operator ++(int);
 	inline f32 operator --(int);
 	inline f32 operator ++();
 	inline f32 operator --();
 	inline half& operator  =(const half& f);
-	template<typename N> inline half& operator  =(const N& f);
-	template<typename N> inline half& operator +=(const N& f);
-	template<typename N> inline half& operator -=(const N& f);
-	template<typename N> inline half& operator *=(const N& f);
-	template<typename N> inline half& operator /=(const N& f);
-	template<typename N> inline bool operator ==(const N& f) const;
-	template<typename N> inline bool operator !=(const N& f) const;
-	template<typename N> inline bool operator <=(const N& f) const;
-	template<typename N> inline bool operator >=(const N& f) const;
-	template<typename N> inline bool operator < (const N& f) const;
-	template<typename N> inline bool operator > (const N& f) const;
-
-	template<typename N> inline half& operator >>(N& v) const;
-	template<typename N> inline half& operator <<(const N& v);
+	inline half& operator  =(const f32& f);
+	inline half& operator +=(const f32& f);
+	inline half& operator -=(const f32& f);
+	inline half& operator *=(const f32& f);
+	inline half& operator /=(const f32& f);
+	inline bool operator ==(const f32& f) const;
+	inline bool operator !=(const f32& f) const;
+	inline bool operator <=(const f32& f) const;
+	inline bool operator >=(const f32& f) const;
+	inline bool operator < (const f32& f) const;
+	inline bool operator > (const f32& f) const;
 private:
 	u16 hf;
 };
@@ -292,37 +296,29 @@ half::half(const i32& num) : half(f32(num)) {}
 half::half(const u16& num) : half(f32(num)) {}
 half::half(const i16& num) : half(f32(num)) {}
 inline half::operator f32() const { return to_float(hf); }
-template<typename N> inline f32 half::operator +(const N& f) const { return operator f32() + f; }
-template<typename N> inline f32 half::operator -(const N& f) const { return operator f32() - f; }
-template<typename N> inline f32 half::operator *(const N& f) const { return operator f32() * f; }
-template<typename N> inline f32 half::operator /(const N& f) const { return operator f32() / f; }
+inline f32 half::operator +(const f32& f) const { return operator f32() + f; }
+inline f32 half::operator -(const f32& f) const { return operator f32() - f; }
+inline f32 half::operator *(const f32& f) const { return operator f32() * f; }
+inline f32 half::operator /(const f32& f) const { return operator f32() / f; }
 inline f32 half::operator ++(int) { f32 f = to_float(hf); hf = to_half(f + 1); return f; }
 inline f32 half::operator --(int) { f32 f = to_float(hf); hf = to_half(f - 1); return f; }
 inline f32 half::operator ++() { f32 f = to_float(hf) + 1; hf = to_half(f); return f; }
 inline f32 half::operator --() { f32 f = to_float(hf) - 1; hf = to_half(f); return f; }
 inline half& half::operator  =(const half& f) { hf = f.hf; return *this; }
-template<typename N> inline half& half::operator  =(const N& f) { hf = to_float(f32(f)); return *this; }
-template<typename N> inline half& half::operator +=(const N& f) { return operator =(operator +(f)); }
-template<typename N> inline half& half::operator -=(const N& f) { return operator =(operator -(f)); }
-template<typename N> inline half& half::operator *=(const N& f) { return operator =(operator *(f)); }
-template<typename N> inline half& half::operator /=(const N& f) { return operator =(operator /(f)); }
-template<typename N> inline bool half::operator ==(const N& f) const { return operator f32() == f; }
-template<typename N> inline bool half::operator !=(const N& f) const { return operator f32() != f; }
-template<typename N> inline bool half::operator <=(const N& f) const { return operator f32() <= f; }
-template<typename N> inline bool half::operator >=(const N& f) const { return operator f32() >= f; }
-template<typename N> inline bool half::operator < (const N& f) const { return operator f32() <  f; }
-template<typename N> inline bool half::operator > (const N& f) const { return operator f32() >  f; }
-inline u16& hfat(const f32& v) { return ((u16*)&v)[endian::be]; }
-inline u32& hfat(const f64& v) { return ((u32*)&v)[endian::be]; }
-template<typename N> inline half& half::operator >>(N& v) const { f32 f = 0; math::hfat(f) = hf; v = f; return *this; }
-template<typename N> inline half& half::operator <<(const N& v) { f32 f(v); hf = hfat(f); return *this; }
+inline half& half::operator  =(const f32& f) { hf = to_float(f32(f)); return *this; }
+inline half& half::operator +=(const f32& f) { return operator =(operator +(f)); }
+inline half& half::operator -=(const f32& f) { return operator =(operator -(f)); }
+inline half& half::operator *=(const f32& f) { return operator =(operator *(f)); }
+inline half& half::operator /=(const f32& f) { return operator =(operator /(f)); }
+inline bool half::operator ==(const f32& f) const { return operator f32() == f; }
+inline bool half::operator !=(const f32& f) const { return operator f32() != f; }
+inline bool half::operator <=(const f32& f) const { return operator f32() <= f; }
+inline bool half::operator >=(const f32& f) const { return operator f32() >= f; }
+inline bool half::operator < (const f32& f) const { return operator f32() <  f; }
+inline bool half::operator > (const f32& f) const { return operator f32() >  f; }
+inline u16& hfat(const f32& v) { return ((u16*)&v)[endian::is_le() ? 1 : 0]; }
+inline u32& hfat(const f64& v) { return ((u32*)&v)[endian::is_le() ? 1 : 0]; }
 
-template<typename N, typename P> __constexpr
-N pow_tail(N v, N b, P p) noexcept { return p ? pow_tail(v * b, b, p - 1) : v; }
-
-template<typename N, typename P> __constexpr inline
-N pow(N b, P p) noexcept { return pow_tail(N(1), b, p); }
-
-#undef __constexpr
+#undef constexpr
 } /* math */
 }
