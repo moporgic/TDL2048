@@ -8,7 +8,6 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
-#include "moporgic/io.h"
 #include <algorithm>
 #include <iostream>
 #include <cstdio>
