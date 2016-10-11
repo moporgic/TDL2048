@@ -361,6 +361,17 @@ std::istream& read(std::istream& in, const type* begin, const type* end) {
 }
 
 template<typename cast, typename type> inline
+std::ostream& write_cast(std::ostream& out, const type& v) {
+	return write(out, cast(v));
+}
+
+template<typename cast, typename type> inline
+std::istream& read_cast(std::istream& in, type& v) {
+	cast buf; read(in, buf); v = buf;
+	return in;
+}
+
+template<typename cast, typename type> inline
 std::ostream& write_cast(std::ostream& out, const type* begin, const type* end) {
 	for (type* value = const_cast<type*>(begin); value != end; value++)
 		write(out, cast(*value));
