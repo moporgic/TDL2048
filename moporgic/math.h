@@ -8,8 +8,8 @@
  *      Author: moporgic
  */
 
-#include "type.h"
 #include "half.h"
+#include "type.h"
 #include <math.h>
 #include <cmath>
 
@@ -244,48 +244,23 @@ unsigned int tzc(register int x) {
 	return (ones32((x & -x) - 1));
 }
 
+/**
+ * Tail recursive pow
+ */
 template<typename N, typename P> constexpr
 N pow_tail(N v, N b, P p) noexcept { return p ? pow_tail(v * b, b, p - 1) : v; }
 
+/**
+ * Tail recursive pow
+ */
 template<typename N, typename P> constexpr inline
 N pow(N b, P p) noexcept { return pow_tail(1, b, p); }
 
+#undef constexpr
+} /* math */
+} /* moporgic */
 
-class half {
-public:
-	half(const half& num);
-	half(const f32& num = 0.0f);
-	half(const f64& num);
-	half(const u64& raw);
-	half(const i64& raw);
-	half(const u32& raw);
-	half(const i32& raw);
-	half(const u16& raw);
-	half(const i16& raw);
-	inline operator f32() const;
-	inline f32 operator +(const f32& f) const;
-	inline f32 operator -(const f32& f) const;
-	inline f32 operator *(const f32& f) const;
-	inline f32 operator /(const f32& f) const;
-	inline f32 operator ++(int);
-	inline f32 operator --(int);
-	inline f32 operator ++();
-	inline f32 operator --();
-	inline half& operator  =(const half& f);
-	inline half& operator  =(const f32& f);
-	inline half& operator +=(const f32& f);
-	inline half& operator -=(const f32& f);
-	inline half& operator *=(const f32& f);
-	inline half& operator /=(const f32& f);
-	inline bool operator ==(const f32& f) const;
-	inline bool operator !=(const f32& f) const;
-	inline bool operator <=(const f32& f) const;
-	inline bool operator >=(const f32& f) const;
-	inline bool operator < (const f32& f) const;
-	inline bool operator > (const f32& f) const;
-private:
-	u16 hf;
-};
+// the declaration of half is inside type.h
 half::half(const half& num) : hf(num.hf) {}
 half::half(const f32& num) : hf(to_half(num)) {}
 half::half(const f64& num) : half(f32(num)) {}
@@ -316,9 +291,6 @@ inline bool half::operator <=(const f32& f) const { return operator f32() <= f; 
 inline bool half::operator >=(const f32& f) const { return operator f32() >= f; }
 inline bool half::operator < (const f32& f) const { return operator f32() <  f; }
 inline bool half::operator > (const f32& f) const { return operator f32() >  f; }
-inline u16& hfat(const f32& v) { return ((u16*)&v)[endian::is_le() ? 1 : 0]; }
-inline u32& hfat(const f64& v) { return ((u32*)&v)[endian::is_le() ? 1 : 0]; }
+inline u16& hfat(const f32& v) { return ((u16*)&v)[moporgic::endian::is_le() ? 1 : 0]; }
+inline u32& hfat(const f64& v) { return ((u32*)&v)[moporgic::endian::is_le() ? 1 : 0]; }
 
-#undef constexpr
-} /* math */
-}
