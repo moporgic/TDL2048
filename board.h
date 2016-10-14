@@ -221,11 +221,11 @@ public:
 
 	u64 raw;
 	u32 ext;
-	u32 nul;
+	u32 inf;
 
 public:
-	inline board(const u64& raw = 0) : raw(raw), ext(0), nul(0) {}
-	inline board(const u64& raw, const u32& ext) : raw(raw), ext(ext), nul(0) {}
+	inline board(const u64& raw = 0) : raw(raw), ext(0), inf(0) {}
+	inline board(const u64& raw, const u32& ext) : raw(raw), ext(ext), inf(0) {}
 	inline board(const u64& raw, const u16& ext) : board(raw, u32(ext) << 16) {}
 	inline board(const board& b) = default;
 	inline ~board() = default;
@@ -634,7 +634,7 @@ public:
 	}
 	inline void write80(std::ostream& out) const {
 		write64(out);
-		moporgic::write(out, raw_cast<u16>(ext, moporgic::endian::be));
+		moporgic::write_cast<u16>(out, ext >> 16);
 	}
 
 	inline void read64(std::istream& in) {
@@ -642,7 +642,7 @@ public:
 	}
 	inline void read80(std::istream& in) {
 		read64(in);
-		moporgic::read(in, raw_cast<u16>(ext, moporgic::endian::be));
+		moporgic::read_cast<u16>(in, ext); ext <<= 16;
 	}
 
 	inline void print(const bool& isat = true, std::ostream& out = std::cout) const {
