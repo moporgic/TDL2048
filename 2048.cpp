@@ -36,28 +36,28 @@ numeric alpha = 0.0025;
 
 class weight {
 public:
-	weight() : _sign(0), _size(0), _value(nullptr) {}
-	weight(const weight& w) : _sign(w._sign), _size(w._size), _value(w._value) {}
+	weight() : id(0), len(0), value(nullptr) {}
+	weight(const weight& w) : id(w.id), len(w.len), value(w.value) {}
 	~weight() {}
 
-	inline u64 sign() const { return _sign; }
-	inline u64 size() const { return _size; }
-	inline numeric& operator [](const u64& i) { return _value[i]; }
+	inline u64 sign() const { return id; }
+	inline u64 size() const { return len; }
+	inline numeric& operator [](const u64& i) { return value[i]; }
 
-	inline bool operator ==(const weight& w) const { return _sign == w._sign; }
-	inline bool operator !=(const weight& w) const { return _sign != w._sign; }
+	inline bool operator ==(const weight& w) const { return id == w.id; }
+	inline bool operator !=(const weight& w) const { return id != w.id; }
 
 	void operator >>(std::ostream& out) const {
 		u32 code = 2;
 		write_cast<byte>(out, code);
 		switch (code) {
 		case 2:
-			write_cast<u32>(out, _sign);
-			write_cast<u64>(out, _size);
+			write_cast<u32>(out, id);
+			write_cast<u64>(out, len);
 			write_cast<u16>(out, sizeof(numeric));
 			switch (sizeof(numeric)) {
-			case 4: write_cast<f32>(out, _value, _value + _size); break;
-			case 8: write_cast<f64>(out, _value, _value + _size); break;
+			case 4: write_cast<f32>(out, value, value + len); break;
+			case 8: write_cast<f64>(out, value, value + len); break;
 			}
 			break;
 		default:
@@ -70,25 +70,25 @@ public:
 		read_cast<byte>(in, code);
 		switch (code) {
 		case 0:
-			read_cast<u32>(in, _sign);
-			read_cast<u64>(in, _size);
-			_value = alloc(_size);
-			read_cast<f32>(in, _value, _value + _size);
+			read_cast<u32>(in, id);
+			read_cast<u64>(in, len);
+			value = alloc(len);
+			read_cast<f32>(in, value, value + len);
 			break;
 		case 1:
-			read_cast<u32>(in, _sign);
-			read_cast<u64>(in, _size);
-			_value = alloc(_size);
-			read_cast<f64>(in, _value, _value + _size);
+			read_cast<u32>(in, id);
+			read_cast<u64>(in, len);
+			value = alloc(len);
+			read_cast<f64>(in, value, value + len);
 			break;
 		case 2:
-			read_cast<u32>(in, _sign);
-			read_cast<u64>(in, _size);
-			_value = alloc(_size);
+			read_cast<u32>(in, id);
+			read_cast<u64>(in, len);
+			value = alloc(len);
 			read_cast<u16>(in, code);
 			switch (code) {
-			case 4: read_cast<f32>(in, _value, _value + _size); break;
-			case 8: read_cast<f64>(in, _value, _value + _size); break;
+			case 4: read_cast<f32>(in, value, value + len); break;
+			case 8: read_cast<f64>(in, value, value + len); break;
 			}
 			break;
 		default:
@@ -142,10 +142,10 @@ public:
 	static inline iter begin() { return wghts().begin(); }
 	static inline iter end() { return wghts().end(); }
 	static inline iter find(const u32& sign) {
-		return std::find_if(begin(), end(), [=](const weight& w) { return w._sign == sign; });
+		return std::find_if(begin(), end(), [=](const weight& w) { return w.id == sign; });
 	}
 private:
-	weight(const u32& sign, const size_t& size) : _sign(sign), _size(size), _value(alloc(size)) {}
+	weight(const u32& sign, const size_t& size) : id(sign), len(size), value(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
@@ -153,25 +153,25 @@ private:
 	}
 
 
-	u32 _sign;
-	size_t _size;
-	numeric* _value;
+	u32 id;
+	size_t len;
+	numeric* value;
 };
 
 class indexer {
 public:
-	indexer() : _sign(0), _index(nullptr) {}
-	indexer(const indexer& i) : _sign(i._sign), _index(i._index) {}
+	indexer() : id(0), map(nullptr) {}
+	indexer(const indexer& i) : id(i.id), map(i.map) {}
 	~indexer() {}
 
 	typedef std::function<u64(const board&)> mapper;
 
-	inline u64 sign() const { return _sign; }
-	inline mapper index() const { return _index; }
-	inline u64 operator ()(const board& b) const { return _index(b); }
+	inline u64 sign() const { return id; }
+	inline mapper index() const { return map; }
+	inline u64 operator ()(const board& b) const { return map(b); }
 
-	inline bool operator ==(const indexer& i) const { return _sign == i._sign; }
-	inline bool operator !=(const indexer& i) const { return _sign != i._sign; }
+	inline bool operator ==(const indexer& i) const { return id == i.id; }
+	inline bool operator !=(const indexer& i) const { return id != i.id; }
 
 	static indexer make(const u32& sign, mapper map) {
 		idxrs().push_back(indexer(sign, map));
@@ -187,28 +187,29 @@ public:
 	static inline iter begin() { return idxrs().begin(); }
 	static inline iter end() { return idxrs().end(); }
 	static inline iter find(const u32& sign) {
-		return std::find_if(begin(), end(), [=](const indexer& i) { return i._sign == sign; });
+		return std::find_if(begin(), end(), [=](const indexer& i) { return i.id == sign; });
 	}
 private:
-	indexer(const u32& sign, mapper map) : _sign(sign), _index(map) {}
+	indexer(const u32& sign, mapper map) : id(sign), map(map) {}
 	static inline std::vector<indexer>& idxrs() { static std::vector<indexer> i; return i; }
 
-	u32 _sign;
-	mapper _index;
+	u32 id;
+	mapper map;
 };
 
 class feature {
 public:
 	feature() {}
-	feature(const feature& t) : _index(t._index), _value(t._value) {}
+	feature(const feature& t) : index(t.index), value(t.value) {}
 	~feature() {}
 
-	inline u64 sign() const { return (_value.sign() << 32) | _index.sign(); }
-	inline operator indexer() const { return _index; }
-	inline operator weight() const { return _value; }
-	inline numeric& operator [](const board& b) { return _value[_index(b)]; }
-	inline numeric& operator [](const u64& idx) { return _value[idx]; }
-	inline u64 operator ()(const board& b) const { return _index(b); }
+	inline u64 sign() const { return (value.sign() << 32) | index.sign(); }
+	inline numeric& operator [](const board& b) { return value[index(b)]; }
+	inline numeric& operator [](const u64& idx) { return value[idx]; }
+	inline u64 operator ()(const board& b) const { return index(b); }
+
+	inline operator indexer() const { return index; }
+	inline operator weight() const { return value; }
 
 	inline bool operator ==(const feature& f) const { return sign() == f.sign(); }
 	inline bool operator !=(const feature& f) const { return sign() != f.sign(); }
@@ -218,8 +219,8 @@ public:
 		write_cast<byte>(out, code);
 		switch (code) {
 		case 0:
-			write_cast<u32>(out, _index.sign());
-			write_cast<u32>(out, _value.sign());
+			write_cast<u32>(out, index.sign());
+			write_cast<u32>(out, value.sign());
 			break;
 		default:
 			std::cerr << "unknown serial at feature::>>" << std::endl;
@@ -232,9 +233,9 @@ public:
 		switch (code) {
 		case 0:
 			read_cast<u32>(in, code);
-			_index = indexer::at(code);
+			index = indexer::at(code);
 			read_cast<u32>(in, code);
-			_value = weight::at(code);
+			value = weight::at(code);
 			break;
 		default:
 			std::cerr << "unknown serial at feature::<<" << std::endl;
@@ -287,19 +288,19 @@ public:
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end() { return feats().end(); }
 	static inline iter find(const u32& wgt, const u32& idx) {
-		const auto wght = weight::find(wgt);
-		const auto idxr = indexer::find(idx);
+		const auto wght = weight::at(wgt);
+		const auto idxr = indexer::at(idx);
 		return std::find_if(begin(), end(),
 			[=](const feature& f) { return weight(f) == wght && indexer(f) == idxr; });
 	}
 
 private:
-	feature(const weight& value, const indexer& index) : _index(index), _value(value) {}
+	feature(const weight& value, const indexer& index) : index(index), value(value) {}
 	static inline std::vector<feature>& feats() { static std::vector<feature> f; return f; }
 //	static inline u64 make_sign(const u32& wgt, const u32& idx) { return (u64(wgt) << 32) | idx; }
 
-	indexer _index;
-	weight _value;
+	indexer index;
+	weight value;
 };
 
 namespace utils {
@@ -1059,6 +1060,30 @@ void make_features(const std::string& res = "") {
 	}
 }
 
+void list_mapping() {
+	for (weight w : weight::list()) {
+		u32 usageK = (sizeof(numeric) * w.size()) >> 10;
+		u32 usageM = usageK >> 10;
+		u32 usageG = usageM >> 10;
+		char buf[64];
+		u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
+		char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
+		snprintf(buf, sizeof(buf), "weight(%08llx)[%llu] = %d%c", w.sign(), w.size(), usage, scale);
+		std::cout << buf;
+		std::string feats;
+		for (feature f : feature::list()) {
+			if (weight(f) == w) {
+				snprintf(buf, sizeof(buf), " %08llx", indexer(f).sign());
+				feats += buf;
+			}
+		}
+		if (feats.size()) std::cout << " :" << feats;
+		std::cout << std::endl;
+	}
+}
+
+
+
 inline numeric estimate(const board& state,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 	register numeric esti = 0;
@@ -1073,28 +1098,6 @@ inline numeric update(const board& state, const numeric& updv,
 	for (auto f = begin; f != end; f++)
 		esti += ((*f)[state] += updv);
 	return esti;
-}
-
-void list_mapping() {
-	for (weight w : weight::list()) {
-		u32 usageK = (sizeof(numeric) * w.size()) >> 10;
-		u32 usageM = usageK >> 10;
-		u32 usageG = usageM >> 10;
-		char buf[64];
-		u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
-		char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c", w.sign(), w.size(), usage, scale);
-		std::cout << buf;
-		std::string feats;
-		for (feature f : feature::list()) {
-			if (weight(f) == w) {
-				snprintf(buf, sizeof(buf), " %08x", indexer(f).sign());
-				feats += buf;
-			}
-		}
-		if (feats.size()) std::cout << " :" << feats;
-		std::cout << std::endl;
-	}
 }
 
 } // utils
