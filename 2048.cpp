@@ -37,7 +37,7 @@ numeric alpha = 0.0025;
 class weight {
 public:
 	weight() : id(0), len(0), value(nullptr) {}
-	weight(const weight& w) : id(w.id), len(w.len), value(w.value) {}
+	weight(const weight& w) = default;
 	~weight() {}
 
 	inline u64 sign() const { return id; }
@@ -161,7 +161,7 @@ private:
 class indexer {
 public:
 	indexer() : id(0), map(nullptr) {}
-	indexer(const indexer& i) : id(i.id), map(i.map) {}
+	indexer(const indexer& i) = default;
 	~indexer() {}
 
 	typedef std::function<u64(const board&)> mapper;
@@ -200,7 +200,7 @@ private:
 class feature {
 public:
 	feature() {}
-	feature(const feature& t) : index(t.index), value(t.value) {}
+	feature(const feature& t) = default;
 	~feature() {}
 
 	inline u64 sign() const { return (value.sign() << 32) | index.sign(); }
