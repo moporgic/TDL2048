@@ -36,12 +36,12 @@ numeric alpha = 0.0025;
 
 class weight {
 public:
-	weight() : id(0), len(0), value(nullptr) {}
+	weight() : id(0), length(0), value(nullptr) {}
 	weight(const weight& w) = default;
 	~weight() {}
 
 	inline u64 sign() const { return id; }
-	inline u64 size() const { return len; }
+	inline u64 size() const { return length; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
 
 	inline bool operator ==(const weight& w) const { return id == w.id; }
@@ -53,9 +53,9 @@ public:
 		switch (code) {
 		case 2:
 			write_cast<u32>(out, id);
-			write_cast<u64>(out, len);
+			write_cast<u64>(out, length);
 			write_cast<u16>(out, sizeof(numeric));
-			write_cast<numeric>(out, value, value + len); break;
+			write_cast<numeric>(out, value, value + length); break;
 			break;
 		default:
 			std::cerr << "unknown serial at weight::>>" << std::endl;
@@ -68,24 +68,24 @@ public:
 		switch (code) {
 		case 0:
 			read_cast<u32>(in, id);
-			read_cast<u64>(in, len);
-			value = alloc(len);
-			read_cast<f32>(in, value, value + len);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			read_cast<f32>(in, value, value + length);
 			break;
 		case 1:
 			read_cast<u32>(in, id);
-			read_cast<u64>(in, len);
-			value = alloc(len);
-			read_cast<f64>(in, value, value + len);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			read_cast<f64>(in, value, value + length);
 			break;
 		case 2:
 			read_cast<u32>(in, id);
-			read_cast<u64>(in, len);
-			value = alloc(len);
+			read_cast<u64>(in, length);
+			value = alloc(length);
 			read_cast<u16>(in, code);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + len); break;
-			case 8: read_cast<f64>(in, value, value + len); break;
+			case 4: read_cast<f32>(in, value, value + length); break;
+			case 8: read_cast<f64>(in, value, value + length); break;
 			}
 			break;
 		default:
@@ -142,7 +142,7 @@ public:
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.id == sign; });
 	}
 private:
-	weight(const u32& sign, const size_t& size) : id(sign), len(size), value(alloc(size)) {}
+	weight(const u32& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
@@ -151,7 +151,7 @@ private:
 
 
 	u32 id;
-	size_t len;
+	size_t length;
 	numeric* value;
 };
 
