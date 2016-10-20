@@ -55,10 +55,7 @@ public:
 			write_cast<u32>(out, id);
 			write_cast<u64>(out, len);
 			write_cast<u16>(out, sizeof(numeric));
-			switch (sizeof(numeric)) {
-			case 4: write_cast<f32>(out, value, value + len); break;
-			case 8: write_cast<f64>(out, value, value + len); break;
-			}
+			write_cast<numeric>(out, value, value + len); break;
 			break;
 		default:
 			std::cerr << "unknown serial at weight::>>" << std::endl;
