@@ -954,34 +954,30 @@ void make_weights(const std::string& res = "") {
 		if (weight::find(sign) == weight::end()) weight::make(sign, size);
 	};
 
-	// weight:size weight(size) weight[size]
+	// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit
 	std::string in(res);
-	while (in.find_first_of(":()[],") != std::string::npos)
-		in[in.find_first_of(":()[],")] = ' ';
 	if (in.empty() && weight::list().empty())
 		in = "default";
-	if (in.find("default") != std::string::npos) {
+	if (in.find("default") != std::string::npos) { // insert default weights
+		auto wghts = "012345:patt 456789:patt 012456:patt 45689a:patt fe000001:^25 ff000000:^16";
+		in.insert(in.find("default"), wghts);
 		in.replace(in.find("default"), 7, "");
-
-		// make default weights
-		std::vector<std::vector<int>> defpatt = {
-			{ 0x0, 0x1, 0x2, 0x3, 0x4, 0x5 },
-			{ 0x4, 0x5, 0x6, 0x7, 0x8, 0x9 },
-			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
-			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
-		};
-		for (const auto& patt : defpatt) {
-			wmake(utils::hashpatt(patt), std::pow(16ull, patt.size()));
-		}
-		wmake(0xfe000001, 1 << 25);
-		wmake(0xff000000, 1 << 16);
 	}
+
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
 	std::stringstream wghtin(in);
 	std::string signs, sizes;
 	while (wghtin >> signs && wghtin >> sizes) {
 		u32 sign = 0; u64 size = 0;
 		std::stringstream(signs) >> std::hex >> sign;
-		std::stringstream(sizes) >> std::dec >> size;
+		if (sizes == "patt" || sizes == "?") {
+			size = std::pow(16ull, signs.size());
+		} else if (sizes.front() == '^') {
+			size = std::pow(2ull, std::stol(sizes.substr(1)));
+		} else {
+			std::stringstream(sizes) >> std::dec >> size;
+		}
 		wmake(sign, size);
 	}
 }
@@ -1010,51 +1006,47 @@ void make_features(const std::string& res = "") {
 
 	// weight:indexer weight(indexer) weight[indexer]
 	std::string in(res);
-	while (in.find_first_of(":()[],") != std::string::npos)
-		in[in.find_first_of(":()[],")] = ' ';
 	if (in.empty() && feature::list().empty())
 		in = "default";
-	if (in.find("default") != std::string::npos) {
+	if (in.find("default") != std::string::npos) { // insert default features
+		auto feats = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] fe000001[fe000001] ff000000[ff000000]";
+		in.insert(in.find("default"), feats);
 		in.replace(in.find("default"), 7, "");
-
-		// make default features
-		std::vector<std::vector<int>> defpatt = {
-			{ 0x0, 0x1, 0x2, 0x3, 0x4, 0x5 },
-			{ 0x4, 0x5, 0x6, 0x7, 0x8, 0x9 },
-			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
-			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
-		};
-		for (const auto& patt : defpatt) {
-			auto xpatt = patt;
-			for (u32 iso = 0; iso < 8; iso++) {
-				std::transform(patt.begin(), patt.end(), xpatt.begin(), [=](int i) -> int {
-					board x(0xfedcba9876543210ull);
-					x.isomorphic(-iso);
-					return x[i];
-				});
-				fmake(utils::hashpatt(patt), utils::hashpatt(xpatt));
-			}
-		}
-		fmake(0xfe000001, 0xfe000001);
-		fmake(0xff000000, 0xff000000);
 	}
+
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
 	std::stringstream featin(in);
 	std::string wghts, idxrs;
 	while (featin >> wghts && featin >> idxrs) {
 		u32 wght = 0, idxr = 0;
+
 		std::stringstream(wghts) >> std::hex >> wght;
-		std::stringstream(idxrs) >> std::hex >> idxr;
 		if (weight::find(wght) == weight::end()) {
-			std::cerr << "undefined weight " << wghts << " [assume pattern]" << std::endl;
 			weight::make(wght, std::pow(16ull, wghts.size()));
 		}
-		if (indexer::find(idxr) == indexer::end()) {
-			std::cerr << "undefined indexer " << idxrs << " [assume pattern]" << std::endl;
-			auto patt = new std::vector<int>(hashpatt(idxrs)); // will NOT be deleted
-			indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+
+		std::vector<int> isomorphic = { 0 };
+		for (; !std::isxdigit(idxrs.back()); idxrs.pop_back()) {
+			switch (idxrs.back()) {
+			case '!': isomorphic = { 0, 1, 2, 3, 4, 5, 6, 7 }; break;
+			}
 		}
-		fmake(wght, idxr);
+		for (int iso : isomorphic) {
+			auto xpatt = utils::hashpatt(idxrs);
+			board x(0xfedcba9876543210ull);
+			x.isomorphic(-iso);
+			for (size_t i = 0; i < xpatt.size(); i++)
+				xpatt[i] = x[xpatt[i]];
+			idxr = utils::hashpatt(xpatt);
+			if (indexer::find(idxr) == indexer::end()) {
+				auto patt = new std::vector<int>(xpatt); // will NOT be deleted
+				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+			}
+			fmake(wght, idxr);
+		}
 	}
+
 }
 
 void list_mapping() {
