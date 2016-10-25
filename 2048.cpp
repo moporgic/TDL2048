@@ -1195,7 +1195,7 @@ struct select {
 		return update();
 	}
 	inline select& update() {
-		return update_random();
+		return update_ordered();
 	}
 	inline select& update_ordered() {
 		best = move;
