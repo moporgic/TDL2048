@@ -968,10 +968,13 @@ void make_weights(const std::string& res = "") {
 	std::string in(res);
 	if (in.empty() && weight::list().empty())
 		in = "default";
-	if (in.find("default") != std::string::npos) { // insert default weights
-		auto wghts = "012345:patt 456789:patt 012456:patt 45689a:patt fe000001:^25 ff000000:^16";
-		in.insert(in.find("default"), wghts);
-		in.replace(in.find("default"), 7, "");
+	std::map<std::string, std::string> predefined;
+	predefined["default"] = "012345:patt 456789:patt 012456:patt 45689a:patt fe000001:^25 ff000000:^16";
+	for (auto predef : predefined) {
+		if (in.find(predef.first) != std::string::npos) { // insert predefined features
+			in.insert(in.find(predef.first), predef.second);
+			in.replace(in.find(predef.first), predef.first.size(), "");
+		}
 	}
 
 	while (in.find_first_of(":()[],") != std::string::npos)
@@ -1018,10 +1021,13 @@ void make_features(const std::string& res = "") {
 	std::string in(res);
 	if (in.empty() && feature::list().empty())
 		in = "default";
-	if (in.find("default") != std::string::npos) { // insert default features
-		auto feats = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] fe000001[fe000001] ff000000[ff000000]";
-		in.insert(in.find("default"), feats);
-		in.replace(in.find("default"), 7, "");
+	std::map<std::string, std::string> predefined;
+	predefined["default"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] fe000001[fe000001] ff000000[ff000000]";
+	for (auto predef : predefined) {
+		if (in.find(predef.first) != std::string::npos) { // insert predefined features
+			in.insert(in.find(predef.first), predef.second);
+			in.replace(in.find(predef.first), predef.first.size(), "");
+		}
 	}
 
 	while (in.find_first_of(":()[],") != std::string::npos)
