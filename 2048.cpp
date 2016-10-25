@@ -890,7 +890,7 @@ void make_indexers(const std::string& res = "") {
 	imake(0xfc000060, utils::indexmax<6>);
 	imake(0xfc000070, utils::indexmax<7>);
 
-	// patt(012367) num(96b4/128b3/256b3)
+	// patt(012367) num(96^4/128^3/256^3)
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
@@ -918,8 +918,8 @@ void make_indexers(const std::string& res = "") {
 		case to_hash("lt"):
 		case to_hash("largetile"): {
 				auto code = new std::vector<int>; // will NOT be deleted;
-				while (sign.find_first_of("b/") != std::string::npos)
-					sign[sign.find_first_of("b/")] = ' ';
+				while (sign.find_first_of("^/") != std::string::npos)
+					sign[sign.find_first_of("^/")] = ' ';
 				std::stringstream numin(sign);
 				std::string tile, size;
 				while (numin >> tile && numin >> size) {
