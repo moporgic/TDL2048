@@ -36,12 +36,12 @@ numeric alpha = 0.01;
 
 class weight {
 public:
-	weight() : id(0), len(0), value(nullptr), accum(nullptr), updvu(nullptr) {}
+	weight() : id(0), length(0), value(nullptr), accum(nullptr), updvu(nullptr) {}
 	weight(const weight& w) = default;
 	~weight() {}
 
 	inline u64 sign() const { return id; }
-	inline u64 size() const { return len; }
+	inline u64 size() const { return length; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
 	inline numeric& operator ()(const u64& i, const numeric& alpha, const numeric& error) {
 		numeric aupdv = alpha * error;
@@ -62,11 +62,11 @@ public:
 		switch (code) {
 		case 127:
 			write_cast<u32>(out, id);
-			write_cast<u64>(out, len);
+			write_cast<u64>(out, length);
 			write_cast<u16>(out, sizeof(numeric));
-			write_cast<numeric>(out, value, value + len);
-			write_cast<numeric>(out, accum, accum + len);
-			write_cast<numeric>(out, updvu, updvu + len);
+			write_cast<numeric>(out, value, value + length);
+			write_cast<numeric>(out, accum, accum + length);
+			write_cast<numeric>(out, updvu, updvu + length);
 			break;
 		default:
 			std::cerr << "unknown serial at weight::>>" << std::endl;
@@ -79,49 +79,49 @@ public:
 		switch (code) {
 		case 0:
 			read_cast<u32>(in, id);
-			read_cast<u64>(in, len);
-			value = alloc(len);
-			accum = alloc(len);
-			updvu = alloc(len);
-			read_cast<f32>(in, value, value + len);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			accum = alloc(length);
+			updvu = alloc(length);
+			read_cast<f32>(in, value, value + length);
 			break;
 		case 1:
 			read_cast<u32>(in, id);
-			read_cast<u64>(in, len);
-			value = alloc(len);
-			accum = alloc(len);
-			updvu = alloc(len);
-			read_cast<f64>(in, value, value + len);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			accum = alloc(length);
+			updvu = alloc(length);
+			read_cast<f64>(in, value, value + length);
 			break;
 		case 2:
 			read_cast<u32>(in, id);
-			read_cast<u64>(in, len);
-			value = alloc(len);
-			accum = alloc(len);
-			updvu = alloc(len);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			accum = alloc(length);
+			updvu = alloc(length);
 			read_cast<u16>(in, code);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + len); break;
-			case 8: read_cast<f64>(in, value, value + len); break;
+			case 4: read_cast<f32>(in, value, value + length); break;
+			case 8: read_cast<f64>(in, value, value + length); break;
 			}
 			break;
 		case 127:
 			read_cast<u32>(in, id);
-			read_cast<u64>(in, len);
-			value = alloc(len);
-			accum = alloc(len);
-			updvu = alloc(len);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			accum = alloc(length);
+			updvu = alloc(length);
 			read_cast<u16>(in, code);
 			switch (code) {
 			case 4:
-				read_cast<f32>(in, value, value + len);
-				read_cast<f32>(in, accum, accum + len);
-				read_cast<f32>(in, updvu, updvu + len);
+				read_cast<f32>(in, value, value + length);
+				read_cast<f32>(in, accum, accum + length);
+				read_cast<f32>(in, updvu, updvu + length);
 				break;
 			case 8:
-				read_cast<f64>(in, value, value + len);
-				read_cast<f64>(in, accum, accum + len);
-				read_cast<f64>(in, updvu, updvu + len);
+				read_cast<f64>(in, value, value + length);
+				read_cast<f64>(in, accum, accum + length);
+				read_cast<f64>(in, updvu, updvu + length);
 				break;
 			}
 			break;
@@ -178,16 +178,23 @@ public:
 	static inline iter find(const u32& sign) {
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.id == sign; });
 	}
+	static inline iter erase(const iter& it) {
+		if (it->length) free(it->value);
+		return wghts().erase(it);
+	}
 private:
-	weight(const u32& sign, const size_t& size) : id(sign), len(size), value(alloc(size)), accum(alloc(size)), updvu(alloc(size)) {}
+	weight(const u32& sign, const size_t& size) : id(sign), length(size), value(alloc(size)), accum(alloc(size)), updvu(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
 		return new numeric[size]();
 	}
+	static inline void free(numeric* v) {
+		delete[] v;
+	}
 
 	u32 id;
-	size_t len;
+	size_t length;
 	numeric* value;
 
 	numeric* accum;
@@ -197,7 +204,7 @@ private:
 class indexer {
 public:
 	indexer() : id(0), map(nullptr) {}
-	indexer(const indexer& i) : id(i.id), map(i.map) {}
+	indexer(const indexer& i) = default;
 	~indexer() {}
 
 	typedef std::function<u64(const board&)> mapper;
@@ -328,6 +335,9 @@ public:
 		const auto idxr = indexer::at(idx);
 		return std::find_if(begin(), end(),
 			[=](const feature& f) { return weight(f) == wght && indexer(f) == idxr; });
+	}
+	static inline iter erase(const iter& it) {
+		return feats().erase(it);
 	}
 
 private:
@@ -919,12 +929,10 @@ void make_indexers(const std::string& res = "") {
 	imake(0xfc000060, utils::indexmax<6>);
 	imake(0xfc000070, utils::indexmax<7>);
 
-	// patt(012367) num(96b4/128b3/256b3)
+	// patt(012367) num(96^4/128^3/256^3)
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
-	if (in.find("default") != std::string::npos)
-		in.replace(in.find("default"), 7, "");
 	std::stringstream idxin(in);
 	std::string type, sign;
 	while (idxin >> type && idxin >> sign) {
@@ -932,36 +940,37 @@ void make_indexers(const std::string& res = "") {
 		std::stringstream(sign) >> std::hex >> idxr;
 		if (indexer::find(idxr) != indexer::end()) {
 			std::cerr << "redefined indexer " << sign << std::endl;
-			continue;
+			std::exit(20);
 		}
 
 		using moporgic::to_hash;
 		switch (to_hash(type)) {
-		case to_hash("p"):
 		case to_hash("patt"):
 		case to_hash("pattern"):
 		case to_hash("tuple"): {
 				auto patt = new std::vector<int>(hashpatt(sign)); // will NOT be deleted
-				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+				imake(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
 			}
 			break;
-		case to_hash("n"):
 		case to_hash("num"):
-		case to_hash("count"): {
+		case to_hash("count"):
+		case to_hash("lt"):
+		case to_hash("largetile"): {
 				auto code = new std::vector<int>; // will NOT be deleted;
-				while (sign.find_first_of("b/") != std::string::npos)
-					sign[sign.find_first_of("b/")] = ' ';
+				while (sign.find_first_of("^/") != std::string::npos)
+					sign[sign.find_first_of("^/")] = ' ';
 				std::stringstream numin(sign);
 				std::string tile, size;
 				while (numin >> tile && numin >> size) {
 					u32 codev = std::stol(tile) | (std::stol(size) << 16);
 					code->push_back(codev);
 				}
-				indexer::make(idxr, std::bind(utils::indexnuma, std::placeholders::_1, std::cref(*code)));
+				imake(idxr, std::bind(utils::indexnuma, std::placeholders::_1, std::cref(*code)));
 			}
 			break;
 		default:
 			std::cerr << "unknown custom indexer type " << type << std::endl;
+			std::exit(20);
 			break;
 		}
 	}
@@ -993,34 +1002,34 @@ void make_weights(const std::string& res = "") {
 		if (weight::find(sign) == weight::end()) weight::make(sign, size);
 	};
 
-	// weight:size weight(size) weight[size]
+	// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit
 	std::string in(res);
-	while (in.find_first_of(":()[],") != std::string::npos)
-		in[in.find_first_of(":()[],")] = ' ';
 	if (in.empty() && weight::list().empty())
 		in = "default";
-	if (in.find("default") != std::string::npos) {
-		in.replace(in.find("default"), 7, "");
-
-		// make default weights
-		std::vector<std::vector<int>> defpatt = {
-			{ 0x0, 0x1, 0x2, 0x3, 0x4, 0x5 },
-			{ 0x4, 0x5, 0x6, 0x7, 0x8, 0x9 },
-			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
-			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
-		};
-		for (const auto& patt : defpatt) {
-			wmake(utils::hashpatt(patt), std::pow(16ull, patt.size()));
+	std::map<std::string, std::string> predefined;
+	predefined["default"] = "012345:patt 456789:patt 012456:patt 45689a:patt fe000001:^25 ff000000:^16";
+	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:?";
+	for (auto predef : predefined) {
+		if (in.find(predef.first) != std::string::npos) { // insert predefined weights
+			in.insert(in.find(predef.first), predef.second);
+			in.replace(in.find(predef.first), predef.first.size(), "");
 		}
-		wmake(0xfe000001, 1 << 25);
-		wmake(0xff000000, 1 << 16);
 	}
+
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
 	std::stringstream wghtin(in);
 	std::string signs, sizes;
 	while (wghtin >> signs && wghtin >> sizes) {
 		u32 sign = 0; u64 size = 0;
 		std::stringstream(signs) >> std::hex >> sign;
-		std::stringstream(sizes) >> std::dec >> size;
+		if (sizes == "patt" || sizes == "?") {
+			size = std::pow(16ull, signs.size());
+		} else if (sizes.front() == '^') {
+			size = std::pow(2ull, std::stol(sizes.substr(1)));
+		} else {
+			std::stringstream(sizes) >> std::dec >> size;
+		}
 		wmake(sign, size);
 	}
 }
@@ -1049,64 +1058,58 @@ void make_features(const std::string& res = "") {
 
 	// weight:indexer weight(indexer) weight[indexer]
 	std::string in(res);
-	while (in.find_first_of(":()[],") != std::string::npos)
-		in[in.find_first_of(":()[],")] = ' ';
 	if (in.empty() && feature::list().empty())
 		in = "default";
-	if (in.find("default") != std::string::npos) {
-		in.replace(in.find("default"), 7, "");
-
-		// make default features
-		std::vector<std::vector<int>> defpatt = {
-			{ 0x0, 0x1, 0x2, 0x3, 0x4, 0x5 },
-			{ 0x4, 0x5, 0x6, 0x7, 0x8, 0x9 },
-			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
-			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
-		};
-		for (const auto& patt : defpatt) {
-			auto xpatt = patt;
-			for (u32 iso = 0; iso < 8; iso++) {
-				std::transform(patt.begin(), patt.end(), xpatt.begin(), [=](int i) -> int {
-					board x(0xfedcba9876543210ull);
-					x.isomorphic(-iso);
-					return x[i];
-				});
-				fmake(utils::hashpatt(patt), utils::hashpatt(xpatt));
-			}
+	std::map<std::string, std::string> predefined;
+	predefined["default"] =
+		"012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] fe000001[fe000001] ff000000[ff000000]";
+	predefined["k.matsuzaki"] =
+		"012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! 01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
+	for (auto predef : predefined) {
+		if (in.find(predef.first) != std::string::npos) { // insert predefined features
+			in.insert(in.find(predef.first), predef.second);
+			in.replace(in.find(predef.first), predef.first.size(), "");
 		}
-		fmake(0xfe000001, 0xfe000001);
-		fmake(0xff000000, 0xff000000);
 	}
+
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
 	std::stringstream featin(in);
 	std::string wghts, idxrs;
 	while (featin >> wghts && featin >> idxrs) {
 		u32 wght = 0, idxr = 0;
+
 		std::stringstream(wghts) >> std::hex >> wght;
-		std::stringstream(idxrs) >> std::hex >> idxr;
 		if (weight::find(wght) == weight::end()) {
-			std::cerr << "undefined weight " << wghts << " [assume pattern]" << std::endl;
 			weight::make(wght, std::pow(16ull, wghts.size()));
 		}
-		if (indexer::find(idxr) == indexer::end()) {
-			std::cerr << "undefined indexer " << idxrs << " [assume pattern]" << std::endl;
-			auto patt = new std::vector<int>(hashpatt(idxrs)); // will NOT be deleted
-			indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+
+		std::vector<int> isomorphic = { 0 };
+		for (; !std::isxdigit(idxrs.back()); idxrs.pop_back()) {
+			switch (idxrs.back()) {
+			case '!': isomorphic = { 0, 1, 2, 3, 4, 5, 6, 7 }; break;
+			}
 		}
-		fmake(wght, idxr);
+		for (int iso : isomorphic) {
+			auto xpatt = utils::hashpatt(idxrs);
+			board x(0xfedcba9876543210ull);
+			x.isomorphic(-iso);
+			for (size_t i = 0; i < xpatt.size(); i++)
+				xpatt[i] = x[xpatt[i]];
+			idxr = utils::hashpatt(xpatt);
+			if (indexer::find(idxr) == indexer::end()) {
+				auto patt = new std::vector<int>(xpatt); // will NOT be deleted
+				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+			}
+			fmake(wght, idxr);
+		}
 	}
+
 }
 
 void list_mapping() {
-	for (weight w : weight::list()) {
-		u32 usageK = (sizeof(numeric) * w.size()) >> 10;
-		u32 usageM = usageK >> 10;
-		u32 usageG = usageM >> 10;
+	for (weight w : std::vector<weight>(weight::list())) {
 		char buf[64];
-		u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
-		char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-		snprintf(buf, sizeof(buf), "weight(%08llx)[%llu] = %d%c", w.sign(), w.size(), usage, scale);
-
-		std::cout << buf;
 		std::string feats;
 		for (feature f : feature::list()) {
 			if (weight(f) == w) {
@@ -1114,9 +1117,17 @@ void list_mapping() {
 				feats += buf;
 			}
 		}
-		std::cout << " x3";
-		if (feats.size()) std::cout << " :" << feats;
-		std::cout << std::endl;
+		if (feats.size()) {
+			u32 usageK = (sizeof(numeric) * w.size()) >> 10;
+			u32 usageM = usageK >> 10;
+			u32 usageG = usageM >> 10;
+			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
+			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
+			snprintf(buf, sizeof(buf), "weight(%08llx)[%llu] = %d%c x3", w.sign(), w.size(), usage, scale);
+			std::cout << buf << " :" << feats << std::endl;
+		} else {
+			weight::erase(weight::find(w.sign()));
+		}
 	}
 }
 
