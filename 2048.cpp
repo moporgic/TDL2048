@@ -179,7 +179,11 @@ public:
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.id == sign; });
 	}
 	static inline iter erase(const iter& it) {
-		if (it->length) free(it->value);
+		if (it->length) {
+			free(it->value);
+			free(it->accum);
+			free(it->updvu);
+		}
 		return wghts().erase(it);
 	}
 private:
