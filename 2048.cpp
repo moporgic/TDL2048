@@ -894,8 +894,6 @@ void make_indexers(const std::string& res = "") {
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
-	if (in.find("default") != std::string::npos)
-		in.replace(in.find("default"), 7, "");
 	std::stringstream idxin(in);
 	std::string type, sign;
 	while (idxin >> type && idxin >> sign) {
@@ -903,22 +901,22 @@ void make_indexers(const std::string& res = "") {
 		std::stringstream(sign) >> std::hex >> idxr;
 		if (indexer::find(idxr) != indexer::end()) {
 			std::cerr << "redefined indexer " << sign << std::endl;
-			continue;
+			std::exit(20);
 		}
 
 		using moporgic::to_hash;
 		switch (to_hash(type)) {
-		case to_hash("p"):
 		case to_hash("patt"):
 		case to_hash("pattern"):
 		case to_hash("tuple"): {
 				auto patt = new std::vector<int>(hashpatt(sign)); // will NOT be deleted
-				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+				imake(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
 			}
 			break;
-		case to_hash("n"):
 		case to_hash("num"):
-		case to_hash("count"): {
+		case to_hash("count"):
+		case to_hash("lt"):
+		case to_hash("largetile"): {
 				auto code = new std::vector<int>; // will NOT be deleted;
 				while (sign.find_first_of("b/") != std::string::npos)
 					sign[sign.find_first_of("b/")] = ' ';
@@ -928,11 +926,12 @@ void make_indexers(const std::string& res = "") {
 					u32 codev = std::stol(tile) | (std::stol(size) << 16);
 					code->push_back(codev);
 				}
-				indexer::make(idxr, std::bind(utils::indexnuma, std::placeholders::_1, std::cref(*code)));
+				imake(idxr, std::bind(utils::indexnuma, std::placeholders::_1, std::cref(*code)));
 			}
 			break;
 		default:
 			std::cerr << "unknown custom indexer type " << type << std::endl;
+			std::exit(20);
 			break;
 		}
 	}
