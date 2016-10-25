@@ -141,12 +141,19 @@ public:
 	static inline iter find(const u32& sign) {
 		return std::find_if(begin(), end(), [=](const weight& w) { return w.id == sign; });
 	}
+	static inline iter erase(const iter& it) {
+		if (it->length) free(it->value);
+		return wghts().erase(it);
+	}
 private:
 	weight(const u32& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
 		return new numeric[size]();
+	}
+	static inline void free(numeric* v) {
+		delete[] v;
 	}
 
 
