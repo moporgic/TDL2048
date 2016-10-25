@@ -969,6 +969,7 @@ void make_weights(const std::string& res = "") {
 		in = "default";
 	std::map<std::string, std::string> predefined;
 	predefined["default"] = "012345:patt 456789:patt 012456:patt 45689a:patt fe000001:^25 ff000000:^16";
+	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:?";
 	for (auto predef : predefined) {
 		if (in.find(predef.first) != std::string::npos) { // insert predefined weights
 			in.insert(in.find(predef.first), predef.second);
@@ -1021,7 +1022,10 @@ void make_features(const std::string& res = "") {
 	if (in.empty() && feature::list().empty())
 		in = "default";
 	std::map<std::string, std::string> predefined;
-	predefined["default"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] fe000001[fe000001] ff000000[ff000000]";
+	predefined["default"] =
+		"012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] fe000001[fe000001] ff000000[ff000000]";
+	predefined["k.matsuzaki"] =
+		"012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! 01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
 	for (auto predef : predefined) {
 		if (in.find(predef.first) != std::string::npos) { // insert predefined features
 			in.insert(in.find(predef.first), predef.second);
