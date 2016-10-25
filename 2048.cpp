@@ -971,7 +971,7 @@ void make_weights(const std::string& res = "") {
 	std::map<std::string, std::string> predefined;
 	predefined["default"] = "012345:patt 456789:patt 012456:patt 45689a:patt fe000001:^25 ff000000:^16";
 	for (auto predef : predefined) {
-		if (in.find(predef.first) != std::string::npos) { // insert predefined features
+		if (in.find(predef.first) != std::string::npos) { // insert predefined weights
 			in.insert(in.find(predef.first), predef.second);
 			in.replace(in.find(predef.first), predef.first.size(), "");
 		}
