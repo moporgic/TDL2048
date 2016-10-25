@@ -297,6 +297,9 @@ public:
 		return std::find_if(begin(), end(),
 			[=](const feature& f) { return weight(f) == wght && indexer(f) == idxr; });
 	}
+	static inline iter erase(const iter& it) {
+		return feats().erase(it);
+	}
 
 private:
 	feature(const weight& value, const indexer& index) : index(index), value(value) {}
@@ -1057,15 +1060,8 @@ void make_features(const std::string& res = "") {
 }
 
 void list_mapping() {
-	for (weight w : weight::list()) {
-		u32 usageK = (sizeof(numeric) * w.size()) >> 10;
-		u32 usageM = usageK >> 10;
-		u32 usageG = usageM >> 10;
+	for (weight w : std::vector<weight>(weight::list())) {
 		char buf[64];
-		u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
-		char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-		snprintf(buf, sizeof(buf), "weight(%08llx)[%llu] = %d%c", w.sign(), w.size(), usage, scale);
-		std::cout << buf;
 		std::string feats;
 		for (feature f : feature::list()) {
 			if (weight(f) == w) {
@@ -1073,8 +1069,17 @@ void list_mapping() {
 				feats += buf;
 			}
 		}
-		if (feats.size()) std::cout << " :" << feats;
-		std::cout << std::endl;
+		if (feats.size()) {
+			u32 usageK = (sizeof(numeric) * w.size()) >> 10;
+			u32 usageM = usageK >> 10;
+			u32 usageG = usageM >> 10;
+			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
+			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
+			snprintf(buf, sizeof(buf), "weight(%08llx)[%llu] = %d%c", w.sign(), w.size(), usage, scale);
+			std::cout << buf << " :" << feats << std::endl;
+		} else {
+			weight::erase(weight::find(w.sign()));
+		}
 	}
 }
 
