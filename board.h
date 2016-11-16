@@ -318,7 +318,7 @@ public:
 //		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
 		u32 r = std::rand() % 100;
 		raw =  (r >=  1 ? 1ULL : 2ULL) << (i << 2);
-		raw |= (r >= 18 ? 1ULL : 2ULL) << (j << 2);
+		raw |= (r >= 19 ? 1ULL : 2ULL) << (j << 2);
 		ext = 0;
 	}
 	inline void next() {
