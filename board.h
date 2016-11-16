@@ -8,7 +8,6 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
-#include "moporgic/io.h"
 #include <algorithm>
 #include <iostream>
 #include <cstdio>
@@ -26,7 +25,6 @@ public:
 		list() : tile(0), size(0) {}
 		~list() = default;
 		inline u32 operator[] (const u32& i) const { return (tile >> (i << 2)) & 0x0f; }
-		inline operator bool() const { return size > 0; }
 		inline operator u32() const { return size; }
 		struct iter {
 			u64 raw;
@@ -223,11 +221,11 @@ public:
 
 	u64 raw;
 	u32 ext;
-	u32 nul;
+	u32 inf;
 
 public:
-	inline board(const u64& raw = 0) : raw(raw), ext(0), nul(0) {}
-	inline board(const u64& raw, const u32& ext) : raw(raw), ext(ext), nul(0) {}
+	inline board(const u64& raw = 0) : raw(raw), ext(0), inf(0) {}
+	inline board(const u64& raw, const u32& ext) : raw(raw), ext(ext), inf(0) {}
 	inline board(const u64& raw, const u16& ext) : board(raw, u32(ext) << 16) {}
 	inline board(const board& b) = default;
 	inline ~board() = default;
@@ -320,7 +318,7 @@ public:
 //		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
 		u32 r = std::rand() % 100;
 		raw =  (r >=  1 ? 1ULL : 2ULL) << (i << 2);
-		raw |= (r >= 18 ? 1ULL : 2ULL) << (j << 2);
+		raw |= (r >= 19 ? 1ULL : 2ULL) << (j << 2);
 		ext = 0;
 	}
 	inline void next() {
@@ -636,7 +634,7 @@ public:
 	}
 	inline void write80(std::ostream& out) const {
 		write64(out);
-		moporgic::write(out, raw_cast<u16>(ext, moporgic::endian::be));
+		moporgic::write_cast<u16>(out, ext >> 16);
 	}
 
 	inline void read64(std::istream& in) {
@@ -644,7 +642,7 @@ public:
 	}
 	inline void read80(std::istream& in) {
 		read64(in);
-		moporgic::read(in, raw_cast<u16>(ext, moporgic::endian::be));
+		moporgic::read_cast<u16>(in, ext); ext <<= 16;
 	}
 
 	inline void print(const bool& isat = true, std::ostream& out = std::cout) const {

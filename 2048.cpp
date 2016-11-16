@@ -12,7 +12,6 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
-#include "moporgic/io.h"
 #include "board.h"
 #include <vector>
 #include <functional>
@@ -34,47 +33,30 @@ namespace moporgic {
 
 typedef double numeric;
 numeric alpha = 0.0025;
-const u64 base = 16;
 std::array<u32, 16> depthp = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
 
 class weight {
 public:
-	weight() : sign(0), size(0), value(nullptr) {}
-	weight(const weight& w) : sign(w.sign), size(w.size), value(w.value) {}
+	weight() : id(0), length(0), value(nullptr) {}
+	weight(const weight& w) = default;
 	~weight() {}
 
-	inline u32 signature() const { return sign; }
-	inline size_t length() const { return size; }
+	inline u64 sign() const { return id; }
+	inline u64 size() const { return length; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
 
-	inline bool operator ==(const weight& w) const { return sign == w.sign; }
-	inline bool operator !=(const weight& w) const { return sign != w.sign; }
+	inline bool operator ==(const weight& w) const { return id == w.id; }
+	inline bool operator !=(const weight& w) const { return id != w.id; }
 
 	void operator >>(std::ostream& out) const {
-		const char serial = 1;
-		out.write(&serial, 1);
-		switch (serial) {
-		case 0:
-			out.write(r32(sign).le(), 4);
-			out.write(r64(size).le(), 8);
-			write<r32, f32>(out);
-			break;
-		case 1:
-			out.write(r32(sign).le(), 4);
-			out.write(r64(size).le(), 8);
-			switch (sizeof(numeric)) {
-			case 4: write<r32, f32>(out); break;
-			case 8: write<r64, f64>(out); break;
-			}
-			break;
+		u32 code = 2;
+		write_cast<byte>(out, code);
+		switch (code) {
 		case 2:
-			out.write(r32(sign).le(), 4);
-			out.write(r64(size).le(), 8);
-			out.write(r16(sizeof(numeric)).le(), 2);
-			switch (sizeof(numeric)) {
-			case 4: write<r32, f32>(out); break;
-			case 8: write<r64, f64>(out); break;
-			}
+			write_cast<u32>(out, id);
+			write_cast<u64>(out, length);
+			write_cast<u16>(out, sizeof(numeric));
+			write_cast<numeric>(out, value, value + length); break;
 			break;
 		default:
 			std::cerr << "unknown serial at weight::>>" << std::endl;
@@ -82,31 +64,29 @@ public:
 		}
 	}
 	void operator <<(std::istream& in) {
-		char buf[8];
-		auto load = moporgic::make_load(in, buf);
-		switch (*load(1)) {
+		u32 code;
+		read_cast<byte>(in, code);
+		switch (code) {
 		case 0:
-			sign = r32(load(4)).le();
-			size = r64(load(8)).le();
-			value = alloc(size);
-			read<r32, f32>(in);
+			read_cast<u32>(in, id);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			read_cast<f32>(in, value, value + length);
 			break;
 		case 1:
-			sign = r32(load(4)).le();
-			size = r64(load(8)).le();
-			value = alloc(size);
-			switch (sizeof(numeric)) {
-			case 4: read<r32, f32>(in); break;
-			case 8: read<r64, f64>(in); break;
-			}
+			read_cast<u32>(in, id);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			read_cast<f64>(in, value, value + length);
 			break;
 		case 2:
-			sign = r32(load(4)).le();
-			size = r64(load(8)).le();
-			value = alloc(size);
-			switch (u32(r16(load(2)).le())) {
-			case 4: read<r32, f32>(in); break;
-			case 8: read<r64, f64>(in); break;
+			read_cast<u32>(in, id);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			read_cast<u16>(in, code);
+			switch (code) {
+			case 4: read_cast<f32>(in, value, value + length); break;
+			case 8: read_cast<f64>(in, value, value + length); break;
 			}
 			break;
 		default:
@@ -116,11 +96,11 @@ public:
 	}
 
 	static void save(std::ostream& out) {
-		const char serial = 0;
-		out.write(&serial, 1);
-		switch (serial) {
+		u32 code = 0;
+		write_cast<byte>(out, code);
+		switch (code) {
 		case 0:
-			out.write(r32(u32(wghts().size())).le(), 4);
+			write_cast<u32>(out, wghts().size());
 			for (weight w : wghts())
 				w >> out;
 			break;
@@ -131,11 +111,11 @@ public:
 		out.flush();
 	}
 	static void load(std::istream& in) {
-		char buf[8];
-		auto load = moporgic::make_load(in, buf);
-		switch (*load(1)) {
+		u32 code;
+		read_cast<byte>(in, code);
+		switch (code) {
 		case 0:
-			for (u32 size = r32(load(4)).le(); size; size--) {
+			for (read_cast<u32>(in, code); code; code--) {
 				weight w; w << in;
 				wghts().push_back(w);
 			}
@@ -160,52 +140,43 @@ public:
 	static inline iter begin() { return wghts().begin(); }
 	static inline iter end() { return wghts().end(); }
 	static inline iter find(const u32& sign) {
-		return std::find_if(begin(), end(), [=](const weight& w) { return w.sign == sign; });
+		return std::find_if(begin(), end(), [=](const weight& w) { return w.id == sign; });
+	}
+	static inline iter erase(const iter& it) {
+		if (it->length) free(it->value);
+		return wghts().erase(it);
 	}
 private:
-	weight(const u32& sign, const size_t& size) : sign(sign), size(size), value(alloc(size)) {}
+	weight(const u32& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
 		return new numeric[size]();
 	}
-
-	template<typename rawx = r64, typename cast = double>
-	void write(std::ostream& out) const {
-		for (size_t i = 0; i < size; i++) {
-			rawx raw(cast(value[i]));
-			out.write(raw.le(), sizeof(rawx));
-		}
-	}
-	template<typename rawx = r64, typename cast = double>
-	void read(std::istream& in) {
-		char buf[8];
-		auto load = moporgic::make_load(in, buf);
-		for (size_t i = 0; i < size; i++) {
-			rawx raw(load(sizeof(rawx)));
-			value[i] = cast(raw.le());
-		}
+	static inline void free(numeric* v) {
+		delete[] v;
 	}
 
-	u32 sign;
-	size_t size;
+
+	u32 id;
+	size_t length;
 	numeric* value;
 };
 
 class indexer {
 public:
-	indexer() : sign(0), map(nullptr) {}
-	indexer(const indexer& i) : sign(i.sign), map(i.map) {}
+	indexer() : id(0), map(nullptr) {}
+	indexer(const indexer& i) = default;
 	~indexer() {}
 
 	typedef std::function<u64(const board&)> mapper;
 
-	inline u32 signature() const { return sign; }
+	inline u64 sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return map(b); }
 
-	inline bool operator ==(const indexer& i) const { return sign == i.sign; }
-	inline bool operator !=(const indexer& i) const { return sign != i.sign; }
+	inline bool operator ==(const indexer& i) const { return id == i.id; }
+	inline bool operator !=(const indexer& i) const { return id != i.id; }
 
 	static indexer make(const u32& sign, mapper map) {
 		idxrs().push_back(indexer(sign, map));
@@ -221,39 +192,40 @@ public:
 	static inline iter begin() { return idxrs().begin(); }
 	static inline iter end() { return idxrs().end(); }
 	static inline iter find(const u32& sign) {
-		return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign == sign; });
+		return std::find_if(begin(), end(), [=](const indexer& i) { return i.id == sign; });
 	}
 private:
-	indexer(const u32& sign, mapper map) : sign(sign), map(map) {}
+	indexer(const u32& sign, mapper map) : id(sign), map(map) {}
 	static inline std::vector<indexer>& idxrs() { static std::vector<indexer> i; return i; }
 
-	u32 sign;
+	u32 id;
 	mapper map;
 };
 
 class feature {
 public:
 	feature() {}
-	feature(const feature& t) : index(t.index), value(t.value) {}
+	feature(const feature& t) = default;
 	~feature() {}
 
-	inline u64 signature() const { return make_sign(value.signature(), index.signature()); }
-	inline operator indexer() const { return index; }
-	inline operator weight() const { return value; }
+	inline u64 sign() const { return (value.sign() << 32) | index.sign(); }
 	inline numeric& operator [](const board& b) { return value[index(b)]; }
 	inline numeric& operator [](const u64& idx) { return value[idx]; }
 	inline u64 operator ()(const board& b) const { return index(b); }
 
-	inline bool operator ==(const feature& f) const { return signature() == f.signature(); }
-	inline bool operator !=(const feature& f) const { return signature() != f.signature(); }
+	inline operator indexer() const { return index; }
+	inline operator weight() const { return value; }
+
+	inline bool operator ==(const feature& f) const { return sign() == f.sign(); }
+	inline bool operator !=(const feature& f) const { return sign() != f.sign(); }
 
 	void operator >>(std::ostream& out) const {
-		const char serial = 0;
-		out.write(&serial, 1);
-		switch (serial) {
+		u32 code = 0;
+		write_cast<byte>(out, code);
+		switch (code) {
 		case 0:
-			out.write(r32(index.signature()).le(), 4);
-			out.write(r32(value.signature()).le(), 4);
+			write_cast<u32>(out, index.sign());
+			write_cast<u32>(out, value.sign());
 			break;
 		default:
 			std::cerr << "unknown serial at feature::>>" << std::endl;
@@ -261,12 +233,14 @@ public:
 		}
 	}
 	void operator <<(std::istream& in) {
-		char buf[8];
-		auto load = moporgic::make_load(in, buf);
-		switch (*load(1)) {
+		u32 code;
+		read_cast<byte>(in, code);
+		switch (code) {
 		case 0:
-			index = indexer::at(r32(load(4)).le());
-			value = weight::at(r32(load(4)).le());
+			read_cast<u32>(in, code);
+			index = indexer::at(code);
+			read_cast<u32>(in, code);
+			value = weight::at(code);
 			break;
 		default:
 			std::cerr << "unknown serial at feature::<<" << std::endl;
@@ -275,11 +249,11 @@ public:
 	}
 
 	static void save(std::ostream& out) {
-		const char serial = 0;
-		out.write(&serial, 1);
-		switch (serial) {
+		u32 code = 0;
+		write_cast<byte>(out, code);
+		switch (code) {
 		case 0:
-			out.write(r32(u32(feats().size())).le(), 4);
+			write_cast<u32>(out, feats().size());
 			for (feature f : feature::list())
 				f >> out;
 			break;
@@ -290,11 +264,11 @@ public:
 		out.flush();
 	}
 	static void load(std::istream& in) {
-		char buf[4];
-		auto load = moporgic::make_load(in, buf);
-		switch (*load(1)) {
+		u32 code;
+		read_cast<byte>(in, code);
+		switch (code) {
 		case 0:
-			for (u32 size = r32(load(4)).le(); size; size--) {
+			for (read_cast<u32>(in, code); code; code--) {
 				feature f; f << in;
 				feats().push_back(f);
 			}
@@ -319,14 +293,19 @@ public:
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end() { return feats().end(); }
 	static inline iter find(const u32& wgt, const u32& idx) {
-		const auto sign = make_sign(wgt, idx);
-		return std::find_if(begin(), end(), [=](const feature& f) { return f.signature() == sign; });
+		const auto wght = weight::at(wgt);
+		const auto idxr = indexer::at(idx);
+		return std::find_if(begin(), end(),
+			[=](const feature& f) { return weight(f) == wght && indexer(f) == idxr; });
+	}
+	static inline iter erase(const iter& it) {
+		return feats().erase(it);
 	}
 
 private:
 	feature(const weight& value, const indexer& index) : index(index), value(value) {}
 	static inline std::vector<feature>& feats() { static std::vector<feature> f; return f; }
-	static inline u64 make_sign(const u32& wgt, const u32& idx) { return (u64(wgt) << 32) | idx; }
+//	static inline u64 make_sign(const u32& wgt, const u32& idx) { return (u64(wgt) << 32) | idx; }
 
 	indexer index;
 	weight value;
@@ -925,6 +904,73 @@ void make_indexers(const std::string& res = "") {
 	imake(0x00fb73ed, utils::index6t<0xf,0xb,0x7,0x3,0xe,0xd>);
 	imake(0x00cdef84, utils::index6t<0xc,0xd,0xe,0xf,0x8,0x4>);
 	imake(0x00048c12, utils::index6t<0x0,0x4,0x8,0xc,0x1,0x2>);
+
+	// k.matsuzaki
+	imake(0x00012456, utils::index6t<0x0,0x1,0x2,0x4,0x5,0x6>);
+	imake(0x0037b26a, utils::index6t<0x3,0x7,0xb,0x2,0x6,0xa>);
+	imake(0x00fedba9, utils::index6t<0xf,0xe,0xd,0xb,0xa,0x9>);
+	imake(0x00c84d95, utils::index6t<0xc,0x8,0x4,0xd,0x9,0x5>);
+	imake(0x00321765, utils::index6t<0x3,0x2,0x1,0x7,0x6,0x5>);
+	imake(0x00fb7ea6, utils::index6t<0xf,0xb,0x7,0xe,0xa,0x6>);
+	imake(0x00cde89a, utils::index6t<0xc,0xd,0xe,0x8,0x9,0xa>);
+	imake(0x00048159, utils::index6t<0x0,0x4,0x8,0x1,0x5,0x9>);
+	imake(0x0012569d, utils::index6t<0x1,0x2,0x5,0x6,0x9,0xd>);
+	imake(0x007b6a54, utils::index6t<0x7,0xb,0x6,0xa,0x5,0x4>);
+	imake(0x00eda962, utils::index6t<0xe,0xd,0xa,0x9,0x6,0x2>);
+	imake(0x008495ab, utils::index6t<0x8,0x4,0x9,0x5,0xa,0xb>);
+	imake(0x002165ae, utils::index6t<0x2,0x1,0x6,0x5,0xa,0xe>);
+	imake(0x00b7a698, utils::index6t<0xb,0x7,0xa,0x6,0x9,0x8>);
+	imake(0x00de9a51, utils::index6t<0xd,0xe,0x9,0xa,0x5,0x1>);
+	imake(0x00485967, utils::index6t<0x4,0x8,0x5,0x9,0x6,0x7>);
+	imake(0x00012345, utils::index6t<0x0,0x1,0x2,0x3,0x4,0x5>);
+	imake(0x0037bf26, utils::index6t<0x3,0x7,0xb,0xf,0x2,0x6>);
+	imake(0x00fedcba, utils::index6t<0xf,0xe,0xd,0xc,0xb,0xa>);
+	imake(0x00c840d9, utils::index6t<0xc,0x8,0x4,0x0,0xd,0x9>);
+	imake(0x00321076, utils::index6t<0x3,0x2,0x1,0x0,0x7,0x6>);
+	imake(0x00fb73ea, utils::index6t<0xf,0xb,0x7,0x3,0xe,0xa>);
+	imake(0x00cdef89, utils::index6t<0xc,0xd,0xe,0xf,0x8,0x9>);
+	imake(0x00048c15, utils::index6t<0x0,0x4,0x8,0xc,0x1,0x5>);
+	imake(0x0001567a, utils::index6t<0x0,0x1,0x5,0x6,0x7,0xa>);
+	imake(0x00376ae9, utils::index6t<0x3,0x7,0x6,0xa,0xe,0x9>);
+	imake(0x00fea985, utils::index6t<0xf,0xe,0xa,0x9,0x8,0x5>);
+	imake(0x00c89516, utils::index6t<0xc,0x8,0x9,0x5,0x1,0x6>);
+	imake(0x00326549, utils::index6t<0x3,0x2,0x6,0x5,0x4,0x9>);
+	imake(0x00fba625, utils::index6t<0xf,0xb,0xa,0x6,0x2,0x5>);
+	imake(0x00cd9ab6, utils::index6t<0xc,0xd,0x9,0xa,0xb,0x6>);
+	imake(0x000459da, utils::index6t<0x0,0x4,0x5,0x9,0xd,0xa>);
+	imake(0x0001259a, utils::index6t<0x0,0x1,0x2,0x5,0x9,0xa>);
+	imake(0x0037b659, utils::index6t<0x3,0x7,0xb,0x6,0x5,0x9>);
+	imake(0x00feda65, utils::index6t<0xf,0xe,0xd,0xa,0x6,0x5>);
+	imake(0x00c849a6, utils::index6t<0xc,0x8,0x4,0x9,0xa,0x6>);
+	imake(0x003216a9, utils::index6t<0x3,0x2,0x1,0x6,0xa,0x9>);
+	imake(0x00fb7a95, utils::index6t<0xf,0xb,0x7,0xa,0x9,0x5>);
+	imake(0x00cde956, utils::index6t<0xc,0xd,0xe,0x9,0x5,0x6>);
+	imake(0x0004856a, utils::index6t<0x0,0x4,0x8,0x5,0x6,0xa>);
+	imake(0x000159de, utils::index6t<0x0,0x1,0x5,0x9,0xd,0xe>);
+	imake(0x00376548, utils::index6t<0x3,0x7,0x6,0x5,0x4,0x8>);
+	imake(0x00fea621, utils::index6t<0xf,0xe,0xa,0x6,0x2,0x1>);
+	imake(0x00c89ab7, utils::index6t<0xc,0x8,0x9,0xa,0xb,0x7>);
+	imake(0x00326aed, utils::index6t<0x3,0x2,0x6,0xa,0xe,0xd>);
+	imake(0x00fba984, utils::index6t<0xf,0xb,0xa,0x9,0x8,0x4>);
+	imake(0x00cd9512, utils::index6t<0xc,0xd,0x9,0x5,0x1,0x2>);
+	imake(0x0004567b, utils::index6t<0x0,0x4,0x5,0x6,0x7,0xb>);
+	imake(0x0001589d, utils::index6t<0x0,0x1,0x5,0x8,0x9,0xd>);
+	imake(0x00376154, utils::index6t<0x3,0x7,0x6,0x1,0x5,0x4>);
+	imake(0x00fea762, utils::index6t<0xf,0xe,0xa,0x7,0x6,0x2>);
+	imake(0x00c89eab, utils::index6t<0xc,0x8,0x9,0xe,0xa,0xb>);
+	imake(0x00326bae, utils::index6t<0x3,0x2,0x6,0xb,0xa,0xe>);
+	imake(0x00fbad98, utils::index6t<0xf,0xb,0xa,0xd,0x9,0x8>);
+	imake(0x00cd9451, utils::index6t<0xc,0xd,0x9,0x4,0x5,0x1>);
+	imake(0x00045267, utils::index6t<0x0,0x4,0x5,0x2,0x6,0x7>);
+	imake(0x0001246a, utils::index6t<0x0,0x1,0x2,0x4,0x6,0xa>);
+	imake(0x0037b2a9, utils::index6t<0x3,0x7,0xb,0x2,0xa,0x9>);
+	imake(0x00fedb95, utils::index6t<0xf,0xe,0xd,0xb,0x9,0x5>);
+	imake(0x00c84d56, utils::index6t<0xc,0x8,0x4,0xd,0x5,0x6>);
+	imake(0x00321759, utils::index6t<0x3,0x2,0x1,0x7,0x5,0x9>);
+	imake(0x00fb7e65, utils::index6t<0xf,0xb,0x7,0xe,0x6,0x5>);
+	imake(0x00cde8a6, utils::index6t<0xc,0xd,0xe,0x8,0xa,0x6>);
+	imake(0x0004819a, utils::index6t<0x0,0x4,0x8,0x1,0x9,0xa>);
+
 	imake(0x00000123, utils::index4t<0x0,0x1,0x2,0x3>);
 	imake(0x00004567, utils::index4t<0x4,0x5,0x6,0x7>);
 	imake(0x000089ab, utils::index4t<0x8,0x9,0xa,0xb>);
@@ -1137,12 +1183,10 @@ void make_indexers(const std::string& res = "") {
 	imake(0xfc000060, utils::indexmax<6>);
 	imake(0xfc000070, utils::indexmax<7>);
 
-	// patt(012367) num(96b4/128b3/256b3)
+	// patt(012367) num(96^4/128^3/256^3)
 	std::string in(res);
 	while (in.find_first_of(":()[],") != std::string::npos)
 		in[in.find_first_of(":()[],")] = ' ';
-	if (in.find("default") != std::string::npos)
-		in.replace(in.find("default"), 7, "");
 	std::stringstream idxin(in);
 	std::string type, sign;
 	while (idxin >> type && idxin >> sign) {
@@ -1150,36 +1194,37 @@ void make_indexers(const std::string& res = "") {
 		std::stringstream(sign) >> std::hex >> idxr;
 		if (indexer::find(idxr) != indexer::end()) {
 			std::cerr << "redefined indexer " << sign << std::endl;
-			continue;
+			std::exit(20);
 		}
 
 		using moporgic::to_hash;
 		switch (to_hash(type)) {
-		case to_hash("p"):
 		case to_hash("patt"):
 		case to_hash("pattern"):
 		case to_hash("tuple"): {
 				auto patt = new std::vector<int>(hashpatt(sign)); // will NOT be deleted
-				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+				imake(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
 			}
 			break;
-		case to_hash("n"):
 		case to_hash("num"):
-		case to_hash("count"): {
+		case to_hash("count"):
+		case to_hash("lt"):
+		case to_hash("largetile"): {
 				auto code = new std::vector<int>; // will NOT be deleted;
-				while (sign.find_first_of("b/") != std::string::npos)
-					sign[sign.find_first_of("b/")] = ' ';
+				while (sign.find_first_of("^/") != std::string::npos)
+					sign[sign.find_first_of("^/")] = ' ';
 				std::stringstream numin(sign);
 				std::string tile, size;
 				while (numin >> tile && numin >> size) {
 					u32 codev = std::stol(tile) | (std::stol(size) << 16);
 					code->push_back(codev);
 				}
-				indexer::make(idxr, std::bind(utils::indexnuma, std::placeholders::_1, std::cref(*code)));
+				imake(idxr, std::bind(utils::indexnuma, std::placeholders::_1, std::cref(*code)));
 			}
 			break;
 		default:
 			std::cerr << "unknown custom indexer type " << type << std::endl;
+			std::exit(20);
 			break;
 		}
 	}
@@ -1211,34 +1256,34 @@ void make_weights(const std::string& res = "") {
 		if (weight::find(sign) == weight::end()) weight::make(sign, size);
 	};
 
-	// weight:size weight(size) weight[size]
+	// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit
 	std::string in(res);
-	while (in.find_first_of(":()[],") != std::string::npos)
-		in[in.find_first_of(":()[],")] = ' ';
 	if (in.empty() && weight::list().empty())
 		in = "default";
-	if (in.find("default") != std::string::npos) {
-		in.replace(in.find("default"), 7, "");
-
-		// make default weights
-		std::vector<std::vector<int>> defpatt = {
-			{ 0x0, 0x1, 0x2, 0x3, 0x4, 0x5 },
-			{ 0x4, 0x5, 0x6, 0x7, 0x8, 0x9 },
-			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
-			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
-		};
-		for (const auto& patt : defpatt) {
-			wmake(utils::hashpatt(patt), std::pow(u64(base), patt.size()));
+	std::map<std::string, std::string> predefined;
+	predefined["default"] = "012345:patt 456789:patt 012456:patt 45689a:patt fe000001:^25 ff000000:^16";
+	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:?";
+	for (auto predef : predefined) {
+		if (in.find(predef.first) != std::string::npos) { // insert predefined weights
+			in.insert(in.find(predef.first), predef.second);
+			in.replace(in.find(predef.first), predef.first.size(), "");
 		}
-		wmake(0xfe000001, 1 << 25);
-		wmake(0xff000000, 1 << 16);
 	}
+
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
 	std::stringstream wghtin(in);
 	std::string signs, sizes;
 	while (wghtin >> signs && wghtin >> sizes) {
 		u32 sign = 0; u64 size = 0;
 		std::stringstream(signs) >> std::hex >> sign;
-		std::stringstream(sizes) >> std::dec >> size;
+		if (sizes == "patt" || sizes == "?") {
+			size = std::pow(16ull, signs.size());
+		} else if (sizes.front() == '^') {
+			size = std::pow(2ull, std::stol(sizes.substr(1)));
+		} else {
+			std::stringstream(sizes) >> std::dec >> size;
+		}
 		wmake(sign, size);
 	}
 }
@@ -1267,52 +1312,80 @@ void make_features(const std::string& res = "") {
 
 	// weight:indexer weight(indexer) weight[indexer]
 	std::string in(res);
-	while (in.find_first_of(":()[],") != std::string::npos)
-		in[in.find_first_of(":()[],")] = ' ';
 	if (in.empty() && feature::list().empty())
 		in = "default";
-	if (in.find("default") != std::string::npos) {
-		in.replace(in.find("default"), 7, "");
-
-		// make default features
-		std::vector<std::vector<int>> defpatt = {
-			{ 0x0, 0x1, 0x2, 0x3, 0x4, 0x5 },
-			{ 0x4, 0x5, 0x6, 0x7, 0x8, 0x9 },
-			{ 0x0, 0x1, 0x2, 0x4, 0x5, 0x6 },
-			{ 0x4, 0x5, 0x6, 0x8, 0x9, 0xa },
-		};
-		for (const auto& patt : defpatt) {
-			auto xpatt = patt;
-			for (u32 iso = 0; iso < 8; iso++) {
-				std::transform(patt.begin(), patt.end(), xpatt.begin(), [=](int i) -> int {
-					board x(0xfedcba9876543210ull);
-					x.isomorphic(-iso);
-					return x[i];
-				});
-				fmake(utils::hashpatt(patt), utils::hashpatt(xpatt));
-			}
+	std::map<std::string, std::string> predefined;
+	predefined["default"] =
+		"012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] fe000001[fe000001] ff000000[ff000000]";
+	predefined["k.matsuzaki"] =
+		"012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! 01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
+	for (auto predef : predefined) {
+		if (in.find(predef.first) != std::string::npos) { // insert predefined features
+			in.insert(in.find(predef.first), predef.second);
+			in.replace(in.find(predef.first), predef.first.size(), "");
 		}
-		fmake(0xfe000001, 0xfe000001);
-		fmake(0xff000000, 0xff000000);
 	}
+
+	while (in.find_first_of(":()[],") != std::string::npos)
+		in[in.find_first_of(":()[],")] = ' ';
 	std::stringstream featin(in);
 	std::string wghts, idxrs;
 	while (featin >> wghts && featin >> idxrs) {
 		u32 wght = 0, idxr = 0;
+
 		std::stringstream(wghts) >> std::hex >> wght;
-		std::stringstream(idxrs) >> std::hex >> idxr;
 		if (weight::find(wght) == weight::end()) {
-			std::cerr << "undefined weight " << wghts << " [assume pattern]" << std::endl;
-			weight::make(wght, std::pow(u64(base), wghts.size()));
+			weight::make(wght, std::pow(16ull, wghts.size()));
 		}
-		if (indexer::find(idxr) == indexer::end()) {
-			std::cerr << "undefined indexer " << idxrs << " [assume pattern]" << std::endl;
-			auto patt = new std::vector<int>(hashpatt(idxrs)); // will NOT be deleted
-			indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+
+		std::vector<int> isomorphic = { 0 };
+		for (; !std::isxdigit(idxrs.back()); idxrs.pop_back()) {
+			switch (idxrs.back()) {
+			case '!': isomorphic = { 0, 1, 2, 3, 4, 5, 6, 7 }; break;
+			}
 		}
-		fmake(wght, idxr);
+		for (int iso : isomorphic) {
+			auto xpatt = utils::hashpatt(idxrs);
+			board x(0xfedcba9876543210ull);
+			x.isomorphic(-iso);
+			for (size_t i = 0; i < xpatt.size(); i++)
+				xpatt[i] = x[xpatt[i]];
+			idxr = utils::hashpatt(xpatt);
+			if (indexer::find(idxr) == indexer::end()) {
+				auto patt = new std::vector<int>(xpatt); // will NOT be deleted
+				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+			}
+			fmake(wght, idxr);
+		}
+	}
+
+}
+
+void list_mapping() {
+	for (weight w : std::vector<weight>(weight::list())) {
+		char buf[64];
+		std::string feats;
+		for (feature f : feature::list()) {
+			if (weight(f) == w) {
+				snprintf(buf, sizeof(buf), " %08llx", indexer(f).sign());
+				feats += buf;
+			}
+		}
+		if (feats.size()) {
+			u32 usageK = (sizeof(numeric) * w.size()) >> 10;
+			u32 usageM = usageK >> 10;
+			u32 usageG = usageM >> 10;
+			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
+			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
+			snprintf(buf, sizeof(buf), "weight(%08llx)[%llu] = %d%c", w.sign(), w.size(), usage, scale);
+			std::cout << buf << " :" << feats << std::endl;
+		} else {
+			weight::erase(weight::find(w.sign()));
+		}
 	}
 }
+
+
 
 inline numeric estimate(const board& state,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
@@ -1420,28 +1493,6 @@ numeric search_max(const board& before, const i32& depth,
 	return expt;
 }
 
-void list_mapping() {
-	for (weight w : weight::list()) {
-		u32 usageK = (sizeof(numeric) * w.length()) >> 10;
-		u32 usageM = usageK >> 10;
-		u32 usageG = usageM >> 10;
-		char buf[64];
-		u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
-		char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-		snprintf(buf, sizeof(buf), "weight(%08x)[%llu] = %d%c", w.signature(), w.length(), usage, scale);
-		std::cout << buf;
-		std::string feats;
-		for (feature f : feature::list()) {
-			if (weight(f) == w) {
-				snprintf(buf, sizeof(buf), " %08x", indexer(f).signature());
-				feats += buf;
-			}
-		}
-		if (feats.size()) std::cout << " :" << feats;
-		std::cout << std::endl;
-	}
-}
-
 } // utils
 
 
@@ -1458,7 +1509,9 @@ struct state {
 		move = b;
 		score = (move.*oper)();
 	}
-	inline numeric estimate(const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+
+	inline numeric estimate(
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		if (score >= 0) {
 			esti = score + utils::estimate(move, begin, end);
 		} else {
@@ -1501,6 +1554,7 @@ struct state {
 
 	inline void operator >>(board& b) const { b = move; }
 	inline bool operator >(const state& s) const { return esti > s.esti; }
+	inline operator bool() const { return score >= 0; }
 
 	void operator >>(std::ostream& out) const {
 		move >> out;
@@ -1510,7 +1564,6 @@ struct state {
 		move << in;
 		moporgic::read(in, score);
 	}
-	inline operator bool() const { return score >= 0; }
 };
 struct select {
 	state move[4];
@@ -1540,9 +1593,9 @@ struct select {
 		return update();
 	}
 	inline select& update() {
-		return update_random();
+		return update_ordered();
 	}
-	inline select& update_fixed() {
+	inline select& update_ordered() {
 		best = move;
 		if (move[1] > *best) best = move + 1;
 		if (move[2] > *best) best = move + 2;
@@ -1557,7 +1610,6 @@ struct select {
 		if (move[(i + 3) % 4] > *best) best = move + ((i + 3) % 4);
 		return *this;
 	}
-	inline void shuffle() { std::random_shuffle(move, move + 4); }
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
@@ -1659,7 +1711,7 @@ struct statistic {
 		local.time = currtimept;
 	}
 
-	inline void updatec(const u32& score, const u32& hash, const u32& opers) {
+	void updatec(const u32& score, const u32& hash, const u32& opers) {
 		update(score, hash, opers);
 		u32 max = std::log2(hash);
 		local.count[max]++;
@@ -1842,6 +1894,8 @@ int main(int argc, const char* argv[]) {
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
+	std::cout << "develop" << " build C++" << __cplusplus;
+	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 //	std::cout << "options = " << std::string(opts) << std::endl;
@@ -1876,11 +1930,11 @@ int main(int argc, const char* argv[]) {
 	switch (to_hash(opts["train-type"])) {
 
 	case to_hash("backward"):
-	case to_hash("backward-reesti"):
+	case to_hash("backward-optimize"):
 		for (stats.init(train); stats; stats++) {
 
-			register u32 score = 0;
-			register u32 opers = 0;
+			u32 score = 0;
+			u32 opers = 0;
 
 			for (b.init(); best << b; b.next()) {
 				score += best.score();
@@ -1890,7 +1944,9 @@ int main(int argc, const char* argv[]) {
 			}
 
 			for (numeric v = 0; path.size(); path.pop_back()) {
-				v = path.back().optimize(v);
+				state& s = path.back();
+				s.estimate();
+				v = s.update(v);
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -1902,8 +1958,8 @@ int main(int argc, const char* argv[]) {
 	case to_hash("forward"):
 		for (stats.init(train); stats; stats++) {
 
-			register u32 score = 0;
-			register u32 opers = 0;
+			u32 score = 0;
+			u32 opers = 0;
 
 			b.init();
 			best << b;
@@ -1939,8 +1995,8 @@ int main(int argc, const char* argv[]) {
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
 	for (stats.init(test, 1); stats; stats++) {
 
-		register u32 score = 0;
-		register u32 opers = 0;
+		u32 score = 0;
+		u32 opers = 0;
 
 		for (b.init(); xbest << b; b.next()) {
 			score += xbest.score();
@@ -1953,6 +2009,7 @@ int main(int argc, const char* argv[]) {
 	if (test) stats.summary();
 
 	utils::save_transposition(opts["cache-output"]);
+
 
 	std::cout << std::endl;
 

@@ -50,5 +50,4 @@
 #include "util.h"
 #include "math.h"
 #include "half.h"
-#include "io.h"
 #endif
