@@ -657,7 +657,6 @@ public:
 		static constexpr style real = 2;
 		static constexpr style illegal = -1;
 	};
-
 	template<format::style style = format::raw>
 	void print(std::ostream& out = std::cout) const {
 		char buff[32];
@@ -666,8 +665,8 @@ public:
 		case format::raw:
 			snprintf(buff, sizeof(buff), "[%016llx|%04x]", raw, ext >> 16);
 			out << buff << std::endl;
-
 			break;
+
 		case format::at:
 			out << "+----------------+" << std::endl;
 			for (u32 i = 0; i < 16; i += 4) {
@@ -675,8 +674,8 @@ public:
 				out << buff << std::endl;
 			}
 			out << "+----------------+" << std::endl;
-
 			break;
+
 		case format::exact:
 			out << "+------------------------+" << std::endl;
 			for (u32 i = 0; i < 16; i += 4) {
@@ -684,7 +683,6 @@ public:
 				out << buff << std::endl;
 			}
 			out << "+------------------------+" << std::endl;
-
 			break;
 		}
 	}
