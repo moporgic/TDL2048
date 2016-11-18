@@ -645,43 +645,49 @@ public:
 		moporgic::read_cast<u16>(in, ext); ext <<= 16;
 	}
 
-	inline void print(const bool& isat = true, std::ostream& out = std::cout) const {
-		if (isat)
-			printat(out);
-		else
-			printexact(out);
-	}
+	class format {
+	public:
+		format() = delete;
+		typedef i32 style;
+		static constexpr style raw = 0;
+		static constexpr style line = 0;
+		static constexpr style at = 1;
+		static constexpr style index = 1;
+		static constexpr style exact = 2;
+		static constexpr style real = 2;
+		static constexpr style illegal = -1;
+	};
 
-	inline void printat(std::ostream& out = std::cout) const {
-		const char* edge = "+----------------+";
-		const char* line = "|%4u%4u%4u%4u|";
+	template<format::style style = format::raw>
+	void print(std::ostream& out = std::cout) const {
 		char buff[32];
-		out << edge << std::endl;
-		for (u32 i = 0; i < 16; i += 4) {
-			snprintf(buff, sizeof(buff), line, at(i + 0), at(i + 1), at(i + 2), at(i + 3));
+		switch (style) {
+		default:
+		case format::raw:
+			snprintf(buff, sizeof(buff), "[%016llx|%04x]", raw, ext >> 16);
 			out << buff << std::endl;
+
+			break;
+		case format::at:
+			out << "+----------------+" << std::endl;
+			for (u32 i = 0; i < 16; i += 4) {
+				snprintf(buff, sizeof(buff), "|%4u%4u%4u%4u|", at(i + 0), at(i + 1), at(i + 2), at(i + 3));
+				out << buff << std::endl;
+			}
+			out << "+----------------+" << std::endl;
+
+			break;
+		case format::exact:
+			out << "+------------------------+" << std::endl;
+			for (u32 i = 0; i < 16; i += 4) {
+				snprintf(buff, sizeof(buff), "|%6u%6u%6u%6u|", exact(i + 0), exact(i + 1), exact(i + 2), exact(i + 3));
+				out << buff << std::endl;
+			}
+			out << "+------------------------+" << std::endl;
+
+			break;
 		}
-		out << edge << std::endl;
 	}
-
-	inline void printexact(std::ostream& out = std::cout) const {
-		const char* edge = "+------------------------+";
-		const char* line = "|%6u%6u%6u%6u|";
-		char buff[32];
-		out << edge << std::endl;
-		for (u32 i = 0; i < 16; i += 4) {
-			snprintf(buff, sizeof(buff), line, exact(i + 0), exact(i + 1), exact(i + 2), exact(i + 3));
-			out << buff << std::endl;
-		}
-		out << edge << std::endl;
-	}
-
-	inline void printraw(std::ostream& out = std::cout) const {
-		char buf[24];
-		snprintf(buf, sizeof(buf), "[%016llx|%04x]", raw, ext >> 16);
-		out << buf << std::endl;
-	}
-
 };
 
 } // namespace moporgic
