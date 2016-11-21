@@ -1483,15 +1483,6 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 int main(int argc, const char* argv[]) {
-	{
-		board x;
-		for (int i = 0; i < 16; i++)
-			x[i] = rand() % 16;
-		x.print<0>();
-		x.print<1>();
-		x.print<2>();
-		return 0;
-	}
 	u32 train = 100;
 	u32 test = 10;
 	u32 timestamp = std::time(nullptr);
