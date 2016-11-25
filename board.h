@@ -10,6 +10,7 @@
 #include "moporgic/math.h"
 #include <algorithm>
 #include <iostream>
+#include <sstream>
 #include <cstdio>
 #include <array>
 
@@ -612,80 +613,143 @@ public:
 		const u32 i;
 	private:
 		inline tile(const board& b, const u32& i) : b(const_cast<board&>(b)), i(i) {}
+		inline bool is_exact() const { return format::flag(b) == format::exact; }
 	public:
 		inline tile(const tile& t) = default;
 		tile() = delete;
-		inline operator u32() const { return b.at(i); }
-		inline tile& operator =(const u32& k) { b.set(i, k); return *this; }
-		inline tile& operator =(const tile& t) { return operator =(u32(t)); }
-		inline bool operator ==(const u32& k) const { return b.at(i) == k; }
-		inline bool operator !=(const u32& k) const { return b.at(i) != k; }
+		inline operator u32() const { return is_exact() ? b.exact(i) : b.at(i); }
+		inline tile& operator =(const u32& k) { b.set(i, is_exact() ? math::lg(k) : k); return *this; }
+		inline tile& operator =(const tile& t) { return operator =(t.operator u32()); }
+		inline bool operator ==(const u32& k) const { return operator u32() == k; }
+		inline bool operator !=(const u32& k) const { return operator u32() != k; }
 	};
 	inline tile operator [](const u32& i) const { return tile(*this, i); }
 
-	inline void operator >>(std::ostream& out) const { write(out); }
-	inline void operator <<(std::istream& in) { read(in); }
-
-	inline void write(std::ostream& out) const { write64(out); }
-	inline void read(std::istream& in) { read64(in); }
-
-	inline void write64(std::ostream& out) const {
-		moporgic::write(out, raw);
-	}
-	inline void write80(std::ostream& out) const {
-		write64(out);
-		moporgic::write_cast<u16>(out, ext >> 16);
-	}
-
-	inline void read64(std::istream& in) {
-		moporgic::read(in, raw);
-	}
-	inline void read80(std::istream& in) {
-		read64(in);
-		moporgic::read_cast<u16>(in, ext); ext <<= 16;
-	}
+	inline void operator >>(std::ostream& out) const { out << (*this); }
+	inline void operator <<(std::istream& in) { in >> (*this); }
 
 	class format {
 	public:
 		format() = delete;
-		typedef i32 style;
-		static constexpr style raw = 0;
-		static constexpr style line = 0;
-		static constexpr style at = 1;
-		static constexpr style index = 1;
-		static constexpr style exact = 2;
-		static constexpr style real = 2;
-		static constexpr style illegal = -1;
-	};
-	template<format::style style = format::raw>
-	void print(std::ostream& out = std::cout) const {
-		char buff[32];
-		switch (style) {
-		default:
-		case format::raw:
-			snprintf(buff, sizeof(buff), "[%016llx|%04x]", raw, ext >> 16);
-			out << buff << std::endl;
-			break;
+//		typedef i32 style;
+//		static constexpr style raw = 0;
+//		static constexpr style raw64 = 4;
+//		static constexpr style raw80 = 5;
+//		static constexpr style lite = 1;
+//		static constexpr style line = 1;
+//		static constexpr style at = 2;
+//		static constexpr style index = 2;
+//		static constexpr style exact = 3;
+//		static constexpr style actual = 3;
+		enum name {
+			at = 0,
+			index = 0,
+			exact = 1,
+			actual = 1,
+			lite = 2,
+			lite80 = 2,
+			lite64 = 6,
+			line = 2,
+			line80 = 2,
+			line64 = 6,
+			raw = 3,
+			raw80 = 5,
+			raw64 = 4,
+			full = 3,
+			bit128 = 3,
+			bit80 = 5,
+			bit64 = 4,
+		};
 
-		case format::at:
-			out << "+----------------+" << std::endl;
-			for (u32 i = 0; i < 16; i += 4) {
-				snprintf(buff, sizeof(buff), "|%4u%4u%4u%4u|", at(i + 0), at(i + 1), at(i + 2), at(i + 3));
-				out << buff << std::endl;
-			}
-			out << "+----------------+" << std::endl;
-			break;
-
-		case format::exact:
-			out << "+------------------------+" << std::endl;
-			for (u32 i = 0; i < 16; i += 4) {
-				snprintf(buff, sizeof(buff), "|%6u%6u%6u%6u|", exact(i + 0), exact(i + 1), exact(i + 2), exact(i + 3));
-				out << buff << std::endl;
-			}
-			out << "+------------------------+" << std::endl;
-			break;
+		static name flag(const board& b) {
+			return static_cast<name>(b.inf);
 		}
+		static void setf(board& b, const name& f) {
+			b.inf = f;
+		}
+	};
+
+    friend std::ostream& operator <<(std::ostream& out, const board& b) {
+		static const char* edge[2] = { "+----------------+", "+------------------------+" };
+		static const char* grid[2] = { "|%4u%4u%4u%4u|",     "|%6u%6u%6u%6u|" };
+		char buff[32];
+    	switch (format::flag(b)) {
+    	case format::raw:
+    		moporgic::write<u64>(out, b.raw);
+    		moporgic::write<u32>(out, b.ext);
+    		moporgic::write<u32>(out, b.inf);
+    		break;
+    	case format::raw64:
+    		moporgic::write<u64>(out, b.raw);
+    		break;
+    	case format::raw80:
+    		moporgic::write<u64>(out, b.raw);
+    		moporgic::write_cast<u16>(out, b.ext >> 16);
+    		break;
+    	case format::lite80:
+			snprintf(buff, sizeof(buff), "[%016llx|%04x]", b.raw, b.ext >> 16);
+			out << buff;
+    		break;
+    	case format::lite64:
+			snprintf(buff, sizeof(buff), "[%016llx]", b.raw);
+			out << buff;
+    		break;
+    	case format::index:
+    	case format::actual:
+    		out << edge[format::flag(b)] << std::endl;
+			for (u32 i = 0; i < 16; i += 4) {
+				snprintf(buff, sizeof(buff), grid[format::flag(b)], u32(b[i+0]), u32(b[i+1]), u32(b[i+2]), u32(b[i+3]));
+				out << buff << std::endl;
+			}
+    		out << edge[format::flag(b)] << std::endl;
+    		break;
+    	}
+		return out;
 	}
+
+	friend std::istream& operator >>(std::istream& in, board& b) {
+		std::string s;
+    	switch (format::flag(b)) {
+    	case format::raw:
+    		moporgic::read<u64>(in, b.raw);
+    		moporgic::read<u32>(in, b.ext);
+    		moporgic::read<u32>(in, b.inf);
+    		break;
+    	case format::raw64:
+    		moporgic::read<u64>(in, b.raw);
+    		break;
+    	case format::raw80:
+			moporgic::read<u64>(in, b.raw);
+			moporgic::read_cast<u16>(in, b.ext); b.ext <<= 16;
+    		break;
+    	case format::lite64:
+    	case format::lite80:
+    		std::cin >> s;
+			std::stringstream(s.substr(s.find('[') + 1)) >> std::hex >> b.raw;
+			if (format::flag(b) != format::lite80) break;
+    		if (s.find('[') == std::string::npos) std::cin >> s;
+			std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
+    		break;
+    	case format::index:
+    	case format::actual:
+    		std::cin >> s;
+    		if (s.find('+') != std::string::npos) {
+        		std::cin >> s;
+        		for (int t, i = 0; i < 16 && std::cin >> t; i++) {
+        			b[i] = t;
+        			if (i % 4 == 3) std::cin >> s >> s;
+        		}
+    		} else {
+    			b[0] = std::stol(s);
+    			for (int t, i = 1; i < 16 && std::cin >> t; i++) {
+    				b[i] = t;
+    			}
+    		}
+    		break;
+    	}
+		return in;
+	}
+
 };
 
 } // namespace moporgic
