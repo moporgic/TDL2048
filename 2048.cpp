@@ -28,6 +28,7 @@
 #include <iterator>
 #include <sstream>
 #include <list>
+#include <random>
 
 namespace moporgic {
 
@@ -316,10 +317,22 @@ public:
 	zhasher(const u64& seeda = 0x0000000000000000ULL,
 			const u64& seedb = 0xffffffffffffffffULL)
 	: sign(seeda ^ seedb), seeda(seeda), seedb(seedb) {
-		for (auto& zrow : zhash) {
-			for (auto& entry : zrow) {
-				entry = rand64();
-				sign ^= entry;
+		for (u32 r = 0; r < 4; r++) {
+			std::default_random_engine engine(moporgic::millisec());
+			std::uniform_int_distribution<u64> dist;
+			for (u32 v = 0; v < (1 << 20); v++) {
+				u64 zrv = dist(engine);
+				u64 zt0 = dist(engine);
+				u64 zt1 = dist(engine);
+				u64 zt2 = dist(engine);
+				u64 zt3 = zrv ^ zt0 ^ zt1 ^ zt2;
+				board b; b.place20(0, v);
+				zhash[r][v] = zrv;
+				ztile[r*4 + 0][b.at5(0)] = zt0;
+				ztile[r*4 + 1][b.at5(1)] = zt1;
+				ztile[r*4 + 2][b.at5(2)] = zt2;
+				ztile[r*4 + 3][b.at5(3)] = zt3;
+				sign ^= zrv;
 			}
 		}
 	}
@@ -335,18 +348,20 @@ public:
 		hash ^= zhash[3][b.fetch(3)];
 		return hash;
 	}
+	inline u64 operator ()(const board::tile& t, const bool& after = true) const {
+		return (after ? seeda : seedb) ^ ztile[t.i][u32(t)];
+	}
 
 	void operator >>(std::ostream& out) const {
-		const char serial = 0;
-		out.write(&serial, 1);
-		switch (serial) {
-		case 0:
-			out.write(r64(seeda).le(), 8);
-			out.write(r64(seedb).le(), 8);
-			for (auto& zrow : zhash)
-				for (auto& entry : zrow)
-					out.write(r64(entry).le(), 8);
-			out.write(r64(sign).le(), 8);
+		u32 code = 1;
+		moporgic::write_cast<byte>(out, code);
+		switch (code) {
+		case 1:
+			moporgic::write(out, seeda);
+			moporgic::write(out, seedb);
+			moporgic::write(out, zhash);
+			moporgic::write(out, ztile);
+			moporgic::write(out, sign);
 			break;
 		default:
 			std::cerr << "unknown serial at zhasher::>>" << std::endl;
@@ -354,20 +369,37 @@ public:
 		}
 	}
 	void operator <<(std::istream& in) {
-		char buf[8];
-		auto load = moporgic::make_load(in, buf);
-		switch (*load(1)) {
+		u32 code;
+		read_cast<byte>(in, code);
+		switch (code) {
 		case 0:
-			seeda = r64(load(8)).le();
-			seedb = r64(load(8)).le();
-			sign = seeda ^ seedb;
-			for (auto& zrow : zhash)
-				for (auto& entry : zrow) {
-					entry = r64(load(8)).le();
-					sign ^= entry;
+			moporgic::read(in, seeda);
+			moporgic::read(in, seedb);
+			moporgic::read(in, zhash);
+			for (u32 r = 0; r < 4; r++) {
+				std::default_random_engine engine(moporgic::millisec());
+				std::uniform_int_distribution<u64> dist;
+				for (u32 v = 0; v < (1 << 20); v++) {
+					u64 zrv = zhash[r][v];
+					u64 zt0 = dist(engine);
+					u64 zt1 = dist(engine);
+					u64 zt2 = dist(engine);
+					u64 zt3 = zrv ^ zt0 ^ zt1 ^ zt2;
+					board b; b.place20(0, v);
+					ztile[r*4 + 0][b.at5(0)] = zt0;
+					ztile[r*4 + 1][b.at5(1)] = zt1;
+					ztile[r*4 + 2][b.at5(2)] = zt2;
+					ztile[r*4 + 3][b.at5(3)] = zt3;
 				}
-			if (sign != u64(r64(load(8)).le()))
-				std::cerr << "warning: signature mismatch at zhasher::<<" << std::endl;
+			}
+			moporgic::read(in, sign);
+			break;
+		case 1:
+			moporgic::read(in, seeda);
+			moporgic::read(in, seedb);
+			moporgic::read(in, zhash);
+			moporgic::read(in, ztile);
+			moporgic::read(in, sign);
 			break;
 		default:
 			std::cerr << "unknown serial at zhasher::<<" << std::endl;
@@ -377,6 +409,7 @@ public:
 private:
 	u64 sign;
 	std::array<std::array<u64, 1 << 20>, 4> zhash;
+	std::array<std::array<u64, 32>, 16> ztile;
 	u64 seeda;
 	u64 seedb;
 };
