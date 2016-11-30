@@ -237,6 +237,7 @@ public:
 	inline bool operator==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
 	inline bool operator!=(const u64& raw) const { return this->raw != raw || this->ext != 0; }
 
+	inline const cache& query(const u32& r) const { return query16(r); }
 	inline u32  fetch(const u32& i) const { return fetch16(i); }
 	inline void place(const u32& i, const u32& r) { place16(i, r); }
 	inline u32  at(const u32& i) const { return at4(i); }
@@ -248,6 +249,13 @@ public:
 	inline void reflect(const bool& hori = true) { if (hori) mirror(); else flip(); }
 	inline void transpose() { transpose64(); }
 	inline u32  empty() const { return empty64(); }
+
+	inline const cache& query16(const u32& r) const {
+		return board::lookup(fetch16(r));
+	}
+	inline const cache& query20(const u32& r) const {
+		return board::lookup(fetch20(r));
+	}
 
 	inline u32 fetch16(const u32& i) const {
 		return ((raw >> (i << 4)) & 0xffff);
@@ -590,10 +598,6 @@ public:
 			return (query(0).right.mono << 0)  | (query(1).right.mono << 6)
 				 | (query(2).right.mono << 12) | (query(3).right.mono << 18);
 		}
-	}
-
-	inline const cache& query(const u32& r) const {
-		return board::lookup(fetch(r));
 	}
 
 	inline u32 operations() const {
