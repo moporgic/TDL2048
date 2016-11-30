@@ -1009,26 +1009,34 @@ void make_indexers(const std::string& res = "") {
 	}
 }
 
-bool save_weights(const std::string& path) {
-	std::ofstream out;
-	char buf[1 << 20];
-	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
-	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-	if (!out.is_open()) return false;
-	weight::save(out);
-	out.flush();
-	out.close();
-	return true;
+u32 save_weights(std::string path) {
+	u32 succ = 0;
+	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
+		std::ofstream out;
+		char buf[1 << 20];
+		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
+		out.open(path.substr(0, last), std::ios::out | std::ios::binary | std::ios::trunc);
+		if (!out.is_open()) continue;
+		weight::save(out);
+		out.flush();
+		out.close();
+		succ++;
+	}
+	return succ;
 }
-bool load_weights(const std::string& path) {
-	std::ifstream in;
-	char buf[1 << 20];
-	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
-	in.open(path, std::ios::in | std::ios::binary);
-	if (!in.is_open()) return false;
-	weight::load(in);
-	in.close();
-	return true;
+u32 load_weights(std::string path) {
+	u32 succ = 0;
+	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
+		std::ifstream in;
+		char buf[1 << 20];
+		in.rdbuf()->pubsetbuf(buf, sizeof(buf));
+		in.open(path.substr(0, last), std::ios::in | std::ios::binary);
+		if (!in.is_open()) continue;
+		weight::load(in);
+		in.close();
+		succ++;
+	}
+	return succ;
 }
 void make_weights(const std::string& res = "") {
 	auto wmake = [](u32 sign, u64 size) {
@@ -1067,22 +1075,30 @@ void make_weights(const std::string& res = "") {
 	}
 }
 
-bool save_features(const std::string& path) {
-	std::ofstream out;
-	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-	if (!out.is_open()) return false;
-	feature::save(out);
-	out.flush();
-	out.close();
-	return true;
+u32 save_features(const std::string& path) {
+	u32 succ = 0;
+	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
+		std::ofstream out;
+		out.open(path.substr(0, last), std::ios::out | std::ios::binary | std::ios::trunc);
+		if (!out.is_open()) continue;
+		feature::save(out);
+		out.flush();
+		out.close();
+		succ++;
+	}
+	return succ;
 }
-bool load_features(const std::string& path) {
-	std::ifstream in;
-	in.open(path, std::ios::in | std::ios::binary);
-	if (!in.is_open()) return false;
-	feature::load(in);
-	in.close();
-	return true;
+u32 load_features(const std::string& path) {
+	u32 succ = 0;
+	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
+		std::ifstream in;
+		in.open(path.substr(0, last), std::ios::in | std::ios::binary);
+		if (!in.is_open()) continue;
+		feature::load(in);
+		in.close();
+		succ++;
+	}
+	return succ;
 }
 void make_features(const std::string& res = "") {
 	auto fmake = [](u32 wght, u32 idxr) {
@@ -1422,29 +1438,35 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
-			opts["weight-input"] = valueof(i, "tdl2048.weight");
+			for (std::string w; (w = valueof(i, "")).size(); )
+				opts["weight-input"] += (w += '|');
 			opts["weight-output"] = opts["weight-input"];
 			break;
 		case to_hash("-wi"):
 		case to_hash("--weight-input"):
-			opts["weight-input"] = valueof(i, "tdl2048.weight");
+			for (std::string w; (w = valueof(i, "")).size(); )
+				opts["weight-input"] += (w += '|');
 			break;
 		case to_hash("-wo"):
 		case to_hash("--weight-output"):
-			opts["weight-output"] = valueof(i, "tdl2048.weight");
+			for (std::string w; (w = valueof(i, "")).size(); )
+				opts["weight-output"] += (w += '|');
 			break;
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			opts["feature-input"] = valueof(i, "tdl2048.feature");
+			for (std::string f; (f = valueof(i, "")).size(); )
+				opts["feature-input"] += (f += '|');
 			opts["feature-output"] = opts["feature-input"];
 			break;
 		case to_hash("-fi"):
 		case to_hash("--feature-input"):
-			opts["feature-input"] = valueof(i, "tdl2048.feature");
+			for (std::string f; (f = valueof(i, "")).size(); )
+				opts["feature-input"] += (f += '|');
 			break;
 		case to_hash("-fo"):
 		case to_hash("--feature-output"):
-			opts["feature-output"] = valueof(i, "tdl2048.feature");
+			for (std::string f; (f = valueof(i, "")).size(); )
+				opts["feature-output"] += (f += '|');
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
