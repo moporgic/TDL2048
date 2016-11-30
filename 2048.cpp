@@ -145,6 +145,11 @@ public:
 		if (it->length) free(it->value);
 		return wghts().erase(it);
 	}
+	static inline std::vector<weight> transfer(const iter& first = begin(), const iter& last = end()) {
+		std::vector<weight> ws(first, last);
+		wghts().erase(first, last);
+		return ws;
+	}
 private:
 	weight(const u32& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
