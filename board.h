@@ -744,24 +744,24 @@ public:
     		break;
     	case style::lite64:
     	case style::lite80:
-    		std::cin >> s;
+    		in >> s;
 			std::stringstream(s.substr(s.find('[') + 1)) >> std::hex >> b.raw;
 			if (style::flag(b) != style::lite80) break;
-    		if (s.find('[') == std::string::npos) std::cin >> s;
+    		if (s.find('[') == std::string::npos) in >> s;
 			std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
     		break;
     	case style::index:
     	case style::actual:
-    		std::cin >> s;
+    		in >> s;
     		if (s.find('+') != std::string::npos) {
-        		std::cin >> s;
-        		for (int t, i = 0; i < 16 && std::cin >> t; i++) {
+        		in >> s;
+        		for (int t, i = 0; i < 16 && in >> t; i++) {
         			b[i] = t;
-        			if (i % 4 == 3) std::cin >> s >> s;
+        			if (i % 4 == 3) in >> s >> s;
         		}
     		} else {
     			b[0] = std::stol(s);
-    			for (int t, i = 1; i < 16 && std::cin >> t; i++) {
+    			for (int t, i = 1; i < 16 && in >> t; i++) {
     				b[i] = t;
     			}
     		}
