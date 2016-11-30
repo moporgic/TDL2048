@@ -31,7 +31,7 @@
 
 namespace moporgic {
 
-typedef double numeric;
+typedef float numeric;
 numeric alpha = 0.0025;
 
 class weight {
