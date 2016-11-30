@@ -244,8 +244,10 @@ public:
 	inline void set(const u32& i, const u32& t) { set4(i, t); }
 	inline void mirror() { mirror64(); }
 	inline void flip() { flip64(); }
+	inline void reverse() { mirror(); flip(); }
 	inline void reflect(const bool& hori = true) { if (hori) mirror(); else flip(); }
 	inline void transpose() { transpose64(); }
+	inline u32  empty() const { return empty64(); }
 
 	inline u32 fetch16(const u32& i) const {
 		return ((raw >> (i << 4)) & 0xffff);
@@ -307,9 +309,33 @@ public:
 		ext = (ext & 0xcc330000) | ((ext & 0x00cc0000) << 6) | ((ext & 0x33000000) >> 6);
 	}
 
-	inline void reverse() {
-		mirror();
-		flip();
+	inline u32 empty64() const {
+		register u64 x = raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		x = ~x & 0x1111111111111111ULL;
+		x += x >> 32;
+		x += x >> 16;
+		x += x >> 8;
+		x += x >> 4;
+		return x & 0xf;
+	}
+	inline u32 empty80() const {
+		register u64 x = raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		x = ~x & 0x1111111111111111ULL;
+		register u64 k = ext >> 16;
+		k = ((k & 0xff00ULL) << 24) | (k & 0x00ffULL);
+		k = ((k & 0xf0000000f0ULL) << 12) | (k & 0x0f0000000fULL);
+		k = ((k & 0x000c000c000c000cULL) << 6) | (k & 0x0003000300030003ULL);
+		k = ((k & 0x0202020202020202ULL) << 3) | (k & 0x0101010101010101ULL);
+		x |= ~k & 0x1111111111111111ULL;
+		x += x >> 32;
+		x += x >> 16;
+		x += x >> 8;
+		x += x >> 4;
+		return x & 0xf;
 	}
 
 	inline void init() {
