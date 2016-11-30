@@ -1581,20 +1581,7 @@ int main(int argc, const char* argv[]) {
 
 	if (train) {
 		std::cout << std::endl << "start training..." << std::endl;
-		for (thdid = thdnum - 1; thdid > 0; thdid--) {
-			if (fork() != 0) {
-				// parent
-				// while (wait(nullptr) > 0);
-				wait(nullptr);
-			} else {
-				if (fork() != 0) {
-					return 0;
-				} else {
-					break;
-				}
-			}
-
-		}
+		for (thdid = thdnum - 1; thdid > 0 && fork() != 0; thdid--);
 	}
 
 	board b;
@@ -1637,11 +1624,7 @@ int main(int argc, const char* argv[]) {
 
 	if (test) {
 		std::cout << std::endl << "start testing..." << std::endl;
-		for (u32 i = 1; i < thdnum; i++) {
-			if (fork() != 0) continue;
-			thdid = i;
-			break;
-		}
+		for (thdid = thdnum - 1; thdid > 0 && fork() != 0; thdid--);
 	}
 	for (stats.init(test); stats; stats++) {
 
