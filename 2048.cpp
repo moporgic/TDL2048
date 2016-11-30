@@ -45,23 +45,33 @@ numeric alpha = 0.0025;
 
 namespace shm {
 std::string hook = "./2048";
-int shmid = 0;
-void* shmptr = nullptr;
+int    shmid = 0;
+void*  shmptr = nullptr;
 size_t shmtop = 0;
-size_t shmlen = 4096;
+size_t length = 4096;
+bool   conti = false;
 
+void setup(const std::string& opts) {
+	shm::hook = opts;
+	if (shm::hook.find(':') != std::string::npos) {
+		auto split = shm::hook.find(':');
+		shm::length = std::stol(shm::hook.substr(split + 1));
+		shm::hook = shm::hook.substr(0, split);
+	}
+}
 void init() {
-	key_t shmkey = ftok(shm::hook.c_str(), 0x0f);
-	shm::shmid = shmget(shmkey, shmlen * (1 << 20), IPC_CREAT | 0600);
+	auto shmkey = ftok(shm::hook.c_str(), 0x0f);
+	shm::shmid = shmget(shmkey, length * (1 << 20), IPC_CREAT | 0600);
 	shm::shmptr = shmat(shm::shmid, nullptr, 0);
 }
 void free() {
 	shmdt(shm::shmptr);
-	shmctl(shm::shmid, IPC_RMID, nullptr);
+	if (!conti) shmctl(shm::shmid, IPC_RMID, nullptr);
 }
+
 numeric* alloc(size_t size) {
 	numeric* ptr = reinterpret_cast<numeric*>(shm::shmptr) + shm::shmtop;
-	std::fill_n(ptr, size, 0);
+	if (!conti) std::fill_n(ptr, size, 0);
 	shm::shmtop += size;
 	return ptr;
 }
@@ -1545,14 +1555,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("test")) test = std::stol(opts["test"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 	if (opts("thread")) thdnum = std::stod(opts["thread"]);
-	if (opts("shmres")) {
-		shm::hook = opts["shmres"];
-		if (shm::hook.find(':') != std::string::npos) {
-			auto split = shm::hook.find(':');
-			shm::shmlen = std::stol(shm::hook.substr(split + 1));
-			shm::hook = shm::hook.substr(0, split);
-		}
-	}
+	if (opts("shmres")) shm::setup(opts["shmres"]);
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
