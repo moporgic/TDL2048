@@ -1408,9 +1408,9 @@ struct statistic {
 
 inline utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
-	auto find_opt = [&](int& i, const char* def) -> const char* {
+	auto find_opt = [&](int& i, const char* defval) -> std::string {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
-		if (def != nullptr) return def;
+		if (defval != nullptr) return defval;
 		std::cerr << "invalid: " << argv[i] << std::endl;
 		std::exit(1);
 		return nullptr;
