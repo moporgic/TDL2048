@@ -1412,8 +1412,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
 		if (defval != nullptr) return defval;
 		std::cerr << "invalid: " << argv[i] << std::endl;
-		std::exit(1);
-		return nullptr;
+		std::exit(1); return "";
 	};
 	auto find_opts = [&](int& i, const char& split) -> std::string {
 		std::string vu;
@@ -1481,8 +1480,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--option"):
 		case to_hash("--options"):
 		case to_hash("--extra"):
-			for (std::string o; (o = find_opt(i, "")).size(); )
-				opts += o;
+			opts["options"] = find_opts(i, ' ');
 			break;
 		case to_hash("-tt"):
 		case to_hash("--train-type"):
