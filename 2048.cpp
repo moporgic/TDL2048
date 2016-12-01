@@ -598,9 +598,11 @@ u64 indexmax(const board& b) { // 16-bit
 	return k.mask(k.max());
 }
 
-void make_indexers(const std::string& res = "") {
-	auto imake = [](u32 sign, indexer::mapper func) {
-		if (indexer::find(sign) == indexer::end()) indexer::make(sign, func);
+u32 make_indexers(const std::string& res = "") {
+	u32 succ = 0;
+	auto imake = [&](u32 sign, indexer::mapper func) {
+		if (indexer::find(sign) != indexer::end()) return;
+		indexer::make(sign, func); succ++;
 	};
 
 	imake(0x00012367, utils::index6t<0x0,0x1,0x2,0x3,0x6,0x7>);
@@ -1007,10 +1009,12 @@ void make_indexers(const std::string& res = "") {
 			break;
 		}
 	}
+	return succ;
 }
 
-u32 save_weights(std::string path) {
+u32 save_weights(const std::string& res) {
 	u32 succ = 0;
+	std::string path(res);
 	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
 		std::ofstream out;
 		char buf[1 << 20];
@@ -1024,8 +1028,9 @@ u32 save_weights(std::string path) {
 	}
 	return succ;
 }
-u32 load_weights(std::string path) {
+u32 load_weights(const std::string& res) {
 	u32 succ = 0;
+	std::string path(res);
 	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
 		std::ifstream in;
 		char buf[1 << 20];
@@ -1038,9 +1043,11 @@ u32 load_weights(std::string path) {
 	}
 	return succ;
 }
-void make_weights(const std::string& res = "") {
-	auto wmake = [](u32 sign, u64 size) {
-		if (weight::find(sign) == weight::end()) weight::make(sign, size);
+u32 make_weights(const std::string& res = "") {
+	u32 succ = 0;
+	auto wmake = [&](u32 sign, u64 size) {
+		if (weight::find(sign) != weight::end()) return;
+		weight::make(sign, size); succ++;
 	};
 
 	// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit
@@ -1074,10 +1081,12 @@ void make_weights(const std::string& res = "") {
 		}
 		wmake(sign, size);
 	}
+	return succ;
 }
 
-u32 save_features(std::string path) {
+u32 save_features(const std::string& res) {
 	u32 succ = 0;
+	std::string path(res);
 	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
 		std::ofstream out;
 		out.open(path.substr(0, last), std::ios::out | std::ios::binary | std::ios::trunc);
@@ -1089,8 +1098,9 @@ u32 save_features(std::string path) {
 	}
 	return succ;
 }
-u32 load_features(std::string path) {
+u32 load_features(const std::string& res) {
 	u32 succ = 0;
+	std::string path(res);
 	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
 		std::ifstream in;
 		in.open(path.substr(0, last), std::ios::in | std::ios::binary);
@@ -1101,9 +1111,11 @@ u32 load_features(std::string path) {
 	}
 	return succ;
 }
-void make_features(const std::string& res = "") {
-	auto fmake = [](u32 wght, u32 idxr) {
-		if (feature::find(wght, idxr) == feature::end()) feature::make(wght, idxr);
+u32 make_features(const std::string& res = "") {
+	u32 succ = 0;
+	auto fmake = [&](u32 wght, u32 idxr) {
+		if (feature::find(wght, idxr) != feature::end()) return;
+		feature::make(wght, idxr); succ++;
 	};
 
 	// weight:indexer weight(indexer) weight[indexer]
@@ -1154,7 +1166,7 @@ void make_features(const std::string& res = "") {
 			fmake(wght, idxr);
 		}
 	}
-
+	return succ;
 }
 
 void list_mapping() {
@@ -1390,17 +1402,19 @@ struct statistic {
 		local.count = {};
 	}
 
-	void summary(const u32& begin = 1, const u32& end = 17) {
-		std::cout << "max tile summary" << std::endl;
-
+	void summary() {
+		std::cout << std::endl << "summary" << std::endl;
+		auto first = 1, last = 17;
 		auto iter = total.count.begin();
-		double sum = std::accumulate(iter + begin, iter + end, 0);
+		auto sum = std::accumulate(iter + first, iter + last, 0);
 		char buf[64];
-		for (u32 i = begin; i < end; ++i) {
-			snprintf(buf, sizeof(buf), "%d:\t%8d%8.2f%%%8.2f%%",
+		for (auto i = first; i < last; ++i) {
+			if (i + 1 < last && std::accumulate(iter + i + 1, iter + last, 0) == sum)
+				continue;
+			snprintf(buf, sizeof(buf), "%d\t%8d%8.2f%%%8.2f%%",
 					(1 << i) & 0xfffffffeu, total.count[i],
 					(total.count[i] * 100.0 / sum),
-					(std::accumulate(iter + i, iter + end, 0) * 100.0 / sum));
+					(std::accumulate(iter + i, iter + last, 0) * 100.0 / sum));
 			std::cout << buf << std::endl;
 		}
 	}
@@ -1625,8 +1639,9 @@ int main(int argc, const char* argv[]) {
 			best >> b;
 		}
 
-		stats.update(score, b.hash(), opers);
+		stats.updatec(score, b.hash(), opers);
 	}
+	if (test) stats.summary();
 
 
 	std::cout << std::endl;
