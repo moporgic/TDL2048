@@ -1076,7 +1076,7 @@ void make_weights(const std::string& res = "") {
 	}
 }
 
-u32 save_features(const std::string& path) {
+u32 save_features(std::string path) {
 	u32 succ = 0;
 	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
 		std::ofstream out;
@@ -1089,7 +1089,7 @@ u32 save_features(const std::string& path) {
 	}
 	return succ;
 }
-u32 load_features(const std::string& path) {
+u32 load_features(std::string path) {
 	u32 succ = 0;
 	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
 		std::ifstream in;
@@ -1493,7 +1493,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
-			opts["comment"] = find_opts(i, "");
+			opts["comment"] = find_opts(i, ' ');
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
