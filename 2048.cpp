@@ -1058,8 +1058,8 @@ void make_weights(const std::string& res = "") {
 		}
 	}
 
-	while (in.find_first_of(":()[],") != std::string::npos)
-		in[in.find_first_of(":()[],")] = ' ';
+	while (in.find_first_of(":|()[],") != std::string::npos)
+		in[in.find_first_of(":|()[],")] = ' ';
 	std::stringstream wghtin(in);
 	std::string signs, sizes;
 	while (wghtin >> signs && wghtin >> sizes) {
@@ -1122,8 +1122,8 @@ void make_features(const std::string& res = "") {
 		}
 	}
 
-	while (in.find_first_of(":()[],") != std::string::npos)
-		in[in.find_first_of(":()[],")] = ' ';
+	while (in.find_first_of(":|()[],") != std::string::npos)
+		in[in.find_first_of(":|()[],")] = ' ';
 	std::stringstream featin(in);
 	std::string wghts, idxrs;
 	while (featin >> wghts && featin >> idxrs) {
@@ -1408,98 +1408,94 @@ struct statistic {
 
 inline utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
-	auto valueof = [&](int& i, const char* def) -> const char* {
+	auto find_opt = [&](int& i, const char* def) -> const char* {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
 		if (def != nullptr) return def;
 		std::cerr << "invalid: " << argv[i] << std::endl;
 		std::exit(1);
+		return nullptr;
+	};
+	auto find_opts = [&](int& i, const char& split) -> std::string {
+		std::string vu;
+		for (std::string v; (v = find_opt(i, "")).size(); ) vu += (v += split);
+		return vu;
 	};
 	for (int i = 1; i < argc; i++) {
 		switch (to_hash(argv[i])) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
-			opts["alpha"] = valueof(i, nullptr);
+			opts["alpha"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-a/"):
 		case to_hash("--alpha-divide"):
-			opts["alpha-divide"] = valueof(i, nullptr);
+			opts["alpha-divide"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
-			opts["train"] = valueof(i, nullptr);
+			opts["train"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-T"):
 		case to_hash("--test"):
-			opts["test"] = valueof(i, nullptr);
+			opts["test"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
 		case to_hash("--srand"):
-			opts["seed"] = valueof(i, nullptr);
+			opts["seed"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
-			for (std::string w; (w = valueof(i, "")).size(); )
-				opts["weight-input"] += (w += '|');
-			opts["weight-output"] = opts["weight-input"];
+			opts["weight-input"] = opts["weight-output"] = find_opts(i, '|');
 			break;
 		case to_hash("-wi"):
 		case to_hash("--weight-input"):
-			for (std::string w; (w = valueof(i, "")).size(); )
-				opts["weight-input"] += (w += '|');
+			opts["weight-input"] = find_opts(i, '|');
 			break;
 		case to_hash("-wo"):
 		case to_hash("--weight-output"):
-			for (std::string w; (w = valueof(i, "")).size(); )
-				opts["weight-output"] += (w += '|');
+			opts["weight-output"] = find_opts(i, '|');
 			break;
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			for (std::string f; (f = valueof(i, "")).size(); )
-				opts["feature-input"] += (f += '|');
-			opts["feature-output"] = opts["feature-input"];
+			opts["feature-input"] = opts["feature-output"] = find_opts(i, '|');
 			break;
 		case to_hash("-fi"):
 		case to_hash("--feature-input"):
-			for (std::string f; (f = valueof(i, "")).size(); )
-				opts["feature-input"] += (f += '|');
+			opts["feature-input"] = find_opts(i, '|');
 			break;
 		case to_hash("-fo"):
 		case to_hash("--feature-output"):
-			for (std::string f; (f = valueof(i, "")).size(); )
-				opts["feature-output"] += (f += '|');
+			opts["feature-output"] = find_opts(i, '|');
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
 		case to_hash("--weight-value"):
-			for (std::string w; (w = valueof(i, "")).size(); )
-				opts["weight-value"] += (w += ',');
+			opts["weight-value"] = find_opts(i, ',');
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
 		case to_hash("--feature-value"):
-			for (std::string f; (f = valueof(i, "")).size(); )
-				opts["feature-value"] += (f += ',');
+			opts["feature-value"] = find_opts(i, ',');
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 		case to_hash("--extra"):
-			for (std::string o; (o = valueof(i, "")).size(); )
+			for (std::string o; (o = find_opt(i, "")).size(); )
 				opts += o;
 			break;
 		case to_hash("-tt"):
 		case to_hash("--train-type"):
-			opts["train-type"] = valueof(i, "");
+			opts["train-type"] = find_opt(i, "");
 			break;
 		case to_hash("-Tt"):
 		case to_hash("-TT"):
 		case to_hash("--test-type"):
-			opts["test-type"] = valueof(i, "");
+			opts["test-type"] = find_opt(i, "");
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
-			opts["comment"] = valueof(i, "");
+			opts["comment"] = find_opts(i, "");
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
