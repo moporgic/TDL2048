@@ -47,7 +47,10 @@ public:
 	inline bool operator ==(const weight& w) const { return id == w.id; }
 	inline bool operator !=(const weight& w) const { return id != w.id; }
 
-	void operator >>(std::ostream& out) const {
+    friend std::ostream& operator <<(std::ostream& out, const weight& w) {
+    	auto& id = w.id;
+    	auto& length = w.length;
+    	auto& value = w.value;
 		u32 code = 2;
 		write_cast<byte>(out, code);
 		switch (code) {
@@ -58,11 +61,15 @@ public:
 			write_cast<numeric>(out, value, value + length); break;
 			break;
 		default:
-			std::cerr << "unknown serial at weight::>>" << std::endl;
+			std::cerr << "unknown serial at out << weight" << std::endl;
 			break;
 		}
-	}
-	void operator <<(std::istream& in) {
+		return out;
+    }
+	friend std::istream& operator >>(std::istream& in, weight& w) {
+    	auto& id = w.id;
+    	auto& length = w.length;
+    	auto& value = w.value;
 		u32 code;
 		read_cast<byte>(in, code);
 		switch (code) {
@@ -92,6 +99,7 @@ public:
 			std::cerr << "unknown serial at weight::<<" << std::endl;
 			break;
 		}
+		return in;
 	}
 
 	static void save(std::ostream& out) {
@@ -101,7 +109,7 @@ public:
 		case 0:
 			write_cast<u32>(out, wghts().size());
 			for (weight w : wghts())
-				w >> out;
+				out << w;
 			break;
 		default:
 			std::cerr << "unknown serial at weight::save" << std::endl;
@@ -115,7 +123,7 @@ public:
 		switch (code) {
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
-				weight w; w << in;
+				weight w; in >> w;
 				wghts().push_back(w);
 			}
 			break;
@@ -223,7 +231,9 @@ public:
 	inline bool operator ==(const feature& f) const { return sign() == f.sign(); }
 	inline bool operator !=(const feature& f) const { return sign() != f.sign(); }
 
-	void operator >>(std::ostream& out) const {
+    friend std::ostream& operator <<(std::ostream& out, const feature& f) {
+    	auto& index = f.index;
+    	auto& value = f.value;
 		u32 code = 0;
 		write_cast<byte>(out, code);
 		switch (code) {
@@ -235,8 +245,11 @@ public:
 			std::cerr << "unknown serial at feature::>>" << std::endl;
 			break;
 		}
-	}
-	void operator <<(std::istream& in) {
+    	return out;
+    }
+	friend std::istream& operator >>(std::istream& in, feature& f) {
+    	auto& index = f.index;
+    	auto& value = f.value;
 		u32 code;
 		read_cast<byte>(in, code);
 		switch (code) {
@@ -250,6 +263,7 @@ public:
 			std::cerr << "unknown serial at feature::<<" << std::endl;
 			break;
 		}
+		return in;
 	}
 
 	static void save(std::ostream& out) {
@@ -259,7 +273,7 @@ public:
 		case 0:
 			write_cast<u32>(out, feats().size());
 			for (feature f : feature::list())
-				f >> out;
+				out << f;
 			break;
 		default:
 			std::cerr << "unknown serial at feature::save" << std::endl;
@@ -273,7 +287,7 @@ public:
 		switch (code) {
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
-				feature f; f << in;
+				feature f; in >> f;
 				feats().push_back(f);
 			}
 			break;
