@@ -1418,17 +1418,16 @@ struct statistic {
 
 	void summary() {
 		std::cout << std::endl << "summary" << std::endl;
-		auto first = 1, last = 17;
-		auto iter = total.count.begin();
-		auto sum = std::accumulate(iter + first, iter + last, 0);
+		auto count = total.count, accum = total.count;
+		for (auto it = accum.begin(); it != accum.end(); it++)
+			(*it) = std::accumulate(it, accum.end(), 0);
 		char buf[64];
-		for (auto i = first; i < last; ++i) {
-			if (i + 1 < last && std::accumulate(iter + i + 1, iter + last, 0) == sum)
-				continue;
+		for (auto i = 1; i < 17 && accum[i - 1]; i++) {
+			if (accum[i + 1] == accum[0]) continue;
 			snprintf(buf, sizeof(buf), "%d\t%8d%8.2f%%%8.2f%%",
-					(1 << i) & 0xfffffffeu, total.count[i],
-					(total.count[i] * 100.0 / sum),
-					(std::accumulate(iter + i, iter + last, 0) * 100.0 / sum));
+					(1 << (i)) & 0xfffffffeu, count[i],
+					(count[i] * 100.0 / accum[0]),
+					(accum[i] * 100.0 / accum[0]));
 			std::cout << buf << std::endl;
 		}
 	}
