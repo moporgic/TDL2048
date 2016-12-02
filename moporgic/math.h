@@ -87,6 +87,23 @@ unsigned int ones64(register unsigned long long x) {
 	return (((x + (x >> 4)) & 0x0f0f0f0f0f0f0f0full) * 0x0101010101010101ull) >> 56;
 }
 
+static inline constexpr
+unsigned int ones16(register unsigned int x) {
+	x -= ((x >> 1) & 0x5555);
+	x = (((x >> 2) & 0x3333) + (x & 0x3333));
+	x = (((x >> 4) + x) & 0x0f0f);
+	x += (x >> 8);
+	return (x & 0x001f);
+}
+
+static inline constexpr
+unsigned int ones8(register unsigned int x) {
+	x -= ((x >> 1) & 0x5555);
+	x = (((x >> 2) & 0x3333) + (x & 0x3333));
+	x = (((x >> 4) + x) & 0x0f0f);
+	return (x & 0x000f);
+}
+
 /**
  * Leading Zero Count
  * Some machines have had single instructions that count the number of leading zero bits in an integer;
@@ -120,6 +137,11 @@ unsigned int lsb32(register unsigned int x) {
 	return (x ^ (x & (x - 1)));
 }
 
+static inline constexpr
+unsigned long long int lsb64(register unsigned long long int x) {
+	return (x ^ (x & (x - 1)));
+}
+
 /**
  * Most Significant 1 Bit
  * Given a binary integer value x, the most significant 1 bit
@@ -135,6 +157,34 @@ unsigned int msb32(register unsigned int x) {
 	x |= (x >> 4);
 	x |= (x >> 8);
 	x |= (x >> 16);
+	return (x & ~(x >> 1));
+}
+
+static inline constexpr
+unsigned long long int msb64(register unsigned long long int x) {
+	x |= (x >> 1);
+	x |= (x >> 2);
+	x |= (x >> 4);
+	x |= (x >> 8);
+	x |= (x >> 16);
+	x |= (x >> 32);
+	return (x & ~(x >> 1));
+}
+
+static inline constexpr
+unsigned int msb16(register unsigned int x) {
+	x |= (x >> 1);
+	x |= (x >> 2);
+	x |= (x >> 4);
+	x |= (x >> 8);
+	return (x & ~(x >> 1));
+}
+
+static inline constexpr
+unsigned int msb8(register unsigned int x) {
+	x |= (x >> 1);
+	x |= (x >> 2);
+	x |= (x >> 4);
 	return (x & ~(x >> 1));
 }
 
@@ -167,6 +217,51 @@ unsigned int log2(register unsigned int x) {
 static inline constexpr
 unsigned int lg(register unsigned int x) {
 	return log2(x);
+}
+
+static inline constexpr
+unsigned int lg32(register unsigned int x) {
+	return log2(x);
+}
+
+static inline constexpr
+unsigned int lg64(register unsigned long long int x) {
+	x |= (x >> 1);
+	x |= (x >> 2);
+	x |= (x >> 4);
+	x |= (x >> 8);
+	x |= (x >> 16);
+	x |= (x >> 32);
+#ifdef	LOG0UNDEFINED
+	return (ones64(x) - 1);
+#else
+	return (ones64(x >> 1));
+#endif
+}
+
+static inline constexpr
+unsigned int lg16(register unsigned int x) {
+	x |= (x >> 1);
+	x |= (x >> 2);
+	x |= (x >> 4);
+	x |= (x >> 8);
+#ifdef	LOG0UNDEFINED
+	return (ones16(x) - 1);
+#else
+	return (ones16(x >> 1));
+#endif
+}
+
+static inline constexpr
+unsigned int lg8(register unsigned int x) {
+	x |= (x >> 1);
+	x |= (x >> 2);
+	x |= (x >> 4);
+#ifdef	LOG0UNDEFINED
+	return (ones8(x) - 1);
+#else
+	return (ones8(x >> 1));
+#endif
 }
 
 /**
