@@ -61,7 +61,7 @@ public:
 			write_cast<numeric>(out, value, value + length); break;
 			break;
 		default:
-			std::cerr << "unknown serial at out << weight" << std::endl;
+			std::cerr << "unknown serial at ostream << weight" << std::endl;
 			break;
 		}
 		return out;
@@ -96,7 +96,7 @@ public:
 			}
 			break;
 		default:
-			std::cerr << "unknown serial at weight::<<" << std::endl;
+			std::cerr << "unknown serial at istream >> weight" << std::endl;
 			break;
 		}
 		return in;
@@ -137,17 +137,17 @@ public:
 		wghts().push_back(weight(sign, size));
 		return wghts().back();
 	}
-	static inline weight at(const u32& sign) {
-		const auto it = find(sign);
-		if (it != end()) return (*it);
+	typedef std::vector<weight>::iterator iter;
+	static inline weight at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(sign, first, last);
+		if (it != last) return (*it);
 		throw std::out_of_range("weight::at");
 	}
-	typedef std::vector<weight>::iterator iter;
 	static inline const std::vector<weight>& list() { return wghts(); }
 	static inline iter begin() { return wghts().begin(); }
-	static inline iter end() { return wghts().end(); }
-	static inline iter find(const u32& sign) {
-		return std::find_if(begin(), end(), [=](const weight& w) { return w.id == sign; });
+	static inline iter end()   { return wghts().end(); }
+	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		return std::find_if(first, last, [=](const weight& w) { return w.sign() == sign; });
 	}
 	static inline iter erase(const iter& it) {
 		if (it->length) free(it->value);
@@ -194,17 +194,17 @@ public:
 		idxrs().push_back(indexer(sign, map));
 		return idxrs().back();
 	}
-	static inline indexer at(const u32& sign) {
-		const auto it = find(sign);
-		if (it != end()) return (*it);
+	typedef std::vector<indexer>::iterator iter;
+	static inline indexer at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(sign, first, last);
+		if (it != last) return (*it);
 		throw std::out_of_range("indexer::at");
 	}
-	typedef std::vector<indexer>::iterator iter;
 	static inline const std::vector<indexer>& list() { return idxrs(); }
 	static inline iter begin() { return idxrs().begin(); }
 	static inline iter end() { return idxrs().end(); }
-	static inline iter find(const u32& sign) {
-		return std::find_if(begin(), end(), [=](const indexer& i) { return i.id == sign; });
+	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		return std::find_if(first, last, [=](const indexer& i) { return i.sign() == sign; });
 	}
 private:
 	indexer(const u32& sign, mapper map) : id(sign), map(map) {}
@@ -242,7 +242,7 @@ public:
 			write_cast<u32>(out, value.sign());
 			break;
 		default:
-			std::cerr << "unknown serial at feature::>>" << std::endl;
+			std::cerr << "unknown serial at ostream << feature" << std::endl;
 			break;
 		}
     	return out;
@@ -260,7 +260,7 @@ public:
 			value = weight::at(code);
 			break;
 		default:
-			std::cerr << "unknown serial at feature::<<" << std::endl;
+			std::cerr << "unknown serial at istream >> feature" << std::endl;
 			break;
 		}
 		return in;
@@ -301,29 +301,29 @@ public:
 		feats().push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
-	static feature at(const u32& wgt, const u32& idx) {
-		const auto it = find(wgt, idx);
-		if (it != end()) return (*it);
+	typedef std::vector<feature>::iterator iter;
+	static feature at(const u32& wgt, const u32& idx, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(wgt, idx, first, last);
+		if (it != last) return (*it);
 		throw std::out_of_range("feature::at");
 	}
-	typedef std::vector<feature>::iterator iter;
 	static inline const std::vector<feature>& list() { return feats(); }
 	static inline iter begin() { return feats().begin(); }
-	static inline iter end() { return feats().end(); }
-	static inline iter find(const u32& wgt, const u32& idx) {
-		const auto wght = weight::at(wgt);
-		const auto idxr = indexer::at(idx);
-		return std::find_if(begin(), end(),
-			[=](const feature& f) { return weight(f) == wght && indexer(f) == idxr; });
+	static inline iter end()   { return feats().end(); }
+	static inline iter find(const u32& wght, const u32& idxr, const iter& first = begin(), const iter& last = end()) {
+		return std::find_if(first, last,
+			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
 	}
-	static inline iter erase(const iter& it) {
-		return feats().erase(it);
+	static inline iter erase(const iter& it) { return feats().erase(it); }
+	static inline std::vector<feature> transfer(const iter& first = begin(), const iter& last = end()) {
+		std::vector<feature> ft(first, last);
+		feats().erase(first, last);
+		return ft;
 	}
 
 private:
 	feature(const weight& value, const indexer& index) : index(index), value(value) {}
 	static inline std::vector<feature>& feats() { static std::vector<feature> f; return f; }
-//	static inline u64 make_sign(const u32& wgt, const u32& idx) { return (u64(wgt) << 32) | idx; }
 
 	indexer index;
 	weight value;
