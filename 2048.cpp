@@ -51,17 +51,20 @@ public:
     	auto& id = w.id;
     	auto& length = w.length;
     	auto& value = w.value;
-		u32 code = 2;
+		u32 code = 4;
 		write_cast<byte>(out, code);
 		switch (code) {
-		case 2:
-			write_cast<u32>(out, id);
-			write_cast<u64>(out, length);
-			write_cast<u16>(out, sizeof(numeric));
-			write_cast<numeric>(out, value, value + length); break;
-			break;
 		default:
 			std::cerr << "unknown serial at ostream << weight" << std::endl;
+			std::cerr << "use default serializer (4) instead..." << std::endl;
+			// no break
+		case 4:
+			write_cast<u32>(out, id);
+			write_cast<u32>(out, 0);
+			write_cast<u8c>(out, sizeof(numeric));
+			write_cast<u64>(out, length);
+			write_cast<numeric>(out, value, value + length);
+			write_cast<u8c>(out, 0);
 			break;
 		}
 		return out;
@@ -88,8 +91,8 @@ public:
 		case 2:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
-			value = alloc(length);
 			read_cast<u16>(in, code);
+			value = alloc(length);
 			switch (code) {
 			case 4: read_cast<f32>(in, value, value + length); break;
 			case 8: read_cast<f64>(in, value, value + length); break;
@@ -97,6 +100,22 @@ public:
 			break;
 		default:
 			std::cerr << "unknown serial at istream >> weight" << std::endl;
+			std::cerr << "use default deserializer (4) instead..." << std::endl;
+			// no break
+		case 4:
+			read_cast<u32>(in, id);
+			read_cast<u32>(in, code);
+			read_cast<u8c>(in, code);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			switch (code) {
+			case 4: read_cast<f32>(in, value, value + length); break;
+			case 8: read_cast<f64>(in, value, value + length); break;
+			}
+			while (read_cast<u8c>(in, code) && code) {
+				u64 skip; read_cast<u64>(in, skip);
+				in.ignore(code * skip);
+			}
 			break;
 		}
 		return in;
