@@ -98,6 +98,17 @@ public:
 			case 8: read_cast<f64>(in, value, value + length); break;
 			}
 			break;
+		case 127:
+			read_cast<u32>(in, id);
+			read_cast<u64>(in, length);
+			read_cast<u16>(in, code);
+			value = alloc(length);
+			switch (code) {
+			case 4: read_cast<f32>(in, value, value + length); break;
+			case 8: read_cast<f64>(in, value, value + length); break;
+			}
+			in.ignore(code * length * 2);
+			break;
 		default:
 			std::cerr << "unknown serial at istream >> weight" << std::endl;
 			std::cerr << "use default deserializer (4) instead..." << std::endl;
