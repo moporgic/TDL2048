@@ -61,10 +61,10 @@ public:
 		case 4:
 			write_cast<u32>(out, id);
 			write_cast<u32>(out, 0);
-			write_cast<u8c>(out, sizeof(numeric));
+			write_cast<u16>(out, sizeof(numeric));
 			write_cast<u64>(out, length);
 			write_cast<numeric>(out, value, value + length);
-			write_cast<u8c>(out, 0);
+			write_cast<u16>(out, 0);
 			break;
 		}
 		return out;
@@ -112,14 +112,14 @@ public:
 		case 4:
 			read_cast<u32>(in, id);
 			read_cast<u32>(in, code);
-			read_cast<u8c>(in, code);
+			read_cast<u16>(in, code);
 			read_cast<u64>(in, length);
 			value = alloc(length);
 			switch (code) {
 			case 4: read_cast<f32>(in, value, value + length); break;
 			case 8: read_cast<f64>(in, value, value + length); break;
 			}
-			while (read_cast<u8c>(in, code) && code) {
+			while (read_cast<u16>(in, code) && code) {
 				u64 skip; read_cast<u64>(in, skip);
 				in.ignore(code * skip);
 			}
