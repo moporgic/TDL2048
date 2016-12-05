@@ -164,16 +164,16 @@ public:
 		return wghts().back();
 	}
 	typedef std::vector<weight>::iterator iter;
-	static inline weight at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
-		const auto it = find(sign, first, last);
-		if (it != last) return (*it);
-		throw std::out_of_range("weight::at");
-	}
 	static inline const std::vector<weight>& list() { return wghts(); }
 	static inline iter begin() { return wghts().begin(); }
 	static inline iter end()   { return wghts().end(); }
 	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
 		return std::find_if(first, last, [=](const weight& w) { return w.sign() == sign; });
+	}
+	static inline weight at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(sign, first, last);
+		if (it != last) return (*it);
+		throw std::out_of_range("weight::at");
 	}
 	static inline iter erase(const iter& it) {
 		if (it->length) free(it->value);
@@ -221,16 +221,16 @@ public:
 		return idxrs().back();
 	}
 	typedef std::vector<indexer>::iterator iter;
-	static inline indexer at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
-		const auto it = find(sign, first, last);
-		if (it != last) return (*it);
-		throw std::out_of_range("indexer::at");
-	}
 	static inline const std::vector<indexer>& list() { return idxrs(); }
 	static inline iter begin() { return idxrs().begin(); }
 	static inline iter end() { return idxrs().end(); }
 	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
 		return std::find_if(first, last, [=](const indexer& i) { return i.sign() == sign; });
+	}
+	static inline indexer at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(sign, first, last);
+		if (it != last) return (*it);
+		throw std::out_of_range("indexer::at");
 	}
 private:
 	indexer(const u32& sign, mapper map) : id(sign), map(map) {}
@@ -328,17 +328,17 @@ public:
 		return feats().back();
 	}
 	typedef std::vector<feature>::iterator iter;
-	static feature at(const u32& wgt, const u32& idx, const iter& first = begin(), const iter& last = end()) {
-		const auto it = find(wgt, idx, first, last);
-		if (it != last) return (*it);
-		throw std::out_of_range("feature::at");
-	}
 	static inline const std::vector<feature>& list() { return feats(); }
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end()   { return feats().end(); }
 	static inline iter find(const u32& wght, const u32& idxr, const iter& first = begin(), const iter& last = end()) {
 		return std::find_if(first, last,
 			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
+	}
+	static feature at(const u32& wgt, const u32& idx, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(wgt, idx, first, last);
+		if (it != last) return (*it);
+		throw std::out_of_range("feature::at");
 	}
 	static inline iter erase(const iter& it) { return feats().erase(it); }
 	static inline std::vector<feature> transfer(const iter& first = begin(), const iter& last = end()) {
@@ -602,11 +602,11 @@ u64 indexnuma(const board& b, const std::vector<int>& n) {
 		// code: 0x00SSTTTT
 		u32 size = (code >> 16);
 		u32 tile = (code & 0xffff);
-		u32 msb = msb32(tile);
-		u32 var = num[log2(msb)];
-		while ((tile &= ~msb) != 0) {
-			msb = msb32(tile);
-			var += num[log2(msb)];
+		u32 idx = log2(tile);
+		u32 var = num[idx];
+		while ((tile &= ~(1 << idx)) != 0) {
+			idx = log2(tile);
+			var += num[idx];
 		}
 		index += (var & ~(-1 << size)) << offset;
 		offset += size;
