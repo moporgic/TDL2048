@@ -77,16 +77,12 @@ public:
 		read_cast<byte>(in, code);
 		switch (code) {
 		case 0:
-			read_cast<u32>(in, id);
-			read_cast<u64>(in, length);
-			value = alloc(length);
-			read_cast<f32>(in, value, value + length);
-			break;
 		case 1:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
 			value = alloc(length);
-			read_cast<f64>(in, value, value + length);
+			if (code == 0) read_cast<f32>(in, value, value + length);
+			if (code == 1) read_cast<f64>(in, value, value + length);
 			break;
 		case 2:
 			read_cast<u32>(in, id);
