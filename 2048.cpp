@@ -1608,7 +1608,6 @@ int main(int argc, const char* argv[]) {
 
 	case to_hash("backward"):
 	case to_hash("backward-optimize"):
-	case to_hash("backpropagation"):
 		for (stats.init(train); stats; stats++) {
 
 			u32 score = 0;
