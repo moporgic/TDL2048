@@ -1104,6 +1104,7 @@ u32 make_weights(const std::string& res = "") {
 		in = "default";
 	std::map<std::string, std::string> predefined;
 	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt";
+	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt";
 	predefined["default"] = predefined["khyeh"] + " fe000001:^25 ff000000:^16";
 	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:?";
 	for (auto predef : predefined) {
@@ -1172,6 +1173,7 @@ u32 make_features(const std::string& res = "") {
 		in = "default";
 	std::map<std::string, std::string> predefined;
 	predefined["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!]";
+	predefined["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!]";
 	predefined["default"] = predefined["khyeh"] + " fe000001[fe000001] ff000000[ff000000]";
 	predefined["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
 								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
@@ -1536,6 +1538,10 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--feature"):
 		case to_hash("--feature-value"):
 			opts["feature-value"] = find_opts(i, ',');
+			break;
+		case to_hash("-wf"):
+		case to_hash("-fw"):
+			opts["feature-value"] = opts["weight-value"] = find_opts(i, ',');
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
