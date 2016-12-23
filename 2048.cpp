@@ -40,7 +40,7 @@
 
 namespace moporgic {
 
-typedef double numeric;
+typedef float numeric;
 numeric alpha = 0.0025;
 
 namespace shm {
@@ -94,51 +94,85 @@ public:
 	inline bool operator ==(const weight& w) const { return id == w.id; }
 	inline bool operator !=(const weight& w) const { return id != w.id; }
 
-	void operator >>(std::ostream& out) const {
-		u32 code = 2;
+    friend std::ostream& operator <<(std::ostream& out, const weight& w) {
+    	auto& id = w.id;
+    	auto& length = w.length;
+    	auto& value = w.value;
+		u32 code = 4;
 		write_cast<byte>(out, code);
 		switch (code) {
-		case 2:
-			write_cast<u32>(out, id);
-			write_cast<u64>(out, length);
-			write_cast<u16>(out, sizeof(numeric));
-			write_cast<numeric>(out, value, value + length); break;
-			break;
 		default:
-			std::cerr << "unknown serial at weight::>>" << std::endl;
+			std::cerr << "unknown serial at ostream << weight" << std::endl;
+			std::cerr << "use default serializer (4) instead..." << std::endl;
+			// no break
+		case 4:
+			write_cast<u32>(out, id);
+			write_cast<u32>(out, 0);
+			write_cast<u16>(out, sizeof(numeric));
+			write_cast<u64>(out, length);
+			write_cast<numeric>(out, value, value + length);
+			write_cast<u16>(out, 0);
 			break;
 		}
-	}
-	void operator <<(std::istream& in) {
+		return out;
+    }
+	friend std::istream& operator >>(std::istream& in, weight& w) {
+    	auto& id = w.id;
+    	auto& length = w.length;
+    	auto& value = w.value;
 		u32 code;
 		read_cast<byte>(in, code);
 		switch (code) {
 		case 0:
-			read_cast<u32>(in, id);
-			read_cast<u64>(in, length);
-			value = alloc(length);
-			read_cast<f32>(in, value, value + length);
-			break;
 		case 1:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
 			value = alloc(length);
-			read_cast<f64>(in, value, value + length);
+			if (code == 0) read_cast<f32>(in, value, value + length);
+			if (code == 1) read_cast<f64>(in, value, value + length);
 			break;
 		case 2:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
-			value = alloc(length);
 			read_cast<u16>(in, code);
+			value = alloc(length);
 			switch (code) {
 			case 4: read_cast<f32>(in, value, value + length); break;
 			case 8: read_cast<f64>(in, value, value + length); break;
 			}
 			break;
+		case 127:
+			read_cast<u32>(in, id);
+			read_cast<u64>(in, length);
+			read_cast<u16>(in, code);
+			value = alloc(length);
+			switch (code) {
+			case 4: read_cast<f32>(in, value, value + length); break;
+			case 8: read_cast<f64>(in, value, value + length); break;
+			}
+			in.ignore(code * length * 2);
+			break;
 		default:
-			std::cerr << "unknown serial at weight::<<" << std::endl;
+			std::cerr << "unknown serial at istream >> weight" << std::endl;
+			std::cerr << "use default deserializer (4) instead..." << std::endl;
+			// no break
+		case 4:
+			read_cast<u32>(in, id);
+			read_cast<u32>(in, code);
+			read_cast<u16>(in, code);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			switch (code) {
+			case 4: read_cast<f32>(in, value, value + length); break;
+			case 8: read_cast<f64>(in, value, value + length); break;
+			}
+			while (read_cast<u16>(in, code) && code) {
+				u64 skip; read_cast<u64>(in, skip);
+				in.ignore(code * skip);
+			}
 			break;
 		}
+		return in;
 	}
 
 	static void save(std::ostream& out) {
@@ -148,7 +182,7 @@ public:
 		case 0:
 			write_cast<u32>(out, wghts().size());
 			for (weight w : wghts())
-				w >> out;
+				out << w;
 			break;
 		default:
 			std::cerr << "unknown serial at weight::save" << std::endl;
@@ -162,7 +196,7 @@ public:
 		switch (code) {
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
-				weight w; w << in;
+				weight w; in >> w;
 				wghts().push_back(w);
 			}
 			break;
@@ -176,21 +210,26 @@ public:
 		wghts().push_back(weight(sign, size));
 		return wghts().back();
 	}
-	static inline weight at(const u32& sign) {
-		const auto it = find(sign);
-		if (it != end()) return (*it);
-		throw std::out_of_range("weight::at");
-	}
 	typedef std::vector<weight>::iterator iter;
 	static inline const std::vector<weight>& list() { return wghts(); }
 	static inline iter begin() { return wghts().begin(); }
-	static inline iter end() { return wghts().end(); }
-	static inline iter find(const u32& sign) {
-		return std::find_if(begin(), end(), [=](const weight& w) { return w.id == sign; });
+	static inline iter end()   { return wghts().end(); }
+	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		return std::find_if(first, last, [=](const weight& w) { return w.sign() == sign; });
+	}
+	static inline weight at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(sign, first, last);
+		if (it != last) return (*it);
+		throw std::out_of_range("weight::at");
 	}
 	static inline iter erase(const iter& it) {
 		if (it->length) free(it->value);
 		return wghts().erase(it);
+	}
+	static inline std::vector<weight> transfer(const iter& first = begin(), const iter& last = end()) {
+		std::vector<weight> ws(first, last);
+		wghts().erase(first, last);
+		return ws;
 	}
 private:
 	weight(const u32& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
@@ -228,17 +267,17 @@ public:
 		idxrs().push_back(indexer(sign, map));
 		return idxrs().back();
 	}
-	static inline indexer at(const u32& sign) {
-		const auto it = find(sign);
-		if (it != end()) return (*it);
-		throw std::out_of_range("indexer::at");
-	}
 	typedef std::vector<indexer>::iterator iter;
 	static inline const std::vector<indexer>& list() { return idxrs(); }
 	static inline iter begin() { return idxrs().begin(); }
 	static inline iter end() { return idxrs().end(); }
-	static inline iter find(const u32& sign) {
-		return std::find_if(begin(), end(), [=](const indexer& i) { return i.id == sign; });
+	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		return std::find_if(first, last, [=](const indexer& i) { return i.sign() == sign; });
+	}
+	static inline indexer at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(sign, first, last);
+		if (it != last) return (*it);
+		throw std::out_of_range("indexer::at");
 	}
 private:
 	indexer(const u32& sign, mapper map) : id(sign), map(map) {}
@@ -265,7 +304,9 @@ public:
 	inline bool operator ==(const feature& f) const { return sign() == f.sign(); }
 	inline bool operator !=(const feature& f) const { return sign() != f.sign(); }
 
-	void operator >>(std::ostream& out) const {
+    friend std::ostream& operator <<(std::ostream& out, const feature& f) {
+    	auto& index = f.index;
+    	auto& value = f.value;
 		u32 code = 0;
 		write_cast<byte>(out, code);
 		switch (code) {
@@ -274,11 +315,14 @@ public:
 			write_cast<u32>(out, value.sign());
 			break;
 		default:
-			std::cerr << "unknown serial at feature::>>" << std::endl;
+			std::cerr << "unknown serial at ostream << feature" << std::endl;
 			break;
 		}
-	}
-	void operator <<(std::istream& in) {
+    	return out;
+    }
+	friend std::istream& operator >>(std::istream& in, feature& f) {
+    	auto& index = f.index;
+    	auto& value = f.value;
 		u32 code;
 		read_cast<byte>(in, code);
 		switch (code) {
@@ -289,9 +333,10 @@ public:
 			value = weight::at(code);
 			break;
 		default:
-			std::cerr << "unknown serial at feature::<<" << std::endl;
+			std::cerr << "unknown serial at istream >> feature" << std::endl;
 			break;
 		}
+		return in;
 	}
 
 	static void save(std::ostream& out) {
@@ -301,7 +346,7 @@ public:
 		case 0:
 			write_cast<u32>(out, feats().size());
 			for (feature f : feature::list())
-				f >> out;
+				out << f;
 			break;
 		default:
 			std::cerr << "unknown serial at feature::save" << std::endl;
@@ -315,7 +360,7 @@ public:
 		switch (code) {
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
-				feature f; f << in;
+				feature f; in >> f;
 				feats().push_back(f);
 			}
 			break;
@@ -329,29 +374,29 @@ public:
 		feats().push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
-	static feature at(const u32& wgt, const u32& idx) {
-		const auto it = find(wgt, idx);
-		if (it != end()) return (*it);
-		throw std::out_of_range("feature::at");
-	}
 	typedef std::vector<feature>::iterator iter;
 	static inline const std::vector<feature>& list() { return feats(); }
 	static inline iter begin() { return feats().begin(); }
-	static inline iter end() { return feats().end(); }
-	static inline iter find(const u32& wgt, const u32& idx) {
-		const auto wght = weight::at(wgt);
-		const auto idxr = indexer::at(idx);
-		return std::find_if(begin(), end(),
-			[=](const feature& f) { return weight(f) == wght && indexer(f) == idxr; });
+	static inline iter end()   { return feats().end(); }
+	static inline iter find(const u32& wght, const u32& idxr, const iter& first = begin(), const iter& last = end()) {
+		return std::find_if(first, last,
+			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
 	}
-	static inline iter erase(const iter& it) {
-		return feats().erase(it);
+	static feature at(const u32& wgt, const u32& idx, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(wgt, idx, first, last);
+		if (it != last) return (*it);
+		throw std::out_of_range("feature::at");
+	}
+	static inline iter erase(const iter& it) { return feats().erase(it); }
+	static inline std::vector<feature> transfer(const iter& first = begin(), const iter& last = end()) {
+		std::vector<feature> ft(first, last);
+		feats().erase(first, last);
+		return ft;
 	}
 
 private:
 	feature(const weight& value, const indexer& index) : index(index), value(value) {}
 	static inline std::vector<feature>& feats() { static std::vector<feature> f; return f; }
-//	static inline u64 make_sign(const u32& wgt, const u32& idx) { return (u64(wgt) << 32) | idx; }
 
 	indexer index;
 	weight value;
@@ -604,11 +649,11 @@ u64 indexnuma(const board& b, const std::vector<int>& n) {
 		// code: 0x00SSTTTT
 		u32 size = (code >> 16);
 		u32 tile = (code & 0xffff);
-		u32 msb = msb32(tile);
-		u32 var = num[log2(msb)];
-		while ((tile &= ~msb) != 0) {
-			msb = msb32(tile);
-			var += num[log2(msb)];
+		u32 idx = log2(tile);
+		u32 var = num[idx];
+		while ((tile &= ~(1 << idx)) != 0) {
+			idx = log2(tile);
+			var += num[idx];
 		}
 		index += (var & ~(-1 << size)) << offset;
 		offset += size;
@@ -640,9 +685,11 @@ u64 indexmax(const board& b) { // 16-bit
 	return k.mask(k.max());
 }
 
-void make_indexers(const std::string& res = "") {
-	auto imake = [](u32 sign, indexer::mapper func) {
-		if (indexer::find(sign) == indexer::end()) indexer::make(sign, func);
+u32 make_indexers(const std::string& res = "") {
+	u32 succ = 0;
+	auto imake = [&](u32 sign, indexer::mapper func) {
+		if (indexer::find(sign) != indexer::end()) return;
+		indexer::make(sign, func); succ++;
 	};
 
 	imake(0x00012367, utils::index6t<0x0,0x1,0x2,0x3,0x6,0x7>);
@@ -725,6 +772,14 @@ void make_indexers(const std::string& res = "") {
 	imake(0x00fb73ed, utils::index6t<0xf,0xb,0x7,0x3,0xe,0xd>);
 	imake(0x00cdef84, utils::index6t<0xc,0xd,0xe,0xf,0x8,0x4>);
 	imake(0x00048c12, utils::index6t<0x0,0x4,0x8,0xc,0x1,0x2>);
+	imake(0x0089abcd, utils::index6t<0x8,0x9,0xa,0xb,0xc,0xd>);
+	imake(0x00159d04, utils::index6t<0x1,0x5,0x9,0xd,0x0,0x4>);
+	imake(0x00765432, utils::index6t<0x7,0x6,0x5,0x4,0x3,0x2>);
+	imake(0x00ea62fb, utils::index6t<0xe,0xa,0x6,0x2,0xf,0xb>);
+	imake(0x00ba98fe, utils::index6t<0xb,0xa,0x9,0x8,0xf,0xe>);
+	imake(0x00d951c8, utils::index6t<0xd,0x9,0x5,0x1,0xc,0x8>);
+	imake(0x00456701, utils::index6t<0x4,0x5,0x6,0x7,0x0,0x1>);
+	imake(0x0026ae37, utils::index6t<0x2,0x6,0xa,0xe,0x3,0x7>);
 
 	// k.matsuzaki
 	imake(0x00012456, utils::index6t<0x0,0x1,0x2,0x4,0x5,0x6>);
@@ -1049,32 +1104,45 @@ void make_indexers(const std::string& res = "") {
 			break;
 		}
 	}
+	return succ;
 }
 
-bool save_weights(const std::string& path) {
-	std::ofstream out;
-	char buf[1 << 20];
-	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
-	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-	if (!out.is_open()) return false;
-	weight::save(out);
-	out.flush();
-	out.close();
-	return true;
+u32 save_weights(const std::string& res) {
+	u32 succ = 0;
+	std::string path(res);
+	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
+		std::ofstream out;
+		char buf[1 << 20];
+		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
+		out.open(path.substr(0, last), std::ios::out | std::ios::binary | std::ios::trunc);
+		if (!out.is_open()) continue;
+		weight::save(out);
+		out.flush();
+		out.close();
+		succ++;
+	}
+	return succ;
 }
-bool load_weights(const std::string& path) {
-	std::ifstream in;
-	char buf[1 << 20];
-	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
-	in.open(path, std::ios::in | std::ios::binary);
-	if (!in.is_open()) return false;
-	weight::load(in);
-	in.close();
-	return true;
+u32 load_weights(const std::string& res) {
+	u32 succ = 0;
+	std::string path(res);
+	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
+		std::ifstream in;
+		char buf[1 << 20];
+		in.rdbuf()->pubsetbuf(buf, sizeof(buf));
+		in.open(path.substr(0, last), std::ios::in | std::ios::binary);
+		if (!in.is_open()) continue;
+		weight::load(in);
+		in.close();
+		succ++;
+	}
+	return succ;
 }
-void make_weights(const std::string& res = "") {
-	auto wmake = [](u32 sign, u64 size) {
-		if (weight::find(sign) == weight::end()) weight::make(sign, size);
+u32 make_weights(const std::string& res = "") {
+	u32 succ = 0;
+	auto wmake = [&](u32 sign, u64 size) {
+		if (weight::find(sign) != weight::end()) return;
+		weight::make(sign, size); succ++;
 	};
 
 	// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit
@@ -1082,7 +1150,9 @@ void make_weights(const std::string& res = "") {
 	if (in.empty() && weight::list().empty())
 		in = "default";
 	std::map<std::string, std::string> predefined;
-	predefined["default"] = "012345:patt 456789:patt 012456:patt 45689a:patt fe000001:^25 ff000000:^16";
+	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt";
+	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt";
+	predefined["default"] = predefined["khyeh"] + " fe000001:^25 ff000000:^16";
 	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:?";
 	for (auto predef : predefined) {
 		if (in.find(predef.first) != std::string::npos) { // insert predefined weights
@@ -1091,8 +1161,8 @@ void make_weights(const std::string& res = "") {
 		}
 	}
 
-	while (in.find_first_of(":()[],") != std::string::npos)
-		in[in.find_first_of(":()[],")] = ' ';
+	while (in.find_first_of(":|()[],") != std::string::npos)
+		in[in.find_first_of(":|()[],")] = ' ';
 	std::stringstream wghtin(in);
 	std::string signs, sizes;
 	while (wghtin >> signs && wghtin >> sizes) {
@@ -1107,28 +1177,41 @@ void make_weights(const std::string& res = "") {
 		}
 		wmake(sign, size);
 	}
+	return succ;
 }
 
-bool save_features(const std::string& path) {
-	std::ofstream out;
-	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-	if (!out.is_open()) return false;
-	feature::save(out);
-	out.flush();
-	out.close();
-	return true;
+u32 save_features(const std::string& res) {
+	u32 succ = 0;
+	std::string path(res);
+	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
+		std::ofstream out;
+		out.open(path.substr(0, last), std::ios::out | std::ios::binary | std::ios::trunc);
+		if (!out.is_open()) continue;
+		feature::save(out);
+		out.flush();
+		out.close();
+		succ++;
+	}
+	return succ;
 }
-bool load_features(const std::string& path) {
-	std::ifstream in;
-	in.open(path, std::ios::in | std::ios::binary);
-	if (!in.is_open()) return false;
-	feature::load(in);
-	in.close();
-	return true;
+u32 load_features(const std::string& res) {
+	u32 succ = 0;
+	std::string path(res);
+	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
+		std::ifstream in;
+		in.open(path.substr(0, last), std::ios::in | std::ios::binary);
+		if (!in.is_open()) continue;
+		feature::load(in);
+		in.close();
+		succ++;
+	}
+	return succ;
 }
-void make_features(const std::string& res = "") {
-	auto fmake = [](u32 wght, u32 idxr) {
-		if (feature::find(wght, idxr) == feature::end()) feature::make(wght, idxr);
+u32 make_features(const std::string& res = "") {
+	u32 succ = 0;
+	auto fmake = [&](u32 wght, u32 idxr) {
+		if (feature::find(wght, idxr) != feature::end()) return;
+		feature::make(wght, idxr); succ++;
 	};
 
 	// weight:indexer weight(indexer) weight[indexer]
@@ -1136,10 +1219,11 @@ void make_features(const std::string& res = "") {
 	if (in.empty() && feature::list().empty())
 		in = "default";
 	std::map<std::string, std::string> predefined;
-	predefined["default"] =
-		"012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] fe000001[fe000001] ff000000[ff000000]";
-	predefined["k.matsuzaki"] =
-		"012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! 01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
+	predefined["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!]";
+	predefined["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!]";
+	predefined["default"] = predefined["khyeh"] + " fe000001[fe000001] ff000000[ff000000]";
+	predefined["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
+								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
 	for (auto predef : predefined) {
 		if (in.find(predef.first) != std::string::npos) { // insert predefined features
 			in.insert(in.find(predef.first), predef.second);
@@ -1147,8 +1231,8 @@ void make_features(const std::string& res = "") {
 		}
 	}
 
-	while (in.find_first_of(":()[],") != std::string::npos)
-		in[in.find_first_of(":()[],")] = ' ';
+	while (in.find_first_of(":|()[],") != std::string::npos)
+		in[in.find_first_of(":|()[],")] = ' ';
 	std::stringstream featin(in);
 	std::string wghts, idxrs;
 	while (featin >> wghts && featin >> idxrs) {
@@ -1179,7 +1263,7 @@ void make_features(const std::string& res = "") {
 			fmake(wght, idxr);
 		}
 	}
-
+	return succ;
 }
 
 void list_mapping() {
@@ -1416,17 +1500,18 @@ struct statistic {
 		local.count = {};
 	}
 
-	void summary(const u32& begin = 1, const u32& end = 17) {
-		std::cout << "max tile summary" << std::endl;
-
-		auto iter = total.count.begin();
-		double sum = std::accumulate(iter + begin, iter + end, 0);
+	void summary() {
+		std::cout << std::endl << "summary" << std::endl;
+		auto count = total.count, accum = total.count;
+		for (auto it = accum.begin(); it != accum.end(); it++)
+			(*it) = std::accumulate(it, accum.end(), 0);
 		char buf[64];
-		for (u32 i = begin; i < end; ++i) {
-			snprintf(buf, sizeof(buf), "%d:\t%8d%8.2f%%%8.2f%%",
-					(1 << i) & 0xfffffffeu, total.count[i],
-					(total.count[i] * 100.0 / sum),
-					(std::accumulate(iter + i, iter + end, 0) * 100.0 / sum));
+		for (auto i = 1; i < 17 && accum[i - 1]; i++) {
+			if (accum[i + 1] == accum[0]) continue;
+			snprintf(buf, sizeof(buf), "%d\t%8d%8.2f%%%8.2f%%",
+					(1 << (i)) & 0xfffffffeu, count[i],
+					(count[i] * 100.0 / accum[0]),
+					(accum[i] * 100.0 / accum[0]));
 			std::cout << buf << std::endl;
 		}
 	}
@@ -1434,101 +1519,104 @@ struct statistic {
 
 inline utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
-
-	auto valueof = [&](int& i, const char* def) -> const char* {
+	auto find_opt = [&](int& i, const char* defval) -> std::string {
 		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
-		if (def != nullptr) return def;
+		if (defval != nullptr) return defval;
 		std::cerr << "invalid: " << argv[i] << std::endl;
-		std::exit(1);
+		std::exit(1); return "";
+	};
+	auto find_opts = [&](int& i, const char& split) -> std::string {
+		std::string vu;
+		for (std::string v; (v = find_opt(i, "")).size(); ) vu += (v += split);
+		return vu;
 	};
 	for (int i = 1; i < argc; i++) {
 		switch (to_hash(argv[i])) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
-			opts["alpha"] = valueof(i, nullptr);
+			opts["alpha"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-a/"):
 		case to_hash("--alpha-divide"):
-			opts["alpha-divide"] = valueof(i, nullptr);
+			opts["alpha-divide"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
-			opts["train"] = valueof(i, nullptr);
+			opts["train"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-T"):
 		case to_hash("--test"):
-			opts["test"] = valueof(i, nullptr);
+			opts["test"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
 		case to_hash("--srand"):
-			opts["seed"] = valueof(i, nullptr);
+			opts["seed"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
-			opts["weight-input"] = valueof(i, "tdl2048.weight");
-			opts["weight-output"] = opts["weight-input"];
+			opts["weight-input"] = opts["weight-output"] = find_opts(i, '|');
 			break;
 		case to_hash("-wi"):
 		case to_hash("--weight-input"):
-			opts["weight-input"] = valueof(i, "tdl2048.weight");
+			opts["weight-input"] = find_opts(i, '|');
 			break;
 		case to_hash("-wo"):
 		case to_hash("--weight-output"):
-			opts["weight-output"] = valueof(i, "tdl2048.weight");
+			opts["weight-output"] = find_opts(i, '|');
 			break;
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			opts["feature-input"] = valueof(i, "tdl2048.feature");
-			opts["feature-output"] = opts["feature-input"];
+			opts["feature-input"] = opts["feature-output"] = find_opts(i, '|');
 			break;
 		case to_hash("-fi"):
 		case to_hash("--feature-input"):
-			opts["feature-input"] = valueof(i, "tdl2048.feature");
+			opts["feature-input"] = find_opts(i, '|');
 			break;
 		case to_hash("-fo"):
 		case to_hash("--feature-output"):
-			opts["feature-output"] = valueof(i, "tdl2048.feature");
+			opts["feature-output"] = find_opts(i, '|');
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
 		case to_hash("--weight-value"):
-			for (std::string w; (w = valueof(i, "")).size(); )
-				opts["weight-value"] += (w += ',');
+			opts["weight-value"] = find_opts(i, ',');
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
 		case to_hash("--feature-value"):
-			for (std::string f; (f = valueof(i, "")).size(); )
-				opts["feature-value"] += (f += ',');
+			opts["feature-value"] = find_opts(i, ',');
+			break;
+		case to_hash("-wf"):
+		case to_hash("-fw"):
+			opts["feature-value"] = opts["weight-value"] = find_opts(i, ',');
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 		case to_hash("--extra"):
-			for (std::string o; (o = valueof(i, "")).size(); )
-				opts += o;
+			opts["options"] = find_opts(i, ' ');
 			break;
 		case to_hash("-tt"):
 		case to_hash("--train-type"):
-			opts["train-type"] = valueof(i, "");
+			opts["train-type"] = find_opt(i, "");
 			break;
 		case to_hash("-Tt"):
 		case to_hash("-TT"):
 		case to_hash("--test-type"):
-			opts["test-type"] = valueof(i, "");
+			opts["test-type"] = find_opt(i, "");
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
-			opts["comment"] = valueof(i, "");
+			opts["comment"] = find_opts(i, ' ');
 			break;
 		case to_hash("-thd"):
 		case to_hash("--thd"):
-			opts["thread"] = valueof(i, nullptr);
+			opts["thread"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-shm"):
 		case to_hash("--shm"):
-			opts["shmres"] = valueof(i, "./2048");
+			opts["shmres"] = find_opt(i, "./2048");
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1640,8 +1728,9 @@ int main(int argc, const char* argv[]) {
 			best >> b;
 		}
 
-		stats.update(score, b.hash(), opers, thdid);
+		stats.updatec(score, b.hash(), opers, thdid);
 	}
+	if (test) stats.summary();
 
 	if (thdid != 0) return 0;
 	while (wait(nullptr) > 0);

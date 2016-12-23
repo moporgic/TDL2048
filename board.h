@@ -2,7 +2,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 3.0
+// Version     : 3.2
 // Description : bitboard of 2048
 //============================================================================
 #include "moporgic/type.h"
@@ -10,6 +10,7 @@
 #include "moporgic/math.h"
 #include <algorithm>
 #include <iostream>
+#include <sstream>
 #include <cstdio>
 #include <array>
 
@@ -236,6 +237,7 @@ public:
 	inline bool operator==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
 	inline bool operator!=(const u64& raw) const { return this->raw != raw || this->ext != 0; }
 
+	inline const cache& query(const u32& r) const { return query16(r); }
 	inline u32  fetch(const u32& i) const { return fetch16(i); }
 	inline void place(const u32& i, const u32& r) { place16(i, r); }
 	inline u32  at(const u32& i) const { return at4(i); }
@@ -243,8 +245,17 @@ public:
 	inline void set(const u32& i, const u32& t) { set4(i, t); }
 	inline void mirror() { mirror64(); }
 	inline void flip() { flip64(); }
+	inline void reverse() { mirror(); flip(); }
 	inline void reflect(const bool& hori = true) { if (hori) mirror(); else flip(); }
 	inline void transpose() { transpose64(); }
+	inline u32  empty() const { return empty64(); }
+
+	inline const cache& query16(const u32& r) const {
+		return board::lookup(fetch16(r));
+	}
+	inline const cache& query20(const u32& r) const {
+		return board::lookup(fetch20(r));
+	}
 
 	inline u32 fetch16(const u32& i) const {
 		return ((raw >> (i << 4)) & 0xffff);
@@ -306,9 +317,33 @@ public:
 		ext = (ext & 0xcc330000) | ((ext & 0x00cc0000) << 6) | ((ext & 0x33000000) >> 6);
 	}
 
-	inline void reverse() {
-		mirror();
-		flip();
+	inline u32 empty64() const {
+		register u64 x = raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		x = ~x & 0x1111111111111111ULL;
+		x += x >> 32;
+		x += x >> 16;
+		x += x >> 8;
+		x += x >> 4;
+		return x & 0xf;
+	}
+	inline u32 empty80() const {
+		register u64 x = raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		x = ~x & 0x1111111111111111ULL;
+		register u64 k = ext >> 16;
+		k = ((k & 0xff00ULL) << 24) | (k & 0x00ffULL);
+		k = ((k & 0xf0000000f0ULL) << 12) | (k & 0x0f0000000fULL);
+		k = ((k & 0x000c000c000c000cULL) << 6) | (k & 0x0003000300030003ULL);
+		k = ((k & 0x0202020202020202ULL) << 3) | (k & 0x0101010101010101ULL);
+		x &= ~k & 0x1111111111111111ULL;
+		x += x >> 32;
+		x += x >> 16;
+		x += x >> 8;
+		x += x >> 4;
+		return x & 0xf;
 	}
 
 	inline void init() {
@@ -565,10 +600,6 @@ public:
 		}
 	}
 
-	inline const cache& query(const u32& r) const {
-		return board::lookup(fetch(r));
-	}
-
 	inline u32 operations() const {
 		board trans(*this); trans.transpose();
 		u32 hori = this->query(0).legal | this->query(1).legal
@@ -612,74 +643,135 @@ public:
 		const u32 i;
 	private:
 		inline tile(const board& b, const u32& i) : b(const_cast<board&>(b)), i(i) {}
+		inline bool is_exact() const { return style::flag(b) == style::exact; }
 	public:
 		inline tile(const tile& t) = default;
 		tile() = delete;
-		inline operator u32() const { return b.at(i); }
-		inline tile& operator =(const u32& k) { b.set(i, k); return *this; }
-		inline tile& operator =(const tile& t) { return operator =(u32(t)); }
-		inline bool operator ==(const u32& k) const { return b.at(i) == k; }
-		inline bool operator !=(const u32& k) const { return b.at(i) != k; }
+		inline operator u32() const { return is_exact() ? b.exact(i) : b.at(i); }
+		inline tile& operator =(const u32& k) { b.set(i, is_exact() ? math::lg(k) : k); return *this; }
+		inline tile& operator =(const tile& t) { return operator =(t.operator u32()); }
+		inline bool operator ==(const u32& k) const { return operator u32() == k; }
+		inline bool operator !=(const u32& k) const { return operator u32() != k; }
 	};
 	inline tile operator [](const u32& i) const { return tile(*this, i); }
 
-	inline void operator >>(std::ostream& out) const { write(out); }
-	inline void operator <<(std::istream& in) { read(in); }
+	inline void operator >>(std::ostream& out) const { out << (*this); }
+	inline void operator <<(std::istream& in) { in >> (*this); }
 
-	inline void write(std::ostream& out) const { write64(out); }
-	inline void read(std::istream& in) { read64(in); }
+	class style {
+	public:
+		style() = delete;
+		enum item {
+			at = 0,
+			index = 0,
+			exact = 1,
+			actual = 1,
+			lite = 2,
+			lite80 = 2,
+			lite64 = 6,
+			line = 2,
+			line80 = 2,
+			line64 = 6,
+			raw = 3,
+			raw80 = 5,
+			raw64 = 4,
+			full = 3,
+			bit128 = 3,
+			bit80 = 5,
+			bit64 = 4,
+		};
 
-	inline void write64(std::ostream& out) const {
-		moporgic::write(out, raw);
-	}
-	inline void write80(std::ostream& out) const {
-		write64(out);
-		moporgic::write_cast<u16>(out, ext >> 16);
-	}
-
-	inline void read64(std::istream& in) {
-		moporgic::read(in, raw);
-	}
-	inline void read80(std::istream& in) {
-		read64(in);
-		moporgic::read_cast<u16>(in, ext); ext <<= 16;
-	}
-
-	inline void print(const bool& isat = true, std::ostream& out = std::cout) const {
-		if (isat)
-			printat(out);
-		else
-			printexact(out);
-	}
-
-	inline void printat(std::ostream& out = std::cout) const {
-		const char* edge = "+----------------+";
-		const char* line = "|%4u%4u%4u%4u|";
-		char buff[32];
-		out << edge << std::endl;
-		for (u32 i = 0; i < 16; i += 4) {
-			snprintf(buff, sizeof(buff), line, at(i + 0), at(i + 1), at(i + 2), at(i + 3));
-			out << buff << std::endl;
+		static item flag(const board& b) {
+			return static_cast<item>(b.inf);
 		}
-		out << edge << std::endl;
-	}
-
-	inline void printexact(std::ostream& out = std::cout) const {
-		const char* edge = "+------------------------+";
-		const char* line = "|%6u%6u%6u%6u|";
-		char buff[32];
-		out << edge << std::endl;
-		for (u32 i = 0; i < 16; i += 4) {
-			snprintf(buff, sizeof(buff), line, exact(i + 0), exact(i + 1), exact(i + 2), exact(i + 3));
-			out << buff << std::endl;
+		static void setf(board& b, const item& f) {
+			b.inf = f;
 		}
-		out << edge << std::endl;
+	};
+	inline board& format(const style::item& style = style::at) {
+		style::setf(*this, style);
+		return *this;
 	}
 
-	inline void printraw(std::ostream& out = std::cout) const {
-		char buf[24];
-		snprintf(buf, sizeof(buf), "[%016llx|%04x]", raw, ext >> 16);
-		out << buf << std::endl;
+    friend std::ostream& operator <<(std::ostream& out, const board& b) {
+		static const char* edge[2] = { "+----------------+", "+------------------------+" };
+		static const char* grid[2] = { "|%4u%4u%4u%4u|",     "|%6u%6u%6u%6u|" };
+		char buff[32];
+    	switch (style::flag(b)) {
+    	case style::raw:
+    		moporgic::write<u64>(out, b.raw);
+    		moporgic::write<u32>(out, b.ext);
+    		moporgic::write<u32>(out, b.inf);
+    		break;
+    	case style::raw64:
+    		moporgic::write<u64>(out, b.raw);
+    		break;
+    	case style::raw80:
+    		moporgic::write<u64>(out, b.raw);
+    		moporgic::write_cast<u16>(out, b.ext >> 16);
+    		break;
+    	case style::lite80:
+			snprintf(buff, sizeof(buff), "[%016llx|%04x]", b.raw, b.ext >> 16);
+			out << buff;
+    		break;
+    	case style::lite64:
+			snprintf(buff, sizeof(buff), "[%016llx]", b.raw);
+			out << buff;
+    		break;
+    	case style::index:
+    	case style::actual:
+    		out << edge[style::flag(b)] << std::endl;
+			for (u32 i = 0; i < 16; i += 4) {
+				snprintf(buff, sizeof(buff), grid[style::flag(b)], u32(b[i+0]), u32(b[i+1]), u32(b[i+2]), u32(b[i+3]));
+				out << buff << std::endl;
+			}
+    		out << edge[style::flag(b)] << std::endl;
+    		break;
+    	}
+		return out;
+	}
+
+	friend std::istream& operator >>(std::istream& in, board& b) {
+		std::string s;
+    	switch (style::flag(b)) {
+    	case style::raw:
+    		moporgic::read<u64>(in, b.raw);
+    		moporgic::read<u32>(in, b.ext);
+    		moporgic::read<u32>(in, b.inf);
+    		break;
+    	case style::raw64:
+    		moporgic::read<u64>(in, b.raw);
+    		break;
+    	case style::raw80:
+			moporgic::read<u64>(in, b.raw);
+			moporgic::read_cast<u16>(in, b.ext); b.ext <<= 16;
+    		break;
+    	case style::lite64:
+    	case style::lite80:
+    		in >> s;
+			std::stringstream(s.substr(s.find('[') + 1)) >> std::hex >> b.raw;
+			if (style::flag(b) != style::lite80) break;
+    		if (s.find('[') == std::string::npos) in >> s;
+			std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
+    		break;
+    	case style::index:
+    	case style::actual:
+    		in >> s;
+    		if (s.find('+') != std::string::npos) {
+        		in >> s;
+        		for (int t, i = 0; i < 16 && in >> t; i++) {
+        			b[i] = t;
+        			if (i % 4 == 3) in >> s >> s;
+        		}
+    		} else {
+    			b[0] = std::stol(s);
+    			for (int t, i = 1; i < 16 && in >> t; i++) {
+    				b[i] = t;
+    			}
+    		}
+    		break;
+    	}
+		return in;
 	}
 
 };
