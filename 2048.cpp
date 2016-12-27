@@ -367,16 +367,16 @@ public:
 		std::uniform_int_distribution<u64> dist;
 		for (u32 r = 0; r < 4; r++) {
 			for (u32 v = 0; v < (1 << 20); v++) {
-				board b; b.place20(0, v);
+				board t; t.place20(0, v);
 				u64 zt0 = dist(engine);
 				u64 zt1 = dist(engine);
 				u64 zt2 = dist(engine);
 				u64 zt3 = dist(engine);
 				zhash[r][v] = zt0 ^ zt1 ^ zt2 ^ zt3;
-				ztile[r*4 + 0][b.at5(0)] = zt0;
-				ztile[r*4 + 1][b.at5(1)] = zt1;
-				ztile[r*4 + 2][b.at5(2)] = zt2;
-				ztile[r*4 + 3][b.at5(3)] = zt3;
+				ztile[r*4 + 0][t.at5(0)] = zt0;
+				ztile[r*4 + 1][t.at5(1)] = zt1;
+				ztile[r*4 + 2][t.at5(2)] = zt2;
+				ztile[r*4 + 3][t.at5(3)] = zt3;
 			}
 		}
 	}
