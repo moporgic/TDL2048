@@ -494,9 +494,9 @@ public:
 			return *this;
 		}
 	private:
-		inline entry& pass(const board& min) {
-			if (sign != min.raw) {
-				sign = min.raw;
+		inline entry& pass(const u64& s) {
+			if (sign != s) {
+				sign = s;
 				esti = 0;
 				depth = -1;
 			}
@@ -509,18 +509,13 @@ public:
 	inline size_t length() const { return size; }
 
 	inline entry& operator[] (const board& b) {
-		board iso = b;
-		u64 min = zhash(iso) % size;
-		for (u32 is = 1; is < 8; is++) {
-			board isomo = b;
-			isomo.isomorphic(is);
-			u64 h = zhash(isomo) % size;
-			if (h < min) {
-				min = h;
-				iso = isomo;
-			}
+		u64 min = b.raw;
+		for (u32 i = 1; i < 8; i++) {
+			board iso = b; iso.isomorphic(i);
+			min = std::min(min, iso.raw);
 		}
-		return cache[min].pass(iso);
+		entry& en = cache[zhash(min) % size];
+		return en.pass(min);
 	}
 
 	void init(const size_t& len) {
