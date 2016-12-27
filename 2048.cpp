@@ -1854,6 +1854,16 @@ struct statistic {
 			std::cout << buf << std::endl;
 		}
 	}
+
+	void merge(const statistic& stat) {
+		total.score += stat.total.score;
+		total.win += stat.total.win;
+		total.time += stat.total.time;
+		total.opers += stat.total.opers;
+		total.hash |= stat.total.hash;
+		total.max = std::max(total.max, stat.total.max);
+		std::transform(total.count.begin(), total.count.end(), stat.total.count.begin(), total.count.begin(), std::plus<u32>());
+	}
 };
 
 inline utils::options parse(int argc, const char* argv[]) {

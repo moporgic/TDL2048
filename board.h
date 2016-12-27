@@ -643,15 +643,23 @@ public:
 		const u32 i;
 	private:
 		inline tile(const board& b, const u32& i) : b(const_cast<board&>(b)), i(i) {}
-		inline bool is_exact() const { return style::flag(b) == style::exact; }
 	public:
 		inline tile(const tile& t) = default;
 		tile() = delete;
-		inline operator u32() const { return is_exact() ? b.exact(i) : b.at(i); }
-		inline tile& operator =(const u32& k) { b.set(i, is_exact() ? math::lg(k) : k); return *this; }
 		inline tile& operator =(const tile& t) { return operator =(t.operator u32()); }
 		inline bool operator ==(const u32& k) const { return operator u32() == k; }
 		inline bool operator !=(const u32& k) const { return operator u32() != k; }
+		inline operator u32() const {
+			auto flag = style::flag(b);
+			u32 at = (flag & style::ext) ? b.at5(i) : b.at4(i);
+			return (flag & style::exact) ? (1 << at) & 0xfffffffeu : at;
+		}
+		inline tile& operator =(const u32& k) {
+			auto flag = style::flag(b);
+			u32 at = (flag & style::exact) ? math::lg(k) : k;
+			if (flag & style::ext) b.set5(i, at); else b.set4(i, at);
+			return *this;
+		}
 	};
 	inline tile operator [](const u32& i) const { return tile(*this, i); }
 
@@ -662,23 +670,22 @@ public:
 	public:
 		style() = delete;
 		enum item {
-			at = 0,
-			index = 0,
-			exact = 1,
-			actual = 1,
-			lite = 2,
-			lite80 = 2,
-			lite64 = 6,
-			line = 2,
-			line80 = 2,
-			line64 = 6,
-			raw = 3,
-			raw80 = 5,
-			raw64 = 4,
-			full = 3,
-			bit128 = 3,
-			bit80 = 5,
-			bit64 = 4,
+			at     = 0x00000000,
+			index  = 0x00000000,
+			exact  = 0x10000000,
+			actual = 0x10000000,
+			lite   = 0xa0000000,
+			line   = 0xa0000000,
+			lite80 = 0xa0000000,
+			line80 = 0xa0000000,
+			lite64 = 0x20000000,
+			line64 = 0x20000000,
+			full   = 0xf0000000,
+			raw    = 0xf0000000,
+			raw64  = 0x30000000,
+			raw80  = 0xb0000000,
+
+			ext    = 0x80000000,
 		};
 
 		static item flag(const board& b) {
@@ -718,6 +725,7 @@ public:
 			snprintf(buff, sizeof(buff), "[%016llx]", b.raw);
 			out << buff;
     		break;
+    	default:
     	case style::index:
     	case style::actual:
     		out << edge[style::flag(b)] << std::endl;
@@ -754,6 +762,7 @@ public:
     		if (s.find('[') == std::string::npos) in >> s;
 			std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
     		break;
+    	default:
     	case style::index:
     	case style::actual:
     		in >> s;
