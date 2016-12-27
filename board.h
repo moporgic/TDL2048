@@ -725,6 +725,7 @@ public:
 			snprintf(buff, sizeof(buff), "[%016llx]", b.raw);
 			out << buff;
     		break;
+    	default:
     	case style::index:
     	case style::actual:
     		out << edge[style::flag(b)] << std::endl;
@@ -761,6 +762,7 @@ public:
     		if (s.find('[') == std::string::npos) in >> s;
 			std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
     		break;
+    	default:
     	case style::index:
     	case style::actual:
     		in >> s;
