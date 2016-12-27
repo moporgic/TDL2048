@@ -359,12 +359,13 @@ private:
 
 class zhasher {
 public:
-	zhasher(const u64& seeda = 0x0000000000000000ULL,
+	zhasher(const u64& seed  = moporgic::millisec(),
+			const u64& seeda = 0x0000000000000000ULL,
 			const u64& seedb = 0xffffffffffffffffULL)
-	: sign(seeda ^ seedb), seeda(seeda), seedb(seedb) {
+	: id(seed ^ seeda ^ seedb), seeda(seeda), seedb(seedb) {
+		std::default_random_engine engine(seed);
+		std::uniform_int_distribution<u64> dist;
 		for (u32 r = 0; r < 4; r++) {
-			std::default_random_engine engine(moporgic::millisec());
-			std::uniform_int_distribution<u64> dist;
 			for (u32 v = 0; v < (1 << 20); v++) {
 				u64 zrv = dist(engine);
 				u64 zt0 = dist(engine);
@@ -377,13 +378,12 @@ public:
 				ztile[r*4 + 1][b.at5(1)] = zt1;
 				ztile[r*4 + 2][b.at5(2)] = zt2;
 				ztile[r*4 + 3][b.at5(3)] = zt3;
-				sign ^= zrv;
 			}
 		}
 	}
 	zhasher(const zhasher& z) = default;
 	~zhasher() = default;
-	inline u64 signature() const { return sign; }
+	inline u64 sign() const { return id; }
 
 	inline u64 operator ()(const board& b, const bool& after = true) const {
 		register u64 hash = after ? seeda : seedb;
@@ -402,16 +402,16 @@ public:
     	auto& seedb = z.seedb;
     	auto& zhash = z.zhash;
     	auto& ztile = z.ztile;
-    	auto& sign = z.sign;
+    	auto& id = z.id;
 		u32 code = 1;
 		moporgic::write_cast<byte>(out, code);
 		switch (code) {
 		case 1:
+			moporgic::write(out, id);
 			moporgic::write(out, seeda);
 			moporgic::write(out, seedb);
 			moporgic::write(out, zhash);
 			moporgic::write(out, ztile);
-			moporgic::write(out, sign);
 			break;
 		default:
 			std::cerr << "unknown serial at zhasher::>>" << std::endl;
@@ -424,7 +424,7 @@ public:
     	auto& seedb = z.seedb;
     	auto& zhash = z.zhash;
     	auto& ztile = z.ztile;
-    	auto& sign = z.sign;
+    	auto& id = z.id;
 		u32 code;
 		read_cast<byte>(in, code);
 		switch (code) {
@@ -432,30 +432,32 @@ public:
 			moporgic::read(in, seeda);
 			moporgic::read(in, seedb);
 			moporgic::read(in, zhash);
-			for (u32 r = 0; r < 4; r++) {
+			{ // rebuild ztile
 				std::default_random_engine engine(moporgic::millisec());
 				std::uniform_int_distribution<u64> dist;
-				for (u32 v = 0; v < (1 << 20); v++) {
-					u64 zrv = zhash[r][v];
-					u64 zt0 = dist(engine);
-					u64 zt1 = dist(engine);
-					u64 zt2 = dist(engine);
-					u64 zt3 = zrv ^ zt0 ^ zt1 ^ zt2;
-					board b; b.place20(0, v);
-					ztile[r*4 + 0][b.at5(0)] = zt0;
-					ztile[r*4 + 1][b.at5(1)] = zt1;
-					ztile[r*4 + 2][b.at5(2)] = zt2;
-					ztile[r*4 + 3][b.at5(3)] = zt3;
+				for (u32 r = 0; r < 4; r++) {
+					for (u32 v = 0; v < (1 << 20); v++) {
+						u64 zrv = zhash[r][v];
+						u64 zt0 = dist(engine);
+						u64 zt1 = dist(engine);
+						u64 zt2 = dist(engine);
+						u64 zt3 = zrv ^ zt0 ^ zt1 ^ zt2;
+						board b; b.place20(0, v);
+						ztile[r*4 + 0][b.at5(0)] = zt0;
+						ztile[r*4 + 1][b.at5(1)] = zt1;
+						ztile[r*4 + 2][b.at5(2)] = zt2;
+						ztile[r*4 + 3][b.at5(3)] = zt3;
+					}
 				}
 			}
-			moporgic::read(in, sign);
+			moporgic::read(in, id);
 			break;
 		case 1:
+			moporgic::read(in, id);
 			moporgic::read(in, seeda);
 			moporgic::read(in, seedb);
 			moporgic::read(in, zhash);
 			moporgic::read(in, ztile);
-			moporgic::read(in, sign);
 			break;
 		default:
 			std::cerr << "unknown serial at zhasher::<<" << std::endl;
@@ -464,7 +466,7 @@ public:
 		return in;
 	}
 private:
-	u64 sign;
+	u64 id;
 	std::array<std::array<u64, 1 << 20>, 4> zhash;
 	std::array<std::array<u64, 32>, 16> ztile;
 	u64 seeda;
@@ -477,133 +479,117 @@ public:
 	friend class transposition;
 	public:
 		u64 sign;
-		i32 depth;
 		f32 esti;
+		i16 depth;
+		u16 info;
 		entry(const entry& e) = default;
-		entry(const u64& sign = 0) : sign(sign), depth(0), esti(0) {}
+		entry(const u64& sign = 0) : sign(sign), esti(0), depth(-1), info(0) {}
 
 		inline operator numeric() const { return esti; }
 		inline bool operator ==(const board& b) const { return sign == b.raw; }
 		inline bool operator >=(const i32& d) const { return depth >= d; }
 
-		inline entry& init(const board& b, const i32& d = 0, const f32& e = 0) {
-			sign = b.raw;
-			return save(e, d);
-		}
 		inline entry& save(const f32& e, const i32& d) {
 			esti = e;
 			depth = d;
 			return *this;
 		}
-	};
-	class hashed {
-	friend class transposition;
-	public:
-		entry* pool;
-		size_t hit;
-		hashed() : pool(nullptr), hit(0) {}
-		~hashed() { if (pool) delete[] pool; }
-
-		inline entry& operator [](const int& i) { return pool[i]; }
-		inline entry& alloc(const size_t& limit) { return pool[hit++ % limit]; }
-		inline size_t valid(const size_t& limit) const { return std::min(hit, limit); }
+	private:
+		inline entry& pass(const board& min) {
+			if (sign != min.raw) {
+				sign = min.raw;
+				esti = 0;
+				depth = -1;
+			}
+			return (*this);
+		}
 	};
 
-	transposition() : zhash(), cache(nullptr), tpbit(0), limit(0), mask(-1) {}
+	transposition() : zhash(), cache(nullptr), size(0) {}
 	~transposition() { if (cache) delete[] cache; }
-	inline size_t length() const { return tpbit ? (1ull << tpbit) : 0; }
-	inline size_t bucket() const { return limit; }
-	inline size_t capacity() const { return length() * bucket(); }
+	inline size_t length() const { return size; }
 
 	inline entry& operator[] (const board& b) {
-
-		board min = b;
-		u64 hash = zhash(min);
+		board iso = b;
+		u64 min = zhash(iso) % size;
 		for (u32 is = 1; is < 8; is++) {
 			board isomo = b;
 			isomo.isomorphic(is);
-			u64 h = zhash(isomo);
-			if (h < hash) {
-				hash = h;
-				min = isomo;
+			u64 h = zhash(isomo) % size;
+			if (h < min) {
+				min = h;
+				iso = isomo;
 			}
 		}
-
-		hashed& ln = cache[hash & mask];
-		size_t valid = ln.valid(limit);
-		for (size_t i = 0; i < valid; i++)
-			if (ln[i] == min)
-				return ln[i];
-
-		entry& en = ln.alloc(limit);
-		en.init(min.raw);
-		return en;
-
+		return cache[min].pass(iso);
 	}
 
-	void init(const u32& bit, const u32& lim) {
-		tpbit = bit;
-		limit = lim;
-		mask = ~(0xffffffffffffffffull << bit);
+	void init(const size_t& len) {
 		if (cache) delete[] cache;
-		cache = alloc(1ULL << bit, limit);
+		cache = alloc(size = len);
 	}
 
     friend std::ostream& operator <<(std::ostream& out, const transposition& tp) {
     	auto& zhash = tp.zhash;
-    	auto& tpbit = tp.tpbit;
-    	auto& limit = tp.limit;
     	auto& cache = tp.cache;
-		u32 code = 0;
+    	auto& size = tp.size;
+		u32 code = 1;
 		write_cast<byte>(out, code);
 		switch (code) {
-		case 0:
-			out << zhash;
-			write_cast<u32>(out, tpbit);
-			write_cast<u32>(out, limit);
-			for (size_t size = 1ull << tpbit, s = 0; s < size; s++) {
-				hashed& ln = cache[s];
-				write_cast<u64>(out, ln.hit);
-				u32 valid = std::min(ln.hit, limit);
-				for (u32 v = 0; v < valid; v++) {
-					entry& en = ln[v];
-					write_cast<u64>(out, en.sign);
-					write_cast<i32>(out, en.depth);
-					write_cast<f32>(out, en.esti);
-				}
-			}
-			break;
 		default:
 			std::cerr << "unknown serial at transposition::>>" << std::endl;
+			std::cerr << "use default serial (1) instead" << std::endl;
+			// no break;
+		case 1:
+			out << zhash;
+			write_cast<u64>(out, size);
+			for (u64 i = 0; i < size; i++) {
+				entry& en = cache[i];
+				write_cast<u64>(out, en.sign);
+				if (en.sign == 0) continue;
+				write_cast<f32>(out, en.esti);
+				write_cast<i16>(out, en.depth);
+				write_cast<u16>(out, en.info);
+			}
 			break;
 		}
 		return out;
 	}
 	friend std::istream& operator >>(std::istream& in, transposition& tp) {
     	auto& zhash = tp.zhash;
-    	auto& tpbit = tp.tpbit;
-    	auto& limit = tp.limit;
     	auto& cache = tp.cache;
-    	auto& mask = tp.mask;
+    	auto& size = tp.size;
+    	u64 tpbit, limit;
 		u32 code = 0;
-		read_cast<u32>(in, code);
+		read_cast<byte>(in, code);
 		switch (code) {
 		case 0:
 			in >> zhash;
 			read_cast<u32>(in, tpbit);
 			read_cast<u32>(in, limit);
-			mask = ~(0xffffffffffffffffull << tpbit);
-			cache = alloc(1ULL << tpbit, limit);
-			for (size_t size = 1ull << tpbit, s = 0; s < size; s++) {
-				hashed& ln = cache[s];
-				read_cast<u64>(in, ln.hit);
-				u32 valid = std::min(ln.hit, limit);
-				for (u32 v = 0; v < valid; v++) {
-					entry& en = ln[v];
-					read_cast<u64>(in, en.sign);
+			size = (1ULL << tpbit) * limit;
+			cache = alloc(size);
+			for (u64 hit, raw, s = 0; s < (1ULL << tpbit); s++) {
+				read_cast<u64>(in, hit);
+				for (hit = std::min(hit, limit); hit; hit--) {
+					read_cast<u64>(in, raw);
+					entry& en = tp[raw];
 					read_cast<i32>(in, en.depth);
 					read_cast<f32>(in, en.esti);
 				}
+			}
+			break;
+		case 1:
+			in >> zhash;
+			read_cast<u64>(in, size);
+			cache = alloc(size);
+			for (u64 i = 0; i < size; i++) {
+				entry& en = cache[i];
+				read_cast<u64>(in, en.sign);
+				if (en.sign == 0) continue;
+				read_cast<f32>(in, en.esti);
+				read_cast<i16>(in, en.depth);
+				read_cast<u16>(in, en.info);
 			}
 			break;
 		default:
@@ -621,20 +607,12 @@ public:
 	}
 
 	static inline entry& find(const board& b) { return instance()[b]; }
-
-	static inline hashed* alloc(size_t size, size_t limit) {
-		hashed* ln = new hashed[size]();
-		for (size_t i = 0; i < size; i++)
-			ln[i].pool = new entry[limit]();
-		return ln;
-	}
+	static inline entry* alloc(size_t len) { return new entry[len](); }
 
 private:
 	zhasher zhash;
-	hashed* cache;
-	u64 tpbit;
-	u64 limit;
-	u64 mask;
+	entry* cache;
+	size_t size;
 };
 
 namespace utils {
@@ -1545,21 +1523,23 @@ inline numeric update(const board& state, const numeric& updv,
 
 void make_transposition(const std::string& res = "") {
 	std::string in(res);
-	if (in.empty() && transposition::instance().capacity() == 0) in = "default";
-	if (in == "default") in = "25x8";
+	if (in.empty() && transposition::instance().length() == 0) in = "default";
+	if (in == "default") in = "4G";
 
 	if (in.size()) {
-		u32 bit;
-		u32 lim;
-		auto it = in.find_first_of("x/|");
-		if (it != std::string::npos) {
-			lim = std::stol(in.substr(it + 1));
-			in = in.substr(0, it);
+		u64 size = 0;
+		if (!std::isdigit(in.back())) {
+			size = std::stoll(in.substr(0, in.size() - 1));
+			switch (in.back()) {
+			case 'K': size *= (1ULL << 10); break;
+			case 'M': size *= (1ULL << 20); break;
+			case 'G': size *= (1ULL << 30); break;
+			}
+			size /= sizeof(transposition::entry);
 		} else {
-			lim = 1;
+			size = std::stoll(in);
 		}
-		bit = std::stol(in);
-		transposition::instance().init(bit, lim);
+		transposition::instance().init(size);
 	}
 }
 bool load_transposition(const std::string& path) {
