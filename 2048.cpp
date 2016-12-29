@@ -646,18 +646,20 @@ public:
 		return in;
 	}
 
-	void stat() {
+	void summary() {
+		std::cout << "summary" << std::endl;
 		std::vector<u64> uu; uu.emplace_back(0);
 		for (u64 i = 0; i < zsize; i++) {
 			auto& h = cache[i];
 			if (std::isnan(h.esti)) {
-				u32 size = h.depth + 1;
+				u32 size = u16(h.depth) + 1;
 				while (uu.size() < size + 1) uu.emplace_back(0);
 				uu[size]++;
 			} else {
 				uu[h.sign ? 1 : 0]++;
 			}
 		}
+		std::cout << "used" "\t" "count" << std::endl;
 		for (u32 i = 0; i < uu.size(); i++)
 			std::cout << i << "\t" << uu[i] << std::endl;
 	}
@@ -2219,7 +2221,6 @@ int main(int argc, const char* argv[]) {
 	if (test) stats.summary();
 
 	utils::save_transposition(opts["cache-output"]);
-	transposition::instance().stat();
 
 	std::cout << std::endl;
 
