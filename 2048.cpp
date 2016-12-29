@@ -543,14 +543,14 @@ public:
 
 		for (auto it = list; it != list + last; it++)
 			if (*(it) < *(it + 1)) std::swap(*(it), *(it + 1));
-		auto hit = 0;
-		auto min = list[last].info;
+		auto hits = 0;
+		auto mini = list[last].info;
 		for (auto it = list; it != list + size; it++) {
-			hit += it->info;
-			it->info -= min;
+			hits += it->info;
+			it->info -= mini;
 		}
 		if (total >= limit || size == 65536) return list[last](x);
-		if (min <= (hit / (size + size)))    return list[last](x);
+		if (mini  <= (hits / (size + size))) return list[last](x);
 
 		list = cast<position*>(realloc(list, sizeof(position) * (size * 2)));
 		total += size;
