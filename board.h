@@ -236,9 +236,11 @@ public:
 	inline bool   operator ==(const board& b) const { return raw == b.raw && ext == b.ext; }
 	inline bool   operator !=(const board& b) const { return raw != b.raw || ext != b.ext; }
 	inline bool   operator  <(const board& b) const { return ext == b.ext ? raw < b.raw : ext < b.ext; }
+	inline bool   operator  >(const board& b) const { return ext == b.ext ? raw > b.raw : ext > b.ext; }
 	inline bool   operator ==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
 	inline bool   operator !=(const u64& raw) const { return this->raw != raw || this->ext != 0; }
 	inline bool   operator  <(const u64& raw) const { return this->raw  < raw && this->ext == 0; }
+	inline bool   operator  >(const u64& raw) const { return this->raw  > raw || this->ext != 0; }
 
 	inline const cache& query(const u32& r) const { return query16(r); }
 	inline u32  fetch(const u32& i) const { return fetch16(i); }
