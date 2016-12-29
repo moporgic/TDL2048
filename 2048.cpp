@@ -474,59 +474,99 @@ private:
 
 class transposition {
 public:
-	class entry {
+	class position {
 	friend class transposition;
 	public:
 		u64 sign;
 		f32 esti;
 		i16 depth;
 		u16 info;
-		entry(const entry& e) = default;
-		entry(const u64& sign = 0) : sign(sign), esti(0), depth(-1), info(0) {}
+		position(const position& e) = default;
+		position(const u64& sign = 0) : sign(sign), esti(0), depth(-1), info(0) {}
 
 		inline operator numeric() const { return esti; }
-		inline bool operator ==(const board& b) const { return sign == b.raw; }
+		inline operator bool()    const { return sign; }
+		inline bool operator ==(const u64& s) const { return sign == s; }
 		inline bool operator >=(const i32& d) const { return depth >= d; }
 
-		inline entry& save(const f32& e, const i32& d) {
+		inline bool operator < (const position& en) const { return info < en.info; }
+		inline bool operator > (const position& en) const { return info > en.info; }
+
+		inline position& save(const f32& e, const i32& d) {
 			esti = e;
 			depth = d;
 			return *this;
 		}
-	private:
-		inline entry& pass(const u64& s) {
+		inline position& operator()(const u64& s) {
 			if (sign != s) {
 				sign = s;
 				esti = 0;
 				depth = -1;
+				info = 0;
+			} else {
+				info = std::min(info + 1, 65535);
 			}
-			return (*this);
+			return *this;
 		}
 	};
 
-	transposition() : zhash(), cache(nullptr), size(0) {}
+	transposition() : zhash(), cache(nullptr), zsize(0), limit(0), total(0) {}
 	~transposition() { if (cache) delete[] cache; }
-	inline size_t length() const { return size; }
+	inline size_t length() const { return zsize; }
 
-	inline entry& operator[] (const board& b) {
-		u64 min = b.raw;
+	inline position& operator[] (const board& b) {
+		u64 x = b.raw;
 		for (u32 i = 1; i < 8; i++) {
-			board iso = b; iso.isomorphic(i);
-			min = std::min(min, iso.raw);
+			board t = b; t.isomorphic(i);
+			x = std::min(x, t.raw);
 		}
-		entry& en = cache[zhash(min) % size];
-		return en.pass(min);
+		auto& data = cache[zhash(x) % zsize];
+
+		if (!data) return data(x);
+		if (!std::isnan(data.esti)) {
+			if (data == x || data.info == 0) return data(x);
+			if (total >= limit)              return data(x);
+
+			auto buff = cast<position*>(calloc(2, sizeof(position)));
+			buff[0] = data;
+			data(cast<uintptr_t>(buff)).save(0.0 / 0.0, 1);
+			total += 2;
+			return buff[1](x);
+		}
+
+		auto& list = raw_cast<position*>(data.sign);
+		auto& last = raw_cast<u16>(data.depth);
+		auto  size = last + 1;
+		for (auto it = list; it != list + size; it++)
+			if ((*it) == x) return (*it)(x);
+		if (size != (1 << math::ones16(last))) return list[++last](x);
+
+		for (auto it = list; it != list + last; it++)
+			if (*(it) < *(it + 1)) std::swap(*(it), *(it + 1));
+		auto hit = 0;
+		auto min = list[last].info;
+		for (auto it = list; it != list + size; it++) {
+			hit += it->info;
+			it->info -= min;
+		}
+		if (total >= limit || size == 65536) return list[last](x);
+		if (min <= (hit / (size + size)))    return list[last](x);
+
+		list = cast<position*>(realloc(list, sizeof(position) * (size * 2)));
+		total += size;
+		return list[++last](x);
 	}
 
-	void init(const size_t& len) {
+	void init(size_t len, size_t lim = 0) {
 		if (cache) delete[] cache;
-		cache = alloc(size = len);
+		cache = alloc(zsize = std::max(len, 1ull));
+		limit = lim;
 	}
 
     friend std::ostream& operator <<(std::ostream& out, const transposition& tp) {
-    	auto& zhash = tp.zhash;
-    	auto& cache = tp.cache;
-    	auto& size = tp.size;
+//    	auto& zhash = tp.zhash;
+//    	auto& cache = tp.cache;
+//    	auto& size = tp.size;
 		u32 code = 1;
 		write_cast<byte>(out, code);
 		switch (code) {
@@ -535,62 +575,67 @@ public:
 			std::cerr << "use default serial (1) instead" << std::endl;
 			// no break;
 		case 1:
-			out << zhash;
-			write_cast<u64>(out, size);
-			for (u64 i = 0; i < size; i++) {
-				entry& en = cache[i];
-				write_cast<u64>(out, en.sign);
-				if (en.sign == 0) continue;
-				write_cast<f32>(out, en.esti);
-				write_cast<i16>(out, en.depth);
-				write_cast<u16>(out, en.info);
-			}
+//			out << zhash;
+//			write_cast<u64>(out, size);
+//			for (u64 i = 0; i < size; i++) {
+//				auto& data = cache[i];
+//				write_cast<u32>(out, data.size());
+//				for (auto& en : data) {
+//					write_cast<u64>(out, en.sign);
+//					write_cast<f32>(out, en.esti);
+//					write_cast<i16>(out, en.depth);
+//					write_cast<u16>(out, en.info);
+//				}
+//			}
 			break;
 		}
 		return out;
 	}
 	friend std::istream& operator >>(std::istream& in, transposition& tp) {
-    	auto& zhash = tp.zhash;
-    	auto& cache = tp.cache;
-    	auto& size = tp.size;
-    	u64 tpbit, limit;
+//    	auto& zhash = tp.zhash;
+//    	auto& cache = tp.cache;
+//    	auto& size = tp.size;
 		u32 code = 0;
 		read_cast<byte>(in, code);
 		switch (code) {
-		case 0:
-			in >> zhash;
-			read_cast<u32>(in, tpbit);
-			read_cast<u32>(in, limit);
-			size = (1ULL << tpbit) * limit;
-			cache = alloc(size);
-			for (u64 hit, raw, s = 0; s < (1ULL << tpbit); s++) {
-				read_cast<u64>(in, hit);
-				for (hit = std::min(hit, limit); hit; hit--) {
-					read_cast<u64>(in, raw);
-					entry& en = tp[raw];
-					read_cast<i32>(in, en.depth);
-					read_cast<f32>(in, en.esti);
-				}
-			}
-			break;
 		case 1:
-			in >> zhash;
-			read_cast<u64>(in, size);
-			cache = alloc(size);
-			for (u64 i = 0; i < size; i++) {
-				entry& en = cache[i];
-				read_cast<u64>(in, en.sign);
-				if (en.sign == 0) continue;
-				read_cast<f32>(in, en.esti);
-				read_cast<i16>(in, en.depth);
-				read_cast<u16>(in, en.info);
-			}
+//			in >> zhash;
+//			read_cast<u64>(in, size);
+//			cache = alloc(size);
+//			for (u64 i = 0; i < size; i++) {
+//				auto& data = cache[i];
+//				read_cast<u32>(in, code);
+//				while (code--) {
+//					data.emplace_back();
+//					auto& en = data.back();
+//					read_cast<u64>(in, en.sign);
+//					read_cast<f32>(in, en.esti);
+//					read_cast<i16>(in, en.depth);
+//					read_cast<u16>(in, en.info);
+//				}
+//			}
 			break;
 		default:
 			std::cerr << "unknown serial at transposition::<<" << std::endl;
 			break;
 		}
 		return in;
+	}
+
+	void stat() {
+		std::vector<u64> uu; uu.emplace_back(0);
+		for (u64 i = 0; i < zsize; i++) {
+			auto& h = cache[i];
+			if (std::isnan(h.esti)) {
+				u32 size = h.depth + 1;
+				while (uu.size() < size + 1) uu.emplace_back(0);
+				uu[size]++;
+			} else {
+				uu[h.sign ? 1 : 0]++;
+			}
+		}
+		for (u32 i = 0; i < uu.size(); i++)
+			std::cout << i << "\t" << uu[i] << std::endl;
 	}
 
 	static void load(std::istream& in) { in >> instance(); }
@@ -600,13 +645,15 @@ public:
 		static transposition tp; return tp;
 	}
 
-	static inline entry& find(const board& b) { return instance()[b]; }
-	static inline entry* alloc(size_t len) { return new entry[len](); }
+	static inline position& find(const board& b) { return instance()[b]; }
+	static inline position* alloc(size_t len) { return new position[len](); }
 
 private:
 	zhasher zhash;
-	entry* cache;
-	size_t size;
+	position* cache;
+	size_t zsize;
+	size_t limit;
+	size_t total;
 };
 
 namespace utils {
@@ -1518,22 +1565,35 @@ inline numeric update(const board& state, const numeric& updv,
 void make_transposition(const std::string& res = "") {
 	std::string in(res);
 	if (in.empty() && transposition::instance().length() == 0) in = "default";
-	if (in == "default") in = "4G";
+	if (in == "default") in = "2G+2G";
 
 	if (in.size()) {
-		u64 size = 0;
-		if (!std::isdigit(in.back())) {
-			size = std::stoll(in.substr(0, in.size() - 1));
-			switch (in.back()) {
-			case 'K': size *= (1ULL << 10); break;
-			case 'M': size *= (1ULL << 20); break;
-			case 'G': size *= (1ULL << 30); break;
+		u64 len = 0;
+		u64 lim = 0;
+		auto rebase = [](u64 v, char c) -> u64 {
+			switch (c) {
+			case 'K': v *= (1ULL << 10); break;
+			case 'M': v *= (1ULL << 20); break;
+			case 'G': v *= (1ULL << 30); break;
 			}
-			size /= sizeof(transposition::entry);
-		} else {
-			size = std::stoll(in);
+			return v;
+		};
+		if (in.find('+') != std::string::npos) {
+			std::string il = in.substr(in.find('+') + 1);
+			if (!std::isdigit(il.back())) {
+				lim = std::stoll(il.substr(0, il.size() - 1));
+				lim = rebase(lim, il.back()) / sizeof(transposition::position);
+			} else {
+				lim = std::stoll(il);
+			}
 		}
-		transposition::instance().init(size);
+		if (!std::isdigit(in.back())) {
+			len = std::stoll(in.substr(0, in.size() - 1));
+			len = rebase(len, in.back()) / sizeof(transposition::position);
+		} else {
+			len = std::stoll(in);
+		}
+		transposition::instance().init(len, lim);
 	}
 }
 bool load_transposition(const std::string& path) {
@@ -2135,7 +2195,7 @@ int main(int argc, const char* argv[]) {
 	if (test) stats.summary();
 
 	utils::save_transposition(opts["cache-output"]);
-
+	transposition::instance().stat();
 
 	std::cout << std::endl;
 
