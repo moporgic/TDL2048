@@ -516,7 +516,7 @@ public:
 
 	inline position& operator[] (const board& b) {
 		auto x = u64(b);
-		for (u32 i = 1; i < 8; i++) {
+		for (auto i = 1; i < 8; i++) {
 			board t = b; t.isomorphic(i);
 			x = std::min(x, u64(t));
 		}
@@ -564,9 +564,11 @@ public:
 	}
 
     friend std::ostream& operator <<(std::ostream& out, const transposition& tp) {
-//    	auto& zhash = tp.zhash;
-//    	auto& cache = tp.cache;
-//    	auto& size = tp.size;
+    	auto& zhash = tp.zhash;
+    	auto& cache = tp.cache;
+    	auto& zsize = tp.zsize;
+    	auto& limit = tp.limit;
+    	auto& total = tp.total;
 		u32 code = 1;
 		write_cast<byte>(out, code);
 		switch (code) {
@@ -575,45 +577,67 @@ public:
 			std::cerr << "use default serial (1) instead" << std::endl;
 			// no break;
 		case 1:
-//			out << zhash;
-//			write_cast<u64>(out, size);
-//			for (u64 i = 0; i < size; i++) {
-//				auto& data = cache[i];
-//				write_cast<u32>(out, data.size());
-//				for (auto& en : data) {
-//					write_cast<u64>(out, en.sign);
-//					write_cast<f32>(out, en.esti);
-//					write_cast<i16>(out, en.depth);
-//					write_cast<u16>(out, en.info);
-//				}
-//			}
+			out << zhash;
+			write_cast<u64>(out, zsize);
+			write_cast<u64>(out, limit);
+			write_cast<u64>(out, total);
+			for (u64 i = 0; i < zsize; i++) {
+				auto& data = cache[i];
+				write_cast<u64>(out, data.sign);
+				if (!data.sign) continue;
+				write_cast<f32>(out, data.esti);
+				write_cast<i16>(out, data.depth);
+				write_cast<u16>(out, data.info);
+				if (!std::isnan(data.esti)) continue;
+
+				auto size = u16(data.depth) + 1u;
+				auto list = cast<position*>(data.sign);
+				std::sort(list, list + size, std::greater<position>());
+				for (auto it = list; it != list + size; it++) {
+					write_cast<u64>(out, it->sign);
+					write_cast<f32>(out, it->esti);
+					write_cast<i16>(out, it->depth);
+					write_cast<u16>(out, it->info);
+				}
+			}
 			break;
 		}
 		return out;
 	}
 	friend std::istream& operator >>(std::istream& in, transposition& tp) {
-//    	auto& zhash = tp.zhash;
-//    	auto& cache = tp.cache;
-//    	auto& size = tp.size;
+    	auto& zhash = tp.zhash;
+    	auto& cache = tp.cache;
+    	auto& zsize = tp.zsize;
+    	auto& limit = tp.limit;
+    	auto& total = tp.total;
 		u32 code = 0;
 		read_cast<byte>(in, code);
 		switch (code) {
 		case 1:
-//			in >> zhash;
-//			read_cast<u64>(in, size);
-//			cache = alloc(size);
-//			for (u64 i = 0; i < size; i++) {
-//				auto& data = cache[i];
-//				read_cast<u32>(in, code);
-//				while (code--) {
-//					data.emplace_back();
-//					auto& en = data.back();
-//					read_cast<u64>(in, en.sign);
-//					read_cast<f32>(in, en.esti);
-//					read_cast<i16>(in, en.depth);
-//					read_cast<u16>(in, en.info);
-//				}
-//			}
+			in >> zhash;
+			read_cast<u64>(in, zsize);
+			read_cast<u64>(in, limit);
+			read_cast<u64>(in, total);
+			cache = alloc(zsize);
+			for (u64 i = 0; i < zsize; i++) {
+				auto& data = cache[i];
+				read_cast<u64>(in, data.sign);
+				if (!data.sign) continue;
+				read_cast<f32>(in, data.esti);
+				read_cast<i16>(in, data.depth);
+				read_cast<u16>(in, data.info);
+				if (!std::isnan(data.esti)) continue;
+
+				auto size = u16(data.depth) + 1u;
+				auto list = cast<position*>(malloc(sizeof(position) * (2 << math::lg(size - 1))));
+				data.sign = cast<uintptr_t>(list);
+				for (auto it = list; it != list + size; it++) {
+					read_cast<u64>(in, it->sign);
+					read_cast<f32>(in, it->esti);
+					read_cast<i16>(in, it->depth);
+					read_cast<u16>(in, it->info);
+				}
+			}
 			break;
 		default:
 			std::cerr << "unknown serial at transposition::<<" << std::endl;
