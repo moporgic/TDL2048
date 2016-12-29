@@ -515,10 +515,10 @@ public:
 	inline size_t length() const { return zsize; }
 
 	inline position& operator[] (const board& b) {
-		u64 x = b.raw;
+		auto x = u64(b);
 		for (u32 i = 1; i < 8; i++) {
 			board t = b; t.isomorphic(i);
-			x = std::min(x, t.raw);
+			x = std::min(x, u64(t));
 		}
 		auto& data = cache[zhash(x) % zsize];
 
@@ -527,11 +527,11 @@ public:
 			if (data == x || data.info == 0) return data(x);
 			if (total >= limit)              return data(x);
 
-			auto buff = cast<position*>(calloc(2, sizeof(position)));
-			buff[0] = data;
-			data(cast<uintptr_t>(buff)).save(0.0 / 0.0, 1);
+			auto list = cast<position*>(malloc(sizeof(position) * 2));
+			list[0] = data;
+			data(cast<uintptr_t>(list)).save(0.0 / 0.0, 1);
 			total += 2;
-			return buff[1](x);
+			return list[1](x);
 		}
 
 		auto& list = raw_cast<position*>(data.sign);
