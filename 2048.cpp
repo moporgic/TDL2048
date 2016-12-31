@@ -472,6 +472,87 @@ private:
 	u64 seedb;
 };
 
+class segment {
+public:
+	class piece {
+	friend class segment;
+	public:
+		inline piece(const piece& i) = default;
+		inline piece(byte* alloc = nullptr, size_t space = 0) : alloc(alloc), space(space) {}
+
+		template<typename pointer>
+		inline operator pointer() { return cast<pointer>(alloc); }
+		inline operator byte*()   { return alloc; }
+		inline operator bool()    { return alloc && space; }
+
+		inline size_t size()  const { return space; }
+		inline byte*  begin() const { return alloc; }
+		inline byte*  end()   const { return alloc + space; }
+
+		inline bool operator <(const piece& i) const { return alloc < i.alloc; }
+		inline bool operator >(const piece& i) const { return alloc > i.alloc; }
+
+	private:
+		byte*  alloc;
+		size_t space;
+	};
+	typedef std::list<piece> plist;
+
+	segment(size_t size) : data(new byte[size]), size(size) {
+		free.emplace_back(data,  size);
+		free.emplace_back(data + size);
+	}
+	~segment() { delete[] data; }
+
+	template<typename pointer = piece>
+	pointer allocate(size_t space) {
+		for (auto it = free.begin(); it != free.end(); it++) {
+			if (it->space >= space) {
+				byte* alloc = it->alloc;
+				it->alloc += space;
+				it->space -= space;
+				if (it->space == 0) free.erase(it);
+				return piece(alloc, space);
+			}
+		}
+		return piece();
+	}
+
+	template<typename pointer = piece>
+	pointer release(void* alloc, size_t space) {
+		piece tok(cast<byte*>(alloc), space);
+		auto it = std::lower_bound(free.begin(), free.end(), tok);
+		auto pt = it; pt--;
+		if (it != free.begin() && pt->end() == tok.begin()) { // -=
+			pt->space += tok.space;
+			if (pt->end() == it->begin() && it->size()) { // -=-
+				pt->space += it->space;
+				tok.space += it->space;
+				free.erase(it);
+			}
+		} else if (tok.end() == it->begin() && it->size()) { // =-
+			it->alloc -= tok.space;
+			it->space += tok.space;
+		} else { // = -
+			free.insert(it, tok);
+		}
+		return piece(tok.end());
+	}
+
+	size_t capacity() const { return size; }
+
+	void clear() {
+		free.clear();
+		free.emplace_back(data, size);
+		free.emplace_back(data + size);
+	}
+
+private:
+	byte*  data;
+	size_t size;
+	plist  free;
+};
+
 class transposition {
 public:
 	class position {
@@ -510,9 +591,22 @@ public:
 		}
 	};
 
-	transposition() : zhash(), cache(nullptr), zsize(0), limit(0), total(0) {}
+	transposition() : zhash(), cache(nullptr), mpool(nullptr), zsize(0), limit(0), total(0) {}
 	~transposition() { if (cache) delete[] cache; }
 	inline size_t length() const { return zsize; }
+
+	inline position* allocate(size_t num) {
+//		return cast<position*>(malloc(num));
+		return mpool->allocate<position*>(sizeof(position) * num);
+	}
+	inline position* reallocate(position* pos, size_t now) {
+//		return cast<position*>(realloc(pos, num));
+		auto alloc = mpool->allocate<position*>(sizeof(position) * (now + now));
+		if (!alloc) return nullptr;
+		std::copy_n(pos, now, alloc);
+		mpool->release(pos, sizeof(position) * now);
+		return alloc;
+	}
 
 	inline position& operator[] (const board& b) {
 		auto x = u64(b);
@@ -527,7 +621,8 @@ public:
 			if (data == x || data.info == 0) return data(x);
 			if (total >= limit)              return data(x);
 
-			auto list = cast<position*>(malloc(sizeof(position) * 2));
+			auto list = allocate(2);
+			if (!list) return data(x);
 			list[0] = data;
 			data(cast<uintptr_t>(list)).save(0.0 / 0.0, 1);
 			total += 2;
@@ -552,7 +647,9 @@ public:
 		if (total >= limit || size == 65536) return list[last](x);
 		if (mini  <= (hits / (size + size))) return list[last](x);
 
-		list = cast<position*>(realloc(list, sizeof(position) * (size * 2)));
+		auto temp = reallocate(list, size);
+		if (!temp) return list[last](x);
+		list = temp;
 		total += size;
 		return list[++last](x);
 	}
@@ -560,7 +657,7 @@ public:
 	void init(size_t len, size_t lim = 0) {
 		if (cache) delete[] cache;
 		cache = alloc(zsize = std::max(len, 1ull));
-		limit = lim;
+		mpool = new segment(sizeof(position) * (limit = lim));
 	}
 
     friend std::ostream& operator <<(std::ostream& out, const transposition& tp) {
@@ -607,6 +704,7 @@ public:
 	friend std::istream& operator >>(std::istream& in, transposition& tp) {
     	auto& zhash = tp.zhash;
     	auto& cache = tp.cache;
+    	auto& mpool = tp.mpool;
     	auto& zsize = tp.zsize;
     	auto& limit = tp.limit;
     	auto& total = tp.total;
@@ -619,6 +717,7 @@ public:
 			read_cast<u64>(in, limit);
 			read_cast<u64>(in, total);
 			cache = alloc(zsize);
+			mpool = new segment(sizeof(position) * limit);
 			for (u64 i = 0; i < zsize; i++) {
 				auto& data = cache[i];
 				read_cast<u64>(in, data.sign);
@@ -629,7 +728,7 @@ public:
 				if (!std::isnan(data.esti)) continue;
 
 				auto size = u16(data.depth) + 1u;
-				auto list = cast<position*>(malloc(sizeof(position) * (2 << math::lg(size - 1))));
+				auto list = tp.allocate((2 << math::lg(size - 1)));
 				data.sign = cast<uintptr_t>(list);
 				for (auto it = list; it != list + size; it++) {
 					read_cast<u64>(in, it->sign);
@@ -677,6 +776,7 @@ public:
 private:
 	zhasher zhash;
 	position* cache;
+	segment* mpool;
 	size_t zsize;
 	size_t limit;
 	size_t total;
@@ -2221,6 +2321,7 @@ int main(int argc, const char* argv[]) {
 	if (test) stats.summary();
 
 	utils::save_transposition(opts["cache-output"]);
+	transposition::instance().summary();
 
 	std::cout << std::endl;
 
