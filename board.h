@@ -1,10 +1,4 @@
 #pragma once
-//============================================================================
-// Name        : board.h
-// Author      : Hung Guei
-// Version     : 3.2
-// Description : bitboard of 2048
-//============================================================================
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
@@ -13,6 +7,13 @@
 #include <sstream>
 #include <cstdio>
 #include <array>
+
+//============================================================================
+// Name        : board.h
+// Author      : Hung Guei
+// Version     : 3.3
+// Description : bitboard of 2048
+//============================================================================
 
 namespace moporgic {
 
