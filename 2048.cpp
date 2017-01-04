@@ -498,11 +498,11 @@ public:
 	};
 	typedef std::list<piece> plist;
 
-	segment(size_t size) : data(new byte[size]), size(size) {
+	segment(byte* data = nullptr, size_t size = 0) : data(data), size(size) {
 		free.emplace_back(data,  size);
 		free.emplace_back(data + size);
 	}
-	~segment() { delete[] data; }
+	segment(const segment& seg) : data(seg.data), size(seg.size), free(seg.free) {}
 
 	template<typename pointer = piece>
 	pointer allocate(size_t space) {
@@ -591,22 +591,9 @@ public:
 		}
 	};
 
-	transposition() : zhash(), cache(nullptr), mpool(nullptr), zsize(0), limit(0), total(0) {}
+	transposition() : zhash(), cache(nullptr), mpool(), zsize(0), limit(0), total(0) {}
 	~transposition() { if (cache) delete[] cache; }
 	inline size_t length() const { return zsize; }
-
-	inline position* allocate(size_t num) {
-//		return cast<position*>(malloc(num));
-		return mpool->allocate<position*>(sizeof(position) * num);
-	}
-	inline position* reallocate(position* pos, size_t now) {
-//		return cast<position*>(realloc(pos, num));
-		auto alloc = mpool->allocate<position*>(sizeof(position) * (now + now));
-		if (!alloc) return nullptr;
-		std::copy_n(pos, now, alloc);
-		mpool->release(pos, sizeof(position) * now);
-		return alloc;
-	}
 
 	inline position& operator[] (const board& b) {
 		auto x = u64(b);
@@ -614,18 +601,18 @@ public:
 			board t = b; t.isomorphic(i);
 			x = std::min(x, u64(t));
 		}
-		auto& data = cache[zhash(x) % zsize];
+		auto hash = zhash(x) % zsize;
 
+		auto& data = cache[hash];
 		if (!data) return data(x);
 		if (!std::isnan(data.esti)) {
-			if (data == x || data.info == 0) return data(x);
-			if (total >= limit)              return data(x);
+			if (data == x || !data.info) return data(x);
+			if (total >= limit)          return data(x);
 
 			auto list = allocate(2);
 			if (!list) return data(x);
 			list[0] = data;
 			data(cast<uintptr_t>(list)).save(0.0 / 0.0, 1);
-			total += 2;
 			return list[1](x);
 		}
 
@@ -650,14 +637,15 @@ public:
 		auto temp = reallocate(list, size);
 		if (!temp) return list[last](x);
 		list = temp;
-		total += size;
 		return list[++last](x);
 	}
 
 	void init(size_t len, size_t lim = 0) {
 		if (cache) delete[] cache;
-		cache = alloc(zsize = std::max(len, 1ull));
-		mpool = new segment(sizeof(position) * (limit = lim));
+		zsize = std::max(len, 1ull);
+		limit = lim;
+		cache = alloc(zsize);
+		mpool = segment(cast<byte*>(alloc(limit)), sizeof(position) * limit);
 	}
 
     friend std::ostream& operator <<(std::ostream& out, const transposition& tp) {
@@ -714,10 +702,10 @@ public:
 		case 1:
 			in >> zhash;
 			read_cast<u64>(in, zsize);
-			read_cast<u64>(in, limit);
+			read_cast<u64>(in, limit); // TODO: limit/size modification on runtime
 			read_cast<u64>(in, total);
 			cache = alloc(zsize);
-			mpool = new segment(sizeof(position) * limit);
+			mpool = segment(cast<byte*>(alloc(limit)), sizeof(position) * limit);
 			for (u64 i = 0; i < zsize; i++) {
 				auto& data = cache[i];
 				read_cast<u64>(in, data.sign);
@@ -766,17 +754,28 @@ public:
 	static void load(std::istream& in) { in >> instance(); }
 	static void save(std::ostream& out) { out << instance(); }
 
-	static inline transposition& instance() {
-		static transposition tp; return tp;
-	}
-
+	static inline transposition& instance() { static transposition tp; return tp; }
 	static inline position& find(const board& b) { return instance()[b]; }
+
+private:
+	inline position* allocate(size_t num) {
+		auto alloc = mpool.allocate<position*>(sizeof(position) * num);
+		if (alloc) total += num;
+		return alloc;
+	}
+	inline position* reallocate(position* pos, size_t now) {
+		auto alloc = allocate(now + now);
+		if (!alloc) return nullptr;
+		std::copy_n(pos, now, alloc);
+		mpool.release(pos, sizeof(position) * now);
+		return alloc;
+	}
 	static inline position* alloc(size_t len) { return new position[len](); }
 
 private:
 	zhasher zhash;
 	position* cache;
-	segment* mpool;
+	segment mpool;
 	size_t zsize;
 	size_t limit;
 	size_t total;
