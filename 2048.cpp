@@ -34,7 +34,7 @@ namespace moporgic {
 
 typedef float numeric;
 numeric alpha = 0.0025;
-std::array<u32, 16> depthp = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
+std::array<u32, 16> depth = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
 
 class weight {
 public:
@@ -502,7 +502,7 @@ public:
 		free.emplace_back(data,  size);
 		free.emplace_back(data + size);
 	}
-	segment(const segment& seg) : data(seg.data), size(seg.size), free(seg.free) {}
+	segment(const segment& seg) = default;
 
 	template<typename pointer = piece>
 	pointer allocate(size_t space) {
@@ -609,7 +609,7 @@ public:
 			if (data == x || !data.info) return data(x);
 			if (total >= limit)          return data(x);
 
-			auto list = allocate(2);
+			auto list = mpool_alloc(2);
 			if (!list) return data(x);
 			list[0] = data;
 			data(cast<uintptr_t>(list)).save(0.0 / 0.0, 1);
@@ -634,7 +634,7 @@ public:
 		if (total >= limit || size == 65536) return list[last](x);
 		if (mini  <= (hits / (size + size))) return list[last](x);
 
-		auto temp = reallocate(list, size);
+		auto temp = mpool_realloc(list, size);
 		if (!temp) return list[last](x);
 		list = temp;
 		return list[++last](x);
@@ -716,7 +716,7 @@ public:
 				if (!std::isnan(data.esti)) continue;
 
 				auto size = u16(data.depth) + 1u;
-				auto list = tp.allocate((2 << math::lg(size - 1)));
+				auto list = tp.mpool_alloc((2 << math::lg(size - 1)));
 				data.sign = cast<uintptr_t>(list);
 				for (auto it = list; it != list + size; it++) {
 					read_cast<u64>(in, it->sign);
@@ -735,20 +735,10 @@ public:
 
 	void summary() {
 		std::cout << "summary" << std::endl;
-		std::vector<u64> uu; uu.emplace_back(0);
-		for (u64 i = 0; i < zsize; i++) {
-			auto& h = cache[i];
-			if (std::isnan(h.esti)) {
-				u32 size = u16(h.depth) + 1;
-				while (uu.size() < size + 1) uu.emplace_back(0);
-				uu[size]++;
-			} else {
-				uu[h.sign ? 1 : 0]++;
-			}
-		}
+		std::vector<u64> stat = count();
 		std::cout << "used" "\t" "count" << std::endl;
-		for (u32 i = 0; i < uu.size(); i++)
-			std::cout << i << "\t" << uu[i] << std::endl;
+		for (u32 i = 0; i < stat.size(); i++)
+			std::cout << i << "\t" << stat[i] << std::endl;
 	}
 
 	static void load(std::istream& in) { in >> instance(); }
@@ -758,19 +748,38 @@ public:
 	static inline position& find(const board& b) { return instance()[b]; }
 
 private:
-	inline position* allocate(size_t num) {
+	inline position* mpool_alloc(size_t num) {
 		auto alloc = mpool.allocate<position*>(sizeof(position) * num);
 		if (alloc) total += num;
 		return alloc;
 	}
-	inline position* reallocate(position* pos, size_t now) {
-		auto alloc = allocate(now + now);
+	inline position* mpool_realloc(position* pos, size_t now) {
+		auto alloc = mpool_alloc(now + now);
 		if (!alloc) return nullptr;
-		std::copy_n(pos, now, alloc);
-		mpool.release(pos, sizeof(position) * now);
+		std::copy(pos, pos + now, alloc);
+		mpool_free(pos, now);
 		return alloc;
 	}
+	inline position* mpool_free(position* pos, size_t now) {
+		return mpool.release(pos, sizeof(position) * now);
+	}
 	static inline position* alloc(size_t len) { return new position[len](); }
+
+	std::vector<u64> count() const {
+		std::vector<u64> stat;
+		stat.emplace_back(0);
+		for (u64 i = 0; i < zsize; i++) {
+			auto& h = cache[i];
+			if (std::isnan(h.esti)) {
+				u32 size = u16(h.depth) + 1;
+				while (stat.size() < size + 1) stat.emplace_back(0);
+				stat[size]++;
+			} else {
+				stat[h.sign ? 1 : 0]++;
+			}
+		}
+		return stat;
+	}
 
 private:
 	zhasher zhash;
@@ -1919,7 +1928,7 @@ struct select {
 };
 struct search : select {
 	std::array<u32, 16> policy;
-	search(const std::array<u32, 16>& p = moporgic::depthp) : select(), policy(p) {}
+	search(const std::array<u32, 16>& p = moporgic::depth) : select(), policy(p) {}
 
 	inline select& operator ()(const board& b) {
 		return operator ()(b, feature::begin(), feature::end());
@@ -2184,7 +2193,7 @@ int main(int argc, const char* argv[]) {
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = moporgic::alpha;
-	auto& depthp = moporgic::depthp;
+	auto& depth = moporgic::depth;
 
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
@@ -2192,10 +2201,10 @@ int main(int argc, const char* argv[]) {
 	if (opts("train")) train = std::stol(opts["train"]);
 	if (opts("test")) test = std::stol(opts["test"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
-	if (opts("depth")) depthp.fill(std::stol(opts["depth"]));
+	if (opts("depth")) depth.fill(std::stol(opts["depth"]));
 	if (opts("depth-dynamic")) {
 		std::string dyndepth(opts["depth-dynamic"]);
-		for (u32 depth = 0, e = 0; e < 16; depthp[e++] = depth) {
+		for (u32 depth = 0, e = 0; e < 16; depth[e++] = depth) {
 			if (dyndepth.empty()) continue;
 			auto it = dyndepth.find_first_of(", ");
 			depth = std::stol(dyndepth.substr(0, it));
@@ -2214,7 +2223,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
 	std::cout << "depth = ";
-	std::copy(depthp.begin(), depthp.end(), std::ostream_iterator<u32>(std::cout, " "));
+	std::copy(depth.begin(), depth.end(), std::ostream_iterator<u32>(std::cout, " "));
 	std::cout << std::endl;
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
