@@ -2150,11 +2150,9 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-d"):
 		case to_hash("--depth"):
-			opts["depth"] = find_opt(i, nullptr);
-			break;
 		case to_hash("-dd"):
 		case to_hash("--depth-dynamic"):
-			opts["depth-dynamic"] = find_opts(i, ',');
+			opts["depth"] = find_opts(i, ',');
 			break;
 		case to_hash("-tp"):
 		case to_hash("--cache"):
@@ -2201,9 +2199,8 @@ int main(int argc, const char* argv[]) {
 	if (opts("train")) train = std::stol(opts["train"]);
 	if (opts("test")) test = std::stol(opts["test"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
-	if (opts("depth")) depth.fill(std::stol(opts["depth"]));
-	if (opts("depth-dynamic")) {
-		std::string dyndepth(opts["depth-dynamic"]);
+	if (opts("depth")) {
+		std::string dyndepth(opts["depth"]);
 		for (u32 depth = 0, e = 0; e < 16; depth[e++] = depth) {
 			if (dyndepth.empty()) continue;
 			auto it = dyndepth.find_first_of(", ");
