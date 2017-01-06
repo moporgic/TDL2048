@@ -159,7 +159,7 @@ public:
 		}
 	}
 
-	static weight make(const u32& sign, const size_t& size) {
+	static weight& make(const u32& sign, const size_t& size) {
 		wghts().push_back(weight(sign, size));
 		return wghts().back();
 	}
@@ -170,13 +170,13 @@ public:
 	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
 		return std::find_if(first, last, [=](const weight& w) { return w.sign() == sign; });
 	}
-	static inline weight at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+	static inline weight& at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
 		const auto it = find(sign, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("weight::at");
 	}
 	static inline iter erase(const iter& it) {
-		if (it->length) free(it->value);
+		if (it->value) free(it->value);
 		return wghts().erase(it);
 	}
 	static inline std::vector<weight> transfer(const iter& first = begin(), const iter& last = end()) {
@@ -216,7 +216,7 @@ public:
 	inline bool operator ==(const indexer& i) const { return id == i.id; }
 	inline bool operator !=(const indexer& i) const { return id != i.id; }
 
-	static indexer make(const u32& sign, mapper map) {
+	static indexer& make(const u32& sign, mapper map) {
 		idxrs().push_back(indexer(sign, map));
 		return idxrs().back();
 	}
@@ -227,7 +227,7 @@ public:
 	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
 		return std::find_if(first, last, [=](const indexer& i) { return i.sign() == sign; });
 	}
-	static inline indexer at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+	static inline indexer& at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
 		const auto it = find(sign, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("indexer::at");
@@ -323,7 +323,7 @@ public:
 		}
 	}
 
-	static feature make(const u32& wgt, const u32& idx) {
+	static feature& make(const u32& wgt, const u32& idx) {
 		feats().push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
@@ -335,7 +335,7 @@ public:
 		return std::find_if(first, last,
 			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
 	}
-	static feature at(const u32& wgt, const u32& idx, const iter& first = begin(), const iter& last = end()) {
+	static feature& at(const u32& wgt, const u32& idx, const iter& first = begin(), const iter& last = end()) {
 		const auto it = find(wgt, idx, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("feature::at");
