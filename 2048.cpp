@@ -498,11 +498,11 @@ public:
 	};
 	typedef std::list<piece> plist;
 
-	segment(byte* data = nullptr, size_t size = 0) : data(data), size(size) {
+	segment(byte* data, size_t size) : data(data), size(size) {
 		free.emplace_back(data,  size);
 		free.emplace_back(data + size);
 	}
-	segment(const segment& seg) = default;
+	segment(const segment& seg) = delete;
 
 	template<typename pointer = piece>
 	pointer allocate(size_t space) {
@@ -591,9 +591,11 @@ public:
 		}
 	};
 
-	transposition() : zhash(), cache(nullptr), mpool(), zsize(0), limit(0), total(0) {}
-	~transposition() { if (cache) delete[] cache; }
+	transposition() : zhash(), cache(nullptr), mpool(nullptr), zsize(0), limit(0) {}
+	transposition(const transposition& tp) = default;
+	~transposition() {}
 	inline size_t length() const { return zsize; }
+	inline size_t size() const { return zsize + limit; }
 
 	inline position& operator[] (const board& b) {
 		auto x = u64(b);
@@ -607,8 +609,6 @@ public:
 		if (!data) return data(x);
 		if (!std::isnan(data.esti)) {
 			if (data == x || !data.info) return data(x);
-			if (total >= limit)          return data(x);
-
 			auto list = mpool_alloc(2);
 			if (!list) return data(x);
 			list[0] = data;
@@ -625,14 +625,14 @@ public:
 
 		for (auto it = list; it != list + last; it++)
 			if (*(it) < *(it + 1)) std::swap(*(it), *(it + 1));
-		auto hits = 0;
 		auto mini = list[last].info;
+		auto hits = 0;
 		for (auto it = list; it != list + size; it++) {
 			hits += it->info;
 			it->info -= mini;
 		}
-		if (total >= limit || size == 65536) return list[last](x);
-		if (mini  <= (hits / (size + size))) return list[last](x);
+		if (mini <= (hits / (size * 2))) return list[last](x);
+		if (size == 65536)               return list[last](x);
 
 		auto temp = mpool_realloc(list, size);
 		if (!temp) return list[last](x);
@@ -640,20 +640,11 @@ public:
 		return list[++last](x);
 	}
 
-	void init(size_t len, size_t lim = 0) {
-		if (cache) delete[] cache;
-		zsize = std::max(len, 1ull);
-		limit = lim;
-		cache = alloc(zsize);
-		mpool = segment(cast<byte*>(alloc(limit)), sizeof(position) * limit);
-	}
-
     friend std::ostream& operator <<(std::ostream& out, const transposition& tp) {
     	auto& zhash = tp.zhash;
     	auto& cache = tp.cache;
     	auto& zsize = tp.zsize;
     	auto& limit = tp.limit;
-    	auto& total = tp.total;
 		u32 code = 1;
 		write_cast<byte>(out, code);
 		switch (code) {
@@ -665,7 +656,6 @@ public:
 			out << zhash;
 			write_cast<u64>(out, zsize);
 			write_cast<u64>(out, limit);
-			write_cast<u64>(out, total);
 			for (u64 i = 0; i < zsize; i++) {
 				auto& data = cache[i];
 				write_cast<u64>(out, data.sign);
@@ -695,7 +685,6 @@ public:
     	auto& mpool = tp.mpool;
     	auto& zsize = tp.zsize;
     	auto& limit = tp.limit;
-    	auto& total = tp.total;
 		u32 code = 0;
 		read_cast<byte>(in, code);
 		switch (code) {
@@ -703,9 +692,8 @@ public:
 			in >> zhash;
 			read_cast<u64>(in, zsize);
 			read_cast<u64>(in, limit); // TODO: limit/size modification on runtime
-			read_cast<u64>(in, total);
-			cache = alloc(zsize);
-			mpool = segment(cast<byte*>(alloc(limit)), sizeof(position) * limit);
+			cache = alloc(zsize + limit);
+			mpool = new segment(cast<byte*>(cache + zsize)), sizeof(position) * limit);
 			for (u64 i = 0; i < zsize; i++) {
 				auto& data = cache[i];
 				read_cast<u64>(in, data.sign);
@@ -744,14 +732,44 @@ public:
 	static void load(std::istream& in) { in >> instance(); }
 	static void save(std::ostream& out) { out << instance(); }
 
-	static inline transposition& instance() { static transposition tp; return tp; }
+	static transposition& make(size_t len, size_t lim = 0) {
+		trans().push_back(transposition(std::max(len, 1ull), lim));
+		return trans().back();
+	}
+	typedef std::vector<transposition>::iterator iter;
+	static inline const std::vector<transposition>& list() { return trans(); }
+	static inline iter begin() { return trans().begin(); }
+	static inline iter end()   { return trans().end(); }
+	static inline iter erase(const iter& it) {
+		if (it->mpool) delete it->mpool;
+		if (it->cache) free(it->cache);
+		return trans().erase(it);
+	}
+	static inline std::vector<transposition> transfer(const iter& first = begin(), const iter& last = end()) {
+		std::vector<transposition> tp(first, last);
+		trans().erase(first, last);
+		return tp;
+	}
+
+	static inline transposition& instance() { return trans().front(); }
 	static inline position& find(const board& b) { return instance()[b]; }
 
 private:
+	transposition(const size_t& len, const size_t& lim) : zsize(len), limit(lim) {
+		cache = alloc(zsize + limit);
+		mpool = new segment(cast<byte*>(cache + zsize)), sizeof(position) * limit);
+	}
+
+	static inline position* alloc(size_t len) { return new position[len](); }
+	static inline void free(position* alloc) { delete[] alloc; }
+
+	static inline std::vector<transposition>& trans() { static std::vector<transposition> tp; return tp; }
+
 	inline position* mpool_alloc(size_t num) {
-		auto alloc = mpool.allocate<position*>(sizeof(position) * num);
-		if (alloc) total += num;
-		return alloc;
+		return mpool->allocate<position*>(sizeof(position) * num);
+	}
+	inline position* mpool_free(position* pos, size_t now) {
+		return mpool->release(pos, sizeof(position) * now);
 	}
 	inline position* mpool_realloc(position* pos, size_t now) {
 		auto alloc = mpool_alloc(now + now);
@@ -760,11 +778,6 @@ private:
 		mpool_free(pos, now);
 		return alloc;
 	}
-	inline position* mpool_free(position* pos, size_t now) {
-		return mpool.release(pos, sizeof(position) * now);
-	}
-	static inline position* alloc(size_t len) { return new position[len](); }
-
 	std::vector<u64> count() const {
 		std::vector<u64> stat;
 		stat.emplace_back(0);
@@ -784,10 +797,9 @@ private:
 private:
 	zhasher zhash;
 	position* cache;
-	segment mpool;
+	segment*  mpool;
 	size_t zsize;
 	size_t limit;
-	size_t total;
 };
 
 namespace utils {
@@ -1701,9 +1713,9 @@ void make_transposition(const std::string& res = "") {
 	if (in.empty() && transposition::instance().length() == 0) in = "default";
 	if (in == "default") in = "2G+2G";
 
+	u64 len = 0;
+	u64 lim = 0;
 	if (in.size()) {
-		u64 len = 0;
-		u64 lim = 0;
 		auto rebase = [](u64 v, char c) -> u64 {
 			switch (c) {
 			case 'K': v *= (1ULL << 10); break;
@@ -1727,8 +1739,8 @@ void make_transposition(const std::string& res = "") {
 		} else {
 			len = std::stoll(in);
 		}
-		transposition::instance().init(len, lim);
 	}
+	transposition::make(len, lim);
 }
 bool load_transposition(const std::string& path) {
 	std::ifstream in;
