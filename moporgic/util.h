@@ -337,52 +337,52 @@ inline void post(const char *buf, unsigned len) {
 }
 
 template<typename type> inline
-std::ostream& write(std::ostream& out, const type& v) {
-	return out.write(reinterpret_cast<char*>(&const_cast<type&>(v)), sizeof(v));
+std::ostream& write(std::ostream& out, const type& v, const size_t& len = sizeof(type)) {
+	return out.write(reinterpret_cast<char*>(&const_cast<type&>(v)), len);
 }
 
 template<typename type> inline
-std::istream& read(std::istream& in, type& v) {
-	return in.read(reinterpret_cast<char*>(&v), sizeof(v));
+std::istream& read(std::istream& in, type& v, const size_t& len = sizeof(type)) {
+	return in.read(reinterpret_cast<char*>(&v), len);
 }
 
 template<typename type> inline
-std::ostream& write(std::ostream& out, const type* begin, const type* end) {
+std::ostream& write(std::ostream& out, const type* begin, const type* end, const size_t& len = sizeof(type)) {
 	for (type* value = const_cast<type*>(begin); value != end; value++)
-		write(out, *value);
+		write(out, *value, len);
 	return out;
 }
 
 template<typename type> inline
-std::istream& read(std::istream& in, const type* begin, const type* end) {
+std::istream& read(std::istream& in, const type* begin, const type* end, const size_t& len = sizeof(type)) {
 	for (type* value = const_cast<type*>(begin); value != end; value++)
-		read(in, *value);
+		read(in, *value, len);
 	return in;
 }
 
 template<typename cast, typename type> inline
-std::ostream& write_cast(std::ostream& out, const type& v) {
-	return write(out, cast(v));
+std::ostream& write_cast(std::ostream& out, const type& v, const size_t& len = sizeof(cast)) {
+	return write(out, cast(v), len);
 }
 
 template<typename cast, typename type> inline
-std::istream& read_cast(std::istream& in, type& v) {
-	cast buf; read(in, buf); v = buf;
+std::istream& read_cast(std::istream& in, type& v, const size_t& len = sizeof(cast)) {
+	cast buf; read(in, buf, len); v = buf;
 	return in;
 }
 
 template<typename cast, typename type> inline
-std::ostream& write_cast(std::ostream& out, const type* begin, const type* end) {
+std::ostream& write_cast(std::ostream& out, const type* begin, const type* end, const size_t& len = sizeof(cast)) {
 	for (type* value = const_cast<type*>(begin); value != end; value++)
-		write(out, cast(*value));
+		write(out, cast(*value), len);
 	return out;
 }
 
 template<typename cast, typename type> inline
-std::istream& read_cast(std::istream& in, const type* begin, const type* end) {
+std::istream& read_cast(std::istream& in, const type* begin, const type* end, const size_t& len = sizeof(cast)) {
 	cast buf;
 	for (type* value = const_cast<type*>(begin); value != end; *value = buf, value++)
-		read(in, buf);
+		read(in, buf, len);
 	return in;
 }
 
