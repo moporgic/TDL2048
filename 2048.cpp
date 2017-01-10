@@ -36,21 +36,25 @@ numeric alpha = 0.01;
 
 class weight {
 public:
-	weight() : id(0), length(0), value(nullptr), accum(nullptr), updvu(nullptr) {}
+	weight() : id(0), length(0), value(nullptr) {}
 	weight(const weight& w) = default;
 	~weight() {}
 
 	inline u64 sign() const { return id; }
 	inline u64 size() const { return length; }
-	inline numeric& operator [](const u64& i) { return value[i]; }
+	inline numeric& operator [](const u64& i) { return value[(i << 1) + i]; }
 	inline numeric& operator ()(const u64& i, const numeric& alpha, const numeric& error) {
-		numeric aupdv = alpha * error;
-//		numeric coher = std::abs(accum[i]) / updvu[i];
+		numeric  aupdv = alpha * error;
+//		numeric  coher = std::abs(accum[i]) / updvu[i];
 //		value[i] += std::isnan(coher) ? aupdv : (coher * aupdv);
-		value[i] += updvu[i] ? (std::abs(accum[i]) / updvu[i]) * aupdv : aupdv;
-		accum[i] += error;
-		updvu[i] += std::abs(error);
-		return value[i];
+		numeric* block = value + ((i << 1) + i);
+		numeric& value = block[0];
+		numeric& accum = block[1];
+		numeric& updvu = block[2];
+		value += updvu ? (std::abs(accum) / updvu) * aupdv : aupdv;
+		accum += error;
+		updvu += std::abs(error);
+		return value;
 	}
 
 	inline bool operator ==(const weight& w) const { return id == w.id; }
@@ -60,29 +64,23 @@ public:
     	auto& id = w.id;
     	auto& length = w.length;
     	auto& value = w.value;
-    	auto& accum = w.accum;
-    	auto& updvu = w.updvu;
 		u32 code = 128;
 		write_cast<byte>(out, code);
 		switch (code) {
-		case 127:
-			write_cast<u32>(out, id);
-			write_cast<u64>(out, length);
-			write_cast<u16>(out, sizeof(numeric));
-			write_cast<numeric>(out, value, value + length);
-			write_cast<numeric>(out, accum, accum + length);
-			write_cast<numeric>(out, updvu, updvu + length);
-			break;
 		case 128:
 			write_cast<u32>(out, id);
 			write_cast<u32>(out, 0);
 			write_cast<u16>(out, sizeof(numeric));
 			write_cast<u64>(out, length);
-			write_cast<numeric>(out, value, value + length);
+			for (size_t i = 0; i < length; i++) {
+				write_cast<numeric>(out, value[i * 3 + 0]);
+			}
 			write_cast<u16>(out, sizeof(numeric));
 			write_cast<u64>(out, length + length);
-			write_cast<numeric>(out, accum, accum + length);
-			write_cast<numeric>(out, updvu, updvu + length);
+			for (size_t i = 0; i < length; i++) {
+				write_cast<numeric>(out, value[i * 3 + 1]); // accum
+				write_cast<numeric>(out, value[i * 3 + 2]); // updvu
+			}
 			write_cast<u16>(out, 0);
 			break;
 		default:
@@ -104,8 +102,6 @@ public:
     	auto& id = w.id;
     	auto& length = w.length;
     	auto& value = w.value;
-    	auto& accum = w.accum;
-    	auto& updvu = w.updvu;
 		u32 code;
 		read_cast<byte>(in, code);
 		switch (code) {
@@ -113,41 +109,37 @@ public:
 		case 1:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
-			value = alloc(length);
-			accum = alloc(length);
-			updvu = alloc(length);
-			if (code == 0) read_cast<f32>(in, value, value + length);
-			if (code == 1) read_cast<f64>(in, value, value + length);
+			value = alloc(length * 3);
+			for (size_t i = 0; i < length; i++) {
+				if (code == 0) read_cast<f32>(in, value[i * 3 + 0]);
+				if (code == 1) read_cast<f64>(in, value[i * 3 + 0]);
+			}
 			break;
 		case 2:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
 			read_cast<u16>(in, code);
-			value = alloc(length);
-			accum = alloc(length);
-			updvu = alloc(length);
+			value = alloc(length * 3);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + length); break;
-			case 8: read_cast<f64>(in, value, value + length); break;
+			case 4: for (size_t i = 0; i < length; i++) read_cast<f32>(in, value[i * 3]); break;
+			case 8: for (size_t i = 0; i < length; i++) read_cast<f64>(in, value[i * 3]); break;
 			}
 			break;
 		case 127:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
-			value = alloc(length);
-			accum = alloc(length);
-			updvu = alloc(length);
+			value = alloc(length * 3);
 			read_cast<u16>(in, code);
 			switch (code) {
 			case 4:
-				read_cast<f32>(in, value, value + length);
-				read_cast<f32>(in, accum, accum + length);
-				read_cast<f32>(in, updvu, updvu + length);
+				for (size_t i = 0; i < length; i++) read_cast<f32>(in, value[i * 3 + 0]);
+				for (size_t i = 0; i < length; i++) read_cast<f32>(in, value[i * 3 + 1]); // accum
+				for (size_t i = 0; i < length; i++) read_cast<f32>(in, value[i * 3 + 2]); // updvu
 				break;
 			case 8:
-				read_cast<f64>(in, value, value + length);
-				read_cast<f64>(in, accum, accum + length);
-				read_cast<f64>(in, updvu, updvu + length);
+				for (size_t i = 0; i < length; i++) read_cast<f64>(in, value[i * 3 + 0]);
+				for (size_t i = 0; i < length; i++) read_cast<f64>(in, value[i * 3 + 1]); // accum
+				for (size_t i = 0; i < length; i++) read_cast<f64>(in, value[i * 3 + 2]); // updvu
 				break;
 			}
 			break;
@@ -156,27 +148,29 @@ public:
 			read_cast<u32>(in, code);
 			read_cast<u16>(in, code);
 			read_cast<u64>(in, length);
-			value = alloc(length);
-			accum = alloc(length);
-			updvu = alloc(length);
+			value = alloc(length * 3);
 			switch (code) {
 			case 4:
-				read_cast<f32>(in, value, value + length);
+				for (size_t i = 0; i < length; i++) read_cast<f32>(in, value[i * 3 + 0]);
 				break;
 			case 8:
-				read_cast<f64>(in, value, value + length);
+				for (size_t i = 0; i < length; i++) read_cast<f64>(in, value[i * 3 + 0]);
 				break;
 			}
 			read_cast<u16>(in, code);
 			in.ignore(8); // length of accum and updvu
 			switch (code) {
 			case 4:
-				read_cast<f32>(in, accum, accum + length);
-				read_cast<f32>(in, updvu, updvu + length);
+				for (size_t i = 0; i < length; i++) {
+					read_cast<f32>(in, value[i * 3 + 1]); // accum
+					read_cast<f32>(in, value[i * 3 + 2]); // updvu
+				}
 				break;
 			case 8:
-				read_cast<f64>(in, accum, accum + length);
-				read_cast<f64>(in, updvu, updvu + length);
+				for (size_t i = 0; i < length; i++) {
+					read_cast<f64>(in, value[i * 3 + 1]);
+					read_cast<f64>(in, value[i * 3 + 2]);
+				}
 				break;
 			}
 			while (read_cast<u16>(in, code) && code) {
@@ -193,12 +187,10 @@ public:
 			read_cast<u32>(in, code);
 			read_cast<u16>(in, code);
 			read_cast<u64>(in, length);
-			value = alloc(length);
-			accum = alloc(length);
-			updvu = alloc(length);
+			value = alloc(length * 3);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + length); break;
-			case 8: read_cast<f64>(in, value, value + length); break;
+			case 4: for (size_t i = 0; i < length; i++) read_cast<f32>(in, value[i * 3 + 0]); break;
+			case 8: for (size_t i = 0; i < length; i++) read_cast<f64>(in, value[i * 3 + 0]); break;
 			}
 			while (read_cast<u16>(in, code) && code) {
 				u64 skip; read_cast<u64>(in, skip);
@@ -258,8 +250,6 @@ public:
 	}
 	static inline iter erase(const iter& it) {
 		if (it->value) free(it->value);
-		if (it->accum) free(it->accum);
-		if (it->updvu) free(it->updvu);
 		return wghts().erase(it);
 	}
 	static inline std::vector<weight> transfer(const iter& first = begin(), const iter& last = end()) {
@@ -268,7 +258,7 @@ public:
 		return ws;
 	}
 private:
-	weight(const u32& sign, const size_t& size) : id(sign), length(size), value(alloc(size)), accum(alloc(size)), updvu(alloc(size)) {}
+	weight(const u32& sign, const size_t& size) : id(sign), length(size), value(alloc(size * 3)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
@@ -281,9 +271,6 @@ private:
 	u32 id;
 	size_t length;
 	numeric* value;
-
-	numeric* accum;
-	numeric* updvu;
 };
 
 class indexer {
