@@ -62,7 +62,7 @@ public:
     	auto& value = w.value;
     	auto& accum = w.accum;
     	auto& updvu = w.updvu;
-		u32 code = 127;
+		u32 code = 128;
 		write_cast<byte>(out, code);
 		switch (code) {
 		case 127:
@@ -73,8 +73,29 @@ public:
 			write_cast<numeric>(out, accum, accum + length);
 			write_cast<numeric>(out, updvu, updvu + length);
 			break;
+		case 128:
+			write_cast<u32>(out, id);
+			write_cast<u32>(out, 0);
+			write_cast<u16>(out, sizeof(numeric));
+			write_cast<u64>(out, length);
+			write_cast<numeric>(out, value, value + length);
+			write_cast<u16>(out, sizeof(numeric));
+			write_cast<u64>(out, length + length);
+			write_cast<numeric>(out, accum, accum + length);
+			write_cast<numeric>(out, updvu, updvu + length);
+			write_cast<u16>(out, 0);
+			break;
 		default:
-			std::cerr << "unknown serial at out << weight" << std::endl;
+			std::cerr << "unknown serial at ostream << weight" << std::endl;
+			std::cerr << "use default serializer (4) instead..." << std::endl;
+			// no break
+		case 4:
+			write_cast<u32>(out, id);
+			write_cast<u32>(out, 0);
+			write_cast<u16>(out, sizeof(numeric));
+			write_cast<u64>(out, length);
+			write_cast<numeric>(out, value, value + length);
+			write_cast<u16>(out, 0);
 			break;
 		}
 		return out;
@@ -89,28 +110,22 @@ public:
 		read_cast<byte>(in, code);
 		switch (code) {
 		case 0:
-			read_cast<u32>(in, id);
-			read_cast<u64>(in, length);
-			value = alloc(length);
-			accum = alloc(length);
-			updvu = alloc(length);
-			read_cast<f32>(in, value, value + length);
-			break;
 		case 1:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
 			value = alloc(length);
 			accum = alloc(length);
 			updvu = alloc(length);
-			read_cast<f64>(in, value, value + length);
+			if (code == 0) read_cast<f32>(in, value, value + length);
+			if (code == 1) read_cast<f64>(in, value, value + length);
 			break;
 		case 2:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
+			read_cast<u16>(in, code);
 			value = alloc(length);
 			accum = alloc(length);
 			updvu = alloc(length);
-			read_cast<u16>(in, code);
 			switch (code) {
 			case 4: read_cast<f32>(in, value, value + length); break;
 			case 8: read_cast<f64>(in, value, value + length); break;
@@ -136,8 +151,59 @@ public:
 				break;
 			}
 			break;
+		case 128:
+			read_cast<u32>(in, id);
+			read_cast<u32>(in, code);
+			read_cast<u16>(in, code);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			accum = alloc(length);
+			updvu = alloc(length);
+			switch (code) {
+			case 4:
+				read_cast<f32>(in, value, value + length);
+				break;
+			case 8:
+				read_cast<f64>(in, value, value + length);
+				break;
+			}
+			read_cast<u16>(in, code);
+			in.ignore(8); // length of accum and updvu
+			switch (code) {
+			case 4:
+				read_cast<f32>(in, accum, accum + length);
+				read_cast<f32>(in, updvu, updvu + length);
+				break;
+			case 8:
+				read_cast<f64>(in, accum, accum + length);
+				read_cast<f64>(in, updvu, updvu + length);
+				break;
+			}
+			while (read_cast<u16>(in, code) && code) {
+				u64 skip; read_cast<u64>(in, skip);
+				in.ignore(code * skip);
+			}
+			break;
 		default:
-			std::cerr << "unknown serial at weight::<<" << std::endl;
+			std::cerr << "unknown serial at istream >> weight" << std::endl;
+			std::cerr << "use default deserializer (4) instead..." << std::endl;
+			// no break
+		case 4:
+			read_cast<u32>(in, id);
+			read_cast<u32>(in, code);
+			read_cast<u16>(in, code);
+			read_cast<u64>(in, length);
+			value = alloc(length);
+			accum = alloc(length);
+			updvu = alloc(length);
+			switch (code) {
+			case 4: read_cast<f32>(in, value, value + length); break;
+			case 8: read_cast<f64>(in, value, value + length); break;
+			}
+			while (read_cast<u16>(in, code) && code) {
+				u64 skip; read_cast<u64>(in, skip);
+				in.ignore(code * skip);
+			}
 			break;
 		}
 		return in;
@@ -147,13 +213,13 @@ public:
 		u32 code = 0;
 		write_cast<byte>(out, code);
 		switch (code) {
+		default:
+			std::cerr << "unknown serial at weight::save" << std::endl;
+			// no break
 		case 0:
 			write_cast<u32>(out, wghts().size());
 			for (weight w : wghts())
 				out << w;
-			break;
-		default:
-			std::cerr << "unknown serial at weight::save" << std::endl;
 			break;
 		}
 		out.flush();
@@ -162,40 +228,38 @@ public:
 		u32 code;
 		read_cast<byte>(in, code);
 		switch (code) {
+		default:
+			std::cerr << "unknown serial at weight::load" << std::endl;
+			// no break
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				weight w; in >> w;
 				wghts().push_back(w);
 			}
 			break;
-		default:
-			std::cerr << "unknown serial at weight::load" << std::endl;
-			break;
 		}
 	}
 
-	static weight make(const u32& sign, const size_t& size) {
+	static weight& make(const u32& sign, const size_t& size) {
 		wghts().push_back(weight(sign, size));
 		return wghts().back();
-	}
-	static inline weight at(const u32& sign) {
-		const auto it = find(sign);
-		if (it != end()) return (*it);
-		throw std::out_of_range("weight::at");
 	}
 	typedef std::vector<weight>::iterator iter;
 	static inline const std::vector<weight>& list() { return wghts(); }
 	static inline iter begin() { return wghts().begin(); }
-	static inline iter end() { return wghts().end(); }
-	static inline iter find(const u32& sign) {
-		return std::find_if(begin(), end(), [=](const weight& w) { return w.id == sign; });
+	static inline iter end()   { return wghts().end(); }
+	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		return std::find_if(first, last, [=](const weight& w) { return w.sign() == sign; });
+	}
+	static inline weight& at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(sign, first, last);
+		if (it != last) return (*it);
+		throw std::out_of_range("weight::at");
 	}
 	static inline iter erase(const iter& it) {
-		if (it->length) {
-			free(it->value);
-			free(it->accum);
-			free(it->updvu);
-		}
+		if (it->value) free(it->value);
+		if (it->accum) free(it->accum);
+		if (it->updvu) free(it->updvu);
 		return wghts().erase(it);
 	}
 	static inline std::vector<weight> transfer(const iter& first = begin(), const iter& last = end()) {
@@ -237,21 +301,21 @@ public:
 	inline bool operator ==(const indexer& i) const { return id == i.id; }
 	inline bool operator !=(const indexer& i) const { return id != i.id; }
 
-	static indexer make(const u32& sign, mapper map) {
+	static indexer& make(const u32& sign, mapper map) {
 		idxrs().push_back(indexer(sign, map));
 		return idxrs().back();
-	}
-	static inline indexer at(const u32& sign) {
-		const auto it = find(sign);
-		if (it != end()) return (*it);
-		throw std::out_of_range("indexer::at");
 	}
 	typedef std::vector<indexer>::iterator iter;
 	static inline const std::vector<indexer>& list() { return idxrs(); }
 	static inline iter begin() { return idxrs().begin(); }
 	static inline iter end() { return idxrs().end(); }
-	static inline iter find(const u32& sign) {
-		return std::find_if(begin(), end(), [=](const indexer& i) { return i.id == sign; });
+	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		return std::find_if(first, last, [=](const indexer& i) { return i.sign() == sign; });
+	}
+	static inline indexer& at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(sign, first, last);
+		if (it != last) return (*it);
+		throw std::out_of_range("indexer::at");
 	}
 private:
 	indexer(const u32& sign, mapper map) : id(sign), map(map) {}
@@ -289,7 +353,7 @@ public:
 			write_cast<u32>(out, value.sign());
 			break;
 		default:
-			std::cerr << "unknown serial at feature::>>" << std::endl;
+			std::cerr << "unknown serial at ostream << feature" << std::endl;
 			break;
 		}
     	return out;
@@ -307,7 +371,7 @@ public:
 			value = weight::at(code);
 			break;
 		default:
-			std::cerr << "unknown serial at feature::<<" << std::endl;
+			std::cerr << "unknown serial at istream >> feature" << std::endl;
 			break;
 		}
 		return in;
@@ -344,33 +408,33 @@ public:
 		}
 	}
 
-	static feature make(const u32& wgt, const u32& idx) {
+	static feature& make(const u32& wgt, const u32& idx) {
 		feats().push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
-	}
-	static feature at(const u32& wgt, const u32& idx) {
-		const auto it = find(wgt, idx);
-		if (it != end()) return (*it);
-		throw std::out_of_range("feature::at");
 	}
 	typedef std::vector<feature>::iterator iter;
 	static inline const std::vector<feature>& list() { return feats(); }
 	static inline iter begin() { return feats().begin(); }
-	static inline iter end() { return feats().end(); }
-	static inline iter find(const u32& wgt, const u32& idx) {
-		const auto wght = weight::at(wgt);
-		const auto idxr = indexer::at(idx);
-		return std::find_if(begin(), end(),
-			[=](const feature& f) { return weight(f) == wght && indexer(f) == idxr; });
+	static inline iter end()   { return feats().end(); }
+	static inline iter find(const u32& wght, const u32& idxr, const iter& first = begin(), const iter& last = end()) {
+		return std::find_if(first, last,
+			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
 	}
-	static inline iter erase(const iter& it) {
-		return feats().erase(it);
+	static feature& at(const u32& wgt, const u32& idx, const iter& first = begin(), const iter& last = end()) {
+		const auto it = find(wgt, idx, first, last);
+		if (it != last) return (*it);
+		throw std::out_of_range("feature::at");
+	}
+	static inline iter erase(const iter& it) { return feats().erase(it); }
+	static inline std::vector<feature> transfer(const iter& first = begin(), const iter& last = end()) {
+		std::vector<feature> ft(first, last);
+		feats().erase(first, last);
+		return ft;
 	}
 
 private:
 	feature(const weight& value, const indexer& index) : index(index), value(value) {}
 	static inline std::vector<feature>& feats() { static std::vector<feature> f; return f; }
-//	static inline u64 make_sign(const u32& wgt, const u32& idx) { return (u64(wgt) << 32) | idx; }
 
 	indexer index;
 	weight value;
@@ -623,11 +687,11 @@ u64 indexnuma(const board& b, const std::vector<int>& n) {
 		// code: 0x00SSTTTT
 		u32 size = (code >> 16);
 		u32 tile = (code & 0xffff);
-		u32 msb = msb32(tile);
-		u32 var = num[log2(msb)];
-		while ((tile &= ~msb) != 0) {
-			msb = msb32(tile);
-			var += num[log2(msb)];
+		u32 idx = log2(tile);
+		u32 var = num[idx];
+		while ((tile &= ~(1 << idx)) != 0) {
+			idx = log2(tile);
+			var += num[idx];
 		}
 		index += (var & ~(-1 << size)) << offset;
 		offset += size;
@@ -746,6 +810,14 @@ u32 make_indexers(const std::string& res = "") {
 	imake(0x00fb73ed, utils::index6t<0xf,0xb,0x7,0x3,0xe,0xd>);
 	imake(0x00cdef84, utils::index6t<0xc,0xd,0xe,0xf,0x8,0x4>);
 	imake(0x00048c12, utils::index6t<0x0,0x4,0x8,0xc,0x1,0x2>);
+	imake(0x0089abcd, utils::index6t<0x8,0x9,0xa,0xb,0xc,0xd>);
+	imake(0x00159d04, utils::index6t<0x1,0x5,0x9,0xd,0x0,0x4>);
+	imake(0x00765432, utils::index6t<0x7,0x6,0x5,0x4,0x3,0x2>);
+	imake(0x00ea62fb, utils::index6t<0xe,0xa,0x6,0x2,0xf,0xb>);
+	imake(0x00ba98fe, utils::index6t<0xb,0xa,0x9,0x8,0xf,0xe>);
+	imake(0x00d951c8, utils::index6t<0xd,0x9,0x5,0x1,0xc,0x8>);
+	imake(0x00456701, utils::index6t<0x4,0x5,0x6,0x7,0x0,0x1>);
+	imake(0x0026ae37, utils::index6t<0x2,0x6,0xa,0xe,0x3,0x7>);
 
 	// k.matsuzaki
 	imake(0x00012456, utils::index6t<0x0,0x1,0x2,0x4,0x5,0x6>);
@@ -1117,6 +1189,7 @@ u32 make_weights(const std::string& res = "") {
 		in = "default";
 	std::map<std::string, std::string> predefined;
 	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt";
+	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt";
 	predefined["default"] = predefined["khyeh"] + " fe000001:^25 ff000000:^16";
 	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:?";
 	for (auto predef : predefined) {
@@ -1185,6 +1258,7 @@ u32 make_features(const std::string& res = "") {
 		in = "default";
 	std::map<std::string, std::string> predefined;
 	predefined["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!]";
+	predefined["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!]";
 	predefined["default"] = predefined["khyeh"] + " fe000001[fe000001] ff000000[ff000000]";
 	predefined["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
 								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
@@ -1390,6 +1464,13 @@ struct statistic {
 	u64 loop;
 	u64 check;
 
+	struct control {
+		u64 num;
+		u64 chk;
+		control(const u64& num = 1000, const u64& chk = 1000) : num(num), chk(chk) {}
+		operator bool() const { return num; }
+	};
+
 	struct record {
 		u64 score;
 		u64 win;
@@ -1400,10 +1481,10 @@ struct statistic {
 		std::array<u32, 32> count;
 	} total, local;
 
-	void init(const u64& max, const u64& chk = 1000) {
-		limit = max * chk;
+	void init(const control& ctrl) {
+		limit = ctrl.num * ctrl.chk;
 		loop = 1;
-		check = chk;
+		check = ctrl.chk;
 
 		total = {};
 		local = {};
@@ -1481,6 +1562,16 @@ struct statistic {
 			std::cout << buf << std::endl;
 		}
 	}
+
+	void merge(const statistic& stat) {
+		total.score += stat.total.score;
+		total.win += stat.total.win;
+		total.time += stat.total.time;
+		total.opers += stat.total.opers;
+		total.hash |= stat.total.hash;
+		total.max = std::max(total.max, stat.total.max);
+		std::transform(total.count.begin(), total.count.end(), stat.total.count.begin(), total.count.begin(), std::plus<u32>());
+	}
 };
 
 inline utils::options parse(int argc, const char* argv[]) {
@@ -1553,6 +1644,10 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--feature-value"):
 			opts["feature-value"] = find_opts(i, ',');
 			break;
+		case to_hash("-wf"):
+		case to_hash("-fw"):
+			opts["feature-value"] = opts["weight-value"] = find_opts(i, ',');
+			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
@@ -1564,9 +1659,18 @@ inline utils::options parse(int argc, const char* argv[]) {
 			opts["train-type"] = find_opt(i, "");
 			break;
 		case to_hash("-Tt"):
-		case to_hash("-TT"):
 		case to_hash("--test-type"):
 			opts["test-type"] = find_opt(i, "");
+			break;
+		case to_hash("-tc"):
+		case to_hash("--train-check"):
+		case to_hash("--train-check-interval"):
+			opts["train-check"] = find_opt(i, "1000");
+			break;
+		case to_hash("-Tc"):
+		case to_hash("--test-check"):
+		case to_hash("--test-check-interval"):
+			opts["test-check"] = find_opt(i, "1000");
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
@@ -1582,8 +1686,8 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 int main(int argc, const char* argv[]) {
-	u32 train = 100;
-	u32 test = 10;
+	statistic::control train(1000, 1000);
+	statistic::control test(100, 1000);
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = moporgic::alpha;
@@ -1591,8 +1695,10 @@ int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
 	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
-	if (opts("train")) train = std::stol(opts["train"]);
-	if (opts("test")) test = std::stol(opts["test"]);
+	if (opts("train")) train.num = std::stol(opts["train"]);
+	if (opts("test")) test.num = std::stol(opts["test"]);
+	if (opts("train-check")) train.chk = std::stol(opts["train-check"]);
+	if (opts("test-check")) test.chk = std::stol(opts["test-check"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 
 	std::srand(seed);
