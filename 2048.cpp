@@ -34,7 +34,7 @@ namespace moporgic {
 
 typedef float numeric;
 numeric alpha = 0.0025;
-std::array<u32, 16> depth = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
+u32 depth[16] = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
 
 class weight {
 public:
@@ -360,28 +360,60 @@ private:
 class zhasher {
 public:
 	zhasher(const u64& seed  = moporgic::millisec(),
-			const u64& seeda = 0x0000000000000000ULL,
-			const u64& seedb = 0xffffffffffffffffULL)
-	: id(seed ^ seeda ^ seedb), seeda(seeda), seedb(seedb) {
+			const u64& seeda = 0x0000000000000000ULL, const u64& seedb = 0xffffffffffffffffULL)
+	: id(seed ^ seeda ^ seedb), zhash(new u64[4][1 << 20]), ztile(new u64[16][32]), seeda(seeda), seedb(seedb) {
 		std::default_random_engine engine(seed);
 		std::uniform_int_distribution<u64> dist;
-		for (u32 r = 0; r < 4; r++) {
-			for (u32 v = 0; v < (1 << 20); v++) {
-				board t; t.place20(0, v);
-				u64 zt0 = dist(engine);
-				u64 zt1 = dist(engine);
-				u64 zt2 = dist(engine);
-				u64 zt3 = dist(engine);
-				zhash[r][v] = zt0 ^ zt1 ^ zt2 ^ zt3;
-				ztile[r*4 + 0][t.at5(0)] = zt0;
-				ztile[r*4 + 1][t.at5(1)] = zt1;
-				ztile[r*4 + 2][t.at5(2)] = zt2;
-				ztile[r*4 + 3][t.at5(3)] = zt3;
+		for (u32 idx = 0; idx < 16; idx++) {
+			for (u32 tile = 0; tile < 32; tile++) {
+				ztile[idx][tile] = dist(engine);
+			}
+		}
+		for (u32 row = 0; row < 4; row++) {
+			auto rhash = zhash[row];
+			auto rtile = ztile + (row * 4);
+			for (u32 value = 0; value < (1 << 20); value++) {
+				board tile; tile.place20(0, value);
+				auto t0 = rtile[0][tile.at5(0)];
+				auto t1 = rtile[1][tile.at5(1)];
+				auto t2 = rtile[2][tile.at5(2)];
+				auto t3 = rtile[3][tile.at5(3)];
+				rhash[value] = t0 ^ t1 ^ t2 ^ t3;
 			}
 		}
 	}
-	zhasher(const zhasher& z) = default;
-	~zhasher() = default;
+	zhasher(const zhasher& z)
+	: id(z.id), zhash(new u64[4][1 << 20]), ztile(new u64[16][32]), seeda(z.seeda), seedb(z.seedb) {
+		std::copy(cast<u64*>(z.zhash), cast<u64*>(z.zhash) + sizeof(u64[4][1 << 20]), cast<u64*>(zhash));
+		std::copy(cast<u64*>(z.ztile), cast<u64*>(z.ztile) + sizeof(u64[16][32]),     cast<u64*>(ztile));
+	}
+	zhasher(zhasher&& z)
+	: id(z.id), zhash(z.zhash), ztile(z.ztile), seeda(z.seeda), seedb(z.seedb) {
+		z.zhash = nullptr;
+		z.ztile = nullptr;
+	}
+	~zhasher() {
+		if (zhash) delete[] zhash;
+		if (ztile) delete[] ztile;
+	}
+
+	zhasher& operator =(const zhasher& z) {
+		id = z.id;
+		std::copy(cast<u64*>(z.zhash), cast<u64*>(z.zhash) + sizeof(u64[4][1 << 20]), cast<u64*>(zhash));
+		std::copy(cast<u64*>(z.ztile), cast<u64*>(z.ztile) + sizeof(u64[16][32]),     cast<u64*>(ztile));
+		seeda = z.seeda;
+		seedb = z.seedb;
+		return *this;
+	}
+	zhasher& operator =(zhasher&& z) {
+		id = z.id;
+		zhash = z.zhash; z.zhash = nullptr;
+		ztile = z.ztile; z.ztile = nullptr;
+		seeda = z.seeda;
+		seedb = z.seedb;
+		return *this;
+	}
+
 	inline u64 sign() const { return id; }
 
 	inline u64 operator ()(const board& b, const bool& after = true) const {
@@ -409,8 +441,8 @@ public:
 			moporgic::write(out, id);
 			moporgic::write(out, seeda);
 			moporgic::write(out, seedb);
-			moporgic::write(out, zhash);
-			moporgic::write(out, ztile);
+			moporgic::write(out, *zhash, sizeof(u64[4][1 << 20]));
+			moporgic::write(out, *ztile, sizeof(u64[16][32]));
 			break;
 		default:
 			std::cerr << "unknown serial at zhasher::>>" << std::endl;
@@ -430,33 +462,18 @@ public:
 		case 0:
 			moporgic::read(in, seeda);
 			moporgic::read(in, seedb);
-			moporgic::read(in, zhash);
-			{ // rebuild ztile
-				std::default_random_engine engine(moporgic::millisec());
-				std::uniform_int_distribution<u64> dist;
-				for (u32 r = 0; r < 4; r++) {
-					for (u32 v = 0; v < (1 << 20); v++) {
-						u64 zrv = zhash[r][v];
-						u64 zt0 = dist(engine);
-						u64 zt1 = dist(engine);
-						u64 zt2 = dist(engine);
-						u64 zt3 = zrv ^ zt0 ^ zt1 ^ zt2;
-						board b; b.place20(0, v);
-						ztile[r*4 + 0][b.at5(0)] = zt0;
-						ztile[r*4 + 1][b.at5(1)] = zt1;
-						ztile[r*4 + 2][b.at5(2)] = zt2;
-						ztile[r*4 + 3][b.at5(3)] = zt3;
-					}
-				}
-			}
+			moporgic::read(in, *zhash, sizeof(u64[4][1 << 20]));
+			for (u32 i = 0; i < 16; i++) // build ztile
+				for (u32 t = 0; t < 32; t++)
+					ztile[i][t] = rand64();
 			moporgic::read(in, id);
 			break;
 		case 1:
 			moporgic::read(in, id);
 			moporgic::read(in, seeda);
 			moporgic::read(in, seedb);
-			moporgic::read(in, zhash);
-			moporgic::read(in, ztile);
+			moporgic::read(in, *zhash, sizeof(u64[4][1 << 20]));
+			moporgic::read(in, *ztile, sizeof(u64[16][32]));
 			break;
 		default:
 			std::cerr << "unknown serial at zhasher::<<" << std::endl;
@@ -465,9 +482,14 @@ public:
 		return in;
 	}
 private:
+	typedef u64(*zhash_t)[1<<20];
+	typedef u64(*ztile_t)[32];
+
 	u64 id;
-	std::array<std::array<u64, 1 << 20>, 4> zhash;
-	std::array<std::array<u64, 32>, 16> ztile;
+//	u64 zhash[4][1 << 20];
+//	u64 ztile[16][32];
+	zhash_t zhash;
+	ztile_t ztile;
 	u64 seeda;
 	u64 seedb;
 };
@@ -498,10 +520,7 @@ public:
 	};
 	typedef std::list<piece> plist;
 
-	segment(byte* data, size_t size) : data(data), size(size) {
-		free.emplace_back(data,  size);
-		free.emplace_back(data + size);
-	}
+	segment() { free.emplace_back(); }
 	segment(const segment& seg) = delete;
 
 	template<typename pointer = piece>
@@ -519,8 +538,8 @@ public:
 	}
 
 	template<typename pointer = piece>
-	pointer release(void* alloc, size_t space) {
-		piece tok(cast<byte*>(alloc), space);
+	pointer release(byte* alloc, size_t space) {
+		piece tok(alloc, space);
 		auto it = std::lower_bound(free.begin(), free.end(), tok);
 		auto pt = it; pt--;
 		if (it != free.begin() && pt->end() == tok.begin()) { // -=
@@ -539,17 +558,19 @@ public:
 		return piece(tok.end());
 	}
 
-	size_t capacity() const { return size; }
+	inline byte* poll(size_t size) {
+		return allocate(size);
+	}
 
-	void clear() {
-		free.clear();
-		free.emplace_back(data, size);
-		free.emplace_back(data + size);
+	inline void offer(byte* data, size_t size) {
+		if (size == 0) return;
+		if (free.back().alloc < data + size) {
+			free.back().alloc = data + size;
+		}
+		release(data, size);
 	}
 
 private:
-	byte*  data;
-	size_t size;
 	plist  free;
 };
 
@@ -591,7 +612,7 @@ public:
 		}
 	};
 
-	transposition() : zhash(), cache(nullptr), mpool(nullptr), zsize(0), limit(0) {}
+	transposition() : zhash(), cache(nullptr), mpool(), zsize(0), limit(0), zmask(-1) {}
 	transposition(const transposition& tp) = default;
 	~transposition() {}
 	inline size_t length() const { return zsize; }
@@ -603,7 +624,7 @@ public:
 			board t = b; t.isomorphic(i);
 			x = std::min(x, u64(t));
 		}
-		auto hash = zhash(x) % zsize;
+		auto hash = zhash(x) & zmask;
 
 		auto& data = cache[hash];
 		if (!data) return data(x);
@@ -675,6 +696,7 @@ public:
 					write_cast<u16>(out, it->info);
 				}
 			}
+			write_cast<u16>(out, 0); // reserved fields
 			break;
 		}
 		return out;
@@ -685,15 +707,17 @@ public:
     	auto& mpool = tp.mpool;
     	auto& zsize = tp.zsize;
     	auto& limit = tp.limit;
+    	auto& zmask = tp.zmask;
 		u32 code = 0;
 		read_cast<byte>(in, code);
 		switch (code) {
 		case 1:
 			in >> zhash;
 			read_cast<u64>(in, zsize);
-			read_cast<u64>(in, limit); // TODO: limit/size modification on runtime
+			read_cast<u64>(in, limit);
+			zmask = zsize - 1;
 			cache = alloc(zsize + limit);
-			mpool = new segment(cast<byte*>(cache + zsize)), sizeof(position) * limit);
+			mpool.offer(cast<byte*>(cache + zsize), sizeof(position) * limit);
 			for (u64 i = 0; i < zsize; i++) {
 				auto& data = cache[i];
 				read_cast<u64>(in, data.sign);
@@ -713,6 +737,10 @@ public:
 					read_cast<u16>(in, it->info);
 				}
 			}
+			while (read_cast<u16>(in, code) && code) {
+				u64 skip; read_cast<u64>(in, skip);
+				in.ignore(code * skip);
+			}
 			break;
 		default:
 			std::cerr << "unknown serial at transposition::<<" << std::endl;
@@ -722,54 +750,58 @@ public:
 	}
 
 	void summary() {
-		std::cout << "summary" << std::endl;
+		std::cout << std::endl << "summary" << std::endl;
 		std::vector<u64> stat = count();
 		std::cout << "used" "\t" "count" << std::endl;
 		for (u32 i = 0; i < stat.size(); i++)
 			std::cout << i << "\t" << stat[i] << std::endl;
 	}
 
-	static void load(std::istream& in) { in >> instance(); }
-	static void save(std::ostream& out) { out << instance(); }
+	static void save(std::ostream& out) {
+		u32 code = 0;
+		write_cast<byte>(out, code);
+		switch (code) {
+		default:
+			std::cerr << "unknown serial at transposition::save" << std::endl;
+			// no break
+		case 0:
+			out << instance();
+			break;
+		}
+		out.flush();
+	}
+	static void load(std::istream& in) {
+		u32 code;
+		read_cast<byte>(in, code);
+		switch (code) {
+		default:
+			std::cerr << "unknown serial at transposition::load" << std::endl;
+			// no break
+		case 0:
+			in >> instance();
+			break;
+		}
+	}
 
 	static transposition& make(size_t len, size_t lim = 0) {
-		trans().push_back(transposition(std::max(len, 1ull), lim));
-		return trans().back();
+		return instance().shape(std::max(len, 1ull), lim);
 	}
-	typedef std::vector<transposition>::iterator iter;
-	static inline const std::vector<transposition>& list() { return trans(); }
-	static inline iter begin() { return trans().begin(); }
-	static inline iter end()   { return trans().end(); }
-	static inline iter erase(const iter& it) {
-		if (it->mpool) delete it->mpool;
-		if (it->cache) free(it->cache);
-		return trans().erase(it);
-	}
-	static inline std::vector<transposition> transfer(const iter& first = begin(), const iter& last = end()) {
-		std::vector<transposition> tp(first, last);
-		trans().erase(first, last);
-		return tp;
-	}
-
-	static inline transposition& instance() { return trans().front(); }
+	static inline transposition& instance() { static transposition tp; return tp; }
 	static inline position& find(const board& b) { return instance()[b]; }
 
 private:
-	transposition(const size_t& len, const size_t& lim) : zsize(len), limit(lim) {
-		cache = alloc(zsize + limit);
-		mpool = new segment(cast<byte*>(cache + zsize)), sizeof(position) * limit);
+	transposition(const size_t& len, const size_t& lim) : zsize(len), limit(lim), zmask(len - 1) {
+		cache = alloc(zsize);
+		mpool.offer(cast<byte*>(alloc(limit)), sizeof(position) * limit);
 	}
-
 	static inline position* alloc(size_t len) { return new position[len](); }
 	static inline void free(position* alloc) { delete[] alloc; }
 
-	static inline std::vector<transposition>& trans() { static std::vector<transposition> tp; return tp; }
-
 	inline position* mpool_alloc(size_t num) {
-		return mpool->allocate<position*>(sizeof(position) * num);
+		return mpool.allocate<position*>(sizeof(position) * num);
 	}
 	inline position* mpool_free(position* pos, size_t now) {
-		return mpool->release(pos, sizeof(position) * now);
+		return mpool.release(cast<byte*>(pos), sizeof(position) * now);
 	}
 	inline position* mpool_realloc(position* pos, size_t now) {
 		auto alloc = mpool_alloc(now + now);
@@ -778,28 +810,64 @@ private:
 		mpool_free(pos, now);
 		return alloc;
 	}
+
+	transposition& shape(size_t len, size_t lim = 0) {
+		if (math::ones64(len) != 1) {
+			std::cout << "unsupported transposition size: " << len << ", ";
+			len = 1ull << (math::lg64(len));
+			std::cout << "fit to " << len << std::endl;
+		}
+
+		if (cache) {
+			if (zsize != len) std::cout << "unsupported operation: reshape z-size" << std::endl;
+			if (limit  > lim) std::cout << "unsupported operation: shrink m-pool" << std::endl;
+			if (limit  < lim) {
+				mpool_offer(lim - limit);
+				limit = lim;
+			}
+		} else {
+			zsize = len;
+			limit = lim;
+			zmask = len - 1;
+			cache = alloc(zsize);
+			mpool_offer(limit);
+		}
+		return *this;
+	}
+
+	void mpool_offer(size_t total) {
+		try {
+			mpool.offer(cast<byte*>(alloc(total)), sizeof(position) * total);
+		} catch (std::bad_alloc&) {	// try allocate block size 1G
+			for (auto block = 0ull; total; total -= block) {
+				block = std::min((1ull << 30) / sizeof(position), total);
+				mpool.offer(cast<byte*>(alloc(block)), sizeof(position) * block);
+			}
+		}
+	}
+
 	std::vector<u64> count() const {
-		std::vector<u64> stat;
-		stat.emplace_back(0);
+		std::vector<u64> stat(65537);
 		for (u64 i = 0; i < zsize; i++) {
 			auto& h = cache[i];
 			if (std::isnan(h.esti)) {
-				u32 size = u16(h.depth) + 1;
-				while (stat.size() < size + 1) stat.emplace_back(0);
-				stat[size]++;
+				stat[u16(h.depth) + 1]++;
 			} else {
 				stat[h.sign ? 1 : 0]++;
 			}
 		}
+		while (stat.back() == 0)
+			stat.pop_back();
 		return stat;
 	}
 
 private:
 	zhasher zhash;
 	position* cache;
-	segment*  mpool;
+	segment mpool;
 	size_t zsize;
 	size_t limit;
+	size_t zmask;
 };
 
 namespace utils {
@@ -1710,12 +1778,13 @@ inline numeric update(const board& state, const numeric& updv,
 
 void make_transposition(const std::string& res = "") {
 	std::string in(res);
-	if (in.empty() && transposition::instance().length() == 0) in = "default";
+	if (in.empty() && transposition::instance().size() == 0) in = "default";
 	if (in == "default") in = "2G+2G";
+	if (in == "no" || in == "null") in = "0";
 
-	u64 len = 0;
-	u64 lim = 0;
 	if (in.size()) {
+		u64 len = 0;
+		u64 lim = 0;
 		auto rebase = [](u64 v, char c) -> u64 {
 			switch (c) {
 			case 'K': v *= (1ULL << 10); break;
@@ -1739,8 +1808,8 @@ void make_transposition(const std::string& res = "") {
 		} else {
 			len = std::stoll(in);
 		}
+		transposition::make(len, lim);
 	}
-	transposition::make(len, lim);
 }
 bool load_transposition(const std::string& path) {
 	std::ifstream in;
@@ -1939,8 +2008,8 @@ struct select {
 	inline numeric esti() const { return best->esti; }
 };
 struct search : select {
-	std::array<u32, 16> policy;
-	search(const std::array<u32, 16>& p = moporgic::depth) : select(), policy(p) {}
+	u32 policy[16];
+	search(const u32* depth = moporgic::depth) : select() { std::copy(depth, depth + 16, policy); }
 
 	inline select& operator ()(const board& b) {
 		return operator ()(b, feature::begin(), feature::end());
@@ -2213,10 +2282,10 @@ int main(int argc, const char* argv[]) {
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 	if (opts("depth")) {
 		std::string dyndepth(opts["depth"]);
-		for (u32 depth = 0, e = 0; e < 16; depth[e++] = depth) {
+		for (u32 d = 0, e = 0; e < 16; depth[e++] = d) {
 			if (dyndepth.empty()) continue;
 			auto it = dyndepth.find_first_of(", ");
-			depth = std::stol(dyndepth.substr(0, it));
+			d = std::stol(dyndepth.substr(0, it));
 			dyndepth = dyndepth.substr(it + 1);
 		}
 	}
@@ -2232,7 +2301,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
 	std::cout << "depth = ";
-	std::copy(depth.begin(), depth.end(), std::ostream_iterator<u32>(std::cout, " "));
+	std::copy(depth, depth + 16, std::ostream_iterator<u32>(std::cout, " "));
 	std::cout << std::endl;
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
