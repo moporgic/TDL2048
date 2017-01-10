@@ -179,13 +179,13 @@ public:
 		u32 code = 0;
 		write_cast<byte>(out, code);
 		switch (code) {
+		default:
+			std::cerr << "unknown serial at weight::save" << std::endl;
+			// no break
 		case 0:
 			write_cast<u32>(out, wghts().size());
 			for (weight w : wghts())
 				out << w;
-			break;
-		default:
-			std::cerr << "unknown serial at weight::save" << std::endl;
 			break;
 		}
 		out.flush();
@@ -194,19 +194,19 @@ public:
 		u32 code;
 		read_cast<byte>(in, code);
 		switch (code) {
+		default:
+			std::cerr << "unknown serial at weight::load" << std::endl;
+			// no break
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				weight w; in >> w;
 				wghts().push_back(w);
 			}
 			break;
-		default:
-			std::cerr << "unknown serial at weight::load" << std::endl;
-			break;
 		}
 	}
 
-	static weight make(const u32& sign, const size_t& size) {
+	static weight& make(const u32& sign, const size_t& size) {
 		wghts().push_back(weight(sign, size));
 		return wghts().back();
 	}
@@ -217,13 +217,13 @@ public:
 	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
 		return std::find_if(first, last, [=](const weight& w) { return w.sign() == sign; });
 	}
-	static inline weight at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+	static inline weight& at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
 		const auto it = find(sign, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("weight::at");
 	}
 	static inline iter erase(const iter& it) {
-		if (it->length) free(it->value);
+		if (it->value) free(it->value);
 		return wghts().erase(it);
 	}
 	static inline std::vector<weight> transfer(const iter& first = begin(), const iter& last = end()) {
@@ -263,7 +263,7 @@ public:
 	inline bool operator ==(const indexer& i) const { return id == i.id; }
 	inline bool operator !=(const indexer& i) const { return id != i.id; }
 
-	static indexer make(const u32& sign, mapper map) {
+	static indexer& make(const u32& sign, mapper map) {
 		idxrs().push_back(indexer(sign, map));
 		return idxrs().back();
 	}
@@ -274,7 +274,7 @@ public:
 	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
 		return std::find_if(first, last, [=](const indexer& i) { return i.sign() == sign; });
 	}
-	static inline indexer at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+	static inline indexer& at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
 		const auto it = find(sign, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("indexer::at");
@@ -370,7 +370,7 @@ public:
 		}
 	}
 
-	static feature make(const u32& wgt, const u32& idx) {
+	static feature& make(const u32& wgt, const u32& idx) {
 		feats().push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
@@ -382,7 +382,7 @@ public:
 		return std::find_if(first, last,
 			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
 	}
-	static feature at(const u32& wgt, const u32& idx, const iter& first = begin(), const iter& last = end()) {
+	static feature& at(const u32& wgt, const u32& idx, const iter& first = begin(), const iter& last = end()) {
 		const auto it = find(wgt, idx, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("feature::at");
@@ -1423,6 +1423,13 @@ struct statistic {
 	u64 loop;
 	u64 check;
 
+	struct control {
+		u64 num;
+		u64 chk;
+		control(const u64& num = 1000, const u64& chk = 1000) : num(num), chk(chk) {}
+		operator bool() const { return num; }
+	};
+
 	struct record {
 		u64 score;
 		u64 win;
@@ -1433,10 +1440,10 @@ struct statistic {
 		std::array<u32, 32> count;
 	} total, local;
 
-	void init(const u64& max, const u64& chk = 1000) {
-		limit = max * chk;
+	void init(const control& ctrl) {
+		limit = ctrl.num * ctrl.chk;
 		loop = 1;
-		check = chk;
+		check = ctrl.chk;
 
 		total = {};
 		local = {};
@@ -1514,6 +1521,16 @@ struct statistic {
 					(accum[i] * 100.0 / accum[0]));
 			std::cout << buf << std::endl;
 		}
+	}
+
+	void merge(const statistic& stat) {
+		total.score += stat.total.score;
+		total.win += stat.total.win;
+		total.time += stat.total.time;
+		total.opers += stat.total.opers;
+		total.hash |= stat.total.hash;
+		total.max = std::max(total.max, stat.total.max);
+		std::transform(total.count.begin(), total.count.end(), stat.total.count.begin(), total.count.begin(), std::plus<u32>());
 	}
 };
 
@@ -1602,9 +1619,18 @@ inline utils::options parse(int argc, const char* argv[]) {
 			opts["train-type"] = find_opt(i, "");
 			break;
 		case to_hash("-Tt"):
-		case to_hash("-TT"):
 		case to_hash("--test-type"):
 			opts["test-type"] = find_opt(i, "");
+			break;
+		case to_hash("-tc"):
+		case to_hash("--train-check"):
+		case to_hash("--train-check-interval"):
+			opts["train-check"] = find_opt(i, "1000");
+			break;
+		case to_hash("-Tc"):
+		case to_hash("--test-check"):
+		case to_hash("--test-check-interval"):
+			opts["test-check"] = find_opt(i, "1000");
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
@@ -1628,8 +1654,8 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 int main(int argc, const char* argv[]) {
-	u32 train = 100;
-	u32 test = 10;
+	statistic::control train(1000, 1000);
+	statistic::control test(100, 1000);
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = moporgic::alpha;
@@ -1639,8 +1665,10 @@ int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
 	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
-	if (opts("train")) train = std::stol(opts["train"]);
-	if (opts("test")) test = std::stol(opts["test"]);
+	if (opts("train")) train.num = std::stol(opts["train"]);
+	if (opts("test")) test.num = std::stol(opts["test"]);
+	if (opts("train-check")) train.chk = std::stol(opts["train-check"]);
+	if (opts("test-check")) test.chk = std::stol(opts["test-check"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 	if (opts("thread")) thdnum = std::stod(opts["thread"]);
 	if (opts("shmres")) shm::setup(opts["shmres"]);
