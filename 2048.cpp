@@ -77,7 +77,7 @@ public:
     	auto& value = w.value;
 		u32 code;
 		read_cast<byte>(in, code);
-		switch (code) {
+		switch (code & 0xff) {
 		case 0:
 		case 1:
 			read_cast<u32>(in, id);
@@ -149,7 +149,7 @@ public:
 	static void load(std::istream& in) {
 		u32 code;
 		read_cast<byte>(in, code);
-		switch (code) {
+		switch (code & 0xff) {
 		default:
 			std::cerr << "unknown serial (" << code << ") at weight::load, ";
 			std::cerr << "use default (0) instead..." << std::endl;
@@ -282,7 +282,7 @@ public:
     	auto& value = f.value;
 		u32 code;
 		read_cast<byte>(in, code);
-		switch (code) {
+		switch (code & 0xff) {
 		case 0:
 			read_cast<u32>(in, code);
 			index = indexer::at(code);
@@ -314,7 +314,7 @@ public:
 	static void load(std::istream& in) {
 		u32 code;
 		read_cast<byte>(in, code);
-		switch (code) {
+		switch (code & 0xff) {
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				feature f; in >> f;
@@ -1528,54 +1528,6 @@ u32 make_indexers(const std::string& res = "") {
 	imake(0xfc000050, utils::indexmax<5>);
 	imake(0xfc000060, utils::indexmax<6>);
 	imake(0xfc000070, utils::indexmax<7>);
-
-	// patt(012367) num(96^4/128^3/256^3)
-	std::string in(res);
-	while (in.find_first_of(":()[],") != std::string::npos)
-		in[in.find_first_of(":()[],")] = ' ';
-	std::stringstream idxin(in);
-	std::string type, sign;
-	while (idxin >> type && idxin >> sign) {
-		u32 idxr;
-		std::stringstream(sign) >> std::hex >> idxr;
-		if (indexer::find(idxr) != indexer::end()) {
-			std::cerr << "redefined indexer " << sign << std::endl;
-			std::exit(20);
-		}
-
-		using moporgic::to_hash;
-		switch (to_hash(type)) {
-		case to_hash("patt"):
-		case to_hash("pattern"):
-		case to_hash("tuple"): {
-				auto patt = new std::vector<int>(hashpatt(sign)); // will NOT be deleted
-				imake(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
-			}
-			break;
-		case to_hash("num"):
-		case to_hash("count"):
-		case to_hash("lt"):
-		case to_hash("largetile"): {
-				std::cerr << "unsupported operation: " << type << std::endl;
-				std::exit(19);
-				auto code = new std::vector<int>; // will NOT be deleted;
-				while (sign.find_first_of("^/") != std::string::npos)
-					sign[sign.find_first_of("^/")] = ' ';
-				std::stringstream numin(sign);
-				std::string tile, size;
-				while (numin >> tile && numin >> size) {
-					u32 codev = std::stol(tile) | (std::stol(size) << 16);
-					code->push_back(codev);
-				}
-				imake(idxr, std::bind(utils::indexnuma, std::placeholders::_1, std::cref(*code)));
-			}
-			break;
-		default:
-			std::cerr << "unknown custom indexer type (" << type << ")" << std::endl;
-			std::exit(20);
-			break;
-		}
-	}
 	return succ;
 }
 
