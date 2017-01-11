@@ -815,15 +815,16 @@ private:
 
 	transposition& shape(size_t len, size_t lim = 0) {
 		if (math::ones64(len) != 1) {
-			std::cout << "unsupported transposition size: " << len << ", ";
+			std::cerr << "unsupported transposition size: " << len << ", ";
 			len = 1ull << (math::lg64(len));
-			std::cout << "fit to " << len << std::endl;
+			std::cerr << "fit to " << len << std::endl;
 		}
 
-		if (cache) {
-			if (zsize != len) std::cout << "unsupported operation: reshape z-size" << std::endl;
-			if (limit  > lim) std::cout << "unsupported operation: shrink m-pool" << std::endl;
-			if (limit  < lim) {
+		if (cache && zsize > 1) {
+			if (zsize > len) std::cerr << "unsupported operation: shrink z-size" << std::endl;
+			if (zsize < len) std::cerr << "unsupported operation: enlarge z-size" << std::endl;
+			if (limit > lim) std::cerr << "unsupported operation: shrink m-pool" << std::endl;
+			if (limit < lim) {
 				mpool_offer(lim - limit);
 				limit = lim;
 			}
@@ -831,6 +832,7 @@ private:
 			zsize = len;
 			limit = lim;
 			zmask = len - 1;
+			if (cache) free(cache);
 			cache = alloc(zsize);
 			mpool_offer(limit);
 		}
