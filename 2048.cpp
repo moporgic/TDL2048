@@ -108,7 +108,7 @@ public:
     	};
 		u32 code;
 		read_cast<byte>(in, code);
-		switch (code) {
+		switch (code & 0xff) {
 		case 0:
 		case 1:
 			read_cast<u32>(in, id);
@@ -213,7 +213,7 @@ public:
 	static void load(std::istream& in) {
 		u32 code;
 		read_cast<byte>(in, code);
-		switch (code) {
+		switch (code & 0xff) {
 		default:
 			std::cerr << "unknown serial at weight::load" << std::endl;
 			// no break
@@ -354,7 +354,7 @@ public:
     	auto& value = f.value;
 		u32 code;
 		read_cast<byte>(in, code);
-		switch (code) {
+		switch (code & 0xff) {
 		case 0:
 			read_cast<u32>(in, code);
 			index = indexer::at(code);
@@ -386,7 +386,7 @@ public:
 	static void load(std::istream& in) {
 		u32 code;
 		read_cast<byte>(in, code);
-		switch (code) {
+		switch (code & 0xff) {
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				feature f; in >> f;
