@@ -2293,8 +2293,8 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 int main(int argc, const char* argv[]) {
-	statistic::control train(1000, 1000);
-	statistic::control test(100, 1000);
+	statistic::control train(0, 1000);
+	statistic::control test(1000, 1);
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = moporgic::alpha;
@@ -2419,7 +2419,7 @@ int main(int argc, const char* argv[]) {
 	search xbest;
 
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
-	for (stats.init(test, 1); stats; stats++) {
+	for (stats.init(test); stats; stats++) {
 
 		u32 score = 0;
 		u32 opers = 0;
