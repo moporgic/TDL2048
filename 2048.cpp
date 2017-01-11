@@ -784,7 +784,7 @@ public:
 	}
 
 	static transposition& make(size_t len, size_t lim = 0) {
-		return instance().shape(std::max(len, 1ull), lim);
+		return instance().shape(std::max(len, size_t(1)), lim);
 	}
 	static inline transposition& instance() { static transposition tp; return tp; }
 	static inline position& find(const board& b) { return instance()[b]; }
@@ -840,7 +840,7 @@ private:
 			mpool.offer(cast<byte*>(alloc(total)), sizeof(position) * total);
 		} catch (std::bad_alloc&) {	// try allocate block size 1G
 			for (auto block = 0ull; total; total -= block) {
-				block = std::min((1ull << 30) / sizeof(position), total);
+				block = std::min(size_t(1ull << 30) / sizeof(position), total);
 				mpool.offer(cast<byte*>(alloc(block)), sizeof(position) * block);
 			}
 		}
