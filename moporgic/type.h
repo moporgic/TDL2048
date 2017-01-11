@@ -21,7 +21,7 @@ typedef int16_t  i16;
 typedef uint16_t u16;
 typedef int8_t   i8;
 typedef uint8_t  u8;
-typedef char     byte;
+typedef uint8_t  byte;
 
 typedef __int128          i128;
 typedef unsigned __int128 u128;
