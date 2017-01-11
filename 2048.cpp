@@ -55,8 +55,8 @@ public:
 		write_cast<byte>(out, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial at ostream << weight" << std::endl;
-			std::cerr << "use default serializer (4) instead..." << std::endl;
+			std::cerr << "unknown serial (" << code << ") at ostream << weight, ";
+			std::cerr << "use default (4) instead..." << std::endl;
 			// no break
 		case 4:
 			write_cast<u32>(out, id);
@@ -106,8 +106,8 @@ public:
 			in.ignore(code * length * 2);
 			break;
 		default:
-			std::cerr << "unknown serial at istream >> weight" << std::endl;
-			std::cerr << "use default deserializer (4) instead..." << std::endl;
+			std::cerr << "unknown serial (" << code << ") at istream >> weight, ";
+			std::cerr << "use default (4) instead..." << std::endl;
 			// no break
 		case 4:
 			read_cast<u32>(in, id);
@@ -133,7 +133,8 @@ public:
 		write_cast<byte>(out, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial at weight::save" << std::endl;
+			std::cerr << "unknown serial (" << code << ") at weight::save, ";
+			std::cerr << "use default (0) instead..." << std::endl;
 			// no break
 		case 0:
 			write_cast<u32>(out, wghts().size());
@@ -148,7 +149,8 @@ public:
 		read_cast<byte>(in, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial at weight::load" << std::endl;
+			std::cerr << "unknown serial (" << code << ") at weight::load, ";
+			std::cerr << "use default (0) instead..." << std::endl;
 			// no break
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
@@ -268,7 +270,7 @@ public:
 			write_cast<u32>(out, value.sign());
 			break;
 		default:
-			std::cerr << "unknown serial at ostream << feature" << std::endl;
+			std::cerr << "unknown serial (" << code << ") at ostream << feature" << std::endl;
 			break;
 		}
     	return out;
@@ -286,7 +288,7 @@ public:
 			value = weight::at(code);
 			break;
 		default:
-			std::cerr << "unknown serial at istream >> feature" << std::endl;
+			std::cerr << "unknown serial (" << code << ") at istream >> feature" << std::endl;
 			break;
 		}
 		return in;
@@ -302,7 +304,7 @@ public:
 				out << f;
 			break;
 		default:
-			std::cerr << "unknown serial at feature::save" << std::endl;
+			std::cerr << "unknown serial (" << code << ") at feature::save" << std::endl;
 			break;
 		}
 		out.flush();
@@ -318,7 +320,7 @@ public:
 			}
 			break;
 		default:
-			std::cerr << "unknown serial at feature::load" << std::endl;
+			std::cerr << "unknown serial (" << code << ") at feature::load" << std::endl;
 			break;
 		}
 	}
@@ -1054,7 +1056,7 @@ u32 make_indexers(const std::string& res = "") {
 			}
 			break;
 		default:
-			std::cerr << "unknown custom indexer type " << type << std::endl;
+			std::cerr << "unknown custom indexer type (" << type << ")" << std::endl;
 			std::exit(20);
 			break;
 		}
@@ -1400,14 +1402,18 @@ struct statistic {
 		u64 opers;
 		u32 max;
 		u32 hash;
-		std::array<u32, 32> count;
 	} total, local;
+
+	std::array<u32, 32> count;
+	std::array<u64, 32> score;
 
 	void init(const control& ctrl) {
 		limit = ctrl.num * ctrl.chk;
 		loop = 1;
 		check = ctrl.chk;
 
+		count = {};
+		score = {};
 		total = {};
 		local = {};
 		local.time = moporgic::millisec();
@@ -1463,22 +1469,24 @@ struct statistic {
 	void updatec(const u32& score, const u32& hash, const u32& opers) {
 		update(score, hash, opers);
 		u32 max = std::log2(hash);
-		local.count[max]++;
-		total.count[max]++;
-		if ((loop % check) != 0) return;
-		local.count = {};
+		this->count[max]++;
+		this->score[max] += score;
 	}
 
-	void summary() {
+	void summary(int first = 1, int last = 17) {
 		std::cout << std::endl << "summary" << std::endl;
-		auto count = total.count, accum = total.count;
+		auto count = this->count;
+		auto accum = this->count;
+		auto score = this->score;
 		for (auto it = accum.begin(); it != accum.end(); it++)
 			(*it) = std::accumulate(it, accum.end(), 0);
-		char buf[64];
-		for (auto i = 1; i < 17 && accum[i - 1]; i++) {
+		char buf[80];
+		std::cout << "tile\t   count   score     rate  achieve" << std::endl;
+		for (auto i = first; i < last && accum[i]; i++) {
 			if (accum[i + 1] == accum[0]) continue;
-			snprintf(buf, sizeof(buf), "%d\t%8d%8.2f%%%8.2f%%",
-					(1 << (i)) & 0xfffffffeu, count[i],
+			snprintf(buf, sizeof(buf), "%d\t" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
+					(1 << (i)) & -2u, count[i],
+					(count[i] ? u32(score[i] / count[i]) : 0),
 					(count[i] * 100.0 / accum[0]),
 					(accum[i] * 100.0 / accum[0]));
 			std::cout << buf << std::endl;
@@ -1492,7 +1500,8 @@ struct statistic {
 		total.opers += stat.total.opers;
 		total.hash |= stat.total.hash;
 		total.max = std::max(total.max, stat.total.max);
-		std::transform(total.count.begin(), total.count.end(), stat.total.count.begin(), total.count.begin(), std::plus<u32>());
+		std::transform(count.begin(), count.end(), stat.count.begin(), count.begin(), std::plus<u32>());
+		std::transform(score.begin(), score.end(), stat.score.begin(), score.begin(), std::plus<u64>());
 	}
 };
 
