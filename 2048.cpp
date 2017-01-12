@@ -1433,10 +1433,10 @@ struct statistic {
 		for (auto it = accum.begin(); it != accum.end(); it++)
 			(*it) = std::accumulate(it, accum.end(), 0);
 		char buf[80];
-		std::cout << "tile\t   count   score     rate  achieve" << std::endl;
+		std::cout << "tile     count   score     rate  achieve" << std::endl;
 		for (auto i = first; i < last && accum[i]; i++) {
 			if (accum[i + 1] == accum[0]) continue;
-			snprintf(buf, sizeof(buf), "%d\t" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
+			snprintf(buf, sizeof(buf), "%-6d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
 					(1 << (i)) & -2u, count[i],
 					(count[i] ? u32(score[i] / count[i]) : 0),
 					(count[i] * 100.0 / accum[0]),
