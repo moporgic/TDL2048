@@ -753,6 +753,10 @@ public:
 
 	void summary() {
 		std::cout << std::endl << "summary" << std::endl;
+		if (zsize <= 1) {
+			std::cout << "no transposition" << std::endl;
+			return;
+		}
 		std::vector<u64> stat = count();
 		std::cout << "used" "\t" "count" << std::endl;
 		for (u32 i = 0; i < stat.size(); i++)
@@ -788,13 +792,14 @@ public:
 	static transposition& make(size_t len, size_t lim = 0) {
 		return instance().shape(std::max(len, size_t(1)), lim);
 	}
-	static inline transposition& instance() { static transposition tp; return tp; }
+	static inline transposition& instance() { static transposition tp(1, 0); return tp; }
 	static inline position& find(const board& b) { return instance()[b]; }
+	static inline position& remove(const board& b) { return find(b)(0); }
 
 private:
 	transposition(const size_t& len, const size_t& lim) : zsize(len), limit(lim), zmask(len - 1) {
-		cache = alloc(zsize);
-		mpool.offer(cast<byte*>(alloc(limit)), sizeof(position) * limit);
+		cache = zsize ? alloc(zsize) : nullptr;
+		mpool.offer(cast<byte*>(limit ? alloc(limit) : nullptr), sizeof(position) * limit);
 	}
 	static inline position* alloc(size_t len) { return new position[len](); }
 	static inline void free(position* alloc) { delete[] alloc; }
@@ -1909,6 +1914,7 @@ struct state {
 
 	inline void operator >>(board& b) const { b = move; }
 	inline bool operator >(const state& s) const { return esti > s.esti; }
+	inline operator board() const { return move; }
 	inline operator bool() const { return score >= 0; }
 
 	void operator >>(std::ostream& out) const {
@@ -1972,6 +1978,7 @@ struct select {
 	inline operator bool() const { return score() != -1; }
 	inline i32 score() const { return best->score; }
 	inline numeric esti() const { return best->esti; }
+	inline numeric estimate() const { return best->estimate(); }
 };
 struct search : select {
 	u32 policy[16];
@@ -2310,7 +2317,7 @@ int main(int argc, const char* argv[]) {
 
 	board b;
 	state last;
-	select best;
+	search xbest;
 	statistic stats;
 	std::vector<state> path;
 	path.reserve(20000);
@@ -2325,15 +2332,16 @@ int main(int argc, const char* argv[]) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best << b; b.next()) {
-				score += best.score();
+			for (b.init(); xbest << b; b.next()) {
+				score += xbest.score();
 				opers += 1;
-				best >> path;
-				best >> b;
+				xbest >> path;
+				xbest >> b;
 			}
 
 			for (numeric v = 0; path.size(); path.pop_back()) {
 				state& s = path.back();
+				transposition::remove(s);
 				s.estimate();
 				v = s.update(v);
 			}
@@ -2351,21 +2359,23 @@ int main(int argc, const char* argv[]) {
 			u32 opers = 0;
 
 			b.init();
-			best << b;
-			score += best.score();
+			xbest << b;
+			score += xbest.score();
 			opers += 1;
-			best >> last;
-			best >> b;
+			xbest >> last;
+			xbest >> b;
 			b.next();
-			while (best << b) {
-				last += best.esti();
-				score += best.score();
+			while (xbest << b) {
+				last += xbest.estimate();
+				transposition::remove(last);
+				score += xbest.score();
 				opers += 1;
-				best >> last;
-				best >> b;
+				xbest >> last;
+				xbest >> b;
 				b.next();
 			}
 			last += 0;
+			transposition::remove(last);
 
 			stats.update(score, b.hash(), opers);
 		}
@@ -2378,8 +2388,6 @@ int main(int argc, const char* argv[]) {
 
 	utils::load_transposition(opts["cache-input"]);
 	utils::make_transposition(opts["cache-value"]);
-
-	search xbest;
 
 	if (test) std::cout << std::endl << "start testing..." << std::endl;
 	for (stats.init(test); stats; stats++) {
