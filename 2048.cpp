@@ -52,7 +52,7 @@ public:
     	auto& length = w.length;
     	auto& value = w.value;
 		u32 code = 4;
-		write_cast<byte>(out, code);
+		write_cast<u8>(out, code);
 		switch (code) {
 		default:
 			std::cerr << "unknown serial (" << code << ") at ostream << weight, ";
@@ -74,8 +74,8 @@ public:
     	auto& length = w.length;
     	auto& value = w.value;
 		u32 code;
-		read_cast<byte>(in, code);
-		switch (code & 0xff) {
+		read_cast<u8>(in, code);
+		switch (code) {
 		case 0:
 		case 1:
 			read_cast<u32>(in, id);
@@ -130,7 +130,7 @@ public:
 
 	static void save(std::ostream& out) {
 		u32 code = 0;
-		write_cast<byte>(out, code);
+		write_cast<u8>(out, code);
 		switch (code) {
 		default:
 			std::cerr << "unknown serial (" << code << ") at weight::save, ";
@@ -146,8 +146,8 @@ public:
 	}
 	static void load(std::istream& in) {
 		u32 code;
-		read_cast<byte>(in, code);
-		switch (code & 0xff) {
+		read_cast<u8>(in, code);
+		switch (code) {
 		default:
 			std::cerr << "unknown serial (" << code << ") at weight::load, ";
 			std::cerr << "use default (0) instead..." << std::endl;
@@ -263,7 +263,7 @@ public:
     	auto& index = f.index;
     	auto& value = f.value;
 		u32 code = 0;
-		write_cast<byte>(out, code);
+		write_cast<u8>(out, code);
 		switch (code) {
 		case 0:
 			write_cast<u32>(out, index.sign());
@@ -279,8 +279,8 @@ public:
     	auto& index = f.index;
     	auto& value = f.value;
 		u32 code;
-		read_cast<byte>(in, code);
-		switch (code & 0xff) {
+		read_cast<u8>(in, code);
+		switch (code) {
 		case 0:
 			read_cast<u32>(in, code);
 			index = indexer::at(code);
@@ -296,7 +296,7 @@ public:
 
 	static void save(std::ostream& out) {
 		u32 code = 0;
-		write_cast<byte>(out, code);
+		write_cast<u8>(out, code);
 		switch (code) {
 		case 0:
 			write_cast<u32>(out, feats().size());
@@ -311,8 +311,8 @@ public:
 	}
 	static void load(std::istream& in) {
 		u32 code;
-		read_cast<byte>(in, code);
-		switch (code & 0xff) {
+		read_cast<u8>(in, code);
+		switch (code) {
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				feature f; in >> f;
