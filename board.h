@@ -187,12 +187,12 @@ public:
 			u32 tmp = 0;
 			score = merge = mono = 0;
 
-			mono = (mono << 2) | monoprobe(row[0], row[1]);
-			mono = (mono << 2) | monoprobe(row[0], row[2]);
-			mono = (mono << 2) | monoprobe(row[0], row[3]);
-			mono = (mono << 2) | monoprobe(row[1], row[2]);
-			mono = (mono << 2) | monoprobe(row[1], row[3]);
-			mono = (mono << 2) | monoprobe(row[2], row[3]);
+			mono |= monoprobe(row[0], row[1]) <<  0;
+			mono |= monoprobe(row[0], row[2]) <<  2;
+			mono |= monoprobe(row[0], row[3]) <<  4;
+			mono |= monoprobe(row[1], row[2]) <<  6;
+			mono |= monoprobe(row[1], row[3]) <<  8;
+			mono |= monoprobe(row[2], row[3]) << 10;
 
 			for (u32 i = 0; i < 4; i++) {
 				u32 tile = row[i];
@@ -217,7 +217,7 @@ public:
 		}
 
 		static u32 monoprobe(const u32& a, const u32& b) {
-			return a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b10 : 0b01);
+			return a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b01 : 0b10);
 		}
 	};
 
