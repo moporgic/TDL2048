@@ -1139,7 +1139,7 @@ u32 make_weights(const std::string& res = "") {
 	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt";
 	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt";
 	predefined["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt";
-	predefined["default"] = predefined["khyeh"] + " fd001001:^24 fd002001:^24";
+	predefined["default"] = predefined["khyeh"] + " fd001001:^24";
 	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:?";
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
@@ -1214,9 +1214,7 @@ u32 make_features(const std::string& res = "") {
 	predefined["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!]";
 	predefined["default"] = predefined["khyeh"] +
 						" fd001001[fd001001] fd001001[fd001011] fd001001[fd001021] fd001001[fd001031]"
-						" fd001001[fd001041] fd001001[fd001051] fd001001[fd001061] fd001001[fd001071]"
-						" fd002001[fd002001] fd002001[fd002011] fd002001[fd002021] fd002001[fd002031]"
-						" fd002001[fd002041] fd002001[fd002051] fd002001[fd002061] fd002001[fd002071]";
+						" fd001001[fd001041] fd001001[fd001051] fd001001[fd001061] fd001001[fd001071]";
 	predefined["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
 								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
 	predefined["4x6patt"] = predefined["khyeh"];
