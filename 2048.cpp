@@ -640,6 +640,64 @@ u64 indexmax(const board& b) { // 16-bit
 	return k.mask(k.max());
 }
 
+u32 isotile[8][16];
+void stateprobe(const board& b) {
+	for (u32 i = 0; i < 8; i++) {
+		board k = b;
+		k.isomorphic(i);
+		for (u32 t = 0; t < 16; t++)
+			isotile[i][t] = k.at(t);
+	}
+}
+
+inline u32 probe(const u32& a, const u32& b) {
+	return a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b10 : 0b01);
+}
+
+template<int iso>
+u64 indexmonotonich(const board& b) { // 24-bit
+	u32* t = isotile[iso];
+	register u32 index = 0;
+
+	index = (index << 2) | probe(t[0], t[1]);
+	index = (index << 2) | probe(t[0], t[2]);
+	index = (index << 2) | probe(t[0], t[3]);
+	index = (index << 2) | probe(t[1], t[2]);
+	index = (index << 2) | probe(t[1], t[3]);
+	index = (index << 2) | probe(t[2], t[3]);
+
+	index = (index << 2) | probe(t[4], t[5]);
+	index = (index << 2) | probe(t[4], t[6]);
+	index = (index << 2) | probe(t[4], t[7]);
+	index = (index << 2) | probe(t[5], t[6]);
+	index = (index << 2) | probe(t[5], t[7]);
+	index = (index << 2) | probe(t[6], t[7]);
+
+	return index;
+}
+
+template<int iso>
+u64 indexmonotonicv(const board& b) { // 24-bit
+	u32* t = isotile[iso];
+	register u32 index = 0;
+
+	index = (index << 2) | probe(t[0], t[4]);
+	index = (index << 2) | probe(t[1], t[5]);
+	index = (index << 2) | probe(t[2], t[6]);
+	index = (index << 2) | probe(t[3], t[7]);
+	index = (index << 2) | probe(t[0], t[8]);
+	index = (index << 2) | probe(t[1], t[9]);
+
+	index = (index << 2) | probe(t[4], t[8]);
+	index = (index << 2) | probe(t[5], t[9]);
+	index = (index << 2) | probe(t[6], t[10]);
+	index = (index << 2) | probe(t[7], t[11]);
+	index = (index << 2) | probe(t[4], t[12]);
+	index = (index << 2) | probe(t[5], t[13]);
+
+	return index;
+}
+
 u32 make_indexers(const std::string& res = "") {
 	u32 succ = 0;
 	auto imake = [&](u32 sign, indexer::mapper func) {
@@ -1005,6 +1063,25 @@ u32 make_indexers(const std::string& res = "") {
 	imake(0xfd000050, utils::indexmono<5>);
 	imake(0xfd000060, utils::indexmono<6>);
 	imake(0xfd000070, utils::indexmono<7>);
+
+	imake(0xfd001001, utils::indexmonotonich<0>);
+	imake(0xfd001011, utils::indexmonotonich<1>);
+	imake(0xfd001021, utils::indexmonotonich<2>);
+	imake(0xfd001031, utils::indexmonotonich<3>);
+	imake(0xfd001041, utils::indexmonotonich<4>);
+	imake(0xfd001051, utils::indexmonotonich<5>);
+	imake(0xfd001061, utils::indexmonotonich<6>);
+	imake(0xfd001071, utils::indexmonotonich<7>);
+
+	imake(0xfd002001, utils::indexmonotonicv<0>);
+	imake(0xfd002011, utils::indexmonotonicv<1>);
+	imake(0xfd002021, utils::indexmonotonicv<2>);
+	imake(0xfd002031, utils::indexmonotonicv<3>);
+	imake(0xfd002041, utils::indexmonotonicv<4>);
+	imake(0xfd002051, utils::indexmonotonicv<5>);
+	imake(0xfd002061, utils::indexmonotonicv<6>);
+	imake(0xfd002071, utils::indexmonotonicv<7>);
+
 	imake(0xfc000000, utils::indexmax<0>);
 	imake(0xfc000010, utils::indexmax<1>);
 	imake(0xfc000020, utils::indexmax<2>);
@@ -1062,7 +1139,7 @@ u32 make_weights(const std::string& res = "") {
 	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt";
 	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt";
 	predefined["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt";
-	predefined["default"] = predefined["khyeh"] + " fe000001:^25 ff000000:^16";
+	predefined["default"] = predefined["khyeh"] + " fd001001:^24 fd002001:^24";
 	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:?";
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
@@ -1135,7 +1212,11 @@ u32 make_features(const std::string& res = "") {
 	predefined["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!]";
 	predefined["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!]";
 	predefined["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!]";
-	predefined["default"] = predefined["khyeh"] + " fe000001[fe000001] ff000000[ff000000]";
+	predefined["default"] = predefined["khyeh"] +
+						" fd001001[fd001001] fd001001[fd001011] fd001001[fd001021] fd001001[fd001031]"
+						" fd001001[fd001041] fd001001[fd001051] fd001001[fd001061] fd001001[fd001071]"
+						" fd002001[fd002001] fd002001[fd002011] fd002001[fd002021] fd002001[fd002031]"
+						" fd002001[fd002041] fd002001[fd002051] fd002001[fd002061] fd002001[fd002071]";
 	predefined["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
 								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
 	predefined["4x6patt"] = predefined["khyeh"];
@@ -1211,6 +1292,7 @@ void list_mapping() {
 
 inline numeric estimate(const board& state,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	stateprobe(state);
 	register numeric esti = 0;
 	for (auto f = begin; f != end; f++)
 		esti += (*f)[state];
@@ -1219,6 +1301,7 @@ inline numeric estimate(const board& state,
 
 inline numeric update(const board& state, const numeric& updv,
 		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+	stateprobe(state);
 	register numeric esti = 0;
 	for (auto f = begin; f != end; f++)
 		esti += ((*f)[state] += updv);
