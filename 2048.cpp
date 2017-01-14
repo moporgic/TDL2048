@@ -1157,6 +1157,8 @@ u32 make_features(const std::string& res = "") {
 
 		std::stringstream(wghts) >> std::hex >> wght;
 		if (weight::find(wght) == weight::end()) {
+			std::cerr << "unknown weight (" << wghts << ") at make_features, ";
+			std::cerr << "assume as pattern descriptor..." << std::endl;
 			weight::make(wght, std::pow(16ull, wghts.size()));
 		}
 
@@ -1174,6 +1176,8 @@ u32 make_features(const std::string& res = "") {
 				xpatt[i] = x[xpatt[i]];
 			idxr = utils::hashpatt(xpatt);
 			if (indexer::find(idxr) == indexer::end()) {
+				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
+				std::cerr << "assume as pattern descriptor..." << std::endl;
 				auto patt = new std::vector<int>(xpatt); // will NOT be deleted
 				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
 			}
@@ -1202,6 +1206,8 @@ void list_mapping() {
 			snprintf(buf, sizeof(buf), "weight(%08llx)[%llu] = %d%c", w.sign(), w.size(), usage, scale);
 			std::cout << buf << " :" << feats << std::endl;
 		} else {
+			snprintf(buf, sizeof(buf), "%08llx", w.sign());
+			std::cerr << "unused weight (" << buf << ") at list_mapping" << std::endl;
 			weight::erase(weight::find(w.sign()));
 		}
 	}
