@@ -1069,7 +1069,8 @@ u32 make_weights(const std::string& res = "") {
 	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt";
 	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt";
 	predefined["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt";
-	predefined["default"] = predefined["khyeh"] + " fd012301:^24 fd456701:^24";
+	predefined["monotonic"] = "fd012301:^24 fd456701:^24";
+	predefined["default"] = predefined["khyeh"] + " " + predefined["monotonic"];
 	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:?";
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
@@ -1142,11 +1143,11 @@ u32 make_features(const std::string& res = "") {
 	predefined["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!]";
 	predefined["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!]";
 	predefined["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!]";
-	predefined["default"] = predefined["khyeh"] +
-						" fd012301[fd012301] fd012301[fd37bf01] fd012301[fdfedc01] fd012301[fdc84001]"
-						" fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01]"
-						" fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101]"
-						" fd456701[fd765401] fd456701[fdea6201] fd456701[fd89ab01] fd456701[fd159d01]";
+	predefined["monotonic"] = "fd012301[fd012301] fd012301[fd37bf01] fd012301[fdfedc01] fd012301[fdc84001] "
+							  "fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01] "
+							  "fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101] "
+							  "fd456701[fd765401] fd456701[fdea6201] fd456701[fd89ab01] fd456701[fd159d01] ";
+	predefined["default"] = predefined["khyeh"] + " " + predefined["monotonic"];
 	predefined["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
 								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
 	predefined["4x6patt"] = predefined["khyeh"];
