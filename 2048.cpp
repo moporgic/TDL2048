@@ -1059,11 +1059,11 @@ u32 make_weights(const std::string& res = "") {
 	if (in.empty() && weight::list().empty())
 		in = "default";
 	std::map<std::string, std::string> predefined;
-	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt";
-	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt";
-	predefined["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt";
-	predefined["default"] = predefined["khyeh"] + " fe000001:^25 ff000000:^16";
-	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:?";
+	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt ";
+	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt ";
+	predefined["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt ";
+	predefined["default"] = predefined["khyeh"] + "fe000001:^25 ff000000:^16 ";
+	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:? ";
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
@@ -1132,12 +1132,12 @@ u32 make_features(const std::string& res = "") {
 	if (in.empty() && feature::list().empty())
 		in = "default";
 	std::map<std::string, std::string> predefined;
-	predefined["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!]";
-	predefined["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!]";
-	predefined["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!]";
-	predefined["default"] = predefined["khyeh"] + " fe000001[fe000001] ff000000[ff000000]";
+	predefined["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] ";
+	predefined["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!] ";
+	predefined["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!] ";
+	predefined["default"] = predefined["khyeh"] + "fe000001[fe000001] ff000000[ff000000] ";
 	predefined["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
-								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
+								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
