@@ -594,6 +594,21 @@ u64 indexnum3(const board& b) { // 28-bit
 	return index;
 }
 
+u64 indexnum4(const board& b) { // 24-bit
+	auto num = b.numof();
+	register u64 index = 0;
+	index |= (num[0] + num[1] + num[2] + num[3]) << 0; // 0+2+4+8, 4-bit
+	index |= (num[4] + num[5] + num[6]) << 4; // 16+32+64, 4-bit
+	index |= (num[7] + num[8]) << 8; // 128+256, 4-bit
+	index |= std::min(num[9] + num[10], 7u) << 12; // 512+1024, 3-bit
+	index |= std::min(num[11], 3u) << 15; // 2048~16384, 2-bit ea.
+	index |= std::min(num[12], 3u) << 17;
+	index |= std::min(num[13], 3u) << 19;
+	index |= std::min(num[14], 3u) << 21;
+	index |= std::min(num[15], 1u) << 23; // 32768, 1-bit
+	return index;
+}
+
 u64 indexnuma(const board& b, const std::vector<int>& n) {
 	auto num = b.numof();
 	register u64 index = 0;
@@ -997,6 +1012,7 @@ u32 make_indexers(const std::string& res = "") {
 	imake(0xfe0000c2, utils::indexnum2x<1, 0, 1>);
 	imake(0xfe0000d2, utils::indexnum2x<1, 2, 3>);
 	imake(0xfe000003, utils::indexnum3);
+	imake(0xfe000004, utils::indexnum4);
 	imake(0xfd000000, utils::indexmono<0>);
 	imake(0xfd000010, utils::indexmono<1>);
 	imake(0xfd000020, utils::indexmono<2>);
