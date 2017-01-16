@@ -631,12 +631,11 @@ u64 indexnuma(const board& b, const std::vector<int>& n) {
 	return index;
 }
 
-template<int isomorphic>
+template<int p0, int p1, int p2, int p3, int p4, int p5, int p6, int p7>
 u64 indexmono(const board& b) { // 24-bit
-	board k = b;
-	k.rotate(isomorphic);
-	if (isomorphic >= 4) k.mirror();
-	return k.mono();
+	u32 h0 = (b.at(p0)) | (b.at(p1) << 4) | (b.at(p2) << 8) | (b.at(p3) << 12);
+	u32 h1 = (b.at(p4)) | (b.at(p5) << 4) | (b.at(p6) << 8) | (b.at(p7) << 12);
+	return (board::lookup(h0).left.mono) | (board::lookup(h1).left.mono << 12);
 }
 
 template<u32 tile, int isomorphic>
@@ -1013,14 +1012,22 @@ u32 make_indexers(const std::string& res = "") {
 	imake(0xfe0000d2, utils::indexnum2x<1, 2, 3>);
 	imake(0xfe000003, utils::indexnum3);
 	imake(0xfe000004, utils::indexnum4);
-	imake(0xfd000000, utils::indexmono<0>);
-	imake(0xfd000010, utils::indexmono<1>);
-	imake(0xfd000020, utils::indexmono<2>);
-	imake(0xfd000030, utils::indexmono<3>);
-	imake(0xfd000040, utils::indexmono<4>);
-	imake(0xfd000050, utils::indexmono<5>);
-	imake(0xfd000060, utils::indexmono<6>);
-	imake(0xfd000070, utils::indexmono<7>);
+	imake(0xfd012301, utils::indexmono<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
+	imake(0xfd37bf01, utils::indexmono<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
+	imake(0xfdfedc01, utils::indexmono<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
+	imake(0xfdc84001, utils::indexmono<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
+	imake(0xfd321001, utils::indexmono<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
+	imake(0xfdfb7301, utils::indexmono<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
+	imake(0xfdcdef01, utils::indexmono<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
+	imake(0xfd048c01, utils::indexmono<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
+	imake(0xfd456701, utils::indexmono<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
+	imake(0xfd26ae01, utils::indexmono<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
+	imake(0xfdba9801, utils::indexmono<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
+	imake(0xfdd95101, utils::indexmono<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
+	imake(0xfd765401, utils::indexmono<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
+	imake(0xfdea6201, utils::indexmono<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
+	imake(0xfd89ab01, utils::indexmono<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
+	imake(0xfd159d01, utils::indexmono<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
 	imake(0xfc000000, utils::indexmax<0>);
 	imake(0xfc000010, utils::indexmax<1>);
 	imake(0xfc000020, utils::indexmax<2>);
@@ -1078,8 +1085,9 @@ u32 make_weights(const std::string& res = "") {
 	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt ";
 	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt ";
 	predefined["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt ";
-	predefined["default"] = predefined["khyeh"] + "fe000001:^25 ff000000:^16 ";
 	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:? ";
+	predefined["monotonic"] = "fd012301:^24 fd456701:^24 ";
+	predefined["default"] = predefined["khyeh"] + predefined["monotonic"];
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
@@ -1151,7 +1159,11 @@ u32 make_features(const std::string& res = "") {
 	predefined["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] ";
 	predefined["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!] ";
 	predefined["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!] ";
-	predefined["default"] = predefined["khyeh"] + "fe000001[fe000001] ff000000[ff000000] ";
+	predefined["monotonic"] = "fd012301[fd012301] fd012301[fd37bf01] fd012301[fdfedc01] fd012301[fdc84001] "
+							  "fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01] "
+							  "fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101] "
+							  "fd456701[fd765401] fd456701[fdea6201] fd456701[fd89ab01] fd456701[fd159d01] ";
+	predefined["default"] = predefined["khyeh"] + predefined["monotonic"];
 	predefined["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
 								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
 	predefined["4x6patt"] = predefined["khyeh"];
