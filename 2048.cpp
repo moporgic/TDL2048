@@ -1440,7 +1440,7 @@ struct statistic {
 			(*it) = std::accumulate(it, accum.end(), 0);
 		char buf[80];
 		snprintf(buf, sizeof(buf), "%-6s" "%8s" "%8s" "%9s" "%9s",
-				"tile", "count", "score", "rate", "achieve");
+				"tile", "count", "score", "rate", "win");
 		std::cout << buf << std::endl;
 		for (auto i = first; i < last && accum[i]; i++) {
 			if (accum[i + 1] == accum[0]) continue;
