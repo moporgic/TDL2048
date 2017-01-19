@@ -1117,7 +1117,7 @@ u32 make_weights(const std::string& res = "") {
 	predefined["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt ";
 	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:? ";
 	predefined["monotonic"] = "fd012301:^24 fd456701:^24 ";
-	predefined["default"] = predefined["khyeh"] + predefined["monotonic"] + "fe000004:^24 ";
+	predefined["default"] = predefined["khyeh"] + predefined["monotonic"] + "fe000005:^24 fe000015:^24 ";
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
@@ -1195,7 +1195,7 @@ u32 make_features(const std::string& res = "") {
 							  "fd456701[fd765401] fd456701[fdea6201] fd456701[fd89ab01] fd456701[fd159d01] ";
 	predefined["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
 								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
-	predefined["default"] = predefined["khyeh"] + predefined["monotonic"] + "fe000004[fe000004] ";
+	predefined["default"] = predefined["khyeh"] + predefined["monotonic"] + "fe000005[fe000005] fe000015[fe000015] ";
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
@@ -1403,11 +1403,13 @@ struct statistic {
 	u64 limit;
 	u64 loop;
 	u64 check;
+	u32 winv;
 
 	struct control {
 		u64 num;
 		u64 chk;
-		control(const u64& num = 1000, const u64& chk = 1000) : num(num), chk(chk) {}
+		u32 win;
+		control(u64 num = 1000, u64 chk = 1000, u32 win = 2048) : num(num), chk(chk), win(win) {}
 		operator bool() const { return num; }
 	};
 
@@ -1423,10 +1425,11 @@ struct statistic {
 	std::array<u32, 32> count;
 	std::array<u64, 32> score;
 
-	void init(const control& ctrl) {
+	void init(const control& ctrl = control()) {
 		limit = ctrl.num * ctrl.chk;
 		loop = 1;
 		check = ctrl.chk;
+		winv = ctrl.win;
 
 		count = {};
 		score = {};
@@ -1443,7 +1446,7 @@ struct statistic {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
-		if (hash >= 2048) local.win++;
+		if (hash >= winv) local.win += 1;
 		local.max = std::max(local.max, score);
 
 		if ((loop % check) != 0) return;
@@ -1485,7 +1488,7 @@ struct statistic {
 	void updatec(const u32& score, const u32& hash, const u32& opers) {
 		update(score, hash, opers);
 		u32 max = std::log2(hash);
-		this->count[max]++;
+		this->count[max] += 1;
 		this->score[max] += score;
 	}
 
