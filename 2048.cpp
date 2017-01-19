@@ -1448,6 +1448,8 @@ struct statistic {
 		local.opers += opers;
 		if (hash >= winv) local.win += 1;
 		local.max = std::max(local.max, score);
+		this->count[std::log2(hash)] += 1;
+		this->score[std::log2(hash)] += score;
 
 		if ((loop % check) != 0) return;
 
@@ -1483,13 +1485,6 @@ struct statistic {
 
 		local = {};
 		local.time = currtimept;
-	}
-
-	void updatec(const u32& score, const u32& hash, const u32& opers) {
-		update(score, hash, opers);
-		u32 max = std::log2(hash);
-		this->count[max] += 1;
-		this->score[max] += score;
 	}
 
 	void summary(int first = 1, int last = 17) {
@@ -1760,7 +1755,7 @@ int main(int argc, const char* argv[]) {
 			best >> b;
 		}
 
-		stats.updatec(score, b.hash(), opers);
+		stats.update(score, b.hash(), opers);
 	}
 	if (test) stats.summary();
 
