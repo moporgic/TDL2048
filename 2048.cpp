@@ -1422,8 +1422,12 @@ struct statistic {
 		u32 hash;
 	} total, local;
 
-	std::array<u32, 32> count;
-	std::array<u64, 32> score;
+	struct each {
+		std::array<u64, 32> score;
+		std::array<u64, 32> opers;
+		std::array<u64, 32> count;
+	} every;
+
 
 	void init(const control& ctrl = control()) {
 		limit = ctrl.num * ctrl.chk;
@@ -1431,8 +1435,7 @@ struct statistic {
 		check = ctrl.chk;
 		winv = ctrl.win;
 
-		count = {};
-		score = {};
+		every = {};
 		total = {};
 		local = {};
 		local.time = moporgic::millisec();
@@ -1448,8 +1451,9 @@ struct statistic {
 		local.opers += opers;
 		if (hash >= winv) local.win += 1;
 		local.max = std::max(local.max, score);
-		this->count[std::log2(hash)] += 1;
-		this->score[std::log2(hash)] += score;
+		every.count[std::log2(hash)] += 1;
+		every.score[std::log2(hash)] += score;
+		every.opers[std::log2(hash)] += opers;
 
 		if ((loop % check) != 0) return;
 
@@ -1487,24 +1491,23 @@ struct statistic {
 		local.time = currtimept;
 	}
 
-	void summary(int first = 1, int last = 17) {
+	void summary() const {
 		std::cout << std::endl << "summary" << std::endl;
-		auto count = this->count;
-		auto accum = this->count;
-		auto score = this->score;
-		for (auto it = accum.begin(); it != accum.end(); it++)
-			(*it) = std::accumulate(it, accum.end(), 0);
 		char buf[80];
-		snprintf(buf, sizeof(buf), "%-6s" "%8s" "%8s" "%9s" "%9s",
-				"tile", "count", "score", "rate", "win");
+		snprintf(buf, sizeof(buf), "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
+								   "tile", "count", "score", "move", "rate", "win");
 		std::cout << buf << std::endl;
-		for (auto i = first; i < last && accum[i]; i++) {
-			if (accum[i + 1] == accum[0]) continue;
-			snprintf(buf, sizeof(buf), "%-6d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
-					(1 << (i)) & -2u, count[i],
-					(count[i] ? u32(score[i] / count[i]) : 0),
-					(count[i] * 100.0 / accum[0]),
-					(accum[i] * 100.0 / accum[0]));
+		const auto& count = every.count;
+		const auto& score = every.score;
+		const auto& opers = every.opers;
+		auto total = std::accumulate(count.begin(), count.end(), 0);
+		auto remain = total;
+		for (auto i = 0; remain; remain -= count[i++]) {
+			if (count[i] == 0) continue;
+			snprintf(buf, sizeof(buf), "%-6d" "%8d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
+					(1 << (i)) & 0xfffffffeu, u32(count[i]),
+					u32(score[i] / count[i]), u32(opers[i] / count[i]),
+					count[i] * 100.0 / total, remain * 100.0 / total);
 			std::cout << buf << std::endl;
 		}
 	}
@@ -1516,8 +1519,9 @@ struct statistic {
 		total.opers += stat.total.opers;
 		total.hash |= stat.total.hash;
 		total.max = std::max(total.max, stat.total.max);
-		std::transform(count.begin(), count.end(), stat.count.begin(), count.begin(), std::plus<u32>());
-		std::transform(score.begin(), score.end(), stat.score.begin(), score.begin(), std::plus<u64>());
+		std::transform(every.count.begin(), every.count.end(), stat.every.count.begin(), every.count.begin(), std::plus<u64>());
+		std::transform(every.score.begin(), every.score.end(), stat.every.score.begin(), every.score.begin(), std::plus<u64>());
+		std::transform(every.opers.begin(), every.opers.end(), stat.every.opers.begin(), every.opers.begin(), std::plus<u64>());
 	}
 };
 
