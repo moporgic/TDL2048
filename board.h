@@ -186,12 +186,13 @@ public:
 			u32 top = 0;
 			u32 tmp = 0;
 			score = merge = mono = 0;
-			if (row[0] >= row[1]) mono |= 0x01;
-			if (row[0] >= row[2]) mono |= 0x02;
-			if (row[0] >= row[3]) mono |= 0x04;
-			if (row[1] >= row[2]) mono |= 0x08;
-			if (row[1] >= row[3]) mono |= 0x10;
-			if (row[2] >= row[3]) mono |= 0x20;
+
+			mono |= monoprobe(row[0], row[1]) <<  0;
+			mono |= monoprobe(row[0], row[2]) <<  2;
+			mono |= monoprobe(row[0], row[3]) <<  4;
+			mono |= monoprobe(row[1], row[2]) <<  6;
+			mono |= monoprobe(row[1], row[3]) <<  8;
+			mono |= monoprobe(row[2], row[3]) << 10;
 
 			for (u32 i = 0; i < 4; i++) {
 				u32 tile = row[i];
@@ -213,6 +214,10 @@ public:
 				}
 			}
 			if (tmp != 0) row[top] = tmp;
+		}
+
+		static u32 monoprobe(const u32& a, const u32& b) {
+			return a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b01 : 0b10);
 		}
 	};
 
@@ -596,13 +601,21 @@ public:
 		return board::lookup(mask(t)).layout;
 	}
 
-	inline u32 mono(const bool& left = true) const {
+	inline u64 mono(const bool& left = true) const {
 		if (left) {
-			return (query(0).left.mono << 0)  | (query(1).left.mono << 6)
-				 | (query(2).left.mono << 12) | (query(3).left.mono << 18);
+			register u64 mono = 0;
+			mono = (mono << 12) | query(0).left.mono;
+			mono = (mono << 12) | query(1).left.mono;
+			mono = (mono << 12) | query(2).left.mono;
+			mono = (mono << 12) | query(3).left.mono;
+			return mono;
 		} else {
-			return (query(0).right.mono << 0)  | (query(1).right.mono << 6)
-				 | (query(2).right.mono << 12) | (query(3).right.mono << 18);
+			register u64 mono = 0;
+			mono = (mono << 12) | query(0).right.mono;
+			mono = (mono << 12) | query(1).right.mono;
+			mono = (mono << 12) | query(2).right.mono;
+			mono = (mono << 12) | query(3).right.mono;
+			return mono;
 		}
 	}
 
