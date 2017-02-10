@@ -54,7 +54,7 @@ public:
     	auto& length = w.length;
     	auto& value = w.value;
 		u32 code = 4;
-		write_cast<byte>(out, code);
+		write_cast<u8>(out, code);
 		switch (code) {
 		default:
 			std::cerr << "unknown serial (" << code << ") at ostream << weight, ";
@@ -76,8 +76,8 @@ public:
     	auto& length = w.length;
     	auto& value = w.value;
 		u32 code;
-		read_cast<byte>(in, code);
-		switch (code & 0xff) {
+		read_cast<u8>(in, code);
+		switch (code) {
 		case 0:
 		case 1:
 			read_cast<u32>(in, id);
@@ -132,7 +132,7 @@ public:
 
 	static void save(std::ostream& out) {
 		u32 code = 0;
-		write_cast<byte>(out, code);
+		write_cast<u8>(out, code);
 		switch (code) {
 		default:
 			std::cerr << "unknown serial (" << code << ") at weight::save, ";
@@ -148,8 +148,8 @@ public:
 	}
 	static void load(std::istream& in) {
 		u32 code;
-		read_cast<byte>(in, code);
-		switch (code & 0xff) {
+		read_cast<u8>(in, code);
+		switch (code) {
 		default:
 			std::cerr << "unknown serial (" << code << ") at weight::load, ";
 			std::cerr << "use default (0) instead..." << std::endl;
@@ -265,7 +265,7 @@ public:
     	auto& index = f.index;
     	auto& value = f.value;
 		u32 code = 0;
-		write_cast<byte>(out, code);
+		write_cast<u8>(out, code);
 		switch (code) {
 		case 0:
 			write_cast<u32>(out, index.sign());
@@ -281,8 +281,8 @@ public:
     	auto& index = f.index;
     	auto& value = f.value;
 		u32 code;
-		read_cast<byte>(in, code);
-		switch (code & 0xff) {
+		read_cast<u8>(in, code);
+		switch (code) {
 		case 0:
 			read_cast<u32>(in, code);
 			index = indexer::at(code);
@@ -298,7 +298,7 @@ public:
 
 	static void save(std::ostream& out) {
 		u32 code = 0;
-		write_cast<byte>(out, code);
+		write_cast<u8>(out, code);
 		switch (code) {
 		case 0:
 			write_cast<u32>(out, feats().size());
@@ -313,8 +313,8 @@ public:
 	}
 	static void load(std::istream& in) {
 		u32 code;
-		read_cast<byte>(in, code);
-		switch (code & 0xff) {
+		read_cast<u8>(in, code);
+		switch (code) {
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				feature f; in >> f;
@@ -1116,6 +1116,49 @@ u64 indexnum3(const board& b) { // 28-tpbit
 	return index;
 }
 
+u64 indexnum4(const board& b) { // 24-bit
+	auto num = b.numof();
+	register u64 index = 0;
+	index |= (num[0] + num[1] + num[2] + num[3]) << 0; // 0+2+4+8, 4-bit
+	index |= (num[4] + num[5] + num[6]) << 4; // 16+32+64, 4-bit
+	index |= (num[7] + num[8]) << 8; // 128+256, 4-bit
+	index |= std::min(num[9] + num[10], 7u) << 12; // 512+1024, 3-bit
+	index |= std::min(num[11], 3u) << 15; // 2048~16384, 2-bit ea.
+	index |= std::min(num[12], 3u) << 17;
+	index |= std::min(num[13], 3u) << 19;
+	index |= std::min(num[14], 3u) << 21;
+	index |= std::min(num[15], 1u) << 23; // 32768, 1-bit
+	return index;
+}
+
+u64 indexnum5lt(const board& b) { // 24-bit
+	auto num = b.numof();
+	register u64 index = 0;
+	index |= std::min(num[8],  7u) <<  0; // 256, 3-bit
+	index |= std::min(num[9],  7u) <<  3; // 512, 3-bit
+	index |= std::min(num[10], 7u) <<  6; // 1024, 3-bit
+	index |= std::min(num[11], 7u) <<  9; // 2048, 3-bit
+	index |= std::min(num[12], 7u) << 12; // 4096, 3-bit
+	index |= std::min(num[13], 7u) << 15; // 8192, 3-bit
+	index |= std::min(num[14], 7u) << 18; // 16384, 3-bit
+	index |= std::min(num[15], 7u) << 21; // 32768, 3-bit
+	return index;
+}
+
+u64 indexnum5st(const board& b) { // 24-bit
+	auto num = b.numof();
+	register u64 index = 0;
+	index |= std::min(num[0], 7u) <<  0; // 0, 3-bit
+	index |= std::min(num[1], 7u) <<  3; // 2, 3-bit
+	index |= std::min(num[2], 7u) <<  6; // 4, 3-bit
+	index |= std::min(num[3], 7u) <<  9; // 8, 3-bit
+	index |= std::min(num[4], 7u) << 12; // 16, 3-bit
+	index |= std::min(num[5], 7u) << 15; // 32, 3-bit
+	index |= std::min(num[6], 7u) << 18; // 64, 3-bit
+	index |= std::min(num[7], 7u) << 21; // 128, 3-bit
+	return index;
+}
+
 u64 indexnuma(const board& b, const std::vector<int>& n) {
 	auto num = b.numof();
 	register u64 index = 0;
@@ -1138,12 +1181,11 @@ u64 indexnuma(const board& b, const std::vector<int>& n) {
 	return index;
 }
 
-template<int isomorphic>
-u64 indexmono(const board& b) { // 24-tpbit
-	board k = b;
-	k.rotate(isomorphic);
-	if (isomorphic >= 4) k.mirror();
-	return k.mono();
+template<int p0, int p1, int p2, int p3, int p4, int p5, int p6, int p7>
+u64 indexmono(const board& b) { // 24-bit
+	u32 h0 = (b.at(p0)) | (b.at(p1) << 4) | (b.at(p2) << 8) | (b.at(p3) << 12);
+	u32 h1 = (b.at(p4)) | (b.at(p5) << 4) | (b.at(p6) << 8) | (b.at(p7) << 12);
+	return (board::lookup(h0).left.mono) | (board::lookup(h1).left.mono << 12);
 }
 
 template<u32 tile, int isomorphic>
@@ -1519,14 +1561,25 @@ u32 make_indexers(const std::string& res = "") {
 	imake(0xfe0000c2, utils::indexnum2x<1, 0, 1>);
 	imake(0xfe0000d2, utils::indexnum2x<1, 2, 3>);
 	imake(0xfe000003, utils::indexnum3);
-	imake(0xfd000000, utils::indexmono<0>);
-	imake(0xfd000010, utils::indexmono<1>);
-	imake(0xfd000020, utils::indexmono<2>);
-	imake(0xfd000030, utils::indexmono<3>);
-	imake(0xfd000040, utils::indexmono<4>);
-	imake(0xfd000050, utils::indexmono<5>);
-	imake(0xfd000060, utils::indexmono<6>);
-	imake(0xfd000070, utils::indexmono<7>);
+	imake(0xfe000004, utils::indexnum4);
+	imake(0xfe000005, utils::indexnum5lt);
+	imake(0xfe000015, utils::indexnum5st);
+	imake(0xfd012301, utils::indexmono<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
+	imake(0xfd37bf01, utils::indexmono<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
+	imake(0xfdfedc01, utils::indexmono<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
+	imake(0xfdc84001, utils::indexmono<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
+	imake(0xfd321001, utils::indexmono<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
+	imake(0xfdfb7301, utils::indexmono<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
+	imake(0xfdcdef01, utils::indexmono<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
+	imake(0xfd048c01, utils::indexmono<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
+	imake(0xfd456701, utils::indexmono<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
+	imake(0xfd26ae01, utils::indexmono<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
+	imake(0xfdba9801, utils::indexmono<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
+	imake(0xfdd95101, utils::indexmono<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
+	imake(0xfd765401, utils::indexmono<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
+	imake(0xfdea6201, utils::indexmono<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
+	imake(0xfd89ab01, utils::indexmono<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
+	imake(0xfd159d01, utils::indexmono<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
 	imake(0xfc000000, utils::indexmax<0>);
 	imake(0xfc000010, utils::indexmax<1>);
 	imake(0xfc000020, utils::indexmax<2>);
@@ -1581,11 +1634,12 @@ u32 make_weights(const std::string& res = "") {
 	if (in.empty() && weight::list().empty())
 		in = "default";
 	std::map<std::string, std::string> predefined;
-	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt";
-	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt";
-	predefined["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt";
-	predefined["default"] = predefined["khyeh"] + " fe000001:^25 ff000000:^16";
-	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:?";
+	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt ";
+	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt ";
+	predefined["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt ";
+	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:? ";
+	predefined["monotonic"] = "fd012301:^24 fd456701:^24 ";
+	predefined["default"] = predefined["khyeh"] + predefined["monotonic"] + "fe000005:^24 fe000015:^24 ";
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
@@ -1654,12 +1708,16 @@ u32 make_features(const std::string& res = "") {
 	if (in.empty() && feature::list().empty())
 		in = "default";
 	std::map<std::string, std::string> predefined;
-	predefined["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!]";
-	predefined["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!]";
-	predefined["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!]";
-	predefined["default"] = predefined["khyeh"] + " fe000001[fe000001] ff000000[ff000000]";
+	predefined["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] ";
+	predefined["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!] ";
+	predefined["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!] ";
+	predefined["monotonic"] = "fd012301[fd012301] fd012301[fd37bf01] fd012301[fdfedc01] fd012301[fdc84001] "
+							  "fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01] "
+							  "fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101] "
+							  "fd456701[fd765401] fd456701[fdea6201] fd456701[fd89ab01] fd456701[fd159d01] ";
 	predefined["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
-								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a!";
+								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
+	predefined["default"] = predefined["khyeh"] + predefined["monotonic"] + "fe000005[fe000005] fe000015[fe000015] ";
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
@@ -1679,6 +1737,8 @@ u32 make_features(const std::string& res = "") {
 
 		std::stringstream(wghts) >> std::hex >> wght;
 		if (weight::find(wght) == weight::end()) {
+			std::cerr << "unknown weight (" << wghts << ") at make_features, ";
+			std::cerr << "assume as pattern descriptor..." << std::endl;
 			weight::make(wght, std::pow(16ull, wghts.size()));
 		}
 
@@ -1696,6 +1756,8 @@ u32 make_features(const std::string& res = "") {
 				xpatt[i] = x[xpatt[i]];
 			idxr = utils::hashpatt(xpatt);
 			if (indexer::find(idxr) == indexer::end()) {
+				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
+				std::cerr << "assume as pattern descriptor..." << std::endl;
 				auto patt = new std::vector<int>(xpatt); // will NOT be deleted
 				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
 			}
@@ -1724,6 +1786,8 @@ void list_mapping() {
 			snprintf(buf, sizeof(buf), "weight(%08llx)[%llu] = %d%c", w.sign(), w.size(), usage, scale);
 			std::cout << buf << " :" << feats << std::endl;
 		} else {
+			snprintf(buf, sizeof(buf), "%08llx", w.sign());
+			std::cerr << "unused weight (" << buf << ") at list_mapping" << std::endl;
 			weight::erase(weight::find(w.sign()));
 		}
 	}
@@ -2005,11 +2069,13 @@ struct statistic {
 	u64 limit;
 	u64 loop;
 	u64 check;
+	u32 winv;
 
 	struct control {
 		u64 num;
 		u64 chk;
-		control(const u64& num = 1000, const u64& chk = 1000) : num(num), chk(chk) {}
+		u32 win;
+		control(u64 num = 1000, u64 chk = 1000, u32 win = 2048) : num(num), chk(chk), win(win) {}
 		operator bool() const { return num; }
 	};
 
@@ -2022,16 +2088,20 @@ struct statistic {
 		u32 hash;
 	} total, local;
 
-	std::array<u32, 32> count;
-	std::array<u64, 32> score;
+	struct each {
+		std::array<u64, 32> score;
+		std::array<u64, 32> opers;
+		std::array<u64, 32> count;
+	} every;
 
-	void init(const control& ctrl) {
+
+	void init(const control& ctrl = control()) {
 		limit = ctrl.num * ctrl.chk;
 		loop = 1;
 		check = ctrl.chk;
+		winv = ctrl.win;
 
-		count = {};
-		score = {};
+		every = {};
 		total = {};
 		local = {};
 		local.time = moporgic::millisec();
@@ -2045,8 +2115,11 @@ struct statistic {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
-		if (hash >= 2048) local.win++;
+		if (hash >= winv) local.win += 1;
 		local.max = std::max(local.max, score);
+		every.count[std::log2(hash)] += 1;
+		every.score[std::log2(hash)] += score;
+		every.opers[std::log2(hash)] += opers;
 
 		if ((loop % check) != 0) return;
 
@@ -2084,29 +2157,23 @@ struct statistic {
 		local.time = currtimept;
 	}
 
-	void updatec(const u32& score, const u32& hash, const u32& opers) {
-		update(score, hash, opers);
-		u32 max = std::log2(hash);
-		this->count[max]++;
-		this->score[max] += score;
-	}
-
-	void summary(int first = 1, int last = 17) {
+	void summary() const {
 		std::cout << std::endl << "summary" << std::endl;
-		auto count = this->count;
-		auto accum = this->count;
-		auto score = this->score;
-		for (auto it = accum.begin(); it != accum.end(); it++)
-			(*it) = std::accumulate(it, accum.end(), 0);
 		char buf[80];
-		std::cout << "tile\t   count   score     rate  achieve" << std::endl;
-		for (auto i = first; i < last && accum[i]; i++) {
-			if (accum[i + 1] == accum[0]) continue;
-			snprintf(buf, sizeof(buf), "%d\t" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
-					(1 << (i)) & -2u, count[i],
-					(count[i] ? u32(score[i] / count[i]) : 0),
-					(count[i] * 100.0 / accum[0]),
-					(accum[i] * 100.0 / accum[0]));
+		snprintf(buf, sizeof(buf), "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
+								   "tile", "count", "score", "move", "rate", "win");
+		std::cout << buf << std::endl;
+		const auto& count = every.count;
+		const auto& score = every.score;
+		const auto& opers = every.opers;
+		auto total = std::accumulate(count.begin(), count.end(), 0);
+		auto remain = total;
+		for (auto i = 0; remain; remain -= count[i++]) {
+			if (count[i] == 0) continue;
+			snprintf(buf, sizeof(buf), "%-6d" "%8d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
+					(1 << (i)) & 0xfffffffeu, u32(count[i]),
+					u32(score[i] / count[i]), u32(opers[i] / count[i]),
+					count[i] * 100.0 / total, remain * 100.0 / total);
 			std::cout << buf << std::endl;
 		}
 	}
@@ -2118,8 +2185,9 @@ struct statistic {
 		total.opers += stat.total.opers;
 		total.hash |= stat.total.hash;
 		total.max = std::max(total.max, stat.total.max);
-		std::transform(count.begin(), count.end(), stat.count.begin(), count.begin(), std::plus<u32>());
-		std::transform(score.begin(), score.end(), stat.score.begin(), score.begin(), std::plus<u64>());
+		std::transform(every.count.begin(), every.count.end(), stat.every.count.begin(), every.count.begin(), std::plus<u64>());
+		std::transform(every.score.begin(), every.score.end(), stat.every.score.begin(), every.score.begin(), std::plus<u64>());
+		std::transform(every.opers.begin(), every.opers.end(), stat.every.opers.begin(), every.opers.begin(), std::plus<u64>());
 	}
 };
 
@@ -2401,7 +2469,7 @@ int main(int argc, const char* argv[]) {
 			xbest >> b;
 		}
 
-		stats.updatec(score, b.hash(), opers);
+		stats.update(score, b.hash(), opers);
 	}
 	if (test) stats.summary();
 
