@@ -1322,6 +1322,9 @@ struct state {
 		return esti;
 	}
 
+	inline numeric value() const { return esti - score; }
+	inline numeric reward() const { return score; }
+
 	inline void operator <<(const board& b) {
 		assign(b);
 		estimate();
