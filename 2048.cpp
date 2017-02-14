@@ -1306,10 +1306,13 @@ struct state {
 		score = (move.*oper)();
 	}
 
+	inline numeric value() const { return esti - score; }
+	inline numeric reward() const { return score; }
+
 	inline numeric estimate(
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		if (score >= 0) {
-			esti = score + utils::estimate(move, begin, end);
+			esti = state::reward() + utils::estimate(move, begin, end);
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
@@ -1318,12 +1321,9 @@ struct state {
 	inline numeric update(const numeric& accu,
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
 			const numeric& alpha = moporgic::alpha) {
-		esti = score + utils::update(move, alpha * (accu - (esti - score)), begin, end);
+		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), begin, end);
 		return esti;
 	}
-
-	inline numeric value() const { return esti - score; }
-	inline numeric reward() const { return score; }
 
 	inline void operator <<(const board& b) {
 		assign(b);
