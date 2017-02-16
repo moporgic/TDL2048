@@ -1542,8 +1542,8 @@ struct statistic {
 		local.time = currtimept;
 	}
 
-	void summary() const {
-		std::cout << std::endl << "summary" << std::endl;
+	void summary(const int& tid = 0) const {
+		std::cout << std::endl << "summary" << " [" << tid << "]" << std::endl;
 		char buf[80];
 		snprintf(buf, sizeof(buf), "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
 								   "tile", "count", "score", "move", "rate", "win");
@@ -1800,7 +1800,7 @@ int main(int argc, const char* argv[]) {
 
 		stats.update(score, b.hash(), opers, thdid);
 	}
-	if (test) stats.summary();
+	if (test) stats.summary(thdid);
 
 	if (thdid != 0) return 0;
 	while (wait(nullptr) > 0);
