@@ -128,12 +128,14 @@ public:
 			i32 moved;
 			u32 mono;
 
-			mvleft(L, score, merge, mono);
+			monoprobe(L, mono);
+			mvleft(L, score, merge);
 			assign(L, hraw, hext, vraw, vext);
 			moved = ((hraw | hext) == r) ? -1 : 0;
 			operation left(hraw, hext, vraw, vext, score, moved, mono);
 
-			mvleft(R, score, merge, mono); std::reverse(R, R + 4);
+			monoprobe(R, mono);
+			mvleft(R, score, merge); std::reverse(R, R + 4);
 			assign(R, hraw, hext, vraw, vext);
 			moved = ((hraw | hext) == r) ? -1 : 0;
 			operation right(hraw, hext, vraw, vext, score, moved, mono);
@@ -182,17 +184,10 @@ public:
 			vraw = (u64(lo[0]) << 0) | (u64(lo[1]) << 16) | (u64(lo[2]) << 32) | (u64(lo[3]) << 48);
 			vext = ((hi[0] << 0) | (hi[1] << 4) | (hi[2] << 8) | (hi[3] << 12)) << 16;
 		}
-		static void mvleft(u32 row[], u32& score, u32& merge, u32& mono) {
+		static void mvleft(u32 row[], u32& score, u32& merge) {
 			u32 top = 0;
 			u32 tmp = 0;
-			score = merge = mono = 0;
-
-			mono |= monoprobe(row[0], row[1]) <<  0;
-			mono |= monoprobe(row[0], row[2]) <<  2;
-			mono |= monoprobe(row[0], row[3]) <<  4;
-			mono |= monoprobe(row[1], row[2]) <<  6;
-			mono |= monoprobe(row[1], row[3]) <<  8;
-			mono |= monoprobe(row[2], row[3]) << 10;
+			score = merge = 0;
 
 			for (u32 i = 0; i < 4; i++) {
 				u32 tile = row[i];
@@ -215,7 +210,15 @@ public:
 			}
 			if (tmp != 0) row[top] = tmp;
 		}
-
+		static void monoprobe(u32 row[], u32& mono) {
+			mono = 0;
+			mono |= monoprobe(row[0], row[1]) <<  0;
+			mono |= monoprobe(row[0], row[2]) <<  2;
+			mono |= monoprobe(row[0], row[3]) <<  4;
+			mono |= monoprobe(row[1], row[2]) <<  6;
+			mono |= monoprobe(row[1], row[3]) <<  8;
+			mono |= monoprobe(row[2], row[3]) << 10;
+		}
 		static u32 monoprobe(const u32& a, const u32& b) {
 			return a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b01 : 0b10);
 		}
