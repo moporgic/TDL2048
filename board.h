@@ -46,7 +46,7 @@ public:
 	class cache {
 	friend class board;
 	public:
-		class operation {
+		class move {
 		friend class board;
 		friend class cache;
 		public:
@@ -82,11 +82,11 @@ public:
 				ext |= extv << i;
 			}
 
-			operation(const operation& op) = default;
-			operation() = delete;
-			~operation() = default;
+			move(const move& op) = default;
+			move() = delete;
+			~move() = default;
 		private:
-			operation(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved, u32 mono)
+			move(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved, u32 mono)
 				: rawh(rawh), exth(exth), rawv(rawv), extv(extv), score(score), moved(moved), mono(mono) {}
 		};
 
@@ -95,8 +95,8 @@ public:
 		const u32 ext; // base row (4-bit extra)
 		const u32 species; // species of this row
 		const u32 merge; // number of merged tiles
-		const operation left; // left operation
-		const operation right; // right operation
+		const move left; // left operation
+		const move right; // right operation
 		const info numof; // number of each tile-type
 		const info mask; // mask of each tile-type
 		const list num; // number of 0~f tile-type
@@ -132,13 +132,13 @@ public:
 			mvleft(L, score, merge);
 			assign(L, hraw, hext, vraw, vext);
 			moved = ((hraw | hext) == r) ? -1 : 0;
-			operation left(hraw, hext, vraw, vext, score, moved, mono);
+			move left(hraw, hext, vraw, vext, score, moved, mono);
 
 			monoprobe(R, mono);
 			mvleft(R, score, merge); std::reverse(R, R + 4);
 			assign(R, hraw, hext, vraw, vext);
 			moved = ((hraw | hext) == r) ? -1 : 0;
-			operation right(hraw, hext, vraw, vext, score, moved, mono);
+			move right(hraw, hext, vraw, vext, score, moved, mono);
 
 			u32 species = 0;
 			info numof = {};
@@ -167,7 +167,7 @@ public:
 			return cache(raw, ext, species, merge, left, right, numof, mask, num, layout, moved, legal);
 		}
 	private:
-		cache(u32 raw, u32 ext, u32 species, u32 merge, operation left, operation right,
+		cache(u32 raw, u32 ext, u32 species, u32 merge, move left, move right,
 			  info numof, info mask, list num, list layout, i32 moved, u32 legal)
 		: raw(raw), ext(ext), species(species), merge(merge), left(left), right(right),
 		  numof(numof), mask(mask), num(num), layout(layout), moved(moved), legal(legal) {}
