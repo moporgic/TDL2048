@@ -46,7 +46,7 @@ public:
 	class cache {
 	friend class board;
 	public:
-		class operation {
+		class move {
 		friend class board;
 		friend class cache;
 		public:
@@ -56,7 +56,7 @@ public:
 			const u32 extv; // vertical move (16-bit extra)
 			const u32 score; // merge score
 			const i32 moved; // moved or not (moved: 0, otherwise -1)
-			const u32 mono; // monotonic decreasing value (6-bit)
+			const u32 mono; // monotonic decreasing value (12-bit)
 
 			template<int i>
 			inline void moveh64(u64& raw, u32& sc, i32& mv) const {
@@ -82,11 +82,11 @@ public:
 				ext |= extv << i;
 			}
 
-			operation(const operation& op) = default;
-			operation() = delete;
-			~operation() = default;
+			move(const move& op) = default;
+			move() = delete;
+			~move() = default;
 		private:
-			operation(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved, u32 mono)
+			move(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved, u32 mono)
 				: rawh(rawh), exth(exth), rawv(rawv), extv(extv), score(score), moved(moved), mono(mono) {}
 		};
 
@@ -95,8 +95,8 @@ public:
 		const u32 ext; // base row (4-bit extra)
 		const u32 species; // species of this row
 		const u32 merge; // number of merged tiles
-		const operation left; // left operation
-		const operation right; // right operation
+		const move left; // left operation
+		const move right; // right operation
 		const info numof; // number of each tile-type
 		const info mask; // mask of each tile-type
 		const list num; // number of 0~f tile-type
@@ -128,15 +128,17 @@ public:
 			i32 moved;
 			u32 mono;
 
-			mvleft(L, score, merge, mono);
+			monoprobe(L, mono);
+			mvleft(L, score, merge);
 			assign(L, hraw, hext, vraw, vext);
 			moved = ((hraw | hext) == r) ? -1 : 0;
-			operation left(hraw, hext, vraw, vext, score, moved, mono);
+			move left(hraw, hext, vraw, vext, score, moved, mono);
 
-			mvleft(R, score, merge, mono); std::reverse(R, R + 4);
+			monoprobe(R, mono);
+			mvleft(R, score, merge); std::reverse(R, R + 4);
 			assign(R, hraw, hext, vraw, vext);
 			moved = ((hraw | hext) == r) ? -1 : 0;
-			operation right(hraw, hext, vraw, vext, score, moved, mono);
+			move right(hraw, hext, vraw, vext, score, moved, mono);
 
 			u32 species = 0;
 			info numof = {};
@@ -165,7 +167,7 @@ public:
 			return cache(raw, ext, species, merge, left, right, numof, mask, num, layout, moved, legal);
 		}
 	private:
-		cache(u32 raw, u32 ext, u32 species, u32 merge, operation left, operation right,
+		cache(u32 raw, u32 ext, u32 species, u32 merge, move left, move right,
 			  info numof, info mask, list num, list layout, i32 moved, u32 legal)
 		: raw(raw), ext(ext), species(species), merge(merge), left(left), right(right),
 		  numof(numof), mask(mask), num(num), layout(layout), moved(moved), legal(legal) {}
@@ -182,17 +184,10 @@ public:
 			vraw = (u64(lo[0]) << 0) | (u64(lo[1]) << 16) | (u64(lo[2]) << 32) | (u64(lo[3]) << 48);
 			vext = ((hi[0] << 0) | (hi[1] << 4) | (hi[2] << 8) | (hi[3] << 12)) << 16;
 		}
-		static void mvleft(u32 row[], u32& score, u32& merge, u32& mono) {
+		static void mvleft(u32 row[], u32& score, u32& merge) {
 			u32 top = 0;
 			u32 tmp = 0;
-			score = merge = mono = 0;
-
-			mono |= monoprobe(row[0], row[1]) <<  0;
-			mono |= monoprobe(row[0], row[2]) <<  2;
-			mono |= monoprobe(row[0], row[3]) <<  4;
-			mono |= monoprobe(row[1], row[2]) <<  6;
-			mono |= monoprobe(row[1], row[3]) <<  8;
-			mono |= monoprobe(row[2], row[3]) << 10;
+			score = merge = 0;
 
 			for (u32 i = 0; i < 4; i++) {
 				u32 tile = row[i];
@@ -215,14 +210,27 @@ public:
 			}
 			if (tmp != 0) row[top] = tmp;
 		}
-
+		static void monoprobe(u32 row[], u32& mono) {
+			mono = 0;
+			mono |= monoprobe(row[0], row[1]) <<  0;
+			mono |= monoprobe(row[0], row[2]) <<  2;
+			mono |= monoprobe(row[0], row[3]) <<  4;
+			mono |= monoprobe(row[1], row[2]) <<  6;
+			mono |= monoprobe(row[1], row[3]) <<  8;
+			mono |= monoprobe(row[2], row[3]) << 10;
+		}
 		static u32 monoprobe(const u32& a, const u32& b) {
 			return a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b01 : 0b10);
+		}
+
+		static u32 seq32_static() {
+			static u32 seq32 = 0;
+			return seq32++;
 		}
 	};
 
 	inline static const cache& lookup(const u32& i) {
-		static cache look[1 << 20](cache::make(seq32_static()));
+		static cache look[1 << 20](cache::make(cache::seq32_static()));
 		return look[i];
 	}
 
