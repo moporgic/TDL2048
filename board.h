@@ -222,10 +222,15 @@ public:
 		static u32 monoprobe(const u32& a, const u32& b) {
 			return a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b01 : 0b10);
 		}
+
+		static u32 seq32_static() {
+			static u32 seq32 = 0;
+			return seq32++;
+		}
 	};
 
 	inline static const cache& lookup(const u32& i) {
-		static cache look[1 << 20](cache::make(seq32_static()));
+		static cache look[1 << 20](cache::make(cache::seq32_static()));
 		return look[i];
 	}
 
