@@ -56,7 +56,7 @@ public:
 			const u32 extv; // vertical move (16-bit extra)
 			const u32 score; // merge score
 			const i32 moved; // moved or not (moved: 0, otherwise -1)
-			const u32 mono; // monotonic decreasing value (6-bit)
+			const u32 mono; // monotonic decreasing value (12-bit)
 
 			template<int i>
 			inline void moveh64(u64& raw, u32& sc, i32& mv) const {
