@@ -1955,13 +1955,13 @@ struct state {
 	inline numeric optimize(const numeric& accu,
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
 			const numeric& alpha = moporgic::alpha) {
-		esti = score + utils::estimate(move, begin, end);
+		esti = state::reward() + utils::estimate(move, begin, end);
 		return update(accu, begin, end, alpha);
 	}
 	inline numeric search(const i32& depth,
 			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		if (score >= 0) {
-			esti = score + utils::search_expt(move, depth, begin, end);
+			esti = state::reward() + utils::search_expt(move, depth, begin, end);
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
