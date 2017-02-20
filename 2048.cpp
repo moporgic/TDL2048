@@ -392,6 +392,19 @@ public:
 		return true;
 	}
 
+	std::string find(const std::string& opt, const std::string& ext = "") {
+		std::string& ref = operator[](opt);
+		if (ext.empty()) return ref;
+		std::stringstream ss(ref);
+		std::string token, label, value;
+		while (ss >> token) {
+			label = token.substr(0, token.find('='));
+			value = token.substr(token.find('=') + 1);
+			if (label == ext) return value;
+		}
+		return "";
+	}
+
 	operator std::string() const {
 		std::string res;
 		for (auto v : opts) {
@@ -1654,8 +1667,8 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 int main(int argc, const char* argv[]) {
-	statistic::control train(1000, 1000);
-	statistic::control test(100, 1000);
+	statistic::control trainctl(1000, 1000);
+	statistic::control testctl(100, 1000);
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = moporgic::alpha;
@@ -1663,10 +1676,10 @@ int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
 	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
-	if (opts("train")) train.num = std::stol(opts["train"]);
-	if (opts("test")) test.num = std::stol(opts["test"]);
-	if (opts("train-check")) train.chk = std::stol(opts["train-check"]);
-	if (opts("test-check")) test.chk = std::stol(opts["test-check"]);
+	if (opts("train")) trainctl.num = std::stol(opts["train"]);
+	if (opts("test")) testctl.num = std::stol(opts["test"]);
+	if (opts("train-check")) trainctl.chk = std::stol(opts["train-check"]);
+	if (opts("test-check")) testctl.chk = std::stol(opts["test-check"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 
 	std::srand(seed);
@@ -1675,7 +1688,6 @@ int main(int argc, const char* argv[]) {
 	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
-//	std::cout << "options = " << std::string(opts) << std::endl;
 	std::cout << "time = " << timestamp << std::endl;
 	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
@@ -1699,17 +1711,19 @@ int main(int argc, const char* argv[]) {
 	select best;
 	statistic stats;
 	std::vector<state> path;
-	path.reserve(20000);
+	path.reserve(65536);
+	u32 score;
+	u32 opers;
 
-	if (train) std::cout << std::endl << "start training..." << std::endl;
+	if (trainctl) std::cout << std::endl << "start training..." << std::endl;
 	switch (to_hash(opts["train-type"])) {
 
 	case to_hash("backward"):
 	case to_hash("backward-optimize"):
-		for (stats.init(train); stats; stats++) {
+		for (stats.init(trainctl); stats; stats++) {
 
-			u32 score = 0;
-			u32 opers = 0;
+			score = 0;
+			opers = 0;
 
 			for (b.init(); best << b; b.next()) {
 				score += best.score();
@@ -1731,10 +1745,10 @@ int main(int argc, const char* argv[]) {
 	default:
 	case to_hash("online"):
 	case to_hash("forward"):
-		for (stats.init(train); stats; stats++) {
+		for (stats.init(trainctl); stats; stats++) {
 
-			u32 score = 0;
-			u32 opers = 0;
+			score = 0;
+			opers = 0;
 
 			b.init();
 			best << b;
@@ -1764,11 +1778,11 @@ int main(int argc, const char* argv[]) {
 
 
 
-	if (test) std::cout << std::endl << "start testing..." << std::endl;
-	for (stats.init(test); stats; stats++) {
+	if (testctl) std::cout << std::endl << "start testing..." << std::endl;
+	for (stats.init(testctl); stats; stats++) {
 
-		u32 score = 0;
-		u32 opers = 0;
+		score = 0;
+		opers = 0;
 
 		for (b.init(); best << b; b.next()) {
 			score += best.score();
@@ -1778,7 +1792,7 @@ int main(int argc, const char* argv[]) {
 
 		stats.update(score, b.hash(), opers);
 	}
-	if (test) stats.summary();
+	if (testctl) stats.summary();
 
 
 	std::cout << std::endl;
