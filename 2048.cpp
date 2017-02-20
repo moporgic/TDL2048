@@ -28,6 +28,7 @@
 #include <iterator>
 #include <sstream>
 #include <list>
+#include <thread>
 
 namespace moporgic {
 
@@ -1416,6 +1417,10 @@ struct statistic {
 		u32 win;
 		control(u64 num = 1000, u64 chk = 1000, u32 win = 2048) : num(num), chk(chk), win(win) {}
 		operator bool() const { return num; }
+
+		void parallel(u32 thdid, u32 thdnum) {
+			num = num / thdnum + (num % thdnum && thdid < (num % thdnum) ? 1 : 0);
+		}
 	};
 
 	struct record {
@@ -1450,7 +1455,7 @@ struct statistic {
 	operator bool() const { return loop <= limit; }
 	bool checked() const { return (loop % check) == 0; }
 
-	void update(const u32& score, const u32& hash, const u32& opers) {
+	void update(const u32& score, const u32& hash, const u32& opers, const u32& thdid = 0) {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
@@ -1473,11 +1478,12 @@ struct statistic {
 
 		std::cout << std::endl;
 		char buf[64];
-		snprintf(buf, sizeof(buf), "%03llu/%03llu %llums %.2fops",
+		snprintf(buf, sizeof(buf), "%03llu/%03llu %llums %.2fops [%u]",
 				loop / check,
 				limit / check,
 				elapsedtime,
-				local.opers * 1000.0 / elapsedtime);
+				local.opers * 1000.0 / elapsedtime,
+				thdid);
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / check,
@@ -1496,8 +1502,8 @@ struct statistic {
 		local.time = currtimept;
 	}
 
-	void summary() const {
-		std::cout << std::endl << "summary" << std::endl;
+	void summary(const u32& thdid = 0) const {
+		std::cout << std::endl << "summary [" << thdid << "]" << std::endl;
 		char buf[80];
 		snprintf(buf, sizeof(buf), "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
 								   "tile", "count", "score", "move", "rate", "win");
@@ -1632,6 +1638,12 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--comment"):
 			opts["comment"] = find_opts(i, ' ');
 			break;
+		case to_hash("-thd"):
+		case to_hash("--thread"):
+		case to_hash("-p"):
+		case to_hash("--parallel"):
+			opts["thread"] = find_opts(i, ' ');
+			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
 			std::exit(1);
@@ -1647,6 +1659,7 @@ int main(int argc, const char* argv[]) {
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = moporgic::alpha;
+	u32 thread = 1;
 
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
@@ -1656,10 +1669,11 @@ int main(int argc, const char* argv[]) {
 	if (opts("train-check")) train.chk = std::stol(opts["train-check"]);
 	if (opts("test-check")) test.chk = std::stol(opts["test-check"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
+	if (opts("thread")) thread = std::max(std::stol(opts["thread"]), 1l);
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
-	std::cout << "develop" << " build C++" << __cplusplus;
+	std::cout << "develop-parallel" << " build C++" << __cplusplus;
 	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
@@ -1681,69 +1695,79 @@ int main(int argc, const char* argv[]) {
 
 	utils::list_mapping();
 
+	auto trainer = [](std::string type, statistic::control ctrl, u32 thdid, u32 thdnum) {
+		board b;
+		state last;
+		select best;
+		statistic stats;
+		std::vector<state> path;
+		path.reserve(20000);
 
-	board b;
-	state last;
-	select best;
-	statistic stats;
-	std::vector<state> path;
-	path.reserve(20000);
+		ctrl.parallel(thdid, thdnum);
+		switch (to_hash(type)) {
 
-	if (train) std::cout << std::endl << "start training..." << std::endl;
-	switch (to_hash(opts["train-type"])) {
+		case to_hash("backward"):
+		case to_hash("backward-optimize"):
+			for (stats.init(ctrl); stats; stats++) {
 
-	case to_hash("backward"):
-	case to_hash("backward-optimize"):
-		for (stats.init(train); stats; stats++) {
+				u32 score = 0;
+				u32 opers = 0;
 
-			u32 score = 0;
-			u32 opers = 0;
+				for (b.init(); best << b; b.next()) {
+					score += best.score();
+					opers += 1;
+					best >> path;
+					best >> b;
+				}
 
-			for (b.init(); best << b; b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> path;
-				best >> b;
+				for (numeric v = 0; path.size(); path.pop_back()) {
+					state& s = path.back();
+					s.estimate();
+					v = s.update(v);
+				}
+
+				stats.update(score, b.hash(), opers, thdid);
 			}
+			break;
 
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				state& s = path.back();
-				s.estimate();
-				v = s.update(v);
-			}
+		default:
+		case to_hash("online"):
+		case to_hash("forward"):
+			for (stats.init(ctrl); stats; stats++) {
 
-			stats.update(score, b.hash(), opers);
-		}
-		break;
+				u32 score = 0;
+				u32 opers = 0;
 
-	default:
-	case to_hash("online"):
-	case to_hash("forward"):
-		for (stats.init(train); stats; stats++) {
-
-			u32 score = 0;
-			u32 opers = 0;
-
-			b.init();
-			best << b;
-			score += best.score();
-			opers += 1;
-			best >> last;
-			best >> b;
-			b.next();
-			while (best << b) {
-				last += best.esti();
+				b.init();
+				best << b;
 				score += best.score();
 				opers += 1;
 				best >> last;
 				best >> b;
 				b.next();
-			}
-			last += 0;
+				while (best << b) {
+					last += best.esti();
+					score += best.score();
+					opers += 1;
+					best >> last;
+					best >> b;
+					b.next();
+				}
+				last += 0;
 
-			stats.update(score, b.hash(), opers);
+				stats.update(score, b.hash(), opers, thdid);
+			}
+			break;
 		}
-		break;
+	};
+
+	if (train) {
+		std::cout << std::endl << "start training..." << std::endl;
+		std::vector<std::shared_ptr<std::thread>> agents;
+		for (u32 tid = 0; tid < thread; tid++)
+			agents.emplace_back(new std::thread(trainer, opts["train-type"], train, tid, thread));
+		for (u32 tid = 0; tid < thread; tid++)
+			agents[tid]->join();
 	}
 
 	utils::save_weights(opts["weight-output"]);
@@ -1751,22 +1775,39 @@ int main(int argc, const char* argv[]) {
 
 
 
+	auto tester = [](std::string type, statistic::control ctrl, u32 thdid, u32 thdnum) {
+		board b;
+		select best;
+		statistic stats;
 
-	if (test) std::cout << std::endl << "start testing..." << std::endl;
-	for (stats.init(test); stats; stats++) {
+		for (u32 i = 0; i < thdid; i++) std::rand();
+		ctrl.parallel(thdid, thdnum);
 
-		u32 score = 0;
-		u32 opers = 0;
+		for (stats.init(ctrl); stats; stats++) {
 
-		for (b.init(); best << b; b.next()) {
-			score += best.score();
-			opers += 1;
-			best >> b;
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> b;
+			}
+
+			stats.update(score, b.hash(), opers, thdid);
 		}
 
-		stats.update(score, b.hash(), opers);
+		stats.summary(thdid);
+	};
+
+	if (test) {
+		std::cout << std::endl << "start testing..." << std::endl;
+		std::vector<std::shared_ptr<std::thread>> agents;
+		for (u32 tid = 0; tid < thread; tid++)
+			agents.emplace_back(new std::thread(tester, opts["test-type"], test, tid, thread));
+		for (u32 tid = 0; tid < thread; tid++)
+			agents[tid]->join();
 	}
-	if (test) stats.summary();
 
 
 	std::cout << std::endl;
