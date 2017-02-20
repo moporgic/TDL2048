@@ -1461,6 +1461,9 @@ struct statistic {
 		u32 win;
 		control(u64 num = 1000, u64 chk = 1000, u32 win = 2048) : num(num), chk(chk), win(win) {}
 		operator bool() const { return num; }
+		void normalize(u32 thdnum, u32 thdid) {
+			num = num / thdnum + (num % thdnum && thdid < (num % thdnum) ? 1 : 0);
+		}
 	};
 
 	struct record {
@@ -1680,6 +1683,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-thd"):
 		case to_hash("--thd"):
+		case to_hash("--thread"):
 			opts["thread"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-shm"):
@@ -1743,6 +1747,7 @@ int main(int argc, const char* argv[]) {
 	if (train) {
 		std::cout << std::endl << "start training..." << std::endl;
 		for (thdid = thdnum - 1; thdid > 0 && fork() != 0; thdid--);
+		train.normalize(thdnum, thdid);
 	}
 
 	board b;
@@ -1786,6 +1791,7 @@ int main(int argc, const char* argv[]) {
 	if (test) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		for (thdid = thdnum - 1; thdid > 0 && fork() != 0; thdid--);
+		test.normalize(thdnum, thdid);
 	}
 	for (stats.init(test); stats; stats++) {
 
