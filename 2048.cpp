@@ -1410,6 +1410,10 @@ struct statistic {
 	u64 check;
 	u32 winv;
 
+	std::string indexf;
+	std::string localf;
+	std::string totalf;
+
 	struct control {
 		u64 num;
 		u64 chk;
@@ -1439,6 +1443,14 @@ struct statistic {
 		loop = 1;
 		check = ctrl.chk;
 		winv = ctrl.win;
+
+//		indexf = "%03llu/%03llu %llums %.2fops";
+//		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
+//		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
+		u32 dec = std::max(std::ceil(std::log10(ctrl.num)) + 1, 3.0);
+		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
+		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
 
 		every = {};
 		total = {};
@@ -1473,19 +1485,19 @@ struct statistic {
 
 		std::cout << std::endl;
 		char buf[64];
-		snprintf(buf, sizeof(buf), "%03llu/%03llu %llums %.2fops",
+		snprintf(buf, sizeof(buf), indexf.c_str(), // "%03llu/%03llu %llums %.2fops",
 				loop / check,
 				limit / check,
 				elapsedtime,
 				local.opers * 1000.0 / elapsedtime);
 		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), "local:  avg=%llu max=%u tile=%u win=%.2f%%",
+		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / check,
 				local.max,
 				math::msb32(local.hash),
 				local.win * 100.0 / check);
 		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), "total:  avg=%llu max=%u tile=%u win=%.2f%%",
+		snprintf(buf, sizeof(buf), totalf.c_str(), // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / loop,
 				total.max,
 				math::msb32(total.hash),
