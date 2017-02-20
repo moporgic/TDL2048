@@ -392,17 +392,19 @@ public:
 		return true;
 	}
 
-	std::string find(const std::string& opt, const std::string& ext = "") {
-		std::string& ref = operator[](opt);
-		if (ext.empty()) return ref;
-		std::stringstream ss(ref);
-		std::string token, label, value;
-		while (ss >> token) {
-			label = token.substr(0, token.find('='));
-			value = token.substr(token.find('=') + 1);
-			if (label == ext) return value;
+	std::string find(const std::string& opt, const std::string& def = "") const {
+		return operator()(opt) ? const_cast<options&>(*this)[opt] : def;
+	}
+
+	std::string find(const std::string& opt, const std::vector<std::string>& ext = {}, const std::string& def = "") const {
+		if (!operator()(opt)) return def;
+		std::stringstream ss(const_cast<options&>(*this)[opt]);
+		for (std::string token; ss >> token; ) {
+			if (std::find(ext.begin(), ext.end(), token.substr(0, token.find('='))) != ext.end()) {
+				return token.substr(token.find('=') + 1);
+			}
 		}
-		return "";
+		return def;
 	}
 
 	operator std::string() const {
@@ -1704,6 +1706,7 @@ int main(int argc, const char* argv[]) {
 	utils::make_features(opts["feature-value"]);
 
 	utils::list_mapping();
+
 
 
 	board b;
