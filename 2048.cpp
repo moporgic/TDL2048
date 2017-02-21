@@ -1722,7 +1722,6 @@ int main(int argc, const char* argv[]) {
 	switch (to_hash(opts["train-type"])) {
 
 	case to_hash("backward"):
-	case to_hash("backward-optimize"):
 		for (stats.init(trainctl); stats; stats++) {
 
 			score = 0;
@@ -1746,7 +1745,6 @@ int main(int argc, const char* argv[]) {
 		break;
 
 	default:
-	case to_hash("online"):
 	case to_hash("forward"):
 		for (stats.init(trainctl); stats; stats++) {
 
