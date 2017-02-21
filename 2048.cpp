@@ -439,6 +439,21 @@ public:
 		return true;
 	}
 
+	std::string find(const std::string& opt, const std::string& def = "") const {
+		return operator()(opt) ? const_cast<options&>(*this)[opt] : def;
+	}
+
+	std::string find(const std::string& opt, const std::vector<std::string>& ext = {}, const std::string& def = "") const {
+		if (!operator()(opt)) return def;
+		std::stringstream ss(const_cast<options&>(*this)[opt]);
+		for (std::string token; ss >> token; ) {
+			if (std::find(ext.begin(), ext.end(), token.substr(0, token.find('='))) != ext.end()) {
+				return token.substr(token.find('=') + 1);
+			}
+		}
+		return def;
+	}
+
 	operator std::string() const {
 		std::string res;
 		for (auto v : opts) {
@@ -1168,6 +1183,7 @@ u32 make_weights(const std::string& res = "") {
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
+	predefined["5x4patt"] = predefined["patt/4-22"];
 	for (auto predef : predefined) {
 		if (in.find(predef.first) != std::string::npos) { // insert predefined weights
 			in.insert(in.find(predef.first), predef.second);
@@ -1246,6 +1262,7 @@ u32 make_features(const std::string& res = "") {
 	predefined["4x6patt"] = predefined["khyeh"];
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
+	predefined["5x4patt"] = predefined["patt/4-22"];
 	for (auto predef : predefined) {
 		if (in.find(predef.first) != std::string::npos) { // insert predefined features
 			in.insert(in.find(predef.first), predef.second);
@@ -1455,6 +1472,10 @@ struct statistic {
 	u64 check;
 	u32 winv;
 
+	std::string indexf;
+	std::string localf;
+	std::string totalf;
+
 	struct control {
 		u64 num;
 		u64 chk;
@@ -1487,6 +1508,14 @@ struct statistic {
 		loop = 1;
 		check = ctrl.chk;
 		winv = ctrl.win;
+
+//		indexf = "%03llu/%03llu %llums %.2fops";
+//		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
+//		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
+		u32 dec = std::max(std::ceil(std::log10(ctrl.num)) + 1, 3.0);
+		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
+		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
 
 		every = {};
 		total = {};
@@ -1521,20 +1550,19 @@ struct statistic {
 
 		std::cout << std::endl;
 		char buf[64];
-		snprintf(buf, sizeof(buf), "%03llu/%03llu %llums %.2fops [%d]",
+		snprintf(buf, sizeof(buf), indexf.c_str(), // "%03llu/%03llu %llums %.2fops",
 				loop / check,
 				limit / check,
 				elapsedtime,
-				local.opers * 1000.0 / elapsedtime,
-				tid);
-		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), "local:  avg=%llu max=%u tile=%u win=%.2f%%",
+				local.opers * 1000.0 / elapsedtime);
+		std::cout << buf << " [" << tid << "]" << std::endl;
+		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / check,
 				local.max,
 				math::msb32(local.hash),
 				local.win * 100.0 / check);
 		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), "total:  avg=%llu max=%u tile=%u win=%.2f%%",
+		snprintf(buf, sizeof(buf), totalf.c_str(), // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / loop,
 				total.max,
 				math::msb32(total.hash),
@@ -1700,8 +1728,8 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 int main(int argc, const char* argv[]) {
-	statistic::control train(1000, 1000);
-	statistic::control test(100, 1000);
+	statistic::control trainctl(1000, 1000);
+	statistic::control testctl(100, 1000);
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = moporgic::alpha;
@@ -1711,10 +1739,10 @@ int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
 	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
-	if (opts("train")) train.num = std::stol(opts["train"]);
-	if (opts("test")) test.num = std::stol(opts["test"]);
-	if (opts("train-check")) train.chk = std::stol(opts["train-check"]);
-	if (opts("test-check")) test.chk = std::stol(opts["test-check"]);
+	if (opts("train")) trainctl.num = std::stol(opts["train"]);
+	if (opts("test")) testctl.num = std::stol(opts["test"]);
+	if (opts("train-check")) trainctl.chk = std::stol(opts["train-check"]);
+	if (opts("test-check")) testctl.chk = std::stol(opts["test-check"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 	if (opts("thread")) thdnum = std::stod(opts["thread"]);
 	if (opts("shmres")) shm::setup(opts["shmres"]);
@@ -1725,7 +1753,6 @@ int main(int argc, const char* argv[]) {
 	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
-//	std::cout << "options = " << std::string(opts) << std::endl;
 	std::cout << "time = " << timestamp << std::endl;
 	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
@@ -1744,21 +1771,26 @@ int main(int argc, const char* argv[]) {
 
 	utils::list_mapping();
 
-	if (train) {
+	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
 		for (thdid = thdnum - 1; thdid > 0 && fork() != 0; thdid--);
-		train.normalize(thdnum, thdid);
+		trainctl.normalize(thdnum, thdid);
 	}
+
 
 	board b;
 	state last;
 	select best;
 	statistic stats;
+	std::vector<state> path;
+	path.reserve(65536);
+	u32 score;
+	u32 opers;
 
-	for (stats.init(train); stats; stats++) {
+	for (stats.init(trainctl); stats; stats++) {
 
-		u32 score = 0;
-		u32 opers = 0;
+		score = 0;
+		opers = 0;
 
 		b.init();
 		best << b;
@@ -1788,15 +1820,15 @@ int main(int argc, const char* argv[]) {
 	utils::save_features(opts["feature-output"]);
 
 
-	if (test) {
+	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		for (thdid = thdnum - 1; thdid > 0 && fork() != 0; thdid--);
-		test.normalize(thdnum, thdid);
+		testctl.normalize(thdnum, thdid);
 	}
-	for (stats.init(test); stats; stats++) {
+	for (stats.init(testctl); stats; stats++) {
 
-		u32 score = 0;
-		u32 opers = 0;
+		score = 0;
+		opers = 0;
 
 		for (b.init(); best << b; b.next()) {
 			score += best.score();
@@ -1806,7 +1838,7 @@ int main(int argc, const char* argv[]) {
 
 		stats.update(score, b.hash(), opers, thdid);
 	}
-	if (test) stats.summary(thdid);
+	if (testctl) stats.summary(thdid);
 
 	if (thdid != 0) return 0;
 	while (wait(nullptr) > 0);
