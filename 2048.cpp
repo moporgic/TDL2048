@@ -1533,13 +1533,12 @@ struct statistic {
 		const auto& score = every.score;
 		const auto& opers = every.opers;
 		auto total = std::accumulate(count.begin(), count.end(), 0);
-		auto remain = total;
-		for (auto i = 0; remain; remain -= count[i++]) {
+		for (auto left = total, i = 0; left; left -= count[i++]) {
 			if (count[i] == 0) continue;
 			snprintf(buf, sizeof(buf), "%-6d" "%8d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
 					(1 << (i)) & 0xfffffffeu, u32(count[i]),
 					u32(score[i] / count[i]), u32(opers[i] / count[i]),
-					count[i] * 100.0 / total, remain * 100.0 / total);
+					count[i] * 100.0 / total, left * 100.0 / total);
 			std::cout << buf << std::endl;
 		}
 	}
@@ -1640,14 +1639,12 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-tt"):
 		case to_hash("-tm"):
-		case to_hash("--train-type"):
 		case to_hash("--train-mode"):
 			opts["train-mode"] = find_opt(i, "");
 			break;
 		case to_hash("-Tt"):
 		case to_hash("-et"):
 		case to_hash("-em"):
-		case to_hash("--test-type"):
 		case to_hash("--test-mode"):
 			opts["test-mode"] = find_opt(i, "");
 			break;
