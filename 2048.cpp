@@ -1585,6 +1585,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 			opts["train"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-T"):
+		case to_hash("-e"):
 		case to_hash("--test"):
 			opts["test"] = find_opt(i, nullptr);
 			break;
@@ -1638,22 +1639,32 @@ inline utils::options parse(int argc, const char* argv[]) {
 			opts["options"] = find_opts(i, ' ');
 			break;
 		case to_hash("-tt"):
+		case to_hash("-tm"):
 		case to_hash("--train-type"):
-			opts["train-type"] = find_opt(i, "");
+		case to_hash("--train-mode"):
+			opts["train-mode"] = find_opt(i, "");
 			break;
 		case to_hash("-Tt"):
+		case to_hash("-et"):
+		case to_hash("-em"):
 		case to_hash("--test-type"):
-			opts["test-type"] = find_opt(i, "");
+		case to_hash("--test-mode"):
+			opts["test-mode"] = find_opt(i, "");
 			break;
 		case to_hash("-tc"):
+		case to_hash("-tu"):
 		case to_hash("--train-check"):
 		case to_hash("--train-check-interval"):
-			opts["train-check"] = find_opt(i, "1000");
+		case to_hash("--train-unit"):
+			opts["train-unit"] = find_opt(i, "1000");
 			break;
 		case to_hash("-Tc"):
+		case to_hash("-ec"):
+		case to_hash("-eu"):
 		case to_hash("--test-check"):
 		case to_hash("--test-check-interval"):
-			opts["test-check"] = find_opt(i, "1000");
+		case to_hash("--test-unit"):
+			opts["test-unit"] = find_opt(i, "1000");
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
@@ -1678,7 +1689,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 	u32 score;
 	u32 opers;
 
-	switch (to_hash(opts["train-type"])) {
+	switch (to_hash(opts["train-mode"])) {
 	case to_hash("backward"):
 		for (stats.init(trainctl); stats; stats++) {
 
@@ -1740,7 +1751,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 	u32 score;
 	u32 opers;
 
-	switch (to_hash(opts["test-type"])) {
+	switch (to_hash(opts["test-mode"])) {
 	default:
 	case to_hash("pass"):
 		for (stats.init(testctl); stats; stats++) {
@@ -1774,8 +1785,8 @@ int main(int argc, const char* argv[]) {
 	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
 	if (opts("train")) trainctl.num = std::stol(opts["train"]);
 	if (opts("test")) testctl.num = std::stol(opts["test"]);
-	if (opts("train-check")) trainctl.chk = std::stol(opts["train-check"]);
-	if (opts("test-check")) testctl.chk = std::stol(opts["test-check"]);
+	if (opts("train-unit")) trainctl.chk = std::stol(opts["train-unit"]);
+	if (opts("test-unit")) testctl.chk = std::stol(opts["test-unit"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 
 	std::srand(seed);
