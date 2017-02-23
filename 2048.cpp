@@ -1668,6 +1668,100 @@ inline utils::options parse(int argc, const char* argv[]) {
 	return opts;
 }
 
+statistic train(statistic::control trainctl, utils::options opts = {}) {
+	board b;
+	state last;
+	select best;
+	statistic stats;
+	std::vector<state> path;
+	path.reserve(65536);
+	u32 score;
+	u32 opers;
+
+	switch (to_hash(opts["train-type"])) {
+	case to_hash("backward"):
+		for (stats.init(trainctl); stats; stats++) {
+
+			score = 0;
+			opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				path.back().estimate();
+				v = path.back().update(v);
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	default:
+	case to_hash("forward"):
+		for (stats.init(trainctl); stats; stats++) {
+
+			score = 0;
+			opers = 0;
+
+			b.init();
+			best << b;
+			score += best.score();
+			opers += 1;
+			best >> last;
+			best >> b;
+			b.next();
+			while (best << b) {
+				last += best.esti();
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> b;
+				b.next();
+			}
+			last += 0;
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+	}
+
+	return stats;
+}
+
+statistic test(statistic::control testctl, utils::options opts = {}) {
+	board b;
+	select best;
+	statistic stats;
+	u32 score;
+	u32 opers;
+
+	switch (to_hash(opts["test-type"])) {
+	default:
+	case to_hash("pass"):
+		for (stats.init(testctl); stats; stats++) {
+
+			score = 0;
+			opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> b;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+	}
+
+	return stats;
+}
+
 int main(int argc, const char* argv[]) {
 	statistic::control trainctl(1000, 1000);
 	statistic::control testctl(100, 1000);
@@ -1708,93 +1802,18 @@ int main(int argc, const char* argv[]) {
 	utils::list_mapping();
 
 
-
-	board b;
-	state last;
-	select best;
-	statistic stats;
-	std::vector<state> path;
-	path.reserve(65536);
-	u32 score;
-	u32 opers;
-
-	if (trainctl) std::cout << std::endl << "start training..." << std::endl;
-	switch (to_hash(opts["train-type"])) {
-
-	case to_hash("backward"):
-		for (stats.init(trainctl); stats; stats++) {
-
-			score = 0;
-			opers = 0;
-
-			for (b.init(); best << b; b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> path;
-				best >> b;
-			}
-
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				state& s = path.back();
-				s.estimate();
-				v = s.update(v);
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
-
-	default:
-	case to_hash("forward"):
-		for (stats.init(trainctl); stats; stats++) {
-
-			score = 0;
-			opers = 0;
-
-			b.init();
-			best << b;
-			score += best.score();
-			opers += 1;
-			best >> last;
-			best >> b;
-			b.next();
-			while (best << b) {
-				last += best.esti();
-				score += best.score();
-				opers += 1;
-				best >> last;
-				best >> b;
-				b.next();
-			}
-			last += 0;
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
+	if (trainctl) {
+		std::cout << std::endl << "start training..." << std::endl;
+		train(trainctl, opts);
 	}
 
 	utils::save_weights(opts["weight-output"]);
 	utils::save_features(opts["feature-output"]);
 
-
-
-
-	if (testctl) std::cout << std::endl << "start testing..." << std::endl;
-	for (stats.init(testctl); stats; stats++) {
-
-		score = 0;
-		opers = 0;
-
-		for (b.init(); best << b; b.next()) {
-			score += best.score();
-			opers += 1;
-			best >> b;
-		}
-
-		stats.update(score, b.hash(), opers);
+	if (testctl) {
+		std::cout << std::endl << "start testing..." << std::endl;
+		test(testctl, opts).summary();
 	}
-	if (testctl) stats.summary();
-
 
 	std::cout << std::endl;
 
