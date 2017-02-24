@@ -1687,6 +1687,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 
 	switch (to_hash(opts["train-mode"])) {
 	case to_hash("backward"):
+	case to_hash("backward-best"):
 		for (stats.init(trainctl); stats; stats++) {
 
 			score = 0;
@@ -1710,6 +1711,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 
 	default:
 	case to_hash("forward"):
+	case to_hash("forward-best"):
 		for (stats.init(trainctl); stats; stats++) {
 
 			score = 0;
@@ -1749,7 +1751,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 
 	switch (to_hash(opts["test-mode"])) {
 	default:
-	case to_hash("pass"):
+	case to_hash("best"):
 		for (stats.init(testctl); stats; stats++) {
 
 			score = 0;
@@ -1771,7 +1773,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 
 int main(int argc, const char* argv[]) {
 	statistic::control trainctl(1000, 1000);
-	statistic::control testctl(100, 1000);
+	statistic::control testctl(1000, 1000);
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = state::alpha();
