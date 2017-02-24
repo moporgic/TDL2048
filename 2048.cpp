@@ -41,7 +41,6 @@
 namespace moporgic {
 
 typedef float numeric;
-numeric alpha = 0.0025;
 
 namespace shm {
 std::string hook = "./2048";
@@ -1382,9 +1381,8 @@ struct state {
 		}
 		return esti;
 	}
-	inline numeric update(const numeric& accu,
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
-			const numeric& alpha = moporgic::alpha) {
+	inline numeric update(const numeric& accu, const numeric& alpha = state::alpha(),
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), begin, end);
 		return esti;
 	}
@@ -1397,7 +1395,7 @@ struct state {
 		return update(v);
 	}
 	inline numeric operator +=(const state& s) {
-		return operator +=(s.esti);
+		return update(s.esti);
 	}
 
 	inline void operator >>(board& b) const { b = move; }
@@ -1411,6 +1409,11 @@ struct state {
 	void operator <<(std::istream& in) {
 		move << in;
 		moporgic::read(in, score);
+	}
+
+	inline static numeric& alpha() {
+		static numeric a = numeric(0.0025);
+		return a;
 	}
 };
 struct select {
@@ -1512,7 +1515,7 @@ struct statistic {
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
-		u32 dec = std::max(std::ceil(std::log10(ctrl.num)) + 1, 3.0);
+		u32 dec = std::max(std::floor(std::log10(ctrl.num)) + 1, 3.0);
 		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
 		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
 		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
@@ -1583,13 +1586,12 @@ struct statistic {
 		const auto& score = every.score;
 		const auto& opers = every.opers;
 		auto total = std::accumulate(count.begin(), count.end(), 0);
-		auto remain = total;
-		for (auto i = 0; remain; remain -= count[i++]) {
+		for (auto left = total, i = 0; left; left -= count[i++]) {
 			if (count[i] == 0) continue;
 			snprintf(buf, sizeof(buf), "%-6d" "%8d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
 					(1 << (i)) & 0xfffffffeu, u32(count[i]),
 					u32(score[i] / count[i]), u32(opers[i] / count[i]),
-					count[i] * 100.0 / total, remain * 100.0 / total);
+					count[i] * 100.0 / total, left * 100.0 / total);
 			std::cout << buf << std::endl;
 		}
 	}
@@ -1626,15 +1628,12 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--alpha"):
 			opts["alpha"] = find_opt(i, nullptr);
 			break;
-		case to_hash("-a/"):
-		case to_hash("--alpha-divide"):
-			opts["alpha-divide"] = find_opt(i, nullptr);
-			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
 			opts["train"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-T"):
+		case to_hash("-e"):
 		case to_hash("--test"):
 			opts["test"] = find_opt(i, nullptr);
 			break;
@@ -1688,22 +1687,30 @@ inline utils::options parse(int argc, const char* argv[]) {
 			opts["options"] = find_opts(i, ' ');
 			break;
 		case to_hash("-tt"):
-		case to_hash("--train-type"):
-			opts["train-type"] = find_opt(i, "");
+		case to_hash("-tm"):
+		case to_hash("--train-mode"):
+			opts["train-mode"] = find_opt(i, "");
 			break;
 		case to_hash("-Tt"):
-		case to_hash("--test-type"):
-			opts["test-type"] = find_opt(i, "");
+		case to_hash("-et"):
+		case to_hash("-em"):
+		case to_hash("--test-mode"):
+			opts["test-mode"] = find_opt(i, "");
 			break;
 		case to_hash("-tc"):
+		case to_hash("-tu"):
 		case to_hash("--train-check"):
 		case to_hash("--train-check-interval"):
-			opts["train-check"] = find_opt(i, "1000");
+		case to_hash("--train-unit"):
+			opts["train-unit"] = find_opt(i, "1000");
 			break;
 		case to_hash("-Tc"):
+		case to_hash("-ec"):
+		case to_hash("-eu"):
 		case to_hash("--test-check"):
 		case to_hash("--test-check-interval"):
-			opts["test-check"] = find_opt(i, "1000");
+		case to_hash("--test-unit"):
+			opts["test-unit"] = find_opt(i, "1000");
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
@@ -1712,6 +1719,8 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-thd"):
 		case to_hash("--thd"):
 		case to_hash("--thread"):
+		case to_hash("-p"):
+		case to_hash("--parallel"):
 			opts["thread"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-shm"):
@@ -1727,12 +1736,110 @@ inline utils::options parse(int argc, const char* argv[]) {
 	return opts;
 }
 
+statistic train(statistic::control trainctl, utils::options opts = {}) {
+	board b;
+	state last;
+	select best;
+	statistic stats;
+	std::vector<state> path;
+	path.reserve(65536);
+	u32 score;
+	u32 opers;
+
+	u32 thdid = std::stod(opts["thread-id"]);
+	switch (to_hash(opts["train-mode"])) {
+	case to_hash("backward"):
+	case to_hash("backward-best"):
+		for (stats.init(trainctl); stats; stats++) {
+
+			score = 0;
+			opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				path.back().estimate();
+				v = path.back().update(v);
+			}
+
+			stats.update(score, b.hash(), opers, thdid);
+		}
+		break;
+
+	default:
+	case to_hash("forward"):
+	case to_hash("forward-best"):
+		for (stats.init(trainctl); stats; stats++) {
+
+			score = 0;
+			opers = 0;
+
+			b.init();
+			best << b;
+			score += best.score();
+			opers += 1;
+			best >> last;
+			best >> b;
+			b.next();
+			while (best << b) {
+				last += best.esti();
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> b;
+				b.next();
+			}
+			last += 0;
+
+			stats.update(score, b.hash(), opers, thdid);
+		}
+		break;
+	}
+
+	return stats;
+}
+
+statistic test(statistic::control testctl, utils::options opts = {}) {
+	board b;
+	select best;
+	statistic stats;
+	u32 score;
+	u32 opers;
+
+	u32 thdid = std::stod(opts["thread-id"]);
+	switch (to_hash(opts["test-mode"])) {
+	default:
+	case to_hash("best"):
+		for (stats.init(testctl); stats; stats++) {
+
+			score = 0;
+			opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> b;
+			}
+
+			stats.update(score, b.hash(), opers, thdid);
+		}
+		break;
+	}
+
+	return stats;
+}
+
 int main(int argc, const char* argv[]) {
 	statistic::control trainctl(1000, 1000);
-	statistic::control testctl(100, 1000);
+	statistic::control testctl(1000, 1000);
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
-	numeric& alpha = moporgic::alpha;
+	numeric& alpha = state::alpha();
 	u32 thdnum = 1;
 	u32 thdid = 0;
 
@@ -1749,7 +1856,7 @@ int main(int argc, const char* argv[]) {
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
-	std::cout << "develop" << " build C++" << __cplusplus;
+	std::cout << "develop-parallel" << " build C++" << __cplusplus;
 	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
@@ -1771,50 +1878,17 @@ int main(int argc, const char* argv[]) {
 
 	utils::list_mapping();
 
+
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
 		for (thdid = thdnum - 1; thdid > 0 && fork() != 0; thdid--);
 		trainctl.normalize(thdnum, thdid);
+		opts["thread-number"] = std::to_string(thdnum);
+		opts["thread-id"] = std::to_string(thdid);
+		train(trainctl, opts);
+		if (thdid != 0) return 0;
+		while (wait(nullptr) > 0);
 	}
-
-
-	board b;
-	state last;
-	select best;
-	statistic stats;
-	std::vector<state> path;
-	path.reserve(65536);
-	u32 score;
-	u32 opers;
-
-	for (stats.init(trainctl); stats; stats++) {
-
-		score = 0;
-		opers = 0;
-
-		b.init();
-		best << b;
-		score += best.score();
-		opers += 1;
-		best >> last;
-		best >> b;
-		b.next();
-		while (best << b) {
-			last += best.esti();
-			score += best.score();
-			opers += 1;
-			best >> last;
-			best >> b;
-			b.next();
-		}
-		last += 0;
-
-		stats.update(score, b.hash(), opers, thdid);
-	}
-
-	if (thdid != 0) return 0;
-	while (wait(nullptr) > 0);
-
 
 	utils::save_weights(opts["weight-output"]);
 	utils::save_features(opts["feature-output"]);
@@ -1824,25 +1898,12 @@ int main(int argc, const char* argv[]) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		for (thdid = thdnum - 1; thdid > 0 && fork() != 0; thdid--);
 		testctl.normalize(thdnum, thdid);
+		opts["thread-number"] = std::to_string(thdnum);
+		opts["thread-id"] = std::to_string(thdid);
+		test(testctl, opts).summary(thdid);
+		if (thdid != 0) return 0;
+		while (wait(nullptr) > 0);
 	}
-	for (stats.init(testctl); stats; stats++) {
-
-		score = 0;
-		opers = 0;
-
-		for (b.init(); best << b; b.next()) {
-			score += best.score();
-			opers += 1;
-			best >> b;
-		}
-
-		stats.update(score, b.hash(), opers, thdid);
-	}
-	if (testctl) stats.summary(thdid);
-
-	if (thdid != 0) return 0;
-	while (wait(nullptr) > 0);
-
 
 	shm::free();
 
