@@ -2486,7 +2486,7 @@ int main(int argc, const char* argv[]) {
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = state::alpha();
-	auto& depth = search::depth();
+	u32* depth = search::depth();
 
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
