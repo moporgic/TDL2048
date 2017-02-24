@@ -32,7 +32,6 @@
 namespace moporgic {
 
 typedef float numeric;
-numeric alpha = 0.0025;
 
 class weight {
 public:
@@ -1335,9 +1334,8 @@ struct state {
 		}
 		return esti;
 	}
-	inline numeric update(const numeric& accu,
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
-			const numeric& alpha = moporgic::alpha) {
+	inline numeric update(const numeric& accu, const numeric& alpha = state::alpha(),
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), begin, end);
 		return esti;
 	}
@@ -1350,7 +1348,7 @@ struct state {
 		return update(v);
 	}
 	inline numeric operator +=(const state& s) {
-		return operator +=(s.esti);
+		return update(s.esti);
 	}
 
 	inline void operator >>(board& b) const { b = move; }
@@ -1364,6 +1362,11 @@ struct state {
 	void operator <<(std::istream& in) {
 		move << in;
 		moporgic::read(in, score);
+	}
+
+	inline static numeric& alpha() {
+		static numeric a = numeric(0.0025);
+		return a;
 	}
 };
 struct select {
@@ -1775,7 +1778,7 @@ int main(int argc, const char* argv[]) {
 	statistic::control testctl(100, 1000);
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
-	numeric& alpha = moporgic::alpha;
+	numeric& alpha = state::alpha();
 
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
