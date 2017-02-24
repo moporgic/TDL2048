@@ -32,7 +32,6 @@
 namespace moporgic {
 
 typedef float numeric;
-numeric alpha = 0.01;
 
 class weight {
 public:
@@ -466,6 +465,21 @@ public:
 		auto it = std::find(extra.begin(), extra.end(), opt);
 		if (it != extra.end()) extra.erase(it);
 		return true;
+	}
+
+	std::string find(const std::string& opt, const std::string& def = "") const {
+		return operator()(opt) ? const_cast<options&>(*this)[opt] : def;
+	}
+
+	std::string find(const std::string& opt, const std::vector<std::string>& ext = {}, const std::string& def = "") const {
+		if (!operator()(opt)) return def;
+		std::stringstream ss(const_cast<options&>(*this)[opt]);
+		for (std::string token; ss >> token; ) {
+			if (std::find(ext.begin(), ext.end(), token.substr(0, token.find('='))) != ext.end()) {
+				return token.substr(token.find('=') + 1);
+			}
+		}
+		return def;
 	}
 
 	operator std::string() const {
@@ -1398,9 +1412,8 @@ struct state {
 		}
 		return esti;
 	}
-	inline numeric update(const numeric& accu,
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
-			const numeric& alpha = moporgic::alpha) {
+	inline numeric update(const numeric& accu, const numeric& alpha = state::alpha(),
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 //		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), begin, end);
 		esti = state::reward() + utils::update(move, alpha, accu - state::value(), begin, end);
 		return esti;
@@ -1414,7 +1427,7 @@ struct state {
 		return update(v);
 	}
 	inline numeric operator +=(const state& s) {
-		return operator +=(s.esti);
+		return update(s.esti);
 	}
 
 	inline void operator >>(board& b) const { b = move; }
@@ -1428,6 +1441,11 @@ struct state {
 	void operator <<(std::istream& in) {
 		move << in;
 		moporgic::read(in, score);
+	}
+
+	inline static numeric& alpha() {
+		static numeric a = numeric(0.01);
+		return a;
 	}
 };
 struct select {
@@ -1489,6 +1507,10 @@ struct statistic {
 	u64 check;
 	u32 winv;
 
+	std::string indexf;
+	std::string localf;
+	std::string totalf;
+
 	struct control {
 		u64 num;
 		u64 chk;
@@ -1518,6 +1540,14 @@ struct statistic {
 		loop = 1;
 		check = ctrl.chk;
 		winv = ctrl.win;
+
+//		indexf = "%03llu/%03llu %llums %.2fops";
+//		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
+//		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
+		u32 dec = std::max(std::floor(std::log10(ctrl.num)) + 1, 3.0);
+		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
+		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
 
 		every = {};
 		total = {};
@@ -1552,19 +1582,19 @@ struct statistic {
 
 		std::cout << std::endl;
 		char buf[64];
-		snprintf(buf, sizeof(buf), "%03llu/%03llu %llums %.2fops",
+		snprintf(buf, sizeof(buf), indexf.c_str(), // "%03llu/%03llu %llums %.2fops",
 				loop / check,
 				limit / check,
 				elapsedtime,
 				local.opers * 1000.0 / elapsedtime);
 		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), "local:  avg=%llu max=%u tile=%u win=%.2f%%",
+		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / check,
 				local.max,
 				math::msb32(local.hash),
 				local.win * 100.0 / check);
 		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), "total:  avg=%llu max=%u tile=%u win=%.2f%%",
+		snprintf(buf, sizeof(buf), totalf.c_str(), // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / loop,
 				total.max,
 				math::msb32(total.hash),
@@ -1585,13 +1615,12 @@ struct statistic {
 		const auto& score = every.score;
 		const auto& opers = every.opers;
 		auto total = std::accumulate(count.begin(), count.end(), 0);
-		auto remain = total;
-		for (auto i = 0; remain; remain -= count[i++]) {
+		for (auto left = total, i = 0; left; left -= count[i++]) {
 			if (count[i] == 0) continue;
 			snprintf(buf, sizeof(buf), "%-6d" "%8d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
 					(1 << (i)) & 0xfffffffeu, u32(count[i]),
 					u32(score[i] / count[i]), u32(opers[i] / count[i]),
-					count[i] * 100.0 / total, remain * 100.0 / total);
+					count[i] * 100.0 / total, left * 100.0 / total);
 			std::cout << buf << std::endl;
 		}
 	}
@@ -1628,15 +1657,12 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--alpha"):
 			opts["alpha"] = find_opt(i, nullptr);
 			break;
-		case to_hash("-a/"):
-		case to_hash("--alpha-divide"):
-			opts["alpha-divide"] = find_opt(i, nullptr);
-			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
 			opts["train"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-T"):
+		case to_hash("-e"):
 		case to_hash("--test"):
 			opts["test"] = find_opt(i, nullptr);
 			break;
@@ -1690,22 +1716,30 @@ inline utils::options parse(int argc, const char* argv[]) {
 			opts["options"] = find_opts(i, ' ');
 			break;
 		case to_hash("-tt"):
-		case to_hash("--train-type"):
-			opts["train-type"] = find_opt(i, "");
+		case to_hash("-tm"):
+		case to_hash("--train-mode"):
+			opts["train-mode"] = find_opt(i, "");
 			break;
 		case to_hash("-Tt"):
-		case to_hash("--test-type"):
-			opts["test-type"] = find_opt(i, "");
+		case to_hash("-et"):
+		case to_hash("-em"):
+		case to_hash("--test-mode"):
+			opts["test-mode"] = find_opt(i, "");
 			break;
 		case to_hash("-tc"):
+		case to_hash("-tu"):
 		case to_hash("--train-check"):
 		case to_hash("--train-check-interval"):
-			opts["train-check"] = find_opt(i, "1000");
+		case to_hash("--train-unit"):
+			opts["train-unit"] = find_opt(i, "1000");
 			break;
 		case to_hash("-Tc"):
+		case to_hash("-ec"):
+		case to_hash("-eu"):
 		case to_hash("--test-check"):
 		case to_hash("--test-check-interval"):
-			opts["test-check"] = find_opt(i, "1000");
+		case to_hash("--test-unit"):
+			opts["test-unit"] = find_opt(i, "1000");
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
@@ -1720,63 +1754,23 @@ inline utils::options parse(int argc, const char* argv[]) {
 	return opts;
 }
 
-int main(int argc, const char* argv[]) {
-	statistic::control train(1000, 1000);
-	statistic::control test(100, 1000);
-	u32 timestamp = std::time(nullptr);
-	u32 seed = timestamp;
-	numeric& alpha = moporgic::alpha;
-
-	utils::options opts = parse(argc, argv);
-	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
-	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
-	if (opts("train")) train.num = std::stol(opts["train"]);
-	if (opts("test")) test.num = std::stol(opts["test"]);
-	if (opts("train-check")) train.chk = std::stol(opts["train-check"]);
-	if (opts("test-check")) test.chk = std::stol(opts["test-check"]);
-	if (opts("seed")) seed = std::stol(opts["seed"]);
-
-	std::srand(seed);
-	std::cout << "TDL2048+ LOG" << std::endl;
-	std::cout << "develop" << " build C++" << __cplusplus;
-	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
-	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
-	std::cout << std::endl;
-//	std::cout << "options = " << std::string(opts) << std::endl;
-	std::cout << "time = " << timestamp << std::endl;
-	std::cout << "seed = " << seed << std::endl;
-	std::cout << "alpha = " << alpha << std::endl;
-//	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
-	std::cout << std::endl;
-
-
-	utils::make_indexers();
-
-	utils::load_weights(opts["weight-input"]);
-	utils::make_weights(opts["weight-value"]);
-
-	utils::load_features(opts["feature-input"]);
-	utils::make_features(opts["feature-value"]);
-
-	utils::list_mapping();
-
-
+statistic train(statistic::control trainctl, utils::options opts = {}) {
 	board b;
 	state last;
 	select best;
 	statistic stats;
 	std::vector<state> path;
-	path.reserve(20000);
+	path.reserve(65536);
+	u32 score;
+	u32 opers;
 
-	if (train) std::cout << std::endl << "start training..." << std::endl;
-	switch (to_hash(opts["train-type"])) {
-
+	switch (to_hash(opts["train-mode"])) {
 	case to_hash("backward"):
-	case to_hash("backward-optimize"):
-		for (stats.init(train); stats; stats++) {
+	case to_hash("backward-best"):
+		for (stats.init(trainctl); stats; stats++) {
 
-			u32 score = 0;
-			u32 opers = 0;
+			score = 0;
+			opers = 0;
 
 			for (b.init(); best << b; b.next()) {
 				score += best.score();
@@ -1786,9 +1780,8 @@ int main(int argc, const char* argv[]) {
 			}
 
 			for (numeric v = 0; path.size(); path.pop_back()) {
-				state& s = path.back();
-				s.estimate();
-				v = s.update(v);
+				path.back().estimate();
+				v = path.back().update(v);
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -1796,12 +1789,12 @@ int main(int argc, const char* argv[]) {
 		break;
 
 	default:
-	case to_hash("online"):
 	case to_hash("forward"):
-		for (stats.init(train); stats; stats++) {
+	case to_hash("forward-best"):
+		for (stats.init(trainctl); stats; stats++) {
 
-			u32 score = 0;
-			u32 opers = 0;
+			score = 0;
+			opers = 0;
 
 			b.init();
 			best << b;
@@ -1825,28 +1818,89 @@ int main(int argc, const char* argv[]) {
 		break;
 	}
 
+	return stats;
+}
+
+statistic test(statistic::control testctl, utils::options opts = {}) {
+	board b;
+	select best;
+	statistic stats;
+	u32 score;
+	u32 opers;
+
+	switch (to_hash(opts["test-mode"])) {
+	default:
+	case to_hash("best"):
+		for (stats.init(testctl); stats; stats++) {
+
+			score = 0;
+			opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> b;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+	}
+
+	return stats;
+}
+
+int main(int argc, const char* argv[]) {
+	statistic::control trainctl(1000, 1000);
+	statistic::control testctl(1000, 1000);
+	u32 timestamp = std::time(nullptr);
+	u32 seed = timestamp;
+	numeric& alpha = state::alpha();
+
+	utils::options opts = parse(argc, argv);
+	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
+	if (opts("train")) trainctl.num = std::stol(opts["train"]);
+	if (opts("test")) testctl.num = std::stol(opts["test"]);
+	if (opts("train-unit")) trainctl.chk = std::stol(opts["train-unit"]);
+	if (opts("test-unit")) testctl.chk = std::stol(opts["test-unit"]);
+	if (opts("seed")) seed = std::stol(opts["seed"]);
+
+	std::srand(seed);
+	std::cout << "TDL2048+ LOG" << std::endl;
+	std::cout << "develop-coherence" << " build C++" << __cplusplus;
+	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
+	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
+	std::cout << std::endl;
+	std::cout << "time = " << timestamp << std::endl;
+	std::cout << "seed = " << seed << std::endl;
+	std::cout << "alpha = " << alpha << std::endl;
+//	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
+	std::cout << std::endl;
+
+
+	utils::make_indexers();
+
+	utils::load_weights(opts["weight-input"]);
+	utils::make_weights(opts["weight-value"]);
+
+	utils::load_features(opts["feature-input"]);
+	utils::make_features(opts["feature-value"]);
+
+	utils::list_mapping();
+
+
+	if (trainctl) {
+		std::cout << std::endl << "start training..." << std::endl;
+		train(trainctl, opts);
+	}
+
 	utils::save_weights(opts["weight-output"]);
 	utils::save_features(opts["feature-output"]);
 
-
-
-
-	if (test) std::cout << std::endl << "start testing..." << std::endl;
-	for (stats.init(test); stats; stats++) {
-
-		u32 score = 0;
-		u32 opers = 0;
-
-		for (b.init(); best << b; b.next()) {
-			score += best.score();
-			opers += 1;
-			best >> b;
-		}
-
-		stats.update(score, b.hash(), opers);
+	if (testctl) {
+		std::cout << std::endl << "start testing..." << std::endl;
+		test(testctl, opts).summary();
 	}
-	if (test) stats.summary();
-
 
 	std::cout << std::endl;
 
