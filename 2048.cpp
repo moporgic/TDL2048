@@ -33,7 +33,6 @@
 namespace moporgic {
 
 typedef float numeric;
-u32 depth[16] = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
 
 class weight {
 public:
@@ -2063,7 +2062,7 @@ struct select {
 };
 struct search : select {
 	u32 policy[16];
-	search(const u32* depth = moporgic::depth) : select() { std::copy(depth, depth + 16, policy); }
+	search(const u32* depth = search::depth()) : select() { std::copy(depth, depth + 16, policy); }
 
 	inline select& operator ()(const board& b) {
 		return operator ()(b, feature::begin(), feature::end());
@@ -2081,6 +2080,11 @@ struct search : select {
 		return update();
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
+
+	static u32* depth() {
+		static u32 dd[16] = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
+		return dd;
+	}
 };
 struct statistic {
 	u64 limit;
@@ -2482,7 +2486,7 @@ int main(int argc, const char* argv[]) {
 	u32 timestamp = std::time(nullptr);
 	u32 seed = timestamp;
 	numeric& alpha = state::alpha();
-	auto& depth = moporgic::depth;
+	auto& depth = search::depth();
 
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
