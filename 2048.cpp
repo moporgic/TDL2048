@@ -1578,10 +1578,6 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--alpha"):
 			opts["alpha"] = find_opt(i, nullptr);
 			break;
-		case to_hash("-a/"):
-		case to_hash("--alpha-divide"):
-			opts["alpha-divide"] = find_opt(i, nullptr);
-			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
 			opts["train"] = find_opt(i, nullptr);
@@ -1782,7 +1778,6 @@ int main(int argc, const char* argv[]) {
 
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
-	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
 	if (opts("train")) trainctl.num = std::stol(opts["train"]);
 	if (opts("test")) testctl.num = std::stol(opts["test"]);
 	if (opts("train-unit")) trainctl.chk = std::stol(opts["train-unit"]);
