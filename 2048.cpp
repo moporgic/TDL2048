@@ -1900,6 +1900,7 @@ int main(int argc, const char* argv[]) {
 		testctl.normalize(thdnum, thdid);
 		opts["thread-number"] = std::to_string(thdnum);
 		opts["thread-id"] = std::to_string(thdid);
+		for (u32 i = 0; i < thdid; i++) std::rand();
 		test(testctl, opts).summary(thdid);
 		if (thdid != 0) return 0;
 		while (wait(nullptr) > 0);
