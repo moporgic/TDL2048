@@ -1885,6 +1885,7 @@ int main(int argc, const char* argv[]) {
 		trainctl.normalize(thdnum, thdid);
 		opts["thread-number"] = std::to_string(thdnum);
 		opts["thread-id"] = std::to_string(thdid);
+		for (u32 i = 0; i < thdid; i++) std::rand();
 		train(trainctl, opts);
 		if (thdid != 0) return 0;
 		while (wait(nullptr) > 0);
