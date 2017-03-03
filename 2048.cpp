@@ -46,10 +46,10 @@ public:
 	inline bool operator ==(const weight& w) const { return id == w.id; }
 	inline bool operator !=(const weight& w) const { return id != w.id; }
 
-    friend std::ostream& operator <<(std::ostream& out, const weight& w) {
-    	auto& id = w.id;
-    	auto& length = w.length;
-    	auto& value = w.value;
+	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
+		auto& id = w.id;
+		auto& length = w.length;
+		auto& value = w.value;
 		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -67,11 +67,11 @@ public:
 			break;
 		}
 		return out;
-    }
+	}
 	friend std::istream& operator >>(std::istream& in, weight& w) {
-    	auto& id = w.id;
-    	auto& length = w.length;
-    	auto& value = w.value;
+		auto& id = w.id;
+		auto& length = w.length;
+		auto& value = w.value;
 		u32 code;
 		read_cast<u8>(in, code);
 		switch (code) {
@@ -258,9 +258,9 @@ public:
 	inline bool operator ==(const feature& f) const { return sign() == f.sign(); }
 	inline bool operator !=(const feature& f) const { return sign() != f.sign(); }
 
-    friend std::ostream& operator <<(std::ostream& out, const feature& f) {
-    	auto& index = f.index;
-    	auto& value = f.value;
+	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
+		auto& index = f.index;
+		auto& value = f.value;
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -272,11 +272,11 @@ public:
 			std::cerr << "unknown serial (" << code << ") at ostream << feature" << std::endl;
 			break;
 		}
-    	return out;
-    }
+		return out;
+	}
 	friend std::istream& operator >>(std::istream& in, feature& f) {
-    	auto& index = f.index;
-    	auto& value = f.value;
+		auto& index = f.index;
+		auto& value = f.value;
 		u32 code;
 		read_cast<u8>(in, code);
 		switch (code) {
