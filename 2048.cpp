@@ -1667,6 +1667,18 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--test-unit"):
 			opts["test-unit"] = find_opt(i, "1000");
 			break;
+		case to_hash("-tv"):
+		case to_hash("--train-win"):
+			opts["train-win"] = find_opt(i, "2048");
+			break;
+		case to_hash("-ev"):
+		case to_hash("--test-win"):
+			opts["test-win"] = find_opt(i, "2048");
+			break;
+		case to_hash("-v"):
+		case to_hash("--win"):
+			opts["train-win"] = opts["test-win"] = find_opt(i, "2048");
+			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
 			opts["comment"] = find_opts(i, ' ');
@@ -1789,6 +1801,8 @@ int main(int argc, const char* argv[]) {
 	if (opts("test")) testctl.loop = std::stol(opts["test"]);
 	if (opts("train-unit")) trainctl.unit = std::stol(opts["train-unit"]);
 	if (opts("test-unit")) testctl.unit = std::stol(opts["test-unit"]);
+	if (opts("train-win")) trainctl.winv = std::stol(opts["train-win"]);
+	if (opts("test-win")) testctl.winv = std::stol(opts["test-win"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 
 	std::srand(seed);
