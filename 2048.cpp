@@ -46,6 +46,11 @@ public:
 	inline bool operator ==(const weight& w) const { return id == w.id; }
 	inline bool operator !=(const weight& w) const { return id != w.id; }
 
+	weight& operator =(const weight& w) const {
+		std::copy_n(w.value, w.length, value);
+		return (*this);
+	}
+
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
 		auto& id = w.id;
 		auto& length = w.length;
