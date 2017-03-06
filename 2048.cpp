@@ -59,7 +59,7 @@ public:
 	inline bool operator ==(const weight& w) const { return id == w.id; }
 	inline bool operator !=(const weight& w) const { return id != w.id; }
 
-	weight& operator =(const weight& w) const {
+	weight& operator =(const weight& w) {
 		std::copy_n(w.value, w.length * 3ull, value);
 		return (*this);
 	}
