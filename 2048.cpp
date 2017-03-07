@@ -55,14 +55,10 @@ public:
 		updvu += std::abs(error);
 		return value;
 	}
+	inline numeric* raw(const u64& i = 0) { return value + ((i << 1) + i); }
 
 	inline bool operator ==(const weight& w) const { return id == w.id; }
 	inline bool operator !=(const weight& w) const { return id != w.id; }
-
-	weight& operator =(const weight& w) {
-		std::copy_n(w.value, w.length * 3ull, value);
-		return (*this);
-	}
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
 		auto& id = w.id;
@@ -115,16 +111,13 @@ public:
 		switch (code) {
 		case 0:
 		case 1:
-			read_cast<u32>(in, id);
-			read_cast<u64>(in, length);
-			value_init(length);
-			if (code == 0) read_cast<f32>(in, value, value + length);
-			if (code == 1) read_cast<f64>(in, value, value + length);
-			break;
 		case 2:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
-			read_cast<u16>(in, code);
+			if (code == 2)
+				read_cast<u16>(in, code);
+			else
+				code = code == 1 ? 8 : 4;
 			value_init(length);
 			switch (code) {
 			case 4: read_cast<f32>(in, value, value + length); break;
