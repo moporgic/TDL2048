@@ -89,14 +89,15 @@ public:
 	inline u64 sign() const { return id; }
 	inline u64 size() const { return length; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
+	inline numeric* raw(const u64& i = 0) { return value + i; }
 
 	inline bool operator ==(const weight& w) const { return id == w.id; }
 	inline bool operator !=(const weight& w) const { return id != w.id; }
 
-    friend std::ostream& operator <<(std::ostream& out, const weight& w) {
-    	auto& id = w.id;
-    	auto& length = w.length;
-    	auto& value = w.value;
+	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
+		auto& id = w.id;
+		auto& length = w.length;
+		auto& value = w.value;
 		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -114,26 +115,23 @@ public:
 			break;
 		}
 		return out;
-    }
+	}
 	friend std::istream& operator >>(std::istream& in, weight& w) {
-    	auto& id = w.id;
-    	auto& length = w.length;
-    	auto& value = w.value;
+		auto& id = w.id;
+		auto& length = w.length;
+		auto& value = w.value;
 		u32 code;
 		read_cast<u8>(in, code);
 		switch (code) {
 		case 0:
 		case 1:
-			read_cast<u32>(in, id);
-			read_cast<u64>(in, length);
-			value = alloc(length);
-			if (code == 0) read_cast<f32>(in, value, value + length);
-			if (code == 1) read_cast<f64>(in, value, value + length);
-			break;
 		case 2:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
-			read_cast<u16>(in, code);
+			if (code == 2)
+				read_cast<u16>(in, code);
+			else
+				code = code == 1 ? 8 : 4;
 			value = alloc(length);
 			switch (code) {
 			case 4: read_cast<f32>(in, value, value + length); break;
@@ -305,9 +303,9 @@ public:
 	inline bool operator ==(const feature& f) const { return sign() == f.sign(); }
 	inline bool operator !=(const feature& f) const { return sign() != f.sign(); }
 
-    friend std::ostream& operator <<(std::ostream& out, const feature& f) {
-    	auto& index = f.index;
-    	auto& value = f.value;
+	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
+		auto& index = f.index;
+		auto& value = f.value;
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -319,11 +317,11 @@ public:
 			std::cerr << "unknown serial (" << code << ") at ostream << feature" << std::endl;
 			break;
 		}
-    	return out;
-    }
+		return out;
+	}
 	friend std::istream& operator >>(std::istream& in, feature& f) {
-    	auto& index = f.index;
-    	auto& value = f.value;
+		auto& index = f.index;
+		auto& value = f.value;
 		u32 code;
 		read_cast<u8>(in, code);
 		switch (code) {
@@ -1472,7 +1470,7 @@ struct select {
 struct statistic {
 	u64 limit;
 	u64 loop;
-	u64 check;
+	u64 unit;
 	u32 winv;
 
 	std::string indexf;
@@ -1480,13 +1478,13 @@ struct statistic {
 	std::string totalf;
 
 	struct control {
-		u64 num;
-		u64 chk;
-		u32 win;
-		control(u64 num = 1000, u64 chk = 1000, u32 win = 2048) : num(num), chk(chk), win(win) {}
-		operator bool() const { return num; }
+		u64 loop;
+		u64 unit;
+		u32 winv;
+		control(u64 loop = 1000, u64 unit = 1000, u32 winv = 2048) : loop(loop), unit(unit), winv(winv) {}
+		operator bool() const { return loop; }
 		void normalize(u32 thdnum, u32 thdid) {
-			num = num / thdnum + (num % thdnum && thdid < (num % thdnum) ? 1 : 0);
+			loop = loop / thdnum + (loop % thdnum && thdid < (loop % thdnum) ? 1 : 0);
 		}
 	};
 
@@ -1507,15 +1505,15 @@ struct statistic {
 
 
 	void init(const control& ctrl = control()) {
-		limit = ctrl.num * ctrl.chk;
+		limit = ctrl.loop * ctrl.unit;
 		loop = 1;
-		check = ctrl.chk;
-		winv = ctrl.win;
+		unit = ctrl.unit;
+		winv = ctrl.winv;
 
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
-		u32 dec = std::max(std::floor(std::log10(ctrl.num)) + 1, 3.0);
+		u32 dec = std::max(std::floor(std::log10(ctrl.loop)) + 1, 3.0);
 		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
 		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
 		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
@@ -1528,7 +1526,7 @@ struct statistic {
 	u64 operator++(int) { return (++loop) - 1; }
 	u64 operator++() { return (++loop); }
 	operator bool() const { return loop <= limit; }
-	bool checked() const { return (loop % check) == 0; }
+	bool checked() const { return (loop % unit) == 0; }
 
 	void update(const u32& score, const u32& hash, const u32& opers, const int& tid = 0) {
 		local.score += score;
@@ -1540,7 +1538,7 @@ struct statistic {
 		every.score[std::log2(hash)] += score;
 		every.opers[std::log2(hash)] += opers;
 
-		if ((loop % check) != 0) return;
+		if ((loop % unit) != 0) return;
 
 		u64 currtimept = moporgic::millisec();
 		u64 elapsedtime = currtimept - local.time;
@@ -1554,16 +1552,16 @@ struct statistic {
 		std::cout << std::endl;
 		char buf[64];
 		snprintf(buf, sizeof(buf), indexf.c_str(), // "%03llu/%03llu %llums %.2fops",
-				loop / check,
-				limit / check,
+				loop / unit,
+				limit / unit,
 				elapsedtime,
 				local.opers * 1000.0 / elapsedtime);
 		std::cout << buf << " [" << tid << "]" << std::endl;
 		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
-				local.score / check,
+				local.score / unit,
 				local.max,
 				math::msb32(local.hash),
-				local.win * 100.0 / check);
+				local.win * 100.0 / unit);
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), totalf.c_str(), // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / loop,
@@ -1712,6 +1710,18 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--test-unit"):
 			opts["test-unit"] = find_opt(i, "1000");
 			break;
+		case to_hash("-tv"):
+		case to_hash("--train-win"):
+			opts["train-win"] = find_opt(i, "2048");
+			break;
+		case to_hash("-ev"):
+		case to_hash("--test-win"):
+			opts["test-win"] = find_opt(i, "2048");
+			break;
+		case to_hash("-v"):
+		case to_hash("--win"):
+			opts["train-win"] = opts["test-win"] = find_opt(i, "2048");
+			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
 			opts["comment"] = find_opts(i, ' ');
@@ -1846,10 +1856,12 @@ int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
 	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
-	if (opts("train")) trainctl.num = std::stol(opts["train"]);
-	if (opts("test")) testctl.num = std::stol(opts["test"]);
-	if (opts("train-check")) trainctl.chk = std::stol(opts["train-check"]);
-	if (opts("test-check")) testctl.chk = std::stol(opts["test-check"]);
+	if (opts("train")) trainctl.loop = std::stol(opts["train"]);
+	if (opts("test")) testctl.loop = std::stol(opts["test"]);
+	if (opts("train-unit")) trainctl.unit = std::stol(opts["train-unit"]);
+	if (opts("test-unit")) testctl.unit = std::stol(opts["test-unit"]);
+	if (opts("train-win")) trainctl.winv = std::stol(opts["train-win"]);
+	if (opts("test-win")) testctl.winv = std::stol(opts["test-win"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 	if (opts("thread")) thdnum = std::stod(opts["thread"]);
 	if (opts("shmres")) shm::setup(opts["shmres"]);
@@ -1890,6 +1902,7 @@ int main(int argc, const char* argv[]) {
 		if (thdid != 0) return 0;
 		while (wait(nullptr) > 0);
 	}
+
 
 	utils::save_weights(opts["weight-output"]);
 	utils::save_features(opts["feature-output"]);
