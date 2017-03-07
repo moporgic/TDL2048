@@ -42,14 +42,10 @@ public:
 	inline u64 sign() const { return id; }
 	inline u64 size() const { return length; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
+	inline numeric* raw(const u64& i = 0) { return value + i; }
 
 	inline bool operator ==(const weight& w) const { return id == w.id; }
 	inline bool operator !=(const weight& w) const { return id != w.id; }
-
-	weight& operator =(const weight& w) {
-		std::copy_n(w.value, w.length, value);
-		return (*this);
-	}
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
 		auto& id = w.id;
