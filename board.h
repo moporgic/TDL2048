@@ -727,86 +727,86 @@ public:
 		return *this;
 	}
 
-    friend std::ostream& operator <<(std::ostream& out, const board& b) {
+	friend std::ostream& operator <<(std::ostream& out, const board& b) {
 		static const char* edge[2] = { "+----------------+", "+------------------------+" };
-		static const char* grid[2] = { "|%4u%4u%4u%4u|",     "|%6u%6u%6u%6u|" };
+		static const char* grid[2] = { "|%4u%4u%4u%4u|", "|%6u%6u%6u%6u|" };
 		char buff[32];
-    	switch (style::flag(b)) {
-    	case style::raw:
-    		moporgic::write<u64>(out, b.raw);
-    		moporgic::write<u32>(out, b.ext);
-    		moporgic::write<u32>(out, b.inf);
-    		break;
-    	case style::raw64:
-    		moporgic::write<u64>(out, b.raw);
-    		break;
-    	case style::raw80:
-    		moporgic::write<u64>(out, b.raw);
-    		moporgic::write_cast<u16>(out, b.ext >> 16);
-    		break;
-    	case style::lite80:
-			snprintf(buff, sizeof(buff), "[%016llx|%04x]", b.raw, b.ext >> 16);
-			out << buff;
-    		break;
-    	case style::lite64:
-			snprintf(buff, sizeof(buff), "[%016llx]", b.raw);
-			out << buff;
-    		break;
-    	default:
-    	case style::index:
-    	case style::actual:
-    		out << edge[style::flag(b)] << std::endl;
-			for (u32 i = 0; i < 16; i += 4) {
-				snprintf(buff, sizeof(buff), grid[style::flag(b)], u32(b[i+0]), u32(b[i+1]), u32(b[i+2]), u32(b[i+3]));
-				out << buff << std::endl;
-			}
-    		out << edge[style::flag(b)] << std::endl;
-    		break;
-    	}
+		switch (style::flag(b)) {
+		case style::raw:
+			moporgic::write<u64>(out, b.raw);
+			moporgic::write<u32>(out, b.ext);
+			moporgic::write<u32>(out, b.inf);
+			break;
+		case style::raw64:
+			moporgic::write<u64>(out, b.raw);
+			break;
+		case style::raw80:
+			moporgic::write<u64>(out, b.raw);
+			moporgic::write_cast<u16>(out, b.ext >> 16);
+			break;
+		case style::lite80:
+				snprintf(buff, sizeof(buff), "[%016llx|%04x]", b.raw, b.ext >> 16);
+				out << buff;
+			break;
+		case style::lite64:
+				snprintf(buff, sizeof(buff), "[%016llx]", b.raw);
+				out << buff;
+			break;
+		default:
+		case style::index:
+		case style::actual:
+			out << edge[style::flag(b)] << std::endl;
+				for (u32 i = 0; i < 16; i += 4) {
+					snprintf(buff, sizeof(buff), grid[style::flag(b)], u32(b[i+0]), u32(b[i+1]), u32(b[i+2]), u32(b[i+3]));
+					out << buff << std::endl;
+				}
+			out << edge[style::flag(b)] << std::endl;
+			break;
+		}
 		return out;
 	}
 
 	friend std::istream& operator >>(std::istream& in, board& b) {
 		std::string s;
-    	switch (style::flag(b)) {
-    	case style::raw:
-    		moporgic::read<u64>(in, b.raw);
-    		moporgic::read<u32>(in, b.ext);
-    		moporgic::read<u32>(in, b.inf);
-    		break;
-    	case style::raw64:
-    		moporgic::read<u64>(in, b.raw);
-    		break;
-    	case style::raw80:
+		switch (style::flag(b)) {
+		case style::raw:
 			moporgic::read<u64>(in, b.raw);
-			moporgic::read_cast<u16>(in, b.ext); b.ext <<= 16;
-    		break;
-    	case style::lite64:
-    	case style::lite80:
-    		in >> s;
-			std::stringstream(s.substr(s.find('[') + 1)) >> std::hex >> b.raw;
-			if (style::flag(b) != style::lite80) break;
-    		if (s.find('[') == std::string::npos) in >> s;
-			std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
-    		break;
-    	default:
-    	case style::index:
-    	case style::actual:
-    		in >> s;
-    		if (s.find('+') != std::string::npos) {
-        		in >> s;
-        		for (int t, i = 0; i < 16 && in >> t; i++) {
-        			b[i] = t;
-        			if (i % 4 == 3) in >> s >> s;
-        		}
-    		} else {
-    			b[0] = std::stol(s);
-    			for (int t, i = 1; i < 16 && in >> t; i++) {
-    				b[i] = t;
-    			}
-    		}
-    		break;
-    	}
+			moporgic::read<u32>(in, b.ext);
+			moporgic::read<u32>(in, b.inf);
+			break;
+		case style::raw64:
+			moporgic::read<u64>(in, b.raw);
+			break;
+		case style::raw80:
+				moporgic::read<u64>(in, b.raw);
+				moporgic::read_cast<u16>(in, b.ext); b.ext <<= 16;
+			break;
+		case style::lite64:
+		case style::lite80:
+			in >> s;
+				std::stringstream(s.substr(s.find('[') + 1)) >> std::hex >> b.raw;
+				if (style::flag(b) != style::lite80) break;
+			if (s.find('[') == std::string::npos) in >> s;
+				std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
+			break;
+		default:
+		case style::index:
+		case style::actual:
+			in >> s;
+			if (s.find('+') != std::string::npos) {
+			in >> s;
+			for (int t, i = 0; i < 16 && in >> t; i++) {
+				b[i] = t;
+				if (i % 4 == 3) in >> s >> s;
+			}
+			} else {
+				b[0] = std::stol(s);
+				for (int t, i = 1; i < 16 && in >> t; i++) {
+					b[i] = t;
+				}
+			}
+			break;
+		}
 		return in;
 	}
 
