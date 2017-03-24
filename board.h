@@ -428,10 +428,10 @@ public:
 		register u64 rawn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.moveh64<0>(rawn, score, moved);
-		query(1).left.moveh64<1>(rawn, score, moved);
-		query(2).left.moveh64<2>(rawn, score, moved);
-		query(3).left.moveh64<3>(rawn, score, moved);
+		query16(0).left.moveh64<0>(rawn, score, moved);
+		query16(1).left.moveh64<1>(rawn, score, moved);
+		query16(2).left.moveh64<2>(rawn, score, moved);
+		query16(3).left.moveh64<3>(rawn, score, moved);
 		raw = rawn;
 		return score | moved;
 	}
@@ -439,10 +439,10 @@ public:
 		register u64 rawn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.moveh64<0>(rawn, score, moved);
-		query(1).right.moveh64<1>(rawn, score, moved);
-		query(2).right.moveh64<2>(rawn, score, moved);
-		query(3).right.moveh64<3>(rawn, score, moved);
+		query16(0).right.moveh64<0>(rawn, score, moved);
+		query16(1).right.moveh64<1>(rawn, score, moved);
+		query16(2).right.moveh64<2>(rawn, score, moved);
+		query16(3).right.moveh64<3>(rawn, score, moved);
 		raw = rawn;
 		return score | moved;
 	}
@@ -451,10 +451,10 @@ public:
 		register u64 rawn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.movev64<0>(rawn, score, moved);
-		query(1).left.movev64<1>(rawn, score, moved);
-		query(2).left.movev64<2>(rawn, score, moved);
-		query(3).left.movev64<3>(rawn, score, moved);
+		query16(0).left.movev64<0>(rawn, score, moved);
+		query16(1).left.movev64<1>(rawn, score, moved);
+		query16(2).left.movev64<2>(rawn, score, moved);
+		query16(3).left.movev64<3>(rawn, score, moved);
 		raw = rawn;
 		return score | moved;
 	}
@@ -463,10 +463,10 @@ public:
 		register u64 rawn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.movev64<0>(rawn, score, moved);
-		query(1).right.movev64<1>(rawn, score, moved);
-		query(2).right.movev64<2>(rawn, score, moved);
-		query(3).right.movev64<3>(rawn, score, moved);
+		query16(0).right.movev64<0>(rawn, score, moved);
+		query16(1).right.movev64<1>(rawn, score, moved);
+		query16(2).right.movev64<2>(rawn, score, moved);
+		query16(3).right.movev64<3>(rawn, score, moved);
 		raw = rawn;
 		return score | moved;
 	}
@@ -476,10 +476,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.moveh80<0>(rawn, extn, score, moved);
-		query(1).left.moveh80<1>(rawn, extn, score, moved);
-		query(2).left.moveh80<2>(rawn, extn, score, moved);
-		query(3).left.moveh80<3>(rawn, extn, score, moved);
+		query20(0).left.moveh80<0>(rawn, extn, score, moved);
+		query20(1).left.moveh80<1>(rawn, extn, score, moved);
+		query20(2).left.moveh80<2>(rawn, extn, score, moved);
+		query20(3).left.moveh80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -489,10 +489,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.moveh80<0>(rawn, extn, score, moved);
-		query(1).right.moveh80<1>(rawn, extn, score, moved);
-		query(2).right.moveh80<2>(rawn, extn, score, moved);
-		query(3).right.moveh80<3>(rawn, extn, score, moved);
+		query20(0).right.moveh80<0>(rawn, extn, score, moved);
+		query20(1).right.moveh80<1>(rawn, extn, score, moved);
+		query20(2).right.moveh80<2>(rawn, extn, score, moved);
+		query20(3).right.moveh80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -503,10 +503,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.movev80<0>(rawn, extn, score, moved);
-		query(1).left.movev80<1>(rawn, extn, score, moved);
-		query(2).left.movev80<2>(rawn, extn, score, moved);
-		query(3).left.movev80<3>(rawn, extn, score, moved);
+		query20(0).left.movev80<0>(rawn, extn, score, moved);
+		query20(1).left.movev80<1>(rawn, extn, score, moved);
+		query20(2).left.movev80<2>(rawn, extn, score, moved);
+		query20(3).left.movev80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -517,10 +517,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.movev80<0>(rawn, extn, score, moved);
-		query(1).right.movev80<1>(rawn, extn, score, moved);
-		query(2).right.movev80<2>(rawn, extn, score, moved);
-		query(3).right.movev80<3>(rawn, extn, score, moved);
+		query20(0).right.movev80<0>(rawn, extn, score, moved);
+		query20(1).right.movev80<1>(rawn, extn, score, moved);
+		query20(2).right.movev80<2>(rawn, extn, score, moved);
+		query20(3).right.movev80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
