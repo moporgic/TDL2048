@@ -1370,6 +1370,7 @@ struct state {
 	inline void operator >>(board& b) const { b = move; }
 	inline bool operator >(const state& s) const { return esti > s.esti; }
 	inline operator bool() const { return score >= 0; }
+	inline operator board() const { return move; }
 
 	void operator >>(std::ostream& out) const {
 		move >> out;
