@@ -245,6 +245,7 @@ public:
 	inline board(const board& b) = default;
 	inline ~board() = default;
 	inline operator u64() const { return raw; }
+	inline operator bool() const { return raw | ext; }
 	inline board& operator  =(const u64& raw) { this->raw = raw; return *this; }
 	inline board& operator  =(const board& b) { raw = b.raw, ext = b.ext; return *this; }
 	inline bool   operator ==(const board& b) const { return raw == b.raw && ext == b.ext; }
