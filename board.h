@@ -699,13 +699,17 @@ public:
 		style() = delete;
 		enum item {
 			at     = 0x00000000,
+			at4    = 0x00000000,
 			index  = 0x00000000,
 			exact  = 0x10000000,
+			exact4 = 0x10000000,
 			actual = 0x10000000,
-			lite   = 0xa0000000,
+			at5    = 0x80000000,
+			exact5 = 0x90000000,
 			line   = 0xa0000000,
 			lite80 = 0xa0000000,
 			line80 = 0xa0000000,
+			lite   = 0x20000000,
 			lite64 = 0x20000000,
 			line64 = 0x20000000,
 			full   = 0xf0000000,
@@ -729,8 +733,8 @@ public:
 	}
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
-		static const char* edge[2] = { "+----------------+", "+------------------------+" };
-		static const char* grid[2] = { "|%4u%4u%4u%4u|", "|%6u%6u%6u%6u|" };
+		const char* edge = style::flag(b) & style::actual ? "+------------------------+" : "+----------------+";
+		const char* grid = style::flag(b) & style::actual ? "|%6u%6u%6u%6u|" : "|%4u%4u%4u%4u|";
 		char buff[32];
 		switch (style::flag(b)) {
 		case style::raw:
@@ -756,12 +760,12 @@ public:
 		default:
 		case style::index:
 		case style::actual:
-			out << edge[style::flag(b)] << std::endl;
+			out << edge << std::endl;
 				for (u32 i = 0; i < 16; i += 4) {
-					snprintf(buff, sizeof(buff), grid[style::flag(b)], u32(b[i+0]), u32(b[i+1]), u32(b[i+2]), u32(b[i+3]));
+					snprintf(buff, sizeof(buff), grid, u32(b[i + 0]), u32(b[i + 1]), u32(b[i + 2]), u32(b[i + 3]));
 					out << buff << std::endl;
 				}
-			out << edge[style::flag(b)] << std::endl;
+			out << edge << std::endl;
 			break;
 		}
 		return out;
@@ -795,11 +799,11 @@ public:
 		case style::actual:
 			in >> s;
 			if (s.find('+') != std::string::npos) {
-			in >> s;
-			for (int t, i = 0; i < 16 && in >> t; i++) {
-				b[i] = t;
-				if (i % 4 == 3) in >> s >> s;
-			}
+				in >> s;
+				for (int t, i = 0; i < 16 && in >> t; i++) {
+					b[i] = t;
+					if (i % 4 == 3) in >> s >> s;
+				}
 			} else {
 				b[0] = std::stol(s);
 				for (int t, i = 1; i < 16 && in >> t; i++) {
