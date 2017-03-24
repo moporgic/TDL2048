@@ -750,21 +750,21 @@ public:
 			moporgic::write_cast<u16>(out, b.ext >> 16);
 			break;
 		case style::lite80:
-				snprintf(buff, sizeof(buff), "[%016llx|%04x]", b.raw, b.ext >> 16);
-				out << buff;
+			snprintf(buff, sizeof(buff), "[%016llx|%04x]", b.raw, b.ext >> 16);
+			out << buff;
 			break;
 		case style::lite64:
-				snprintf(buff, sizeof(buff), "[%016llx]", b.raw);
-				out << buff;
+			snprintf(buff, sizeof(buff), "[%016llx]", b.raw);
+			out << buff;
 			break;
 		default:
 		case style::index:
 		case style::actual:
 			out << edge << std::endl;
-				for (u32 i = 0; i < 16; i += 4) {
-					snprintf(buff, sizeof(buff), grid, u32(b[i + 0]), u32(b[i + 1]), u32(b[i + 2]), u32(b[i + 3]));
-					out << buff << std::endl;
-				}
+			for (u32 i = 0; i < 16; i += 4) {
+				snprintf(buff, sizeof(buff), grid, u32(b[i + 0]), u32(b[i + 1]), u32(b[i + 2]), u32(b[i + 3]));
+				out << buff << std::endl;
+			}
 			out << edge << std::endl;
 			break;
 		}
@@ -783,16 +783,16 @@ public:
 			moporgic::read<u64>(in, b.raw);
 			break;
 		case style::raw80:
-				moporgic::read<u64>(in, b.raw);
-				moporgic::read_cast<u16>(in, b.ext); b.ext <<= 16;
+			moporgic::read<u64>(in, b.raw);
+			moporgic::read_cast<u16>(in, b.ext); b.ext <<= 16;
 			break;
 		case style::lite64:
 		case style::lite80:
 			in >> s;
-				std::stringstream(s.substr(s.find('[') + 1)) >> std::hex >> b.raw;
-				if (style::flag(b) != style::lite80) break;
+			std::stringstream(s.substr(s.find('[') + 1)) >> std::hex >> b.raw;
+			if (style::flag(b) != style::lite80) break;
 			if (s.find('[') == std::string::npos) in >> s;
-				std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
+			std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
 			break;
 		default:
 		case style::index:
