@@ -1388,11 +1388,12 @@ struct state {
 struct select {
 	state move[4];
 	state *best;
-	select() : best(move) {
-		move[0] = state(&board::up);
-		move[1] = state(&board::right);
-		move[2] = state(&board::down);
-		move[3] = state(&board::left);
+	select(i32 (board::*up)() = &board::up, i32 (board::*right)() = &board::right,
+			i32 (board::*down)() = &board::down, i32 (board::*left)() = &board::left) : best(move) {
+		move[0] = state(up);
+		move[1] = state(right);
+		move[2] = state(down);
+		move[3] = state(left);
 	}
 	inline select& operator ()(const board& b) {
 		move[0] << b;
