@@ -447,7 +447,7 @@ public:
 		return score | moved;
 	}
 	inline i32 up64() {
-		transpose();
+		transpose64();
 		register u64 rawn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
@@ -459,7 +459,7 @@ public:
 		return score | moved;
 	}
 	inline i32 down64() {
-		transpose();
+		transpose64();
 		register u64 rawn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
@@ -498,7 +498,7 @@ public:
 		return score | moved;
 	}
 	inline i32 up80() {
-		transpose();
+		transpose80();
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
@@ -512,7 +512,7 @@ public:
 		return score | moved;
 	}
 	inline i32 down80() {
-		transpose();
+		transpose80();
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
