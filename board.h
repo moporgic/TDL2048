@@ -245,6 +245,7 @@ public:
 	inline board(const board& b) = default;
 	inline ~board() = default;
 	inline operator u64() const { return raw; }
+	inline operator bool() const { return raw | ext; }
 	inline board& operator  =(const u64& raw) { this->raw = raw; return *this; }
 	inline board& operator  =(const board& b) { raw = b.raw, ext = b.ext; return *this; }
 	inline bool   operator ==(const board& b) const { return raw == b.raw && ext == b.ext; }
@@ -427,10 +428,10 @@ public:
 		register u64 rawn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.moveh64<0>(rawn, score, moved);
-		query(1).left.moveh64<1>(rawn, score, moved);
-		query(2).left.moveh64<2>(rawn, score, moved);
-		query(3).left.moveh64<3>(rawn, score, moved);
+		query16(0).left.moveh64<0>(rawn, score, moved);
+		query16(1).left.moveh64<1>(rawn, score, moved);
+		query16(2).left.moveh64<2>(rawn, score, moved);
+		query16(3).left.moveh64<3>(rawn, score, moved);
 		raw = rawn;
 		return score | moved;
 	}
@@ -438,34 +439,34 @@ public:
 		register u64 rawn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.moveh64<0>(rawn, score, moved);
-		query(1).right.moveh64<1>(rawn, score, moved);
-		query(2).right.moveh64<2>(rawn, score, moved);
-		query(3).right.moveh64<3>(rawn, score, moved);
+		query16(0).right.moveh64<0>(rawn, score, moved);
+		query16(1).right.moveh64<1>(rawn, score, moved);
+		query16(2).right.moveh64<2>(rawn, score, moved);
+		query16(3).right.moveh64<3>(rawn, score, moved);
 		raw = rawn;
 		return score | moved;
 	}
 	inline i32 up64() {
-		transpose();
+		transpose64();
 		register u64 rawn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.movev64<0>(rawn, score, moved);
-		query(1).left.movev64<1>(rawn, score, moved);
-		query(2).left.movev64<2>(rawn, score, moved);
-		query(3).left.movev64<3>(rawn, score, moved);
+		query16(0).left.movev64<0>(rawn, score, moved);
+		query16(1).left.movev64<1>(rawn, score, moved);
+		query16(2).left.movev64<2>(rawn, score, moved);
+		query16(3).left.movev64<3>(rawn, score, moved);
 		raw = rawn;
 		return score | moved;
 	}
 	inline i32 down64() {
-		transpose();
+		transpose64();
 		register u64 rawn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.movev64<0>(rawn, score, moved);
-		query(1).right.movev64<1>(rawn, score, moved);
-		query(2).right.movev64<2>(rawn, score, moved);
-		query(3).right.movev64<3>(rawn, score, moved);
+		query16(0).right.movev64<0>(rawn, score, moved);
+		query16(1).right.movev64<1>(rawn, score, moved);
+		query16(2).right.movev64<2>(rawn, score, moved);
+		query16(3).right.movev64<3>(rawn, score, moved);
 		raw = rawn;
 		return score | moved;
 	}
@@ -475,10 +476,10 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.moveh80<0>(rawn, extn, score, moved);
-		query(1).left.moveh80<1>(rawn, extn, score, moved);
-		query(2).left.moveh80<2>(rawn, extn, score, moved);
-		query(3).left.moveh80<3>(rawn, extn, score, moved);
+		query20(0).left.moveh80<0>(rawn, extn, score, moved);
+		query20(1).left.moveh80<1>(rawn, extn, score, moved);
+		query20(2).left.moveh80<2>(rawn, extn, score, moved);
+		query20(3).left.moveh80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -488,38 +489,38 @@ public:
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.moveh80<0>(rawn, extn, score, moved);
-		query(1).right.moveh80<1>(rawn, extn, score, moved);
-		query(2).right.moveh80<2>(rawn, extn, score, moved);
-		query(3).right.moveh80<3>(rawn, extn, score, moved);
+		query20(0).right.moveh80<0>(rawn, extn, score, moved);
+		query20(1).right.moveh80<1>(rawn, extn, score, moved);
+		query20(2).right.moveh80<2>(rawn, extn, score, moved);
+		query20(3).right.moveh80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
 	}
 	inline i32 up80() {
-		transpose();
+		transpose80();
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).left.movev80<0>(rawn, extn, score, moved);
-		query(1).left.movev80<1>(rawn, extn, score, moved);
-		query(2).left.movev80<2>(rawn, extn, score, moved);
-		query(3).left.movev80<3>(rawn, extn, score, moved);
+		query20(0).left.movev80<0>(rawn, extn, score, moved);
+		query20(1).left.movev80<1>(rawn, extn, score, moved);
+		query20(2).left.movev80<2>(rawn, extn, score, moved);
+		query20(3).left.movev80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
 	}
 	inline i32 down80() {
-		transpose();
+		transpose80();
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
 		register i32 moved = -1;
-		query(0).right.movev80<0>(rawn, extn, score, moved);
-		query(1).right.movev80<1>(rawn, extn, score, moved);
-		query(2).right.movev80<2>(rawn, extn, score, moved);
-		query(3).right.movev80<3>(rawn, extn, score, moved);
+		query20(0).right.movev80<0>(rawn, extn, score, moved);
+		query20(1).right.movev80<1>(rawn, extn, score, moved);
+		query20(2).right.movev80<2>(rawn, extn, score, moved);
+		query20(3).right.movev80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
 		return score | moved;
@@ -698,13 +699,17 @@ public:
 		style() = delete;
 		enum item {
 			at     = 0x00000000,
+			at4    = 0x00000000,
 			index  = 0x00000000,
 			exact  = 0x10000000,
+			exact4 = 0x10000000,
 			actual = 0x10000000,
-			lite   = 0xa0000000,
+			at5    = 0x80000000,
+			exact5 = 0x90000000,
 			line   = 0xa0000000,
 			lite80 = 0xa0000000,
 			line80 = 0xa0000000,
+			lite   = 0x20000000,
 			lite64 = 0x20000000,
 			line64 = 0x20000000,
 			full   = 0xf0000000,
@@ -727,86 +732,86 @@ public:
 		return *this;
 	}
 
-    friend std::ostream& operator <<(std::ostream& out, const board& b) {
-		static const char* edge[2] = { "+----------------+", "+------------------------+" };
-		static const char* grid[2] = { "|%4u%4u%4u%4u|",     "|%6u%6u%6u%6u|" };
+	friend std::ostream& operator <<(std::ostream& out, const board& b) {
+		const char* edge = style::flag(b) & style::actual ? "+------------------------+" : "+----------------+";
+		const char* grid = style::flag(b) & style::actual ? "|%6u%6u%6u%6u|" : "|%4u%4u%4u%4u|";
 		char buff[32];
-    	switch (style::flag(b)) {
-    	case style::raw:
-    		moporgic::write<u64>(out, b.raw);
-    		moporgic::write<u32>(out, b.ext);
-    		moporgic::write<u32>(out, b.inf);
-    		break;
-    	case style::raw64:
-    		moporgic::write<u64>(out, b.raw);
-    		break;
-    	case style::raw80:
-    		moporgic::write<u64>(out, b.raw);
-    		moporgic::write_cast<u16>(out, b.ext >> 16);
-    		break;
-    	case style::lite80:
+		switch (style::flag(b)) {
+		case style::raw:
+			moporgic::write<u64>(out, b.raw);
+			moporgic::write<u32>(out, b.ext);
+			moporgic::write<u32>(out, b.inf);
+			break;
+		case style::raw64:
+			moporgic::write<u64>(out, b.raw);
+			break;
+		case style::raw80:
+			moporgic::write<u64>(out, b.raw);
+			moporgic::write_cast<u16>(out, b.ext >> 16);
+			break;
+		case style::lite80:
 			snprintf(buff, sizeof(buff), "[%016llx|%04x]", b.raw, b.ext >> 16);
 			out << buff;
-    		break;
-    	case style::lite64:
+			break;
+		case style::lite64:
 			snprintf(buff, sizeof(buff), "[%016llx]", b.raw);
 			out << buff;
-    		break;
-    	default:
-    	case style::index:
-    	case style::actual:
-    		out << edge[style::flag(b)] << std::endl;
+			break;
+		default:
+		case style::index:
+		case style::actual:
+			out << edge << std::endl;
 			for (u32 i = 0; i < 16; i += 4) {
-				snprintf(buff, sizeof(buff), grid[style::flag(b)], u32(b[i+0]), u32(b[i+1]), u32(b[i+2]), u32(b[i+3]));
+				snprintf(buff, sizeof(buff), grid, u32(b[i + 0]), u32(b[i + 1]), u32(b[i + 2]), u32(b[i + 3]));
 				out << buff << std::endl;
 			}
-    		out << edge[style::flag(b)] << std::endl;
-    		break;
-    	}
+			out << edge << std::endl;
+			break;
+		}
 		return out;
 	}
 
 	friend std::istream& operator >>(std::istream& in, board& b) {
 		std::string s;
-    	switch (style::flag(b)) {
-    	case style::raw:
-    		moporgic::read<u64>(in, b.raw);
-    		moporgic::read<u32>(in, b.ext);
-    		moporgic::read<u32>(in, b.inf);
-    		break;
-    	case style::raw64:
-    		moporgic::read<u64>(in, b.raw);
-    		break;
-    	case style::raw80:
+		switch (style::flag(b)) {
+		case style::raw:
+			moporgic::read<u64>(in, b.raw);
+			moporgic::read<u32>(in, b.ext);
+			moporgic::read<u32>(in, b.inf);
+			break;
+		case style::raw64:
+			moporgic::read<u64>(in, b.raw);
+			break;
+		case style::raw80:
 			moporgic::read<u64>(in, b.raw);
 			moporgic::read_cast<u16>(in, b.ext); b.ext <<= 16;
-    		break;
-    	case style::lite64:
-    	case style::lite80:
-    		in >> s;
+			break;
+		case style::lite64:
+		case style::lite80:
+			in >> s;
 			std::stringstream(s.substr(s.find('[') + 1)) >> std::hex >> b.raw;
-			if (style::flag(b) != style::lite80) break;
-    		if (s.find('[') == std::string::npos) in >> s;
+			if (style::flag(b) & style::ext == 0) break;
+			if (s.find('[') == std::string::npos) in >> s;
 			std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
-    		break;
-    	default:
-    	case style::index:
-    	case style::actual:
-    		in >> s;
-    		if (s.find('+') != std::string::npos) {
-        		in >> s;
-        		for (int t, i = 0; i < 16 && in >> t; i++) {
-        			b[i] = t;
-        			if (i % 4 == 3) in >> s >> s;
-        		}
-    		} else {
-    			b[0] = std::stol(s);
-    			for (int t, i = 1; i < 16 && in >> t; i++) {
-    				b[i] = t;
-    			}
-    		}
-    		break;
-    	}
+			break;
+		default:
+		case style::index:
+		case style::actual:
+			in >> s;
+			if (s.find('+') != std::string::npos) {
+				in >> s;
+				for (int t, i = 0; i < 16 && in >> t; i++) {
+					b[i] = t;
+					if (i % 4 == 3) in >> s >> s;
+				}
+			} else {
+				b[0] = std::stol(s);
+				for (int t, i = 1; i < 16 && in >> t; i++) {
+					b[i] = t;
+				}
+			}
+			break;
+		}
 		return in;
 	}
 
