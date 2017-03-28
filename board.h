@@ -611,22 +611,22 @@ public:
 	inline list find64(const u32& t) const { return board::lookup(mask64(t)).layout; }
 	inline list find80(const u32& t) const { return board::lookup(mask80(t)).layout; }
 
-	inline u64 mono(const bool& left = true) const {
-		if (left) {
-			register u64 mono = 0;
-			mono = (mono << 12) | query(0).left.mono;
-			mono = (mono << 12) | query(1).left.mono;
-			mono = (mono << 12) | query(2).left.mono;
-			mono = (mono << 12) | query(3).left.mono;
-			return mono;
-		} else {
-			register u64 mono = 0;
-			mono = (mono << 12) | query(0).right.mono;
-			mono = (mono << 12) | query(1).right.mono;
-			mono = (mono << 12) | query(2).right.mono;
-			mono = (mono << 12) | query(3).right.mono;
-			return mono;
-		}
+	inline u64 mono(const bool& left = true) const { return left ? monoleft() : monoright(); }
+	inline u64 monoleft() const {
+		register u64 mono = 0;
+		mono = (mono << 12) | query(0).left.mono;
+		mono = (mono << 12) | query(1).left.mono;
+		mono = (mono << 12) | query(2).left.mono;
+		mono = (mono << 12) | query(3).left.mono;
+		return mono;
+	}
+	inline u64 monoright() const {
+		register u64 mono = 0;
+		mono = (mono << 12) | query(0).right.mono;
+		mono = (mono << 12) | query(1).right.mono;
+		mono = (mono << 12) | query(2).right.mono;
+		mono = (mono << 12) | query(3).right.mono;
+		return mono;
 	}
 
 	inline u32 operations() const {
