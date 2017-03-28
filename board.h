@@ -631,10 +631,8 @@ public:
 
 	inline u32 operations() const {
 		board trans(*this); trans.transpose();
-		u32 hori = this->query(0).legal | this->query(1).legal
-				 | this->query(2).legal | this->query(3).legal;
-		u32 vert = trans.query(0).legal | trans.query(1).legal
-				 | trans.query(2).legal | trans.query(3).legal;
+		u32 hori = this->query(0).legal | this->query(1).legal | this->query(2).legal | this->query(3).legal;
+		u32 vert = trans.query(0).legal | trans.query(1).legal | trans.query(2).legal | trans.query(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
 	inline list actions() const {
