@@ -790,7 +790,7 @@ public:
 		case style::lite80:
 			in >> s;
 			std::stringstream(s.substr(s.find('[') + 1)) >> std::hex >> b.raw;
-			if (style::flag(b) & style::ext == 0) break;
+			if ((style::flag(b) & style::ext) == 0) break;
 			if (s.find('[') == std::string::npos) in >> s;
 			std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
 			break;
