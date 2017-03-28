@@ -269,7 +269,6 @@ public:
 	inline void mirror() { mirror64(); }
 	inline void flip() { flip64(); }
 	inline void reverse() { mirror(); flip(); }
-	inline void reflect(const bool& hori = true) { if (hori) mirror(); else flip(); }
 	inline void transpose() { transpose64(); }
 	inline u32  empty() const { return empty64(); }
 
