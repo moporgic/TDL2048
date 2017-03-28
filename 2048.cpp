@@ -1231,6 +1231,7 @@ u32 make_features(const std::string& res = "") {
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
 	predefined["5x4patt"] = predefined["patt/4-22"];
+	predefined["mono"] = predefined["monotonic"];
 	for (auto predef : predefined) {
 		if (in.find(predef.first) != std::string::npos) { // insert predefined features
 			in.insert(in.find(predef.first), predef.second);
