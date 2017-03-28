@@ -258,6 +258,9 @@ public:
 	inline bool   operator  >(const u64& raw) const { return this->raw  > raw || this->ext != 0; }
 
 	inline const cache& query(const u32& r) const { return query16(r); }
+	inline const cache& query16(const u32& r) const { return board::lookup(fetch16(r)); }
+	inline const cache& query20(const u32& r) const { return board::lookup(fetch20(r)); }
+
 	inline u32  fetch(const u32& i) const { return fetch16(i); }
 	inline void place(const u32& i, const u32& r) { place16(i, r); }
 	inline u32  at(const u32& i) const { return at4(i); }
@@ -270,12 +273,6 @@ public:
 	inline void transpose() { transpose64(); }
 	inline u32  empty() const { return empty64(); }
 
-	inline const cache& query16(const u32& r) const {
-		return board::lookup(fetch16(r));
-	}
-	inline const cache& query20(const u32& r) const {
-		return board::lookup(fetch20(r));
-	}
 
 	inline u32 fetch16(const u32& i) const {
 		return ((raw >> (i << 4)) & 0xffff);
@@ -591,10 +588,14 @@ public:
 			num[at(i)]++;
 	}
 
-	inline u32 mask(const u32& t) const {
-		return (query(0).mask[t] << 0) | (query(1).mask[t] << 4)
-			 | (query(2).mask[t] << 8) | (query(3).mask[t] << 12);
+	inline u32 mask(const u32& t) const { return mask64(t); }
+	inline u32 mask64(const u32& t) const {
+		return (query16(0).mask[t] << 0) | (query16(1).mask[t] << 4) | (query16(2).mask[t] << 8) | (query16(3).mask[t] << 12);
 	}
+	inline u32 mask80(const u32& t) const {
+		return (query20(0).mask[t] << 0) | (query20(1).mask[t] << 4) | (query20(2).mask[t] << 8) | (query20(3).mask[t] << 12);
+	}
+
 	template<typename numa>
 	inline void mask(numa msk, const u32& min, const u32& max) const {
 		const cache::info& mask0 = query(0).mask;
@@ -606,9 +607,9 @@ public:
 		}
 	}
 
-	inline list find(const u32& t) const {
-		return board::lookup(mask(t)).layout;
-	}
+	inline list find(const u32& t) const { return find64(t); }
+	inline list find64(const u32& t) const { return board::lookup(mask64(t)).layout; }
+	inline list find80(const u32& t) const { return board::lookup(mask80(t)).layout; }
 
 	inline u64 mono(const bool& left = true) const {
 		if (left) {
