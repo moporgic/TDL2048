@@ -709,18 +709,18 @@ public:
 	}
 	inline u64 monoleft64() const {
 		register u64 mono = 0;
-		mono |= query16(0).left.mono <<  0;
-		mono |= query16(1).left.mono << 12;
-		mono |= query16(2).left.mono << 24;
-		mono |= query16(3).left.mono << 36;
+		mono |= u64(query16(0).left.mono) <<  0;
+		mono |= u64(query16(1).left.mono) << 12;
+		mono |= u64(query16(2).left.mono) << 24;
+		mono |= u64(query16(3).left.mono) << 36;
 		return mono;
 	}
 	inline u64 monoleft80() const {
 		register u64 mono = 0;
-		mono |= query20(0).left.mono <<  0;
-		mono |= query20(1).left.mono << 12;
-		mono |= query20(2).left.mono << 24;
-		mono |= query20(3).left.mono << 36;
+		mono |= u64(query20(0).left.mono) <<  0;
+		mono |= u64(query20(1).left.mono) << 12;
+		mono |= u64(query20(2).left.mono) << 24;
+		mono |= u64(query20(3).left.mono) << 36;
 		return mono;
 	}
 
@@ -729,18 +729,18 @@ public:
 	}
 	inline u64 monoright64() const {
 		register u64 mono = 0;
-		mono |= query16(0).right.mono <<  0;
-		mono |= query16(1).right.mono << 12;
-		mono |= query16(2).right.mono << 24;
-		mono |= query16(3).right.mono << 36;
+		mono |= u64(query16(0).right.mono) <<  0;
+		mono |= u64(query16(1).right.mono) << 12;
+		mono |= u64(query16(2).right.mono) << 24;
+		mono |= u64(query16(3).right.mono) << 36;
 		return mono;
 	}
 	inline u64 monoright80() const {
 		register u64 mono = 0;
-		mono |= query20(0).right.mono <<  0;
-		mono |= query20(1).right.mono << 12;
-		mono |= query20(2).right.mono << 24;
-		mono |= query20(3).right.mono << 36;
+		mono |= u64(query20(0).right.mono) <<  0;
+		mono |= u64(query20(1).right.mono) << 12;
+		mono |= u64(query20(2).right.mono) << 24;
+		mono |= u64(query20(3).right.mono) << 36;
 		return mono;
 	}
 
