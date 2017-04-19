@@ -1806,7 +1806,7 @@ int main(int argc, const char* argv[]) {
 	statistic::control trainctl(1000, 1000);
 	statistic::control testctl(1000, 1000);
 	u32 timestamp = std::time(nullptr);
-	u32 seed = timestamp;
+	u32 seed = moporgic::rdtsc();
 	numeric& alpha = state::alpha();
 
 	utils::options opts = parse(argc, argv);
