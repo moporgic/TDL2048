@@ -406,65 +406,83 @@ namespace utils {
 class options {
 public:
 	options() {}
-	options(const options& opts) : opts(opts.opts), extra(opts.extra) {}
+	options(const options& opts) : opts(opts.opts) {}
 
-	std::string& operator [](const std::string& opt) {
-		if (opts.find(opt) == opts.end()) {
-			auto it = std::find(extra.begin(), extra.end(), opt);
-			if (it != extra.end()) extra.erase(it);
-			opts[opt] = "";
+	class option {
+		friend class options;
+	public:
+		option() = delete;
+		option(const option& opt) = default;
+		operator std::string&() { return opt; }
+		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.opt; }
+		friend std::istream& operator >>(std::istream& in, option& opt) { return in >> opt.opt; }
+		std::string& operator =(const std::string& s) { return (opt = s); }
+		std::string& operator +=(const std::string& s) { return (opt += s); }
+		std::string operator +(const std::string& s) const { return opt + s; }
+		bool operator ==(const std::string& s) const { return opt == s; }
+		bool operator !=(const std::string& s) const { return opt != s; }
+
+		bool operator ()(const std::string& ext) const {
+			for (const std::string& label : stov(ext)) {
+				auto pos = opt.find(label);
+				if (pos == std::string::npos) continue;
+				if (pos != 0 && opt[pos - 1] > ' ') continue;
+				if (opt[pos + label.size()] <= ' ') return true;
+				if (opt[pos + label.size()] == '=') return true;
+			}
+			return false;
 		}
-		return opts[opt];
-	}
+
+		std::string operator [](const std::string& ext) {
+			std::string label = " " + ext + " ";
+			for (const std::string& token : stov(opt))
+				if (label.find(" " + token.substr(0, token.find('=')) + " ") != std::string::npos)
+					return token.substr(token.find('=') + 1);
+			opt += ext;
+			return ext.substr(ext.find('=') + 1);
+		}
+
+		std::string find(const std::string& ext, const std::string& def = "") const {
+			return operator() (ext) ? const_cast<option&>(*this)[ext] : def;
+		}
+	private:
+		std::string& opt;
+
+		option(std::string& opt) : opt(opt) {}
+		std::vector<std::string> stov(const std::string& s) const {
+			std::stringstream ss(s);
+			std::istream_iterator<std::string> begin(ss), end;
+			return std::vector<std::string>(begin, end);
+		}
+	};
 
 	bool operator ()(const std::string& opt) const {
-		if (opts.find(opt) != opts.end()) return true;
-		if (std::find(extra.begin(), extra.end(), opt) != extra.end()) return true;
-		return false;
+		return opts.find(opt) != opts.end();
 	}
 
-	bool operator +=(const std::string& opt) {
-		if (operator ()(opt)) return false;
-		extra.push_back(opt);
-		return true;
+	bool operator ()(const std::string& opt, const std::string& ext) const {
+		return operator ()(opt) ? const_cast<options&>(*this)[opt](ext) : false;
 	}
-	bool operator -=(const std::string& opt) {
-		if (operator ()(opt) == false) return false;
-		if (opts.find(opt) != opts.end()) opts.erase(opts.find(opt));
-		auto it = std::find(extra.begin(), extra.end(), opt);
-		if (it != extra.end()) extra.erase(it);
-		return true;
+
+	option operator [](const std::string& opt) {
+		if (opts.find(opt) == opts.end()) opts[opt] = "";
+		return opts[opt];
 	}
 
 	std::string find(const std::string& opt, const std::string& def = "") const {
 		return operator()(opt) ? const_cast<options&>(*this)[opt] : def;
 	}
 
-	std::string find(const std::string& opt, const std::vector<std::string>& ext = {}, const std::string& def = "") const {
-		if (!operator()(opt)) return def;
-		std::stringstream ss(const_cast<options&>(*this)[opt]);
-		for (std::string token; ss >> token; ) {
-			if (std::find(ext.begin(), ext.end(), token.substr(0, token.find('='))) != ext.end()) {
-				return token.substr(token.find('=') + 1);
-			}
-		}
-		return def;
-	}
-
 	operator std::string() const {
-		std::string res;
-		for (auto v : opts) {
-			res.append(v.first).append("=").append(v.second).append(" ");
-		}
-		for (auto s : extra) {
-			res.append(s).append(" ");
-		}
-		return res;
+		std::string options;
+		for (auto v : opts)
+			options += (v.second.size() ? (v.first + "=" + v.second) : v.first) + " ";
+		if (options.size()) options.pop_back();
+		return options;
 	}
 
 private:
 	std::map<std::string, std::string> opts;
-	std::list<std::string> extra;
 };
 
 inline u32 hashpatt(const std::vector<int>& patt) {
@@ -1260,6 +1278,7 @@ u32 make_features(const std::string& res = "") {
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
 	predefined["5x4patt"] = predefined["patt/4-22"];
+	predefined["mono"] = predefined["monotonic"];
 	for (auto predef : predefined) {
 		if (in.find(predef.first) != std::string::npos) { // insert predefined features
 			in.insert(in.find(predef.first), predef.second);
@@ -1399,6 +1418,7 @@ struct state {
 	inline void operator >>(board& b) const { b = move; }
 	inline bool operator >(const state& s) const { return esti > s.esti; }
 	inline operator bool() const { return score >= 0; }
+	inline operator board() const { return move; }
 
 	void operator >>(std::ostream& out) const {
 		move >> out;
@@ -1417,11 +1437,12 @@ struct state {
 struct select {
 	state move[4];
 	state *best;
-	select() : best(move) {
-		move[0] = state(&board::up);
-		move[1] = state(&board::right);
-		move[2] = state(&board::down);
-		move[3] = state(&board::left);
+	select(i32 (board::*up)() = &board::up, i32 (board::*right)() = &board::right,
+			i32 (board::*down)() = &board::down, i32 (board::*left)() = &board::left) : best(move) {
+		move[0] = state(up);
+		move[1] = state(right);
+		move[2] = state(down);
+		move[3] = state(left);
 	}
 	inline select& operator ()(const board& b) {
 		move[0] << b;
@@ -1848,7 +1869,7 @@ int main(int argc, const char* argv[]) {
 	statistic::control trainctl(1000, 1000);
 	statistic::control testctl(1000, 1000);
 	u32 timestamp = std::time(nullptr);
-	u32 seed = timestamp;
+	u32 seed = moporgic::rdtsc();
 	numeric& alpha = state::alpha();
 	u32 thdnum = 1;
 	u32 thdid = 0;
