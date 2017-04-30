@@ -700,7 +700,6 @@ template<u32 tile, int isomorphic>
 u64 indexmask(const board& b) { // 16-bit
 	board k = b;
 	k.isomorphic(isomorphic);
-	if (isomorphic >= 4) k.mirror();
 	return k.mask(tile);
 }
 
@@ -708,7 +707,6 @@ template<int isomorphic>
 u64 indexmax(const board& b) { // 16-bit
 	board k = b;
 	k.isomorphic(isomorphic);
-	if (isomorphic >= 4) k.mirror();
 	return k.mask(k.max());
 }
 
