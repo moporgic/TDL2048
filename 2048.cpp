@@ -1438,6 +1438,9 @@ struct select {
 	inline operator bool() const { return score() != -1; }
 	inline i32 score() const { return best->score; }
 	inline numeric esti() const { return best->esti; }
+
+	inline state* begin() { return move; }
+	inline state* end() { return move + 4; }
 };
 struct statistic {
 	u64 limit;
