@@ -1324,12 +1324,13 @@ inline numeric update(const board& state, const numeric& updv,
 
 
 struct state {
+	typedef i32 (board::*action)();
 	board move;
-	i32 (board::*oper)();
+	action oper;
 	i32 score;
 	numeric esti;
 	state() : state(nullptr) {}
-	state(i32 (board::*oper)()) : oper(oper), score(-1), esti(0) {}
+	state(action oper) : oper(oper), score(-1), esti(0) {}
 	state(const state& s) = default;
 
 	inline void assign(const board& b) {
@@ -1388,8 +1389,8 @@ struct state {
 struct select {
 	state move[4];
 	state *best;
-	select(i32 (board::*up)() = &board::up, i32 (board::*right)() = &board::right,
-			i32 (board::*down)() = &board::down, i32 (board::*left)() = &board::left) : best(move) {
+	select(state::action up = &board::up, state::action right = &board::right,
+		   state::action down = &board::down, state::action left = &board::left) : best(move) {
 		move[0] = state(up);
 		move[1] = state(right);
 		move[2] = state(down);
