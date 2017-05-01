@@ -2513,7 +2513,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 }
 
 int main(int argc, const char* argv[]) {
-	statistic::control trainctl(1000, 1000);
+	statistic::control trainctl(1000, 1);
 	statistic::control testctl(1000, 1);
 	u32 timestamp = std::time(nullptr);
 	u32 seed = moporgic::rdtsc();
