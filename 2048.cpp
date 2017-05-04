@@ -775,16 +775,14 @@ u64 indexmono(const board& b) { // 24-bit
 template<u32 tile, int isomorphic>
 u64 indexmask(const board& b) { // 16-bit
 	board k = b;
-	k.rotate(isomorphic);
-	if (isomorphic >= 4) k.mirror();
+	k.isomorphic(isomorphic);
 	return k.mask(tile);
 }
 
 template<int isomorphic>
 u64 indexmax(const board& b) { // 16-bit
 	board k = b;
-	k.rotate(isomorphic);
-	if (isomorphic >= 4) k.mirror();
+	k.isomorphic(isomorphic);
 	return k.mask(k.max());
 }
 
@@ -1307,6 +1305,7 @@ u32 make_features(const std::string& res = "") {
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
 	predefined["5x4patt"] = predefined["patt/4-22"];
+	predefined["mono"] = predefined["monotonic"];
 	for (auto predef : predefined) {
 		if (in.find(predef.first) != std::string::npos) { // insert predefined features
 			in.insert(in.find(predef.first), predef.second);
@@ -1403,12 +1402,13 @@ inline numeric update(const board& state, const numeric& alpha, const numeric& e
 
 
 struct state {
+	typedef i32 (board::*action)();
 	board move;
-	i32 (board::*oper)();
+	action oper;
 	i32 score;
 	numeric esti;
 	state() : state(nullptr) {}
-	state(i32 (board::*oper)()) : oper(oper), score(-1), esti(0) {}
+	state(action oper) : oper(oper), score(-1), esti(0) {}
 	state(const state& s) = default;
 
 	inline void assign(const board& b) {
@@ -1468,8 +1468,8 @@ struct state {
 struct select {
 	state move[4];
 	state *best;
-	select(i32 (board::*up)() = &board::up, i32 (board::*right)() = &board::right,
-			i32 (board::*down)() = &board::down, i32 (board::*left)() = &board::left) : best(move) {
+	select(state::action up = &board::up, state::action right = &board::right,
+		   state::action down = &board::down, state::action left = &board::left) : best(move) {
 		move[0] = state(up);
 		move[1] = state(right);
 		move[2] = state(down);
@@ -1518,6 +1518,9 @@ struct select {
 	inline operator bool() const { return score() != -1; }
 	inline i32 score() const { return best->score; }
 	inline numeric esti() const { return best->esti; }
+
+	inline state* begin() { return move; }
+	inline state* end() { return move + 4; }
 };
 struct statistic {
 	u64 limit;
@@ -1884,7 +1887,7 @@ int main(int argc, const char* argv[]) {
 	statistic::control trainctl(1000, 1000);
 	statistic::control testctl(1000, 1000);
 	u32 timestamp = std::time(nullptr);
-	u32 seed = timestamp;
+	u32 seed = moporgic::rdtsc();
 	numeric& alpha = state::alpha();
 
 	utils::options opts = parse(argc, argv);
