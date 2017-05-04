@@ -746,16 +746,14 @@ u64 indexmono(const board& b) { // 24-bit
 template<u32 tile, int isomorphic>
 u64 indexmask(const board& b) { // 16-bit
 	board k = b;
-	k.rotate(isomorphic);
-	if (isomorphic >= 4) k.mirror();
+	k.isomorphic(isomorphic);
 	return k.mask(tile);
 }
 
 template<int isomorphic>
 u64 indexmax(const board& b) { // 16-bit
 	board k = b;
-	k.rotate(isomorphic);
-	if (isomorphic >= 4) k.mirror();
+	k.isomorphic(isomorphic);
 	return k.mask(k.max());
 }
 
@@ -1373,12 +1371,13 @@ inline numeric update(const board& state, const numeric& updv,
 
 
 struct state {
+	typedef i32 (board::*action)();
 	board move;
-	i32 (board::*oper)();
+	action oper;
 	i32 score;
 	numeric esti;
 	state() : state(nullptr) {}
-	state(i32 (board::*oper)()) : oper(oper), score(-1), esti(0) {}
+	state(action oper) : oper(oper), score(-1), esti(0) {}
 	state(const state& s) = default;
 
 	inline void assign(const board& b) {
@@ -1437,8 +1436,8 @@ struct state {
 struct select {
 	state move[4];
 	state *best;
-	select(i32 (board::*up)() = &board::up, i32 (board::*right)() = &board::right,
-			i32 (board::*down)() = &board::down, i32 (board::*left)() = &board::left) : best(move) {
+	select(state::action up = &board::up, state::action right = &board::right,
+		   state::action down = &board::down, state::action left = &board::left) : best(move) {
 		move[0] = state(up);
 		move[1] = state(right);
 		move[2] = state(down);
@@ -1487,6 +1486,9 @@ struct select {
 	inline operator bool() const { return score() != -1; }
 	inline i32 score() const { return best->score; }
 	inline numeric esti() const { return best->esti; }
+
+	inline state* begin() { return move; }
+	inline state* end() { return move + 4; }
 };
 struct statistic {
 	u64 limit;
