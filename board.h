@@ -575,7 +575,7 @@ public:
 		optype(const oper& op = illegal) : op(op) {}
 		optype(const optype& opt) = default;
 		operator oper() const { return op; }
-		std::string name() const {
+		const char* name() const {
 			const char* res[] = { "up", "right", "down", "left", "#4", "#5", "#6", "none" };
 			return res[op & 0x0111];
 		}
