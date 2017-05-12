@@ -566,24 +566,29 @@ public:
 	class optype {
 	public:
 		typedef i32 oper;
+		typedef i32 (board::*action)();
 		static constexpr oper up = 0;
 		static constexpr oper right = 1;
 		static constexpr oper down = 2;
 		static constexpr oper left = 3;
-		static constexpr oper illegal = -1;
+		static constexpr oper null = 4;
 		oper op;
-		optype(const oper& op = illegal) : op(op) {}
+		optype(const oper& op = null) : op(op) {}
 		optype(const optype& opt) = default;
 		operator oper() const { return op; }
 		const char* name() const {
-			const char* res[] = { "up", "right", "down", "left", "#4", "#5", "#6", "none" };
-			return res[op & 0x0111];
+			const char* res[] = { "up", "right", "down", "left", "null" };
+			return res[op];
+		}
+		action function() const {
+			action res[] = { &board::up, &board::right, &board::down, &board::left, nullptr };
+			return res[op];
 		}
 		friend std::ostream& operator <<(std::ostream& out, const optype& o) {
 			return out << o.name();
 		}
-		static inline std::array<oper, 4> operations() { return { up, right, down, left }; }
-		static inline std::array<oper, 4> actions() { return operations(); }
+		static inline std::array<optype, 4> operations() { return { up, right, down, left }; }
+		static inline std::array<optype, 4> actions() { return operations(); }
 	};
 
 	inline i32 operate(const optype::oper& op) {
