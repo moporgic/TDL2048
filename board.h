@@ -577,7 +577,7 @@ public:
 		operator oper() const { return op; }
 		const char* name() const {
 			const char* res[] = { "up", "right", "down", "left", "#4", "#5", "#6", "none" };
-			return res[op & 0x0111];
+			return res[op & 0b0111];
 		}
 		friend std::ostream& operator <<(std::ostream& out, const optype& o) {
 			return out << o.name();
