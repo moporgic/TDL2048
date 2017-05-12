@@ -565,13 +565,16 @@ public:
 
 	class optype {
 	public:
-		optype() = delete;
 		typedef i32 oper;
 		static constexpr oper up = 0;
 		static constexpr oper right = 1;
 		static constexpr oper down = 2;
 		static constexpr oper left = 3;
 		static constexpr oper illegal = -1;
+		oper op;
+		optype(const oper& op = illegal) : op(op) {}
+		optype(const optype& opt) = default;
+		operator oper() const { return op; }
 	};
 
 	inline i32 operate(const optype::oper& op) {
