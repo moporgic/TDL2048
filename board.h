@@ -575,6 +575,8 @@ public:
 		optype(const oper& op = illegal) : op(op) {}
 		optype(const optype& opt) = default;
 		operator oper() const { return op; }
+		static inline std::array<oper, 4> operations() { return { up, right, down, left }; }
+		static inline std::array<oper, 4> actions() { return operations(); }
 	};
 
 	inline i32 operate(const optype::oper& op) {
