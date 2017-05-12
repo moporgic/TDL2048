@@ -582,8 +582,8 @@ public:
 		friend std::ostream& operator <<(std::ostream& out, const optype& o) {
 			return out << o.name();
 		}
-		static inline std::array<oper, 4> operations() { return { up, right, down, left }; }
-		static inline std::array<oper, 4> actions() { return operations(); }
+		static inline std::array<optype, 4> operations() { return { up, right, down, left }; }
+		static inline std::array<optype, 4> actions() { return operations(); }
 	};
 
 	inline i32 operate(const optype::oper& op) {
