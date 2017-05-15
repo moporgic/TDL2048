@@ -20,14 +20,17 @@ namespace moporgic {
 class board {
 public:
 	struct list {
-		u64 tile;
-		u32 size;
-		list(const u64& t, const u32& s) : tile(t), size(s) {}
+		u64 raw;
+		u32 num;
+		list(const u64& t, const u32& s) : raw(t), num(s) {}
 		list(const list& t) = default;
-		list() : tile(0), size(0) {}
+		list() : raw(0), num(0) {}
 		~list() = default;
-		inline u32 operator[] (const u32& i) const { return (tile >> (i << 2)) & 0x0f; }
-		inline operator u32() const { return size; }
+		inline u32 operator[] (const u32& i) const { return (raw >> (i << 2)) & 0x0f; }
+		inline u32 at(const u32& i) const {
+			if (i >= num) throw std::out_of_range("board::list");
+			return operator[](i);
+		}
 		struct iter {
 			u64 raw;
 			i32 idx;
@@ -40,8 +43,10 @@ public:
 			inline iter  operator++(int) { return iter(raw, ++idx - 1); }
 			inline iter  operator--(int) { return iter(raw, --idx + 1); }
 		};
-		inline iter begin() const { return iter(tile, 0); }
-		inline iter end() const { return iter(tile, size); }
+		inline iter begin() const { return iter(raw, 0); }
+		inline iter end() const { return iter(raw, num); }
+		inline size_t size() const { return num; }
+		inline bool empty() const { return num == 0; }
 	};
 	class cache {
 	friend class board;
@@ -148,14 +153,14 @@ public:
 				species |= (1 << V[i]);
 				numof[V[i]]++;
 				mask[V[i]] |= (1 << i);
-				num.tile += (1ULL << (V[i] << 2));
+				num.raw += (1ULL << (V[i] << 2));
 			}
 
 			list layout;
 			auto tilemask = r;
 			for (int i = 0; i < 16; i++) {
 				if ((tilemask >> i) & 1) // map bit-location to index
-					layout.tile |= (u64(i) << ((layout.size++) << 2));
+					layout.raw |= (u64(i) << ((layout.num++) << 2));
 			}
 
 			moved = left.moved & right.moved;
@@ -384,27 +389,27 @@ public:
 	inline void next() { return next64(); }
 	inline void next64() {
 		list empty = spaces64();
-		u32 p = empty[std::rand() % empty.size];
+		u32 p = empty[std::rand() % empty.num];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
 	inline void next80() {
 		list empty = spaces80();
-		u32 p = empty[std::rand() % empty.size];
+		u32 p = empty[std::rand() % empty.num];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
 
 	inline bool popup() { return popup64(); }
 	inline bool popup64() {
 		list empty = spaces64();
-		if (empty.size == 0) return false;
-		u32 p = empty[std::rand() % empty.size];
+		if (empty.num == 0) return false;
+		u32 p = empty[std::rand() % empty.num];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
 	inline bool popup80() {
 		list empty = spaces80();
-		if (empty.size == 0) return false;
-		u32 p = empty[std::rand() % empty.size];
+		if (empty.num == 0) return false;
+		u32 p = empty[std::rand() % empty.num];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
@@ -565,13 +570,30 @@ public:
 
 	class optype {
 	public:
-		optype() = delete;
 		typedef i32 oper;
+		typedef i32 (board::*action)();
 		static constexpr oper up = 0;
 		static constexpr oper right = 1;
 		static constexpr oper down = 2;
 		static constexpr oper left = 3;
-		static constexpr oper illegal = -1;
+		static constexpr oper null = 4;
+		oper op;
+		optype(const oper& op = null) : op(op) {}
+		optype(const optype& opt) = default;
+		operator oper() const { return op; }
+		const char* name() const {
+			const char* res[] = { "up", "right", "down", "left", "null" };
+			return res[op];
+		}
+		action function() const {
+			action res[] = { &board::up, &board::right, &board::down, &board::left, nullptr };
+			return res[op];
+		}
+		friend std::ostream& operator <<(std::ostream& out, const optype& o) {
+			return out << o.name();
+		}
+		static inline std::array<optype, 4> operations() { return { up, right, down, left }; }
+		static inline std::array<optype, 4> actions() { return operations(); }
 	};
 
 	inline i32 operate(const optype::oper& op) {
@@ -633,7 +655,7 @@ public:
 	inline u32 max80() const { return math::log2(scale80()); }
 
 	inline list numof() const {
-		u64 num = query(0).num.tile + query(1).num.tile + query(2).num.tile + query(3).num.tile;
+		u64 num = query(0).num.raw + query(1).num.raw + query(2).num.raw + query(3).num.raw;
 		return list(num, 16);
 	}
 
