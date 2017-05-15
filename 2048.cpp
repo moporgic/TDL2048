@@ -1911,7 +1911,7 @@ numeric search_expt(const board& after, const i32& depth,
 	const auto spaces = after.spaces();
 	numeric expt = 0;
 	board before = after;
-	for (u32 i = 0; i < spaces.size; i++) {
+	for (size_t i = 0; i < spaces.size(); i++) {
 		const u32 pos = spaces[i];
 		before.set(pos, 1);
 		expt += 9 * search_max(before, depth - 1, begin, end);
@@ -1919,7 +1919,7 @@ numeric search_expt(const board& after, const i32& depth,
 		expt += 1 * search_max(before, depth - 1, begin, end);
 		before = after;
 	}
-	numeric esti = expt / (10 * spaces.size);
+	numeric esti = expt / (10 * spaces.size());
 	return t.save(esti, depth);
 }
 
@@ -2088,7 +2088,7 @@ struct search : select {
 		return operator ()(b, feature::begin(), feature::end());
 	}
 	inline select& operator ()(const board& b, const feature::iter begin, const feature::iter end) {
-		u32 depth = policy[b.spaces().size] - 1;
+		u32 depth = policy[b.spaces().size()] - 1;
 		move[0].assign(b);
 		move[1].assign(b);
 		move[2].assign(b);
