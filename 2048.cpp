@@ -1857,7 +1857,8 @@ int main(int argc, const char* argv[]) {
 	if (opts("test-win")) testctl.winv = std::stol(opts["test-win"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 	if (opts("thread")) thread = std::max(std::stol(opts["thread"]), 1l);
-	opts["thread"] = std::to_string(thread);
+	if (!opts("thread")) opts["thread"] = std::to_string(thread);
+	if (!opts("options", "summary")) opts["options"] += "summary=test";
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
@@ -1898,7 +1899,8 @@ int main(int argc, const char* argv[]) {
 			agent.wait();
 			stat.merge(agent.get());
 		}
-		stat.summary();
+		if (opts["options"].find("summary").find("train") != std::string::npos)
+			stat.summary();
 	}
 
 
@@ -1920,7 +1922,8 @@ int main(int argc, const char* argv[]) {
 			agent.wait();
 			stat.merge(agent.get());
 		}
-		stat.summary();
+		if (opts["options"].find("summary").find("test") != std::string::npos)
+			stat.summary();
 	}
 
 	std::cout << std::endl;
