@@ -1563,7 +1563,7 @@ struct statistic {
 				total.score / limit,
 				total.max,
 				math::msb32(total.hash),
-				total.win * 100.0 / loop);
+				total.win * 100.0 / limit);
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
 								   "tile", "count", "score", "move", "rate", "win");
