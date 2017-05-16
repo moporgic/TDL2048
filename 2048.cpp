@@ -29,6 +29,7 @@
 #include <sstream>
 #include <list>
 #include <thread>
+#include <future>
 
 namespace moporgic {
 
@@ -1872,14 +1873,14 @@ int main(int argc, const char* argv[]) {
 
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
-		std::list<std::thread> agents;
+		std::list<std::future<statistic>> agents;
 		for (u32 tid = 0; tid < thread; tid++) {
 			utils::options optid = opts;
 			optid["thread-id"] = std::to_string(tid);
-			agents.emplace_back(train, trainctl, optid);
+			agents.push_back(std::async(std::launch::async, train, trainctl, optid));
 		}
-		for (std::thread& agent : agents)
-			agent.join();
+		for (auto& agent : agents)
+			agent.wait();
 	}
 
 
@@ -1889,14 +1890,18 @@ int main(int argc, const char* argv[]) {
 
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
-		std::list<std::thread> agents;
+		std::list<std::future<statistic>> agents;
 		for (u32 tid = 0; tid < thread; tid++) {
 			utils::options optid = opts;
 			optid["thread-id"] = std::to_string(tid);
-			agents.emplace_back(test, testctl, optid);
+			agents.push_back(std::async(std::launch::async, test, testctl, optid));
 		}
-		for (std::thread& agent : agents)
-			agent.join();
+		statistic stat = {};
+		for (auto& agent : agents) {
+			agent.wait();
+			stat.merge(agent.get());
+		}
+		stat.summary(thread);
 	}
 
 	std::cout << std::endl;
