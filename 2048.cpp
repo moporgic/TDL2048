@@ -1892,8 +1892,13 @@ int main(int argc, const char* argv[]) {
 			optid["thread-id"] = std::to_string(tid);
 			agents.push_back(std::async(std::launch::async, train, trainctl, optid));
 		}
-		for (auto& agent : agents)
+		statistic stat;
+		stat.init(trainctl);
+		for (auto& agent : agents) {
 			agent.wait();
+			stat.merge(agent.get());
+		}
+		stat.summary();
 	}
 
 
