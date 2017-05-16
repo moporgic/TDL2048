@@ -1463,7 +1463,7 @@ struct statistic {
 		control(u64 loop = 1000, u64 unit = 1000, u32 winv = 2048) : loop(loop), unit(unit), winv(winv) {}
 		operator bool() const { return loop; }
 
-		void parallel(u32 thdid, u32 thdnum) {
+		void split(u32 thdid, u32 thdnum) {
 			loop = loop / thdnum + (loop % thdnum && thdid < (loop % thdnum) ? 1 : 0);
 		}
 	};
@@ -1739,7 +1739,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 	std::string suffix;
 	if (thread > 1) suffix = " [" + opts.find("thread-id", "0") + "]";
 	for (u32 i = 0; i <= thdid; i++) std::rand();
-	trainctl.parallel(thdid, thread);
+	trainctl.split(thdid, thread);
 
 	board b;
 	state last;
@@ -1813,7 +1813,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 	std::string suffix;
 	if (thread > 1) suffix = " [" + opts.find("thread-id", "0") + "]";
 	for (u32 i = 0; i <= thdid; i++) std::rand();
-	testctl.parallel(thdid, thread);
+	testctl.split(thdid, thread);
 
 	board b;
 	select best;
