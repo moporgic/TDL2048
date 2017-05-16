@@ -1,2 +1,2 @@
 all:
-	g++ -std=c++1y -O3 2048.cpp -o 2048
+	g++ -std=c++1y -lpthread -O3 2048.cpp -o 2048
