@@ -1872,14 +1872,14 @@ int main(int argc, const char* argv[]) {
 
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
-		std::vector<std::shared_ptr<std::thread>> agents;
+		std::list<std::thread> agents;
 		for (u32 tid = 0; tid < thread; tid++) {
 			utils::options optid = opts;
 			optid["thread-id"] = std::to_string(tid);
-			agents.emplace_back(new std::thread(train, trainctl, optid));
+			agents.emplace_back(train, trainctl, optid);
 		}
-		for (u32 tid = 0; tid < thread; tid++)
-			agents[tid]->join();
+		for (std::thread& agent : agents)
+			agent.join();
 	}
 
 
@@ -1889,14 +1889,14 @@ int main(int argc, const char* argv[]) {
 
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
-		std::vector<std::shared_ptr<std::thread>> agents;
+		std::list<std::thread> agents;
 		for (u32 tid = 0; tid < thread; tid++) {
 			utils::options optid = opts;
 			optid["thread-id"] = std::to_string(tid);
-			agents.emplace_back(new std::thread(test, testctl, optid));
+			agents.emplace_back(test, testctl, optid);
 		}
-		for (u32 tid = 0; tid < thread; tid++)
-			agents[tid]->join();
+		for (std::thread& agent : agents)
+			agent.join();
 	}
 
 	std::cout << std::endl;
