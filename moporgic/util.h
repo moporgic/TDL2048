@@ -187,7 +187,7 @@ inline unsigned long long rdtsc() {
 }
 
 #define alias_declare(alias, name)\
-template <typename... types>\
+template <typename... types> inline\
 auto alias(types&&... args) -> decltype(name(std::forward<types>(args)...)) {\
 	return name(std::forward<types>(args)...);\
 }
