@@ -1454,6 +1454,7 @@ struct statistic {
 	std::string indexf;
 	std::string localf;
 	std::string totalf;
+	std::string summaf;
 
 	struct control {
 		u64 loop;
@@ -1482,7 +1483,7 @@ struct statistic {
 		std::array<u64, 32> count;
 	} every;
 
-
+	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	void init(const control& ctrl = control()) {
 		limit = ctrl.loop * ctrl.unit;
 		loop = 1;
@@ -1496,6 +1497,7 @@ struct statistic {
 		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
 		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
 		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		summaf = "summary" + std::string((dec << 1) - 5, ' ') + "%llums %.2fops";
 
 		every = {};
 		total = {};
@@ -1519,11 +1521,11 @@ struct statistic {
 
 		if ((loop % unit) != 0) return;
 
-		u64 currtimept = moporgic::millisec();
-		u64 elapsedtime = currtimept - local.time;
+		u64 current_time = moporgic::millisec();
+		local.time = current_time - local.time;
 		total.score += local.score;
 		total.win += local.win;
-		total.time += elapsedtime;
+		total.time += local.time;
 		total.opers += local.opers;
 		total.hash |= local.hash;
 		total.max = std::max(total.max, local.max);
@@ -1533,8 +1535,8 @@ struct statistic {
 		snprintf(buf, sizeof(buf), indexf.c_str(), // "%03llu/%03llu %llums %.2fops",
 				loop / unit,
 				limit / unit,
-				elapsedtime,
-				local.opers * 1000.0 / elapsedtime);
+				local.time,
+				local.opers * 1000.0 / local.time);
 		std::cout << buf << " [" << thdid << "]" << std::endl;
 		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / unit,
@@ -1550,12 +1552,19 @@ struct statistic {
 		std::cout << buf << std::endl;
 
 		local = {};
-		local.time = currtimept;
+		local.time = current_time;
 	}
 
-	void summary(const u32& thdid = 0) const {
-		std::cout << std::endl << "summary [" << thdid << "]" << std::endl;
+	void summary() const {
 		char buf[80];
+		snprintf(buf, sizeof(buf), summaf.c_str(), total.time, total.opers * 1000.0 / total.time);
+		std::cout << std::endl << buf << std::endl;
+		snprintf(buf, sizeof(buf), totalf.c_str(), // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
+				total.score / limit,
+				total.max,
+				math::msb32(total.hash),
+				total.win * 100.0 / loop);
+		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
 								   "tile", "count", "score", "move", "rate", "win");
 		std::cout << buf << std::endl;
@@ -1896,12 +1905,13 @@ int main(int argc, const char* argv[]) {
 			optid["thread-id"] = std::to_string(tid);
 			agents.push_back(std::async(std::launch::async, test, testctl, optid));
 		}
-		statistic stat = {};
+		statistic stat;
+		stat.init(testctl);
 		for (auto& agent : agents) {
 			agent.wait();
 			stat.merge(agent.get());
 		}
-		stat.summary(thread);
+		stat.summary();
 	}
 
 	std::cout << std::endl;
