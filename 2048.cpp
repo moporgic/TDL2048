@@ -1509,7 +1509,7 @@ struct statistic {
 	operator bool() const { return loop <= limit; }
 	bool checked() const { return (loop % unit) == 0; }
 
-	void update(const u32& score, const u32& hash, const u32& opers, const u32& thdid = 0) {
+	void update(const u32& score, const u32& hash, const u32& opers, const std::string& suffix = "") {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
@@ -1537,7 +1537,7 @@ struct statistic {
 				limit / unit,
 				local.time,
 				local.opers * 1000.0 / local.time);
-		std::cout << buf << " [" << thdid << "]" << std::endl;
+		std::cout << buf << suffix << std::endl;
 		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / unit,
 				local.max,
@@ -1736,6 +1736,8 @@ inline utils::options parse(int argc, const char* argv[]) {
 statistic train(statistic::control trainctl, utils::options opts = {}) {
 	const u32 thdid = std::stol(opts.find("thread-id", "0"));
 	const u32 thread = std::stol(opts.find("thread", "1"));
+	std::string suffix;
+	if (thread > 1) suffix = " [" + opts.find("thread-id", "0") + "]";
 	for (u32 i = 0; i <= thdid; i++) std::rand();
 	trainctl.parallel(thdid, thread);
 
@@ -1768,7 +1770,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 				v = path.back().update(v);
 			}
 
-			stats.update(score, b.hash(), opers, thdid);
+			stats.update(score, b.hash(), opers, suffix);
 		}
 		break;
 
@@ -1797,7 +1799,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 			}
 			last += 0;
 
-			stats.update(score, b.hash(), opers, thdid);
+			stats.update(score, b.hash(), opers, suffix);
 		}
 		break;
 	}
@@ -1808,6 +1810,8 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 statistic test(statistic::control testctl, utils::options opts = {}) {
 	const u32 thdid = std::stol(opts.find("thread-id", "0"));
 	const u32 thread = std::stol(opts.find("thread", "1"));
+	std::string suffix;
+	if (thread > 1) suffix = " [" + opts.find("thread-id", "0") + "]";
 	for (u32 i = 0; i <= thdid; i++) std::rand();
 	testctl.parallel(thdid, thread);
 
@@ -1831,7 +1835,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 				best >> b;
 			}
 
-			stats.update(score, b.hash(), opers, thdid);
+			stats.update(score, b.hash(), opers, suffix);
 		}
 		break;
 	}
