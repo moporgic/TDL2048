@@ -1724,6 +1724,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 	const u32 thread = std::stol(opts.find("thread", "1"));
 	for (u32 i = 0; i < thdid; i++) std::rand();
 	trainctl.parallel(thdid, thread);
+
 	board b;
 	state last;
 	select best;
@@ -1795,6 +1796,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 	const u32 thread = std::stol(opts.find("thread", "1"));
 	for (u32 i = 0; i < thdid; i++) std::rand();
 	testctl.parallel(thdid, thread);
+
 	board b;
 	select best;
 	statistic stats;
@@ -1841,6 +1843,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("test-win")) testctl.winv = std::stol(opts["test-win"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 	if (opts("thread")) thread = std::max(std::stol(opts["thread"]), 1l);
+	opts["thread"] = std::to_string(thread);
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
@@ -1851,6 +1854,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << timestamp << std::endl;
 	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
+	std::cout << "parallel = " << thread << "x" << std::endl;
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
@@ -1871,7 +1875,6 @@ int main(int argc, const char* argv[]) {
 		std::vector<std::shared_ptr<std::thread>> agents;
 		for (u32 tid = 0; tid < thread; tid++) {
 			utils::options optid = opts;
-			optid["thread"] = std::to_string(thread);
 			optid["thread-id"] = std::to_string(tid);
 			agents.emplace_back(new std::thread(train, trainctl, optid));
 		}
@@ -1879,15 +1882,16 @@ int main(int argc, const char* argv[]) {
 			agents[tid]->join();
 	}
 
+
 	utils::save_weights(opts["weight-output"]);
 	utils::save_features(opts["feature-output"]);
+
 
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		std::vector<std::shared_ptr<std::thread>> agents;
 		for (u32 tid = 0; tid < thread; tid++) {
 			utils::options optid = opts;
-			optid["thread"] = std::to_string(thread);
 			optid["thread-id"] = std::to_string(tid);
 			agents.emplace_back(new std::thread(test, testctl, optid));
 		}
