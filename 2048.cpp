@@ -1869,7 +1869,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << timestamp << std::endl;
 	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
-	std::cout << "parallel = " << thread << "x" << std::endl;
+	std::cout << "agent = " << thread << "x" << std::endl;
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
 
