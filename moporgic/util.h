@@ -32,6 +32,20 @@
 
 namespace moporgic {
 
+inline unsigned long long rdtsc() {
+#if defined __x86_64__
+	register unsigned int lo, hi;
+	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+	return ((unsigned long long) hi << 32) | lo;
+#elif defined __i386__
+	register unsigned int lo;
+    __asm__ __volatile__ ("rdtsc" : "=a" (lo));
+    return lo;
+#else
+    return -1;
+#endif
+}
+
 inline uint64_t millisec() {
 	auto now = std::chrono::system_clock::now();
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());

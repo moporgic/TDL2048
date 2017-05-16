@@ -33,7 +33,6 @@
 namespace moporgic {
 
 typedef float numeric;
-numeric alpha = 0.0025;
 
 class weight {
 public:
@@ -44,14 +43,15 @@ public:
 	inline u64 sign() const { return id; }
 	inline u64 size() const { return length; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
+	inline numeric* raw(const u64& i = 0) { return value + i; }
 
 	inline bool operator ==(const weight& w) const { return id == w.id; }
 	inline bool operator !=(const weight& w) const { return id != w.id; }
 
-    friend std::ostream& operator <<(std::ostream& out, const weight& w) {
-    	auto& id = w.id;
-    	auto& length = w.length;
-    	auto& value = w.value;
+	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
+		auto& id = w.id;
+		auto& length = w.length;
+		auto& value = w.value;
 		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -69,26 +69,23 @@ public:
 			break;
 		}
 		return out;
-    }
+	}
 	friend std::istream& operator >>(std::istream& in, weight& w) {
-    	auto& id = w.id;
-    	auto& length = w.length;
-    	auto& value = w.value;
+		auto& id = w.id;
+		auto& length = w.length;
+		auto& value = w.value;
 		u32 code;
 		read_cast<u8>(in, code);
 		switch (code) {
 		case 0:
 		case 1:
-			read_cast<u32>(in, id);
-			read_cast<u64>(in, length);
-			value = alloc(length);
-			if (code == 0) read_cast<f32>(in, value, value + length);
-			if (code == 1) read_cast<f64>(in, value, value + length);
-			break;
 		case 2:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
-			read_cast<u16>(in, code);
+			if (code == 2)
+				read_cast<u16>(in, code);
+			else
+				code = code == 1 ? 8 : 4;
 			value = alloc(length);
 			switch (code) {
 			case 4: read_cast<f32>(in, value, value + length); break;
@@ -260,9 +257,9 @@ public:
 	inline bool operator ==(const feature& f) const { return sign() == f.sign(); }
 	inline bool operator !=(const feature& f) const { return sign() != f.sign(); }
 
-    friend std::ostream& operator <<(std::ostream& out, const feature& f) {
-    	auto& index = f.index;
-    	auto& value = f.value;
+	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
+		auto& index = f.index;
+		auto& value = f.value;
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -274,11 +271,11 @@ public:
 			std::cerr << "unknown serial (" << code << ") at ostream << feature" << std::endl;
 			break;
 		}
-    	return out;
-    }
+		return out;
+	}
 	friend std::istream& operator >>(std::istream& in, feature& f) {
-    	auto& index = f.index;
-    	auto& value = f.value;
+		auto& index = f.index;
+		auto& value = f.value;
 		u32 code;
 		read_cast<u8>(in, code);
 		switch (code) {
@@ -363,65 +360,83 @@ namespace utils {
 class options {
 public:
 	options() {}
-	options(const options& opts) : opts(opts.opts), extra(opts.extra) {}
+	options(const options& opts) : opts(opts.opts) {}
 
-	std::string& operator [](const std::string& opt) {
-		if (opts.find(opt) == opts.end()) {
-			auto it = std::find(extra.begin(), extra.end(), opt);
-			if (it != extra.end()) extra.erase(it);
-			opts[opt] = "";
+	class option {
+		friend class options;
+	public:
+		option() = delete;
+		option(const option& opt) = default;
+		operator std::string&() { return opt; }
+		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.opt; }
+		friend std::istream& operator >>(std::istream& in, option& opt) { return in >> opt.opt; }
+		std::string& operator =(const std::string& s) { return (opt = s); }
+		std::string& operator +=(const std::string& s) { return (opt += s); }
+		std::string operator +(const std::string& s) const { return opt + s; }
+		bool operator ==(const std::string& s) const { return opt == s; }
+		bool operator !=(const std::string& s) const { return opt != s; }
+
+		bool operator ()(const std::string& ext) const {
+			for (const std::string& label : stov(ext)) {
+				auto pos = opt.find(label);
+				if (pos == std::string::npos) continue;
+				if (pos != 0 && opt[pos - 1] > ' ') continue;
+				if (opt[pos + label.size()] <= ' ') return true;
+				if (opt[pos + label.size()] == '=') return true;
+			}
+			return false;
 		}
-		return opts[opt];
-	}
+
+		std::string operator [](const std::string& ext) {
+			std::string label = " " + ext + " ";
+			for (const std::string& token : stov(opt))
+				if (label.find(" " + token.substr(0, token.find('=')) + " ") != std::string::npos)
+					return token.substr(token.find('=') + 1);
+			opt += ext;
+			return ext.substr(ext.find('=') + 1);
+		}
+
+		std::string find(const std::string& ext, const std::string& def = "") const {
+			return operator() (ext) ? const_cast<option&>(*this)[ext] : def;
+		}
+	private:
+		std::string& opt;
+
+		option(std::string& opt) : opt(opt) {}
+		std::vector<std::string> stov(const std::string& s) const {
+			std::stringstream ss(s);
+			std::istream_iterator<std::string> begin(ss), end;
+			return std::vector<std::string>(begin, end);
+		}
+	};
 
 	bool operator ()(const std::string& opt) const {
-		if (opts.find(opt) != opts.end()) return true;
-		if (std::find(extra.begin(), extra.end(), opt) != extra.end()) return true;
-		return false;
+		return opts.find(opt) != opts.end();
 	}
 
-	bool operator +=(const std::string& opt) {
-		if (operator ()(opt)) return false;
-		extra.push_back(opt);
-		return true;
+	bool operator ()(const std::string& opt, const std::string& ext) const {
+		return operator ()(opt) ? const_cast<options&>(*this)[opt](ext) : false;
 	}
-	bool operator -=(const std::string& opt) {
-		if (operator ()(opt) == false) return false;
-		if (opts.find(opt) != opts.end()) opts.erase(opts.find(opt));
-		auto it = std::find(extra.begin(), extra.end(), opt);
-		if (it != extra.end()) extra.erase(it);
-		return true;
+
+	option operator [](const std::string& opt) {
+		if (opts.find(opt) == opts.end()) opts[opt] = "";
+		return opts[opt];
 	}
 
 	std::string find(const std::string& opt, const std::string& def = "") const {
 		return operator()(opt) ? const_cast<options&>(*this)[opt] : def;
 	}
 
-	std::string find(const std::string& opt, const std::vector<std::string>& ext = {}, const std::string& def = "") const {
-		if (!operator()(opt)) return def;
-		std::stringstream ss(const_cast<options&>(*this)[opt]);
-		for (std::string token; ss >> token; ) {
-			if (std::find(ext.begin(), ext.end(), token.substr(0, token.find('='))) != ext.end()) {
-				return token.substr(token.find('=') + 1);
-			}
-		}
-		return def;
-	}
-
 	operator std::string() const {
-		std::string res;
-		for (auto v : opts) {
-			res.append(v.first).append("=").append(v.second).append(" ");
-		}
-		for (auto s : extra) {
-			res.append(s).append(" ");
-		}
-		return res;
+		std::string options;
+		for (auto v : opts)
+			options += (v.second.size() ? (v.first + "=" + v.second) : v.first) + " ";
+		if (options.size()) options.pop_back();
+		return options;
 	}
 
 private:
 	std::map<std::string, std::string> opts;
-	std::list<std::string> extra;
 };
 
 inline u32 hashpatt(const std::vector<int>& patt) {
@@ -685,16 +700,14 @@ u64 indexmono(const board& b) { // 24-bit
 template<u32 tile, int isomorphic>
 u64 indexmask(const board& b) { // 16-bit
 	board k = b;
-	k.rotate(isomorphic);
-	if (isomorphic >= 4) k.mirror();
+	k.isomorphic(isomorphic);
 	return k.mask(tile);
 }
 
 template<int isomorphic>
 u64 indexmax(const board& b) { // 16-bit
 	board k = b;
-	k.rotate(isomorphic);
-	if (isomorphic >= 4) k.mirror();
+	k.isomorphic(isomorphic);
 	return k.mask(k.max());
 }
 
@@ -1217,6 +1230,7 @@ u32 make_features(const std::string& res = "") {
 	predefined["5x6patt"] = predefined["patt/42-33"];
 	predefined["8x6patt"] = predefined["k.matsuzaki"];
 	predefined["5x4patt"] = predefined["patt/4-22"];
+	predefined["mono"] = predefined["monotonic"];
 	for (auto predef : predefined) {
 		if (in.find(predef.first) != std::string::npos) { // insert predefined features
 			in.insert(in.find(predef.first), predef.second);
@@ -1311,12 +1325,13 @@ inline numeric update(const board& state, const numeric& updv,
 
 
 struct state {
+	typedef i32 (board::*action)();
 	board move;
-	i32 (board::*oper)();
+	action oper;
 	i32 score;
 	numeric esti;
 	state() : state(nullptr) {}
-	state(i32 (board::*oper)()) : oper(oper), score(-1), esti(0) {}
+	state(action oper) : oper(oper), score(-1), esti(0) {}
 	state(const state& s) = default;
 
 	inline void assign(const board& b) {
@@ -1336,9 +1351,8 @@ struct state {
 		}
 		return esti;
 	}
-	inline numeric update(const numeric& accu,
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end(),
-			const numeric& alpha = moporgic::alpha) {
+	inline numeric update(const numeric& accu, const numeric& alpha = state::alpha(),
+			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
 		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), begin, end);
 		return esti;
 	}
@@ -1351,12 +1365,13 @@ struct state {
 		return update(v);
 	}
 	inline numeric operator +=(const state& s) {
-		return operator +=(s.esti);
+		return update(s.esti);
 	}
 
 	inline void operator >>(board& b) const { b = move; }
 	inline bool operator >(const state& s) const { return esti > s.esti; }
 	inline operator bool() const { return score >= 0; }
+	inline operator board() const { return move; }
 
 	void operator >>(std::ostream& out) const {
 		move >> out;
@@ -1366,15 +1381,21 @@ struct state {
 		move << in;
 		moporgic::read(in, score);
 	}
+
+	inline static numeric& alpha() {
+		static numeric a = numeric(0.0025);
+		return a;
+	}
 };
 struct select {
 	state move[4];
 	state *best;
-	select() : best(move) {
-		move[0] = state(&board::up);
-		move[1] = state(&board::right);
-		move[2] = state(&board::down);
-		move[3] = state(&board::left);
+	select(state::action up = &board::up, state::action right = &board::right,
+		   state::action down = &board::down, state::action left = &board::left) : best(move) {
+		move[0] = state(up);
+		move[1] = state(right);
+		move[2] = state(down);
+		move[3] = state(left);
 	}
 	inline select& operator ()(const board& b) {
 		move[0] << b;
@@ -1419,11 +1440,14 @@ struct select {
 	inline operator bool() const { return score() != -1; }
 	inline i32 score() const { return best->score; }
 	inline numeric esti() const { return best->esti; }
+
+	inline state* begin() { return move; }
+	inline state* end() { return move + 4; }
 };
 struct statistic {
 	u64 limit;
 	u64 loop;
-	u64 check;
+	u64 unit;
 	u32 winv;
 
 	std::string indexf;
@@ -1431,14 +1455,14 @@ struct statistic {
 	std::string totalf;
 
 	struct control {
-		u64 num;
-		u64 chk;
-		u32 win;
-		control(u64 num = 1000, u64 chk = 1000, u32 win = 2048) : num(num), chk(chk), win(win) {}
-		operator bool() const { return num; }
+		u64 loop;
+		u64 unit;
+		u32 winv;
+		control(u64 loop = 1000, u64 unit = 1000, u32 winv = 2048) : loop(loop), unit(unit), winv(winv) {}
+		operator bool() const { return loop; }
 
 		void parallel(u32 thdid, u32 thdnum) {
-			num = num / thdnum + (num % thdnum && thdid < (num % thdnum) ? 1 : 0);
+			loop = loop / thdnum + (loop % thdnum && thdid < (loop % thdnum) ? 1 : 0);
 		}
 	};
 
@@ -1459,15 +1483,15 @@ struct statistic {
 
 
 	void init(const control& ctrl = control()) {
-		limit = ctrl.num * ctrl.chk;
+		limit = ctrl.loop * ctrl.unit;
 		loop = 1;
-		check = ctrl.chk;
-		winv = ctrl.win;
+		unit = ctrl.unit;
+		winv = ctrl.winv;
 
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
-		u32 dec = std::max(std::ceil(std::log10(ctrl.num)) + 1, 3.0);
+		u32 dec = std::max(std::floor(std::log10(ctrl.loop)) + 1, 3.0);
 		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
 		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
 		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
@@ -1480,7 +1504,7 @@ struct statistic {
 	u64 operator++(int) { return (++loop) - 1; }
 	u64 operator++() { return (++loop); }
 	operator bool() const { return loop <= limit; }
-	bool checked() const { return (loop % check) == 0; }
+	bool checked() const { return (loop % unit) == 0; }
 
 	void update(const u32& score, const u32& hash, const u32& opers, const u32& thdid = 0) {
 		local.score += score;
@@ -1492,7 +1516,7 @@ struct statistic {
 		every.score[std::log2(hash)] += score;
 		every.opers[std::log2(hash)] += opers;
 
-		if ((loop % check) != 0) return;
+		if ((loop % unit) != 0) return;
 
 		u64 currtimept = moporgic::millisec();
 		u64 elapsedtime = currtimept - local.time;
@@ -1506,16 +1530,16 @@ struct statistic {
 		std::cout << std::endl;
 		char buf[64];
 		snprintf(buf, sizeof(buf), indexf.c_str(), // "%03llu/%03llu %llums %.2fops",
-				loop / check,
-				limit / check,
+				loop / unit,
+				limit / unit,
 				elapsedtime,
 				local.opers * 1000.0 / elapsedtime);
 		std::cout << buf << " [" << thdid << "]" << std::endl;
 		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
-				local.score / check,
+				local.score / unit,
 				local.max,
 				math::msb32(local.hash),
-				local.win * 100.0 / check);
+				local.win * 100.0 / unit);
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), totalf.c_str(), // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / loop,
@@ -1538,13 +1562,12 @@ struct statistic {
 		const auto& score = every.score;
 		const auto& opers = every.opers;
 		auto total = std::accumulate(count.begin(), count.end(), 0);
-		auto remain = total;
-		for (auto i = 0; remain; remain -= count[i++]) {
+		for (auto left = total, i = 0; left; left -= count[i++]) {
 			if (count[i] == 0) continue;
 			snprintf(buf, sizeof(buf), "%-6d" "%8d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
 					(1 << (i)) & 0xfffffffeu, u32(count[i]),
 					u32(score[i] / count[i]), u32(opers[i] / count[i]),
-					count[i] * 100.0 / total, remain * 100.0 / total);
+					count[i] * 100.0 / total, left * 100.0 / total);
 			std::cout << buf << std::endl;
 		}
 	}
@@ -1581,15 +1604,12 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--alpha"):
 			opts["alpha"] = find_opt(i, nullptr);
 			break;
-		case to_hash("-a/"):
-		case to_hash("--alpha-divide"):
-			opts["alpha-divide"] = find_opt(i, nullptr);
-			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
 			opts["train"] = find_opt(i, nullptr);
 			break;
 		case to_hash("-T"):
+		case to_hash("-e"):
 		case to_hash("--test"):
 			opts["test"] = find_opt(i, nullptr);
 			break;
@@ -1643,22 +1663,42 @@ inline utils::options parse(int argc, const char* argv[]) {
 			opts["options"] = find_opts(i, ' ');
 			break;
 		case to_hash("-tt"):
-		case to_hash("--train-type"):
-			opts["train-type"] = find_opt(i, "");
+		case to_hash("-tm"):
+		case to_hash("--train-mode"):
+			opts["train-mode"] = find_opt(i, "");
 			break;
 		case to_hash("-Tt"):
-		case to_hash("--test-type"):
-			opts["test-type"] = find_opt(i, "");
+		case to_hash("-et"):
+		case to_hash("-em"):
+		case to_hash("--test-mode"):
+			opts["test-mode"] = find_opt(i, "");
 			break;
 		case to_hash("-tc"):
+		case to_hash("-tu"):
 		case to_hash("--train-check"):
 		case to_hash("--train-check-interval"):
-			opts["train-check"] = find_opt(i, "1000");
+		case to_hash("--train-unit"):
+			opts["train-unit"] = find_opt(i, "1000");
 			break;
 		case to_hash("-Tc"):
+		case to_hash("-ec"):
+		case to_hash("-eu"):
 		case to_hash("--test-check"):
 		case to_hash("--test-check-interval"):
-			opts["test-check"] = find_opt(i, "1000");
+		case to_hash("--test-unit"):
+			opts["test-unit"] = find_opt(i, "1000");
+			break;
+		case to_hash("-tv"):
+		case to_hash("--train-win"):
+			opts["train-win"] = find_opt(i, "2048");
+			break;
+		case to_hash("-ev"):
+		case to_hash("--test-win"):
+			opts["test-win"] = find_opt(i, "2048");
+			break;
+		case to_hash("-v"):
+		case to_hash("--win"):
+			opts["train-win"] = opts["test-win"] = find_opt(i, "2048");
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
@@ -1679,21 +1719,62 @@ inline utils::options parse(int argc, const char* argv[]) {
 	return opts;
 }
 
+statistic train(statistic::control trainctl, utils::options opts = {}) {
+	board b;
+	state last;
+	select best;
+	statistic stats;
+
+	// ...
+
+	return stats;
+}
+
+statistic test(statistic::control testctl, utils::options opts = {}) {
+	board b;
+	select best;
+	statistic stats;
+	u32 score;
+	u32 opers;
+
+	switch (to_hash(opts["test-mode"])) {
+	default:
+	case to_hash("best"):
+		for (stats.init(testctl); stats; stats++) {
+
+			score = 0;
+			opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> b;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+	}
+
+	return stats;
+}
+
 int main(int argc, const char* argv[]) {
 	statistic::control trainctl(1000, 1000);
-	statistic::control testctl(100, 1000);
+	statistic::control testctl(1000, 1000);
 	u32 timestamp = std::time(nullptr);
-	u32 seed = timestamp;
-	numeric& alpha = moporgic::alpha;
+	u32 seed = moporgic::rdtsc();
+	numeric& alpha = state::alpha();
 	u32 thread = 1;
 
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
-	if (opts("alpha-divide")) alpha /= std::stod(opts["alpha-divide"]);
-	if (opts("train")) trainctl.num = std::stol(opts["train"]);
-	if (opts("test")) testctl.num = std::stol(opts["test"]);
-	if (opts("train-check")) trainctl.chk = std::stol(opts["train-check"]);
-	if (opts("test-check")) testctl.chk = std::stol(opts["test-check"]);
+	if (opts("train")) trainctl.loop = std::stol(opts["train"]);
+	if (opts("test")) testctl.loop = std::stol(opts["test"]);
+	if (opts("train-unit")) trainctl.unit = std::stol(opts["train-unit"]);
+	if (opts("test-unit")) testctl.unit = std::stol(opts["test-unit"]);
+	if (opts("train-win")) trainctl.winv = std::stol(opts["train-win"]);
+	if (opts("test-win")) testctl.winv = std::stol(opts["test-win"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 	if (opts("thread")) thread = std::max(std::stol(opts["thread"]), 1l);
 
@@ -1720,79 +1801,16 @@ int main(int argc, const char* argv[]) {
 
 	utils::list_mapping();
 
-	auto trainer = [](std::string type, statistic::control ctrl, u32 thdid, u32 thdnum) {
-		board b;
-		state last;
-		select best;
-		statistic stats;
-		std::vector<state> path;
-		path.reserve(65536);
-		u32 score;
-		u32 opers;
-
-		ctrl.parallel(thdid, thdnum);
-		switch (to_hash(type)) {
-
-		case to_hash("backward"):
-		case to_hash("backward-optimize"):
-			for (stats.init(ctrl); stats; stats++) {
-
-				score = 0;
-				opers = 0;
-
-				for (b.init(); best << b; b.next()) {
-					score += best.score();
-					opers += 1;
-					best >> path;
-					best >> b;
-				}
-
-				for (numeric v = 0; path.size(); path.pop_back()) {
-					state& s = path.back();
-					s.estimate();
-					v = s.update(v);
-				}
-
-				stats.update(score, b.hash(), opers, thdid);
-			}
-			break;
-
-		default:
-		case to_hash("online"):
-		case to_hash("forward"):
-			for (stats.init(ctrl); stats; stats++) {
-
-				score = 0;
-				opers = 0;
-
-				b.init();
-				best << b;
-				score += best.score();
-				opers += 1;
-				best >> last;
-				best >> b;
-				b.next();
-				while (best << b) {
-					last += best.esti();
-					score += best.score();
-					opers += 1;
-					best >> last;
-					best >> b;
-					b.next();
-				}
-				last += 0;
-
-				stats.update(score, b.hash(), opers, thdid);
-			}
-			break;
-		}
-	};
 
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
 		std::vector<std::shared_ptr<std::thread>> agents;
-		for (u32 tid = 0; tid < thread; tid++)
-			agents.emplace_back(new std::thread(trainer, opts["train-type"], trainctl, tid, thread));
+		for (u32 tid = 0; tid < thread; tid++) {
+			utils::options optid = opts;
+			optid["thread"] = std::to_string(thread);
+			optid["thread-id"] = std::to_string(tid);
+			agents.emplace_back(new std::thread(train, trainctl, optid));
+		}
 		for (u32 tid = 0; tid < thread; tid++)
 			agents[tid]->join();
 	}
@@ -1800,44 +1818,18 @@ int main(int argc, const char* argv[]) {
 	utils::save_weights(opts["weight-output"]);
 	utils::save_features(opts["feature-output"]);
 
-
-
-	auto tester = [](std::string type, statistic::control ctrl, u32 thdid, u32 thdnum) {
-		board b;
-		select best;
-		statistic stats;
-		u32 score;
-		u32 opers;
-
-		for (u32 i = 0; i < thdid; i++) std::rand();
-		ctrl.parallel(thdid, thdnum);
-
-		for (stats.init(ctrl); stats; stats++) {
-
-			score = 0;
-			opers = 0;
-
-			for (b.init(); best << b; b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> b;
-			}
-
-			stats.update(score, b.hash(), opers, thdid);
-		}
-
-		stats.summary(thdid);
-	};
-
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		std::vector<std::shared_ptr<std::thread>> agents;
-		for (u32 tid = 0; tid < thread; tid++)
-			agents.emplace_back(new std::thread(tester, opts["test-type"], testctl, tid, thread));
+		for (u32 tid = 0; tid < thread; tid++) {
+			utils::options optid = opts;
+			optid["thread"] = std::to_string(thread);
+			optid["thread-id"] = std::to_string(tid);
+			agents.emplace_back(new std::thread(test, testctl, optid));
+		}
 		for (u32 tid = 0; tid < thread; tid++)
 			agents[tid]->join();
 	}
-
 
 	std::cout << std::endl;
 
