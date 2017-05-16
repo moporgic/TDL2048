@@ -19,10 +19,6 @@
 
 #endif /* DEBUG */
 
-#ifndef MOPORGIC_SEQSTATIC_POOL
-#define MOPORGIC_SEQSTATIC_POOL 1
-#endif
-
 #include <cstdint>
 #include <chrono>
 #include <string>
@@ -31,20 +27,6 @@
 #include <functional>
 
 namespace moporgic {
-
-inline unsigned long long rdtsc() {
-#if defined __x86_64__
-	register unsigned int lo, hi;
-	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
-	return ((unsigned long long) hi << 32) | lo;
-#elif defined __i386__
-	register unsigned int lo;
-    __asm__ __volatile__ ("rdtsc" : "=a" (lo));
-    return lo;
-#else
-    return -1;
-#endif
-}
 
 inline uint64_t millisec() {
 	auto now = std::chrono::system_clock::now();
@@ -55,17 +37,6 @@ inline uint64_t microsec() {
 	auto now = std::chrono::high_resolution_clock::now();
 	auto us = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());
 	return us.count();
-}
-
-template<int pid = 0>
-const uint32_t seq32_static() {
-	static uint32_t seq[MOPORGIC_SEQSTATIC_POOL] = {};
-	return seq[pid]++;
-}
-template<int pid = 0>
-const uint64_t seq64_static() {
-	static uint64_t seq[MOPORGIC_SEQSTATIC_POOL] = {};
-	return seq[pid]++;
 }
 
 constexpr
@@ -198,9 +169,32 @@ uint32_t randx() {
 #endif
 }
 
-#undef constexpr
+inline unsigned long long rdtsc() {
+#if defined __GNUC__ && defined __x86_64__
+	register unsigned int lo, hi;
+	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
+	return ((unsigned long long) hi << 32) | lo;
+#elif defined __GNUC__ && defined __i386__
+	register unsigned int lo;
+    __asm__ __volatile__ ("rdtsc" : "=a" (lo));
+    return lo;
+#elif defined _MSC_VER
+    // #include <intrin.h>
+    return __rdtsc();
+#else
+    return -1;
+#endif
+}
+
+#define alias_declare(alias, name)\
+template <typename... types>\
+auto alias(types&&... args) -> decltype(name(std::forward<types>(args)...)) {\
+	return name(std::forward<types>(args)...);\
+}
 
 } /* moporgic */
+
+#undef constexpr
 
 namespace moporgic {
 
@@ -210,9 +204,9 @@ namespace moporgic {
 //#define print(...)		printf(__VA_ARGS__)
 //#define println(...)	printf(__VA_ARGS__); putchar('\n')
 #define removebuf()		setvbuf(stdout, NULL, _IONBF, 0)
-#define	randinit()		srand(time(nullptr))
-#define mallof(T, size) ((T*) malloc(sizeof(T) * size))
-#define callof(T, size) ((T*) calloc(size, sizeof(T))
+//#define randinit()		srand(time(nullptr))
+//#define mallof(T, size) ((T*) malloc(sizeof(T) * size))
+//#define callof(T, size) ((T*) calloc(size, sizeof(T))
 
 #define _getch(ch)				(ch = getchar())
 #define _appendn(val, ch)		val = (val * 10) + (ch - '0')
