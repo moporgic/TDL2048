@@ -1833,6 +1833,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("train-win")) trainctl.winv = std::stol(opts["train-win"]);
 	if (opts("test-win")) testctl.winv = std::stol(opts["test-win"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
+	if (!opts("options", "summary")) opts["options"]["summary"] = "test";
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
@@ -1860,7 +1861,9 @@ int main(int argc, const char* argv[]) {
 
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
-		train(trainctl, opts);
+		auto stat = train(trainctl, opts);
+		if (opts["options"].find("summary").find("train") != std::string::npos)
+			stat.summary();
 	}
 
 	utils::save_weights(opts["weight-output"]);
@@ -1868,7 +1871,9 @@ int main(int argc, const char* argv[]) {
 
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
-		test(testctl, opts).summary();
+		auto stat = test(testctl, opts);
+		if (opts["options"].find("summary").find("test") != std::string::npos)
+			stat.summary();
 	}
 
 	std::cout << std::endl;
