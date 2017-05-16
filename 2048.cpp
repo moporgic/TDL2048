@@ -1720,17 +1720,81 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 statistic train(statistic::control trainctl, utils::options opts = {}) {
+	const u32 thdid = std::stol(opts.find("thread-id", "0"));
+	const u32 thread = std::stol(opts.find("thread", "1"));
+	for (u32 i = 0; i < thdid; i++) std::rand();
+	trainctl.parallel(thdid, thread);
 	board b;
 	state last;
 	select best;
 	statistic stats;
+	std::vector<state> path;
+	path.reserve(65536);
+	u32 score;
+	u32 opers;
 
-	// ...
+	switch (to_hash(opts["train-mode"])) {
+	case to_hash("backward"):
+	case to_hash("backward-best"):
+		for (stats.init(trainctl); stats; stats++) {
+
+			score = 0;
+			opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				path.back().estimate();
+				v = path.back().update(v);
+			}
+
+			stats.update(score, b.hash(), opers, thdid);
+		}
+		break;
+
+	default:
+	case to_hash("forward"):
+	case to_hash("forward-best"):
+		for (stats.init(trainctl); stats; stats++) {
+
+			score = 0;
+			opers = 0;
+
+			b.init();
+			best << b;
+			score += best.score();
+			opers += 1;
+			best >> last;
+			best >> b;
+			b.next();
+			while (best << b) {
+				last += best.esti();
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> b;
+				b.next();
+			}
+			last += 0;
+
+			stats.update(score, b.hash(), opers, thdid);
+		}
+		break;
+	}
 
 	return stats;
 }
 
 statistic test(statistic::control testctl, utils::options opts = {}) {
+	const u32 thdid = std::stol(opts.find("thread-id", "0"));
+	const u32 thread = std::stol(opts.find("thread", "1"));
+	for (u32 i = 0; i < thdid; i++) std::rand();
+	testctl.parallel(thdid, thread);
 	board b;
 	select best;
 	statistic stats;
@@ -1751,7 +1815,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 				best >> b;
 			}
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.hash(), opers, thdid);
 		}
 		break;
 	}
