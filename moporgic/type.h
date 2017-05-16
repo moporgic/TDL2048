@@ -21,7 +21,8 @@ typedef int16_t  i16;
 typedef uint16_t u16;
 typedef int8_t   i8;
 typedef uint8_t  u8;
-typedef char     byte;
+//typedef char     byte;
+struct  byte;
 
 typedef __int128          i128;
 typedef unsigned __int128 u128;
@@ -53,8 +54,31 @@ dst& reference_cast(src& ref) { return *(pointer_cast<dst>(&ref)); }
 template<typename dst, int off = 0, typename src> inline constexpr
 dst& raw_cast(src& ref, int sh = 0) { return *(pointer_cast<dst>(&ref) + off + sh); }
 
+struct byte {
+	unsigned char v;
+	inline constexpr byte(unsigned char v = 0) : v(v) {}
+	inline constexpr operator unsigned char&() { return v; }
+	inline constexpr operator unsigned char*() { return &v; }
+	inline constexpr operator char*() { return cast<char*>(&v); }
+	friend std::ostream& operator <<(std::ostream& os, const byte& b) {
+		register auto hi = (b.v >> 4) & 0xf;
+		register auto lo = (b.v >> 0) & 0xf;
+		os << cast<char>(hi < 10 ? hi + '0' : hi + 'a' - 10);
+		os << cast<char>(lo < 10 ? lo + '0' : lo + 'a' - 10);
+		return os;
+	}
+	friend std::istream& operator >>(std::istream& is, const byte& b) {
+		register unsigned char hi, lo;
+		is >> hi >> lo;
+		hi = (hi & 15) + (hi >> 6) * 9;
+		lo = (lo & 15) + (lo >> 6) * 9;
+		if (is) const_cast<byte&>(b).v = (hi << 4) | lo;
+		return is;
+	}
+};
+
 struct u8c {
-	byte v;
+	u8 v;
 	inline constexpr u8c(const u32& b = 0);
 	inline constexpr u8c(const u8c& b);
 	inline constexpr u8c& operator =(const u32& b);
