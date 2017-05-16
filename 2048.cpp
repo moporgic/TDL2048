@@ -1833,7 +1833,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("train-win")) trainctl.winv = std::stol(opts["train-win"]);
 	if (opts("test-win")) testctl.winv = std::stol(opts["test-win"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
-	if (!opts("options", "summary")) opts["options"]["summary"] = "test";
+	if (!opts("options", "summary")) opts["options"] += "summary=test";
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
