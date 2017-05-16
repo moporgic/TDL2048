@@ -1497,7 +1497,7 @@ struct statistic {
 		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
 		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
 		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		summaf = "summary" + std::string((dec << 1) - 5, ' ') + "%llums %.2fops";
+		summaf = "%0" + std::to_string(dec * 2 + 1) + "llu %llums %.2fops";
 
 		every = {};
 		total = {};
@@ -1556,9 +1556,13 @@ struct statistic {
 	}
 
 	void summary() const {
+		std::cout << std::endl << "summary" << std::endl;
 		char buf[80];
-		snprintf(buf, sizeof(buf), summaf.c_str(), total.time, total.opers * 1000.0 / total.time);
-		std::cout << std::endl << buf << std::endl;
+		snprintf(buf, sizeof(buf), summaf.c_str(),
+				limit / unit,
+				total.time,
+				total.opers * 1000.0 / total.time);
+		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), totalf.c_str(), // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / limit,
 				total.max,
