@@ -1531,6 +1531,7 @@ struct statistic {
 	std::string indexf;
 	std::string localf;
 	std::string totalf;
+	std::string summaf;
 
 	struct control {
 		u64 loop;
@@ -1555,7 +1556,7 @@ struct statistic {
 		std::array<u64, 32> count;
 	} every;
 
-
+	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	void init(const control& ctrl = control()) {
 		limit = ctrl.loop * ctrl.unit;
 		loop = 1;
@@ -1569,6 +1570,7 @@ struct statistic {
 		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
 		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
 		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		summaf = "%0" + std::to_string(dec * 2 + 1) + "llu %llums %.2fops";
 
 		every = {};
 		total = {};
@@ -1592,11 +1594,11 @@ struct statistic {
 
 		if ((loop % unit) != 0) return;
 
-		u64 currtimept = moporgic::millisec();
-		u64 elapsedtime = currtimept - local.time;
+		u64 current_time = moporgic::millisec();
+		local.time = current_time - local.time;
 		total.score += local.score;
 		total.win += local.win;
-		total.time += elapsedtime;
+		total.time += local.time;
 		total.opers += local.opers;
 		total.hash |= local.hash;
 		total.max = std::max(total.max, local.max);
@@ -1606,8 +1608,8 @@ struct statistic {
 		snprintf(buf, sizeof(buf), indexf.c_str(), // "%03llu/%03llu %llums %.2fops",
 				loop / unit,
 				limit / unit,
-				elapsedtime,
-				local.opers * 1000.0 / elapsedtime);
+				local.time,
+				local.opers * 1000.0 / local.time);
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / unit,
@@ -1623,12 +1625,23 @@ struct statistic {
 		std::cout << buf << std::endl;
 
 		local = {};
-		local.time = currtimept;
+		local.time = current_time;
 	}
 
 	void summary() const {
 		std::cout << std::endl << "summary" << std::endl;
 		char buf[80];
+		snprintf(buf, sizeof(buf), summaf.c_str(),
+				limit / unit,
+				total.time,
+				total.opers * 1000.0 / total.time);
+		std::cout << buf << std::endl;
+		snprintf(buf, sizeof(buf), totalf.c_str(), // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
+				total.score / limit,
+				total.max,
+				math::msb32(total.hash),
+				total.win * 100.0 / limit);
+		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
 								   "tile", "count", "score", "move", "rate", "win");
 		std::cout << buf << std::endl;
@@ -1899,6 +1912,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("train-win")) trainctl.winv = std::stol(opts["train-win"]);
 	if (opts("test-win")) testctl.winv = std::stol(opts["test-win"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
+	if (!opts("options", "summary")) opts["options"] += "summary=test";
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
@@ -1926,7 +1940,9 @@ int main(int argc, const char* argv[]) {
 
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
-		train(trainctl, opts);
+		auto stat = train(trainctl, opts);
+		if (opts["options"].find("summary").find("train") != std::string::npos)
+			stat.summary();
 	}
 
 	utils::save_weights(opts["weight-output"]);
@@ -1934,7 +1950,9 @@ int main(int argc, const char* argv[]) {
 
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
-		test(testctl, opts).summary();
+		auto stat = test(testctl, opts);
+		if (opts["options"].find("summary").find("test") != std::string::npos)
+			stat.summary();
 	}
 
 	std::cout << std::endl;
