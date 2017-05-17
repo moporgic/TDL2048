@@ -373,51 +373,51 @@ public:
 		template<typename type> bool operator ==(const type& v) const { return opt == vtos(v); }
 		template<typename type> bool operator !=(const type& v) const { return opt != vtos(v); }
 
-		class opinion {
+		class item {
 			friend class option;
 		public:
-			opinion() = delete;
-			opinion(const opinion& opin) = default;
+			item() = delete;
+			item(const item& i) = default;
 			operator std::string() const { return value(); }
 			std::string label() const { return token.substr(0, token.find('=')); }
 			std::string value() const { return token.substr(token.find('=') + 1); }
-			friend std::ostream& operator <<(std::ostream& out, const opinion& opin) {
-				return out << opin.value();
+			friend std::ostream& operator <<(std::ostream& out, const item& i) {
+				return out << i.value();
 			}
-			friend std::istream& operator >>(std::istream& in, opinion& opin) {
+			friend std::istream& operator >>(std::istream& in, item& i) {
 				std::string buf;
-				if (in >> buf) opin = buf;
+				if (in >> buf) i = buf;
 				return in;
 			}
-			template<typename type> opinion& operator  =(const type& v) {
+			template<typename type> item& operator  =(const type& v) {
 				std::string nv = vtos(v);
 				token = nv.size() ? label() + "=" + vtos(v) : label();
 				std::stringstream ss;
 				for (std::string symbol : split(opt))
-					ss << (opinion(opt, symbol).label() != label() ? symbol : token);
+					ss << (item(opt, symbol).label() != label() ? symbol : token);
 				opt = ss.str();
 				return (*this);
 			}
 			template<typename type> bool operator ==(const type& v) const { return value() == vtos(v); }
 			template<typename type> bool operator !=(const type& v) const { return value() != vtos(v); }
 		private:
-			opinion(std::string& opt, std::string token) : opt(opt), token(token) {}
+			item(std::string& opt, std::string token) : opt(opt), token(token) {}
 			std::string& opt;
 			std::string token;
 		};
 
 		bool operator ()(const std::string& ext) const {
 			for (std::string token : split(opt))
-				if (opinion(opt, token).label() == ext)
+				if (item(opt, token).label() == ext)
 					return true;
 			return false;
 		}
 
-		opinion operator [](const std::string& ext) {
+		item operator [](const std::string& ext) {
 			for (std::string token : split(opt))
-				if (opinion(opt, token).label() == ext)
-					return opinion(opt, token);
-			return opinion(opt.append(" ").append(ext), ext);
+				if (item(opt, token).label() == ext)
+					return item(opt, token);
+			return item(opt.append(" ").append(ext), ext);
 		}
 
 		template<typename type = std::string>
