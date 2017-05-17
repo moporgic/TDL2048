@@ -1484,6 +1484,8 @@ struct statistic {
 	} every;
 
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
+	statistic(const control& ctrl) : statistic() { init(ctrl); }
+
 	void init(const control& ctrl = control()) {
 		limit = ctrl.loop * ctrl.unit;
 		loop = 1;
