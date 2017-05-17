@@ -369,44 +369,64 @@ public:
 		operator std::string&() { return opt; }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.opt; }
 		friend std::istream& operator >>(std::istream& in, option& opt) { return in >> opt.opt; }
-		std::string& operator =(const std::string& s) { return (opt = s); }
-		std::string& operator +=(const std::string& s) { return (opt += s); }
-		std::string operator +(const std::string& s) const { return opt + s; }
-		bool operator ==(const std::string& s) const { return opt == s; }
-		bool operator !=(const std::string& s) const { return opt != s; }
+		template<typename type> std::string& operator  =(const type& v) { return (opt = vtos(v)); }
+		template<typename type> bool operator ==(const type& v) const { return opt == vtos(v); }
+		template<typename type> bool operator !=(const type& v) const { return opt != vtos(v); }
+
+		class opinion {
+			friend class option;
+		public:
+			opinion() = delete;
+			opinion(const opinion& opin) = default;
+			operator std::string() const { return value(); }
+			std::string label() const { return token.substr(0, token.find('=')); }
+			std::string value() const { return token.substr(token.find('=') + 1); }
+			friend std::ostream& operator <<(std::ostream& out, const opinion& opin) {
+				return out << opin.value();
+			}
+			friend std::istream& operator >>(std::istream& in, opinion& opin) {
+				std::string buf;
+				if (in >> buf) opin = buf;
+				return in;
+			}
+			template<typename type> opinion& operator  =(const type& v) {
+				std::string nv = vtos(v);
+				token = nv.size() ? label() + "=" + vtos(v) : label();
+				std::stringstream ss;
+				for (std::string symbol : split(opt))
+					ss << (opinion(opt, symbol).label() != label() ? symbol : token);
+				opt = ss.str();
+				return (*this);
+			}
+			template<typename type> bool operator ==(const type& v) const { return value() == vtos(v); }
+			template<typename type> bool operator !=(const type& v) const { return value() != vtos(v); }
+		private:
+			opinion(std::string& opt, std::string token) : opt(opt), token(token) {}
+			std::string& opt;
+			std::string token;
+		};
 
 		bool operator ()(const std::string& ext) const {
-			for (const std::string& label : stov(ext)) {
-				auto pos = opt.find(label);
-				if (pos == std::string::npos) continue;
-				if (pos != 0 && opt[pos - 1] > ' ') continue;
-				if (opt[pos + label.size()] <= ' ') return true;
-				if (opt[pos + label.size()] == '=') return true;
-			}
+			for (std::string token : split(opt))
+				if (opinion(opt, token).label() == ext)
+					return true;
 			return false;
 		}
 
-		std::string operator [](const std::string& ext) {
-			std::string label = " " + ext + " ";
-			for (const std::string& token : stov(opt))
-				if (label.find(" " + token.substr(0, token.find('=')) + " ") != std::string::npos)
-					return token.substr(token.find('=') + 1);
-			opt += ext;
-			return ext.substr(ext.find('=') + 1);
+		opinion operator [](const std::string& ext) {
+			for (std::string token : split(opt))
+				if (opinion(opt, token).label() == ext)
+					return opinion(opt, token);
+			return opinion(opt.append(" ").append(ext), ext);
 		}
 
-		std::string find(const std::string& ext, const std::string& def = "") const {
-			return operator() (ext) ? const_cast<option&>(*this)[ext] : def;
+		template<typename type = std::string>
+		std::string find(const std::string& ext, const type& def = {}) const {
+			return operator() (ext) ? const_cast<option&>(*this)[ext] : vtos(def);
 		}
 	private:
 		std::string& opt;
-
 		option(std::string& opt) : opt(opt) {}
-		std::vector<std::string> stov(const std::string& s) const {
-			std::stringstream ss(s);
-			std::istream_iterator<std::string> begin(ss), end;
-			return std::vector<std::string>(begin, end);
-		}
 	};
 
 	bool operator ()(const std::string& opt) const {
@@ -422,8 +442,9 @@ public:
 		return opts[opt];
 	}
 
-	std::string find(const std::string& opt, const std::string& def = "") const {
-		return operator()(opt) ? const_cast<options&>(*this)[opt] : def;
+	template<typename type = std::string>
+	std::string find(const std::string& opt, const type& def = {}) const {
+		return operator()(opt) ? const_cast<options&>(*this)[opt] : vtos(def);
 	}
 
 	operator std::string() const {
@@ -436,6 +457,19 @@ public:
 
 private:
 	std::map<std::string, std::string> opts;
+
+	template<typename type>
+	static std::string vtos(const type& v) {
+		std::stringstream ss;
+		ss << v;
+		return ss.str();
+	}
+
+	static std::vector<std::string> split(const std::string& s) {
+		std::stringstream ss(s);
+		std::istream_iterator<std::string> begin(ss), end;
+		return std::vector<std::string>(begin, end);
+	}
 };
 
 inline u32 hashpatt(const std::vector<int>& patt) {
@@ -1860,7 +1894,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("train-win")) trainctl.winv = std::stol(opts["train-win"]);
 	if (opts("test-win")) testctl.winv = std::stol(opts["test-win"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
-	if (!opts("options", "summary")) opts["options"] += "summary=test";
+	if (!opts("options", "summary")) opts["options"]["summary"] = "test";
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
