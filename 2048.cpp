@@ -371,44 +371,74 @@ public:
 		operator std::string&() { return opt; }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.opt; }
 		friend std::istream& operator >>(std::istream& in, option& opt) { return in >> opt.opt; }
-		std::string& operator =(const std::string& s) { return (opt = s); }
-		std::string& operator +=(const std::string& s) { return (opt += s); }
-		std::string operator +(const std::string& s) const { return opt + s; }
-		bool operator ==(const std::string& s) const { return opt == s; }
-		bool operator !=(const std::string& s) const { return opt != s; }
+		template<typename type> std::string& operator  =(const type& v) { return (opt = vtos(v)); }
+		template<typename type> bool operator ==(const type& v) const { return opt == vtos(v); }
+		template<typename type> bool operator !=(const type& v) const { return opt != vtos(v); }
+
+		class item {
+			friend class option;
+		public:
+			item() = delete;
+			item(const item& i) = default;
+			operator std::string() const { return value(); }
+			std::string label() const { return token.substr(0, token.find('=')); }
+			std::string value() const { return token.substr(token.find('=') + 1); }
+			friend std::ostream& operator <<(std::ostream& out, const item& i) {
+				return out << i.value();
+			}
+			friend std::istream& operator >>(std::istream& in, item& i) {
+				std::string buf;
+				if (in >> buf) i = buf;
+				return in;
+			}
+			template<typename type> item& operator  =(const type& v) {
+				token = encode(label(), vtos(v));
+				std::stringstream ss;
+				for (std::string symbol : split(opt))
+					ss << (item(opt, symbol).label() != label() ? symbol : token) << " ";
+				opt = ss.str();
+				opt.pop_back();
+				return (*this);
+			}
+			template<typename type> bool operator ==(const type& v) const { return value() == vtos(v); }
+			template<typename type> bool operator !=(const type& v) const { return value() != vtos(v); }
+
+			template<typename type = std::string>
+			bool is(const type& val = {}) const {
+				return token.find(vtos(val)) != std::string::npos;
+			}
+		private:
+			item(std::string& opt, std::string token) : opt(opt), token(token) {}
+			std::string& opt;
+			std::string token;
+		};
 
 		bool operator ()(const std::string& ext) const {
-			for (const std::string& label : stov(ext)) {
-				auto pos = opt.find(label);
-				if (pos == std::string::npos) continue;
-				if (pos != 0 && opt[pos - 1] > ' ') continue;
-				if (opt[pos + label.size()] <= ' ') return true;
-				if (opt[pos + label.size()] == '=') return true;
-			}
+			for (std::string token : split(opt))
+				if (item(opt, token).label() == ext)
+					return true;
 			return false;
 		}
 
-		std::string operator [](const std::string& ext) {
-			std::string label = " " + ext + " ";
-			for (const std::string& token : stov(opt))
-				if (label.find(" " + token.substr(0, token.find('=')) + " ") != std::string::npos)
-					return token.substr(token.find('=') + 1);
-			opt += ext;
-			return ext.substr(ext.find('=') + 1);
+		item operator [](const std::string& ext) {
+			for (std::string token : split(opt))
+				if (item(opt, token).label() == ext)
+					return item(opt, token);
+			return item(opt.append(" ").append(ext), ext);
 		}
 
-		std::string find(const std::string& ext, const std::string& def = "") const {
-			return operator() (ext) ? const_cast<option&>(*this)[ext] : def;
+		template<typename type = std::string>
+		std::string find(const std::string& ext, const type& def = {}) const {
+			return operator() (ext) ? const_cast<option&>(*this)[ext] : vtos(def);
+		}
+
+		template<typename type = std::string>
+		bool is(const type& val = {}) const {
+			return opt.find(vtos(val)) != std::string::npos;
 		}
 	private:
 		std::string& opt;
-
 		option(std::string& opt) : opt(opt) {}
-		std::vector<std::string> stov(const std::string& s) const {
-			std::stringstream ss(s);
-			std::istream_iterator<std::string> begin(ss), end;
-			return std::vector<std::string>(begin, end);
-		}
 	};
 
 	bool operator ()(const std::string& opt) const {
@@ -424,20 +454,37 @@ public:
 		return opts[opt];
 	}
 
-	std::string find(const std::string& opt, const std::string& def = "") const {
-		return operator()(opt) ? const_cast<options&>(*this)[opt] : def;
+	template<typename type = std::string>
+	std::string find(const std::string& opt, const type& def = {}) const {
+		return operator()(opt) ? const_cast<options&>(*this)[opt] : vtos(def);
 	}
 
 	operator std::string() const {
-		std::string options;
+		std::stringstream ss;
 		for (auto v : opts)
-			options += (v.second.size() ? (v.first + "=" + v.second) : v.first) + " ";
-		if (options.size()) options.pop_back();
-		return options;
+			ss << encode(v.first, v.second) << " ";
+		return ss.str();
 	}
 
 private:
 	std::map<std::string, std::string> opts;
+
+	static std::string encode(const std::string& label, const std::string& value) {
+		return value.size() ? (label + "=" + value) : label;
+	}
+
+	template<typename type>
+	static std::string vtos(const type& v) {
+		std::stringstream ss;
+		ss << v;
+		return ss.str();
+	}
+
+	static std::vector<std::string> split(const std::string& s) {
+		std::stringstream ss(s);
+		std::istream_iterator<std::string> begin(ss), end;
+		return std::vector<std::string>(begin, end);
+	}
 };
 
 inline u32 hashpatt(const std::vector<int>& patt) {
@@ -1887,7 +1934,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 	if (opts("thread")) thread = std::max(std::stol(opts["thread"]), 1l);
 	if (!opts("thread")) opts["thread"] = std::to_string(thread);
-	if (!opts("options", "summary")) opts["options"] += "summary=test";
+	if (!opts("options", "summary")) opts["options"]["summary"] = "test";
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
@@ -1927,7 +1974,7 @@ int main(int argc, const char* argv[]) {
 			agent.wait();
 			stat += agent.get();
 		}
-		if (opts["options"].find("summary").find("train") != std::string::npos)
+		if (opts["options"]["summary"].is("train"))
 			stat.summary();
 	}
 
@@ -1949,7 +1996,7 @@ int main(int argc, const char* argv[]) {
 			agent.wait();
 			stat += agent.get();
 		}
-		if (opts["options"].find("summary").find("test") != std::string::npos)
+		if (opts["options"]["summary"].is("test"))
 			stat.summary();
 	}
 
