@@ -1499,7 +1499,6 @@ struct statistic {
 	} every;
 
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
-	statistic(const control& ctrl) : statistic() { init(ctrl); }
 	statistic(const statistic& stat) = default;
 
 	void init(const control& ctrl = control()) {
@@ -1507,21 +1506,25 @@ struct statistic {
 		loop = 1;
 		unit = ctrl.unit;
 		winv = ctrl.winv;
-
-//		indexf = "%03llu/%03llu %llums %.2fops";
-//		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
-//		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
-		u32 dec = std::max(std::floor(std::log10(ctrl.loop)) + 1, 3.0);
-		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
-		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		summaf = "%0" + std::to_string(dec * 2 + 1) + "llu %llums %.2fops";
+		format();
 
 		every = {};
 		total = {};
 		local = {};
 		local.time = moporgic::millisec();
 	}
+	void format() {
+//		indexf = "%03llu/%03llu %llums %.2fops";
+//		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
+//		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
+//		summaf = "%7llu %llums %.2fops";
+		u32 dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
+		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
+		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		summaf = "%0" + std::to_string(dec * 2 + 1) + "llu %llums %.2fops";
+	}
+
 	u64 operator++(int) { return (++loop) - 1; }
 	u64 operator++() { return (++loop); }
 	operator bool() const { return loop <= limit; }
@@ -1612,6 +1615,7 @@ struct statistic {
 		total << stat.total;
 		local << stat.local;
 		every << stat.every;
+		format();
 		return *this;
 	}
 
