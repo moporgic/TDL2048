@@ -1524,7 +1524,7 @@ struct statistic {
 	operator bool() const { return loop <= limit; }
 	bool checked() const { return (loop % unit) == 0; }
 
-	void update(const u32& score, const u32& hash, const u32& opers) {
+	void update(const u32& score, const u32& hash, const u32& opers, const std::string& suffix = "") {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
@@ -1552,7 +1552,7 @@ struct statistic {
 				limit / unit,
 				local.time,
 				local.opers * 1000.0 / local.time);
-		std::cout << buf << std::endl;
+		std::cout << buf << suffix << std::endl;
 		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / unit,
 				local.max,
@@ -1570,8 +1570,8 @@ struct statistic {
 		local.time = current_time;
 	}
 
-	void summary() const {
-		std::cout << std::endl << "summary" << std::endl;
+	void summary(const std::string& suffix = "") const {
+		std::cout << std::endl << "summary" << suffix << std::endl;
 		char buf[80];
 		snprintf(buf, sizeof(buf), summaf.c_str(),
 				limit / unit,
