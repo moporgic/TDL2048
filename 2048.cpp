@@ -1555,8 +1555,8 @@ struct statistic {
 		local.time = current_time;
 	}
 
-	void summary() const {
-		std::cout << std::endl << "summary" << std::endl;
+	void summary(const std::string& suffix = "") const {
+		std::cout << std::endl << "summary" << suffix << std::endl;
 		char buf[80];
 		snprintf(buf, sizeof(buf), summaf.c_str(),
 				limit / unit,
