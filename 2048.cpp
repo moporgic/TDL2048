@@ -1449,10 +1449,16 @@ struct statistic {
 	u64 unit;
 	u32 winv;
 
-	std::string indexf;
-	std::string localf;
-	std::string totalf;
-	std::string summaf;
+	class format_t : public std::array<char, 64> {
+	public:
+		inline void operator =(const std::string& s) { std::copy_n(s.begin(), s.size() + 1, begin()); }
+		inline const char* c_str() const { return &(operator[](0)); }
+	};
+
+	format_t indexf;
+	format_t localf;
+	format_t totalf;
+	format_t summaf;
 
 	struct control {
 		u64 loop;
@@ -1469,7 +1475,7 @@ struct statistic {
 		u64 opers;
 		u32 max;
 		u32 hash;
-		record& operator <<(const record& rec) {
+		record& operator +=(const record& rec) {
 			score += rec.score;
 			win += rec.win;
 			time += rec.time;
@@ -1484,7 +1490,7 @@ struct statistic {
 		std::array<u64, 32> score;
 		std::array<u64, 32> opers;
 		std::array<u64, 32> count;
-		each& operator <<(const each& ea) {
+		each& operator +=(const each& ea) {
 			std::transform(count.begin(), count.end(), ea.count.begin(), count.begin(), std::plus<u64>());
 			std::transform(score.begin(), score.end(), ea.score.begin(), score.begin(), std::plus<u64>());
 			std::transform(opers.begin(), opers.end(), ea.opers.begin(), opers.begin(), std::plus<u64>());
@@ -1601,22 +1607,16 @@ struct statistic {
 		}
 	}
 
-	statistic& operator <<(const statistic& stat) {
+	statistic& operator +=(const statistic& stat) {
 		limit += stat.limit;
 		loop += stat.loop;
-		unit = std::max(unit, stat.unit);
-		winv = std::max(winv, stat.winv);
-		total << stat.total;
-		local << stat.local;
-		every << stat.every;
+		if (!unit) unit = stat.unit;
+		if (!winv) winv = stat.winv;
+		total += stat.total;
+		local += stat.local;
+		every += stat.every;
 		format();
 		return *this;
-	}
-
-	static statistic merge(const statistic* first, const statistic* last) {
-		statistic stat;
-		for (auto it = first; it != last; it++) stat << (*it);
-		return stat;
 	}
 };
 
