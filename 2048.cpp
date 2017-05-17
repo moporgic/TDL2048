@@ -43,42 +43,35 @@ namespace moporgic {
 typedef float numeric;
 
 namespace shm {
+typedef std::pair<int, void*> shm_t;
+std::vector<shm_t> info;
 std::string hook = "./2048";
-int    shmid = 0;
-void*  shmptr = nullptr;
-size_t shmtop = 0;
-size_t length = 4096;
-bool   conti = false;
-
-void setup(const std::string& opts) {
-	shm::hook = opts;
-	if (shm::hook.find(':') != std::string::npos) {
-		auto split = shm::hook.find(':');
-		shm::length = std::stol(shm::hook.substr(split + 1));
-		shm::hook = shm::hook.substr(0, split);
-	}
-}
-void init() {
-	auto shmkey = ftok(shm::hook.c_str(), 0x0f);
-	shm::shmid = shmget(shmkey, length * (1 << 20), IPC_CREAT | 0600);
-	shm::shmptr = shmat(shm::shmid, nullptr, 0);
-}
-void free() {
-	shmdt(shm::shmptr);
-	if (!conti) shmctl(shm::shmid, IPC_RMID, nullptr);
-}
 
 numeric* alloc(size_t size) {
-	numeric* ptr = reinterpret_cast<numeric*>(shm::shmptr) + shm::shmtop;
-	if (!conti) std::fill_n(ptr, size, 0);
-	shm::shmtop += size;
+	static int seq = 0;
+	auto key = ftok(hook.c_str(), ++seq);
+	int id = shmget(key, size * sizeof(numeric), IPC_CREAT | 0600);
+	void* shm = shmat(id, nullptr, 0);
+	if (shm == cast<void*>(-1ull)) {
+		std::cerr << "shared memory allocation failed: " << size << std::endl;
+		std::exit(111);
+	}
+	numeric* ptr = cast<numeric*>(shm);
+	std::fill_n(ptr, size, 0);
+	info.emplace_back(id, ptr);
 	return ptr;
 }
+
 void free(numeric* p) {
-	std::cerr << "unsupported operation: shm::free" << std::endl;
-	std::exit(111);
+	auto it = std::find_if(info.begin(), info.end(),
+			[=](const shm_t& shm) { return shm.second == p; });
+	if (it != info.end()) {
+		shmdt(it->second);
+		shmctl(it->first, IPC_RMID, nullptr);
+		info.erase(it);
+	}
 }
-}
+} // namespace shm
 
 class weight {
 public:
@@ -1758,7 +1751,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-shm"):
 		case to_hash("--shm"):
-			opts["shmres"] = find_opt(i, "./2048");
+			opts["shm-hook"] = find_opt(i, "./2048");
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1887,7 +1880,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("test-win")) testctl.winv = std::stol(opts["test-win"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 	if (opts("thread")) thdnum = std::stod(opts["thread"]);
-	if (opts("shmres")) shm::setup(opts["shmres"]);
+	shm::hook = opts.find("shm-hook", argv[0]);
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
@@ -1898,10 +1891,9 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << timestamp << std::endl;
 	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
+	std::cout << "shm = " << shm::hook << std::endl;
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
-
-	shm::init();
 
 	utils::make_indexers();
 
@@ -1943,9 +1935,10 @@ int main(int argc, const char* argv[]) {
 		while (wait(nullptr) > 0);
 	}
 
-	shm::free();
-
 	std::cout << std::endl;
+
+	for (weight w : weight::list())
+		shm::free(w.raw());
 
 	return 0;
 }
