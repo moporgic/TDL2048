@@ -1500,7 +1500,7 @@ struct statistic {
 
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	statistic(const control& ctrl) : statistic() { init(ctrl); }
-	statistic(const statistic& stat) = delete;
+	statistic(const statistic& stat) = default;
 
 	void init(const control& ctrl = control()) {
 		limit = ctrl.loop * ctrl.unit;
@@ -1918,11 +1918,10 @@ int main(int argc, const char* argv[]) {
 			optid["thread-id"] = std::to_string(tid);
 			agents.push_back(std::async(std::launch::async, train, trainctl, optid));
 		}
-		statistic stat;
-		stat.init(trainctl);
+		statistic stat(trainctl);
 		for (auto& agent : agents) {
 			agent.wait();
-			stat.merge(agent.get());
+			stat << agent.get();
 		}
 		if (opts["options"].find("summary").find("train") != std::string::npos)
 			stat.summary();
@@ -1941,11 +1940,10 @@ int main(int argc, const char* argv[]) {
 			optid["thread-id"] = std::to_string(tid);
 			agents.push_back(std::async(std::launch::async, test, testctl, optid));
 		}
-		statistic stat;
-		stat.init(testctl);
+		statistic stat(testctl);
 		for (auto& agent : agents) {
 			agent.wait();
-			stat.merge(agent.get());
+			stat << agent.get();
 		}
 		if (opts["options"].find("summary").find("test") != std::string::npos)
 			stat.summary();
