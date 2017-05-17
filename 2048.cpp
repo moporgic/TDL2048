@@ -1749,7 +1749,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--thread"):
 		case to_hash("-p"):
 		case to_hash("--parallel"):
-			opts["thread"] = find_opts(i, ' ');
+			opts["thread"] = find_opt(i, std::to_string(std::thread::hardware_concurrency()).c_str());
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
