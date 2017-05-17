@@ -57,7 +57,7 @@ type* alloc(size_t size) {
 		std::cerr << "shared memory allocation failed: " << size << std::endl;
 		std::exit(111);
 	}
-	std::fill_n(cast<numeric*>(shm), size, type());
+	std::fill_n(cast<type*>(shm), size, type());
 	info.emplace_back(id, shm);
 	return cast<type*>(shm);
 }
