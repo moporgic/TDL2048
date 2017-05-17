@@ -1917,15 +1917,15 @@ int main(int argc, const char* argv[]) {
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
 		std::list<std::future<statistic>> agents;
-		for (u32 tid = 0; tid < thread; tid++) {
-			utils::options optid = opts;
-			optid["thread-id"] = std::to_string(tid);
-			agents.push_back(std::async(std::launch::async, train, trainctl, optid));
+		for (u32 tid = 1; tid < thread; tid++) {
+			utils::options opta = opts;
+			opta["thread-id"] = std::to_string(tid);
+			agents.push_back(std::async(std::launch::async, train, trainctl, opta));
 		}
-		statistic stat;
+		statistic stat = train(trainctl, opts);
 		for (auto& agent : agents) {
 			agent.wait();
-			stat << agent.get();
+			stat += agent.get();
 		}
 		if (opts["options"].find("summary").find("train") != std::string::npos)
 			stat.summary();
@@ -1939,15 +1939,15 @@ int main(int argc, const char* argv[]) {
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		std::list<std::future<statistic>> agents;
-		for (u32 tid = 0; tid < thread; tid++) {
-			utils::options optid = opts;
-			optid["thread-id"] = std::to_string(tid);
-			agents.push_back(std::async(std::launch::async, test, testctl, optid));
+		for (u32 tid = 1; tid < thread; tid++) {
+			utils::options opta = opts;
+			opta["thread-id"] = std::to_string(tid);
+			agents.push_back(std::async(std::launch::async, test, testctl, opta));
 		}
-		statistic stat;
+		statistic stat = test(testctl, opts);
 		for (auto& agent : agents) {
 			agent.wait();
-			stat << agent.get();
+			stat += agent.get();
 		}
 		if (opts["options"].find("summary").find("test") != std::string::npos)
 			stat.summary();
