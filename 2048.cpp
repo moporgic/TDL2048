@@ -1513,26 +1513,32 @@ struct statistic {
 		u64 opers;
 		u32 max;
 		u32 hash;
+		record& operator <<(const record& rec) {
+			score += rec.score;
+			win += rec.win;
+			time += rec.time;
+			opers += rec.opers;
+			hash |= rec.hash;
+			max = std::max(max, rec.max);
+			return (*this);
+		}
 	} total, local;
 
 	struct each {
 		std::array<u64, 32> score;
 		std::array<u64, 32> opers;
 		std::array<u64, 32> count;
+		each& operator <<(const each& ea) {
+			std::transform(count.begin(), count.end(), ea.count.begin(), count.begin(), std::plus<u64>());
+			std::transform(score.begin(), score.end(), ea.score.begin(), score.begin(), std::plus<u64>());
+			std::transform(opers.begin(), opers.end(), ea.opers.begin(), opers.begin(), std::plus<u64>());
+			return (*this);
+		}
 	} every;
 
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	statistic(const control& ctrl) : statistic() { init(ctrl); }
-	statistic& operator =(const statistic& stat) {
-		limit = stat.limit;
-		loop = stat.loop;
-		unit = stat.unit;
-		winv = stat.winv;
-		total = stat.total;
-		local = stat.local;
-		every = stat.every;
-		return *this;
-	}
+	statistic(const statistic& stat) = default;
 
 	void init(const control& ctrl = control()) {
 		limit = ctrl.loop * ctrl.unit;
@@ -1637,16 +1643,21 @@ struct statistic {
 		}
 	}
 
-	void merge(const statistic& stat) {
-		total.score += stat.total.score;
-		total.win += stat.total.win;
-		total.time += stat.total.time;
-		total.opers += stat.total.opers;
-		total.hash |= stat.total.hash;
-		total.max = std::max(total.max, stat.total.max);
-		std::transform(every.count.begin(), every.count.end(), stat.every.count.begin(), every.count.begin(), std::plus<u64>());
-		std::transform(every.score.begin(), every.score.end(), stat.every.score.begin(), every.score.begin(), std::plus<u64>());
-		std::transform(every.opers.begin(), every.opers.end(), stat.every.opers.begin(), every.opers.begin(), std::plus<u64>());
+	statistic& operator <<(const statistic& stat) {
+		limit += stat.limit;
+		loop += stat.loop;
+		unit = std::max(unit, stat.unit);
+		winv = std::max(winv, stat.winv);
+		total << stat.total;
+		local << stat.local;
+		every << stat.every;
+		return *this;
+	}
+
+	static statistic merge(const statistic* first, const statistic* last) {
+		statistic stat;
+		for (auto it = first; it != last; it++) stat << (*it);
+		return stat;
 	}
 };
 
@@ -1954,7 +1965,7 @@ int main(int argc, const char* argv[]) {
 		if (thdid != 0) return 0;
 		while (wait(nullptr) > 0);
 		for (u32 i = 0; i < thread; i++)
-			stat.merge(stats[i]);
+			stat << stats[i];
 		if (opts["options"].find("summary").find("train") != std::string::npos)
 			stat.summary();
 		shm::free(stats);
@@ -1974,7 +1985,7 @@ int main(int argc, const char* argv[]) {
 		if (thdid != 0) return 0;
 		while (wait(nullptr) > 0);
 		for (u32 i = 0; i < thread; i++)
-			stat.merge(stats[i]);
+			stat << stats[i];
 		if (opts["options"].find("summary").find("test") != std::string::npos)
 			stat.summary();
 		shm::free(stats);
