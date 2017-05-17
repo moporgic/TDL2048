@@ -1736,8 +1736,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 statistic train(statistic::control trainctl, utils::options opts = {}) {
 	const u32 thdid = std::stol(opts.find("thread-id", "0"));
 	const u32 thread = std::stol(opts.find("thread", "1"));
-	std::string suffix;
-	if (thread > 1) suffix = " [" + opts.find("thread-id", "0") + "]";
+	std::string suffix = (thread > 1) ? (" [" + std::to_string(thdid) + "]") : "";
 	for (u32 i = 0; i <= thdid; i++) std::rand();
 	trainctl.split(thdid, thread);
 
@@ -1810,8 +1809,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 statistic test(statistic::control testctl, utils::options opts = {}) {
 	const u32 thdid = std::stol(opts.find("thread-id", "0"));
 	const u32 thread = std::stol(opts.find("thread", "1"));
-	std::string suffix;
-	if (thread > 1) suffix = " [" + opts.find("thread-id", "0") + "]";
+	std::string suffix = (thread > 1) ? (" [" + std::to_string(thdid) + "]") : "";
 	for (u32 i = 0; i <= thdid; i++) std::rand();
 	testctl.split(thdid, thread);
 
