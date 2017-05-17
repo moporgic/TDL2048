@@ -46,23 +46,23 @@ namespace shm {
 typedef std::pair<int, void*> shm_t;
 std::vector<shm_t> info;
 std::string hook = "./2048";
+int total = 0;
 
-numeric* alloc(size_t size) {
-	static int seq = 0;
-	auto key = ftok(hook.c_str(), ++seq);
-	int id = shmget(key, size * sizeof(numeric), IPC_CREAT | 0600);
+template<typename type>
+type* alloc(size_t size) {
+	auto key = ftok(hook.c_str(), ++total);
+	int id = shmget(key, size * sizeof(type), IPC_CREAT | 0600);
 	void* shm = shmat(id, nullptr, 0);
 	if (shm == cast<void*>(-1ull)) {
 		std::cerr << "shared memory allocation failed: " << size << std::endl;
 		std::exit(111);
 	}
-	numeric* ptr = cast<numeric*>(shm);
-	std::fill_n(ptr, size, 0);
-	info.emplace_back(id, ptr);
-	return ptr;
+	std::fill_n(cast<numeric*>(shm), size, type());
+	info.emplace_back(id, shm);
+	return cast<type*>(shm);
 }
 
-void free(numeric* p) {
+void free(void* p) {
 	auto it = std::find_if(info.begin(), info.end(),
 			[=](const shm_t& shm) { return shm.second == p; });
 	if (it != info.end()) {
@@ -228,7 +228,7 @@ private:
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
-		return shm::alloc(size); //new numeric[size]();
+		return shm::alloc<numeric>(size); //new numeric[size]();
 	}
 	static inline void free(numeric* v) {
 		shm::free(v);
