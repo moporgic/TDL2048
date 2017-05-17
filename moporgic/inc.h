@@ -44,7 +44,7 @@
 #include <iterator>
 #include <utility>
 #include <iomanip>
-// #define INC_MOPORGIC_LIB // to include moporgious libiray
+// #define INC_MOPORGIC_LIB // to include moporgious library
 #ifdef INC_MOPORGIC_LIB
 #include "type.h"
 #include "util.h"

@@ -1492,6 +1492,7 @@ struct statistic {
 	std::string indexf;
 	std::string localf;
 	std::string totalf;
+	std::string summaf;
 
 	struct control {
 		u64 loop;
@@ -1499,7 +1500,8 @@ struct statistic {
 		u32 winv;
 		control(u64 loop = 1000, u64 unit = 1000, u32 winv = 2048) : loop(loop), unit(unit), winv(winv) {}
 		operator bool() const { return loop; }
-		void normalize(u32 thdnum, u32 thdid) {
+
+		void split(u32 thdid, u32 thdnum) {
 			loop = loop / thdnum + (loop % thdnum && thdid < (loop % thdnum) ? 1 : 0);
 		}
 	};
@@ -1519,7 +1521,7 @@ struct statistic {
 		std::array<u64, 32> count;
 	} every;
 
-
+	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	void init(const control& ctrl = control()) {
 		limit = ctrl.loop * ctrl.unit;
 		loop = 1;
@@ -1533,6 +1535,7 @@ struct statistic {
 		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
 		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
 		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		summaf = "%0" + std::to_string(dec * 2 + 1) + "llu %llums %.2fops";
 
 		every = {};
 		total = {};
@@ -1544,7 +1547,8 @@ struct statistic {
 	operator bool() const { return loop <= limit; }
 	bool checked() const { return (loop % unit) == 0; }
 
-	void update(const u32& score, const u32& hash, const u32& opers, const int& tid = 0) {
+
+	void update(const u32& score, const u32& hash, const u32& opers, const std::string& suffix = "") {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
@@ -1556,11 +1560,11 @@ struct statistic {
 
 		if ((loop % unit) != 0) return;
 
-		u64 currtimept = moporgic::millisec();
-		u64 elapsedtime = currtimept - local.time;
+		u64 current_time = moporgic::millisec();
+		local.time = current_time - local.time;
 		total.score += local.score;
 		total.win += local.win;
-		total.time += elapsedtime;
+		total.time += local.time;
 		total.opers += local.opers;
 		total.hash |= local.hash;
 		total.max = std::max(total.max, local.max);
@@ -1570,9 +1574,9 @@ struct statistic {
 		snprintf(buf, sizeof(buf), indexf.c_str(), // "%03llu/%03llu %llums %.2fops",
 				loop / unit,
 				limit / unit,
-				elapsedtime,
-				local.opers * 1000.0 / elapsedtime);
-		std::cout << buf << " [" << tid << "]" << std::endl;
+				local.time,
+				local.opers * 1000.0 / local.time);
+		std::cout << buf << suffix << std::endl;
 		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / unit,
 				local.max,
@@ -1587,12 +1591,23 @@ struct statistic {
 		std::cout << buf << std::endl;
 
 		local = {};
-		local.time = currtimept;
+		local.time = current_time;
 	}
 
-	void summary(const int& tid = 0) const {
-		std::cout << std::endl << "summary" << " [" << tid << "]" << std::endl;
+	void summary(const std::string& suffix = "") const {
+		std::cout << std::endl << "summary" << suffix << std::endl;
 		char buf[80];
+		snprintf(buf, sizeof(buf), summaf.c_str(),
+				limit / unit,
+				total.time,
+				total.opers * 1000.0 / total.time);
+		std::cout << buf << std::endl;
+		snprintf(buf, sizeof(buf), totalf.c_str(), // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
+				total.score / limit,
+				total.max,
+				math::msb32(total.hash),
+				total.win * 100.0 / limit);
+		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
 								   "tile", "count", "score", "move", "rate", "win");
 		std::cout << buf << std::endl;
@@ -1763,6 +1778,12 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 statistic train(statistic::control trainctl, utils::options opts = {}) {
+	const u32 thdid = std::stol(opts.find("thread-id", "0"));
+	const u32 thread = std::stol(opts.find("thread", "1"));
+	std::string suffix = (thread > 1) ? (" [" + std::to_string(thdid) + "]") : "";
+	for (u32 i = 0; i <= thdid; i++) std::rand();
+	trainctl.split(thdid, thread);
+
 	board b;
 	state last;
 	select best;
@@ -1772,7 +1793,6 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 	u32 score;
 	u32 opers;
 
-	u32 thdid = std::stod(opts["thread-id"]);
 	switch (to_hash(opts["train-mode"])) {
 	case to_hash("backward"):
 	case to_hash("backward-best"):
@@ -1793,7 +1813,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 				v = path.back().update(v);
 			}
 
-			stats.update(score, b.hash(), opers, thdid);
+			stats.update(score, b.hash(), opers, suffix);
 		}
 		break;
 
@@ -1822,7 +1842,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 			}
 			last += 0;
 
-			stats.update(score, b.hash(), opers, thdid);
+			stats.update(score, b.hash(), opers, suffix);
 		}
 		break;
 	}
@@ -1831,13 +1851,18 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 }
 
 statistic test(statistic::control testctl, utils::options opts = {}) {
+	const u32 thdid = std::stol(opts.find("thread-id", "0"));
+	const u32 thread = std::stol(opts.find("thread", "1"));
+	std::string suffix = (thread > 1) ? (" [" + std::to_string(thdid) + "]") : "";
+	for (u32 i = 0; i <= thdid; i++) std::rand();
+	testctl.split(thdid, thread);
+
 	board b;
 	select best;
 	statistic stats;
 	u32 score;
 	u32 opers;
 
-	u32 thdid = std::stod(opts["thread-id"]);
 	switch (to_hash(opts["test-mode"])) {
 	default:
 	case to_hash("best"):
@@ -1852,7 +1877,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 				best >> b;
 			}
 
-			stats.update(score, b.hash(), opers, thdid);
+			stats.update(score, b.hash(), opers, suffix);
 		}
 		break;
 	}
@@ -1866,8 +1891,7 @@ int main(int argc, const char* argv[]) {
 	u32 timestamp = std::time(nullptr);
 	u32 seed = moporgic::rdtsc();
 	numeric& alpha = state::alpha();
-	u32 thdnum = 1;
-	u32 thdid = 0;
+	u32 thread = 1, thdid;
 
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
@@ -1879,7 +1903,9 @@ int main(int argc, const char* argv[]) {
 	if (opts("train-win")) trainctl.winv = std::stol(opts["train-win"]);
 	if (opts("test-win")) testctl.winv = std::stol(opts["test-win"]);
 	if (opts("seed")) seed = std::stol(opts["seed"]);
-	if (opts("thread")) thdnum = std::stod(opts["thread"]);
+	if (opts("thread")) thread = std::max(std::stol(opts["thread"]), 1l);
+	if (!opts("thread")) opts["thread"] = std::to_string(thread);
+	if (!opts("options", "summary")) opts["options"] += "summary=test";
 	shm::hook = opts.find("shm-hook", argv[0]);
 
 	std::srand(seed);
@@ -1891,6 +1917,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << timestamp << std::endl;
 	std::cout << "seed = " << seed << std::endl;
 	std::cout << "alpha = " << alpha << std::endl;
+	std::cout << "agent = " << thread << "x" << std::endl;
 	std::cout << "shm = " << shm::hook << std::endl;
 //	printf("board::look[%d] = %lluM", (1 << 20), ((sizeof(board::cache) * (1 << 20)) >> 20));
 	std::cout << std::endl;
@@ -1908,11 +1935,8 @@ int main(int argc, const char* argv[]) {
 
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
-		for (thdid = thdnum - 1; thdid > 0 && fork() != 0; thdid--);
-		trainctl.normalize(thdnum, thdid);
-		opts["thread-number"] = std::to_string(thdnum);
+		for (thdid = thread - 1; thdid > 0 && fork() != 0; thdid--);
 		opts["thread-id"] = std::to_string(thdid);
-		for (u32 i = 0; i < thdid; i++) std::rand();
 		train(trainctl, opts);
 		if (thdid != 0) return 0;
 		while (wait(nullptr) > 0);
@@ -1925,12 +1949,9 @@ int main(int argc, const char* argv[]) {
 
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
-		for (thdid = thdnum - 1; thdid > 0 && fork() != 0; thdid--);
-		testctl.normalize(thdnum, thdid);
-		opts["thread-number"] = std::to_string(thdnum);
+		for (thdid = thread - 1; thdid > 0 && fork() != 0; thdid--);
 		opts["thread-id"] = std::to_string(thdid);
-		for (u32 i = 0; i < thdid; i++) std::rand();
-		test(testctl, opts).summary(thdid);
+		test(testctl, opts).summary();
 		if (thdid != 0) return 0;
 		while (wait(nullptr) > 0);
 	}
