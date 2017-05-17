@@ -1537,7 +1537,6 @@ struct statistic {
 	} every;
 
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
-	statistic(const control& ctrl) : statistic() { init(ctrl); }
 	statistic(const statistic& stat) = default;
 
 	void init(const control& ctrl = control()) {
@@ -1545,26 +1544,29 @@ struct statistic {
 		loop = 1;
 		unit = ctrl.unit;
 		winv = ctrl.winv;
-
-//		indexf = "%03llu/%03llu %llums %.2fops";
-//		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
-//		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
-		u32 dec = std::max(std::floor(std::log10(ctrl.loop)) + 1, 3.0);
-		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
-		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		summaf = "%0" + std::to_string(dec * 2 + 1) + "llu %llums %.2fops";
+		format();
 
 		every = {};
 		total = {};
 		local = {};
 		local.time = moporgic::millisec();
 	}
+	void format() {
+//		indexf = "%03llu/%03llu %llums %.2fops";
+//		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
+//		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
+//		summaf = "%7llu %llums %.2fops";
+		u32 dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
+		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
+		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		summaf = "%0" + std::to_string(dec * 2 + 1) + "llu %llums %.2fops";
+	}
+
 	u64 operator++(int) { return (++loop) - 1; }
 	u64 operator++() { return (++loop); }
 	operator bool() const { return loop <= limit; }
 	bool checked() const { return (loop % unit) == 0; }
-
 
 	void update(const u32& score, const u32& hash, const u32& opers, const std::string& suffix = "") {
 		local.score += score;
@@ -1651,6 +1653,7 @@ struct statistic {
 		total << stat.total;
 		local << stat.local;
 		every << stat.every;
+		format();
 		return *this;
 	}
 
@@ -1785,7 +1788,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--thread"):
 		case to_hash("-p"):
 		case to_hash("--parallel"):
-			opts["thread"] = find_opt(i, nullptr);
+			opts["thread"] = find_opt(i, std::to_string(std::thread::hardware_concurrency()).c_str());
 			break;
 		case to_hash("-shm"):
 		case to_hash("--shm"):
@@ -1958,16 +1961,14 @@ int main(int argc, const char* argv[]) {
 
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
-		statistic stat(trainctl), *stats = shm::alloc<statistic>(thread);
+		statistic* stats = shm::alloc<statistic>(thread);
 		for (thdid = thread - 1; thdid > 0 && fork() != 0; thdid--);
 		opts["thread-id"] = std::to_string(thdid);
 		stats[thdid] = train(trainctl, opts);
 		if (thdid != 0) return 0;
 		while (wait(nullptr) > 0);
-		for (u32 i = 0; i < thread; i++)
-			stat << stats[i];
 		if (opts["options"].find("summary").find("train") != std::string::npos)
-			stat.summary();
+			statistic::merge(stats, stats + thread).summary();
 		shm::free(stats);
 	}
 
@@ -1978,16 +1979,14 @@ int main(int argc, const char* argv[]) {
 
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
-		statistic stat(testctl), *stats = shm::alloc<statistic>(thread);
+		statistic* stats = shm::alloc<statistic>(thread);
 		for (thdid = thread - 1; thdid > 0 && fork() != 0; thdid--);
 		opts["thread-id"] = std::to_string(thdid);
 		stats[thdid] = test(testctl, opts);
 		if (thdid != 0) return 0;
 		while (wait(nullptr) > 0);
-		for (u32 i = 0; i < thread; i++)
-			stat << stats[i];
 		if (opts["options"].find("summary").find("test") != std::string::npos)
-			stat.summary();
+			statistic::merge(stats, stats + thread).summary();
 		shm::free(stats);
 	}
 
