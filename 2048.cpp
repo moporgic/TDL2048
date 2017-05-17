@@ -1922,7 +1922,7 @@ int main(int argc, const char* argv[]) {
 			optid["thread-id"] = std::to_string(tid);
 			agents.push_back(std::async(std::launch::async, train, trainctl, optid));
 		}
-		statistic stat(trainctl);
+		statistic stat;
 		for (auto& agent : agents) {
 			agent.wait();
 			stat << agent.get();
@@ -1944,7 +1944,7 @@ int main(int argc, const char* argv[]) {
 			optid["thread-id"] = std::to_string(tid);
 			agents.push_back(std::async(std::launch::async, test, testctl, optid));
 		}
-		statistic stat(testctl);
+		statistic stat;
 		for (auto& agent : agents) {
 			agent.wait();
 			stat << agent.get();
