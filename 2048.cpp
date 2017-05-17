@@ -1921,7 +1921,7 @@ int main(int argc, const char* argv[]) {
 	u32 timestamp = std::time(nullptr);
 	u32 seed = moporgic::rdtsc();
 	numeric& alpha = state::alpha();
-	u32 thread = 1;
+	u32 thread = 1, thdid;
 
 	utils::options opts = parse(argc, argv);
 	if (opts("alpha")) alpha = std::stod(opts["alpha"]);
@@ -1964,16 +1964,11 @@ int main(int argc, const char* argv[]) {
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
 		std::list<std::future<statistic>> agents;
-		for (u32 tid = 1; tid < thread; tid++) {
-			utils::options opta = opts;
-			opta["thread-id"] = std::to_string(tid);
-			agents.push_back(std::async(std::launch::async, train, trainctl, opta));
-		}
+		for (thdid = thread - 1; std::stol(opts["thread-id"] = thdid); thdid--)
+			agents.push_back(std::async(std::launch::async, train, trainctl, opts));
 		statistic stat = train(trainctl, opts);
-		for (auto& agent : agents) {
-			agent.wait();
+		for (auto& agent : agents)
 			stat += agent.get();
-		}
 		if (opts["options"]["summary"].is("train"))
 			stat.summary();
 	}
@@ -1986,16 +1981,11 @@ int main(int argc, const char* argv[]) {
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		std::list<std::future<statistic>> agents;
-		for (u32 tid = 1; tid < thread; tid++) {
-			utils::options opta = opts;
-			opta["thread-id"] = std::to_string(tid);
-			agents.push_back(std::async(std::launch::async, test, testctl, opta));
-		}
+		for (thdid = thread - 1; std::stol(opts["thread-id"] = thdid); thdid--)
+			agents.push_back(std::async(std::launch::async, test, testctl, opts));
 		statistic stat = test(testctl, opts);
-		for (auto& agent : agents) {
-			agent.wait();
+		for (auto& agent : agents)
 			stat += agent.get();
-		}
 		if (opts["options"]["summary"].is("test"))
 			stat.summary();
 	}
