@@ -390,16 +390,21 @@ public:
 				return in;
 			}
 			template<typename type> item& operator  =(const type& v) {
-				std::string nv = vtos(v);
-				token = nv.size() ? label() + "=" + vtos(v) : label();
+				token = encode(label(), vtos(v));
 				std::stringstream ss;
 				for (std::string symbol : split(opt))
-					ss << (item(opt, symbol).label() != label() ? symbol : token);
+					ss << (item(opt, symbol).label() != label() ? symbol : token) << " ";
 				opt = ss.str();
+				opt.pop_back();
 				return (*this);
 			}
 			template<typename type> bool operator ==(const type& v) const { return value() == vtos(v); }
 			template<typename type> bool operator !=(const type& v) const { return value() != vtos(v); }
+
+			template<typename type = std::string>
+			bool is(const type& val = {}) const {
+				return token.find(vtos(val)) != std::string::npos;
+			}
 		private:
 			item(std::string& opt, std::string token) : opt(opt), token(token) {}
 			std::string& opt;
@@ -423,6 +428,11 @@ public:
 		template<typename type = std::string>
 		std::string find(const std::string& ext, const type& def = {}) const {
 			return operator() (ext) ? const_cast<option&>(*this)[ext] : vtos(def);
+		}
+
+		template<typename type = std::string>
+		bool is(const type& val = {}) const {
+			return opt.find(vtos(val)) != std::string::npos;
 		}
 	private:
 		std::string& opt;
@@ -448,15 +458,18 @@ public:
 	}
 
 	operator std::string() const {
-		std::string options;
+		std::stringstream ss;
 		for (auto v : opts)
-			options += (v.second.size() ? (v.first + "=" + v.second) : v.first) + " ";
-		if (options.size()) options.pop_back();
-		return options;
+			ss << encode(v.first, v.second) << " ";
+		return ss.str();
 	}
 
 private:
 	std::map<std::string, std::string> opts;
+
+	static std::string encode(const std::string& label, const std::string& value) {
+		return value.size() ? (label + "=" + value) : label;
+	}
 
 	template<typename type>
 	static std::string vtos(const type& v) {
@@ -1923,7 +1936,7 @@ int main(int argc, const char* argv[]) {
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
 		auto stat = train(trainctl, opts);
-		if (opts["options"].find("summary").find("train") != std::string::npos)
+		if (opts["options"]["summary"].is("train"))
 			stat.summary();
 	}
 
@@ -1933,7 +1946,7 @@ int main(int argc, const char* argv[]) {
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		auto stat = test(testctl, opts);
-		if (opts["options"].find("summary").find("test") != std::string::npos)
+		if (opts["options"]["summary"].is("test"))
 			stat.summary();
 	}
 
