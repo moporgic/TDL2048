@@ -360,83 +360,61 @@ class options {
 public:
 	options() {}
 	options(const options& opts) : opts(opts.opts) {}
+	using vector = std::vector<std::string>;
 
-	class option {
+	class opinion {
+		friend class option;
+	public:
+		opinion() = delete;
+		opinion(const opinion& i) = default;
+		opinion(std::string& token) : token(token) {}
+		std::string label() const { return token.substr(0, token.find('=')); }
+		std::string value() const { return token.substr(token.find('=') + 1); }
+		operator std::string() const { return value(); }
+		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
+		opinion& operator  =(const std::string& v) { token = v.size() ? (label() + "=" + v) : label(); return (*this); }
+		opinion& operator +=(const std::string& v) { token += v; return (*this); }
+		opinion& operator  =(const vector& vec) { return operator  =(vtos(vec)); }
+		opinion& operator +=(const vector& vec) { return operator +=(vtos(vec)); }
+		bool operator ==(const std::string& v) const { return value() == v; }
+		bool operator !=(const std::string& v) const { return value() != v; }
+		bool operator ()(const std::string& v) const { return value().find(v) != std::string::npos; }
+	private:
+		std::string& token;
+	};
+
+	class option : public vector {
 		friend class options;
 	public:
-		option() = delete;
-		option(const option& opt) = default;
-		operator std::string&() { return opt; }
-		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.opt; }
-		friend std::istream& operator >>(std::istream& in, option& opt) { return in >> opt.opt; }
-		template<typename type> std::string& operator  =(const type& v) { return (opt = vtos(v)); }
-		template<typename type> bool operator ==(const type& v) const { return opt == vtos(v); }
-		template<typename type> bool operator !=(const type& v) const { return opt != vtos(v); }
-
-		class item {
-			friend class option;
-		public:
-			item() = delete;
-			item(const item& i) = default;
-			operator std::string() const { return value(); }
-			std::string label() const { return token.substr(0, token.find('=')); }
-			std::string value() const { return token.substr(token.find('=') + 1); }
-			friend std::ostream& operator <<(std::ostream& out, const item& i) {
-				return out << i.value();
-			}
-			friend std::istream& operator >>(std::istream& in, item& i) {
-				std::string buf;
-				if (in >> buf) i = buf;
-				return in;
-			}
-			template<typename type> item& operator  =(const type& v) {
-				token = encode(label(), vtos(v));
-				std::stringstream ss;
-				for (std::string symbol : split(opt))
-					ss << (item(opt, symbol).label() != label() ? symbol : token) << " ";
-				opt = ss.str();
-				opt.pop_back();
-				return (*this);
-			}
-			template<typename type> bool operator ==(const type& v) const { return value() == vtos(v); }
-			template<typename type> bool operator !=(const type& v) const { return value() != vtos(v); }
-
-			template<typename type = std::string>
-			bool is(const type& val = {}) const {
-				return token.find(vtos(val)) != std::string::npos;
-			}
-		private:
-			item(std::string& opt, std::string token) : opt(opt), token(token) {}
-			std::string& opt;
-			std::string token;
-		};
+		option(const vector& opt = {}) : vector(opt) {}
+		std::string value() const { return vtos(*this); }
+		operator std::string() const { return value(); }
+		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
+		option& operator  =(const std::string& v) { clear(); return operator +=(v); }
+		option& operator +=(const std::string& v) { push_back(v); return *this; }
+		option& operator  =(const vector& vec) { clear(); return operator +=(vec); }
+		option& operator +=(const vector& vec) { insert(end(), vec.begin(), vec.end()); return *this; }
+		bool operator ==(const std::string& v) const { return value() == v; }
+		bool operator !=(const std::string& v) const { return value() != v; }
 
 		bool operator ()(const std::string& ext) const {
-			for (std::string token : split(opt))
-				if (item(opt, token).label() == ext)
-					return true;
-			return false;
+			return std::find_if(cbegin(), cend(),
+					[=](std::string token) { return opinion(token).label() == ext; }) != cend();
 		}
 
-		item operator [](const std::string& ext) {
-			for (std::string token : split(opt))
-				if (item(opt, token).label() == ext)
-					return item(opt, token);
-			return item(opt.append(" ").append(ext), ext);
+		opinion operator [](const std::string& ext) {
+			auto pos = std::find_if(begin(), end(),
+					[=](std::string token) { return opinion(token).label() == ext; });
+			return (pos != end()) ? opinion(*pos) : operator +=(ext)[ext];
 		}
 
-		template<typename type = std::string>
-		std::string find(const std::string& ext, const type& def = {}) const {
-			return operator() (ext) ? const_cast<option&>(*this)[ext] : vtos(def);
+		std::string find(const std::string& ext, const std::string& val = {}) const {
+			return operator() (ext) ? const_cast<option&>(*this)[ext] : val;
 		}
 
-		template<typename type = std::string>
-		bool is(const type& val = {}) const {
-			return opt.find(vtos(val)) != std::string::npos;
+		bool is(const std::string& val) const {
+			return value().find(val) != std::string::npos;
 		}
-	private:
-		std::string& opt;
-		option(std::string& opt) : opt(opt) {}
 	};
 
 	bool operator ()(const std::string& opt) const {
@@ -447,41 +425,29 @@ public:
 		return operator ()(opt) ? const_cast<options&>(*this)[opt](ext) : false;
 	}
 
-	option operator [](const std::string& opt) {
-		if (opts.find(opt) == opts.end()) opts[opt] = "";
+	option& operator [](const std::string& opt) {
+		if (opts.find(opt) == opts.end()) opts[opt] = option();
 		return opts[opt];
 	}
 
-	template<typename type = std::string>
-	std::string find(const std::string& opt, const type& def = {}) const {
-		return operator()(opt) ? const_cast<options&>(*this)[opt] : vtos(def);
-	}
-
-	operator std::string() const {
-		std::stringstream ss;
-		for (auto v : opts)
-			ss << encode(v.first, v.second) << " ";
-		return ss.str();
+	std::string find(const std::string& opt, const std::string& val = {}) const {
+		return operator()(opt) ? const_cast<options&>(*this)[opt] : val;
 	}
 
 private:
-	std::map<std::string, std::string> opts;
+	std::map<std::string, option> opts;
 
-	static std::string encode(const std::string& label, const std::string& value) {
-		return value.size() ? (label + "=" + value) : label;
-	}
-
-	template<typename type>
-	static std::string vtos(const type& v) {
-		std::stringstream ss;
-		ss << v;
-		return ss.str();
-	}
-
-	static std::vector<std::string> split(const std::string& s) {
-		std::stringstream ss(s);
+	static std::vector<std::string> stov(const std::string& str) {
+		std::stringstream ss(str);
 		std::istream_iterator<std::string> begin(ss), end;
 		return std::vector<std::string>(begin, end);
+	}
+
+	static std::string vtos(const vector& vec) {
+		std::string str = std::accumulate(vec.cbegin(), vec.cend(), std::string(),
+		    [](std::string& r, const std::string& v){ return std::move(r) + v + " "; });
+		if (str.size()) str.pop_back();
+		return str;
 	}
 };
 
@@ -1668,80 +1634,77 @@ struct statistic {
 
 inline utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
-	auto find_opt = [&](int& i, const char* defval) -> std::string {
-		if (i + 1 < argc && *(argv[i + 1]) != '-') return argv[++i];
-		if (defval != nullptr) return defval;
-		std::cerr << "invalid: " << argv[i] << std::endl;
-		std::exit(1); return "";
+	auto find_opt = [&](int& i, const std::string& v) -> std::string {
+		return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
 	};
-	auto find_opts = [&](int& i, const char& split) -> std::string {
-		std::string vu;
-		for (std::string v; (v = find_opt(i, "")).size(); ) vu += (v += split);
-		return vu;
+	auto find_opts = [&](int& i) -> std::vector<std::string> {
+		std::vector<std::string> vec;
+		for (std::string v; (v = find_opt(i, "")).size(); ) vec.push_back(v);
+		return vec;
 	};
 	for (int i = 1; i < argc; i++) {
 		switch (to_hash(argv[i])) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
-			opts["alpha"] = find_opt(i, nullptr);
+			opts["alpha"] = find_opt(i, std::to_string(state::alpha()));
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
-			opts["train"] = find_opt(i, nullptr);
+			opts["train"] = find_opt(i, "1000");
 			break;
 		case to_hash("-T"):
 		case to_hash("-e"):
 		case to_hash("--test"):
-			opts["test"] = find_opt(i, nullptr);
+			opts["test"] = find_opt(i, "1000");
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
 		case to_hash("--srand"):
-			opts["seed"] = find_opt(i, nullptr);
+			opts["seed"] = find_opt(i, std::to_string(moporgic::rdtsc()));
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
-			opts["weight-input"] = opts["weight-output"] = find_opts(i, '|');
+			opts["weight-input"] = opts["weight-output"] = find_opts(i);
 			break;
 		case to_hash("-wi"):
 		case to_hash("--weight-input"):
-			opts["weight-input"] = find_opts(i, '|');
+			opts["weight-input"] = find_opts(i);
 			break;
 		case to_hash("-wo"):
 		case to_hash("--weight-output"):
-			opts["weight-output"] = find_opts(i, '|');
+			opts["weight-output"] = find_opts(i);
 			break;
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			opts["feature-input"] = opts["feature-output"] = find_opts(i, '|');
+			opts["feature-input"] = opts["feature-output"] = find_opts(i);
 			break;
 		case to_hash("-fi"):
 		case to_hash("--feature-input"):
-			opts["feature-input"] = find_opts(i, '|');
+			opts["feature-input"] = find_opts(i);
 			break;
 		case to_hash("-fo"):
 		case to_hash("--feature-output"):
-			opts["feature-output"] = find_opts(i, '|');
+			opts["feature-output"] = find_opts(i);
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
 		case to_hash("--weight-value"):
-			opts["weight-value"] = find_opts(i, ',');
+			opts["weight-value"] = find_opts(i);
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
 		case to_hash("--feature-value"):
-			opts["feature-value"] = find_opts(i, ',');
+			opts["feature-value"] = find_opts(i);
 			break;
 		case to_hash("-wf"):
 		case to_hash("-fw"):
-			opts["feature-value"] = opts["weight-value"] = find_opts(i, ',');
+			opts["feature-value"] = opts["weight-value"] = find_opts(i);
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 		case to_hash("--extra"):
-			opts["options"] = find_opts(i, ' ');
+			opts["options"] = find_opts(i);
 			break;
 		case to_hash("-tt"):
 		case to_hash("-tm"):
@@ -1783,11 +1746,12 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
-			opts["comment"] = find_opts(i, ' ');
+			opts["comment"] = find_opts(i);
 			break;
 		default:
-			std::cerr << "unknown: " << argv[i] << std::endl;
-			std::exit(1);
+			std::cerr << "unknown: " << argv[i];
+			for (auto& v : find_opts(i)) std::cerr << " " << v;
+			std::cerr << std::endl;
 			break;
 		}
 	}
@@ -1935,7 +1899,7 @@ int main(int argc, const char* argv[]) {
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
 		auto stat = train(trainctl, opts);
-		if (opts["options"]["summary"].is("train"))
+		if (opts["options"]["summary"]("train"))
 			stat.summary();
 	}
 
@@ -1945,7 +1909,7 @@ int main(int argc, const char* argv[]) {
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		auto stat = test(testctl, opts);
-		if (opts["options"]["summary"].is("test"))
+		if (opts["options"]["summary"]("test"))
 			stat.summary();
 	}
 
