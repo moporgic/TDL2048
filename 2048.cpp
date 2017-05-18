@@ -409,44 +409,74 @@ public:
 		operator std::string&() { return opt; }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.opt; }
 		friend std::istream& operator >>(std::istream& in, option& opt) { return in >> opt.opt; }
-		std::string& operator =(const std::string& s) { return (opt = s); }
-		std::string& operator +=(const std::string& s) { return (opt += s); }
-		std::string operator +(const std::string& s) const { return opt + s; }
-		bool operator ==(const std::string& s) const { return opt == s; }
-		bool operator !=(const std::string& s) const { return opt != s; }
+		template<typename type> std::string& operator  =(const type& v) { return (opt = vtos(v)); }
+		template<typename type> bool operator ==(const type& v) const { return opt == vtos(v); }
+		template<typename type> bool operator !=(const type& v) const { return opt != vtos(v); }
+
+		class item {
+			friend class option;
+		public:
+			item() = delete;
+			item(const item& i) = default;
+			operator std::string() const { return value(); }
+			std::string label() const { return token.substr(0, token.find('=')); }
+			std::string value() const { return token.substr(token.find('=') + 1); }
+			friend std::ostream& operator <<(std::ostream& out, const item& i) {
+				return out << i.value();
+			}
+			friend std::istream& operator >>(std::istream& in, item& i) {
+				std::string buf;
+				if (in >> buf) i = buf;
+				return in;
+			}
+			template<typename type> item& operator  =(const type& v) {
+				token = encode(label(), vtos(v));
+				std::stringstream ss;
+				for (std::string symbol : split(opt))
+					ss << (item(opt, symbol).label() != label() ? symbol : token) << " ";
+				opt = ss.str();
+				opt.pop_back();
+				return (*this);
+			}
+			template<typename type> bool operator ==(const type& v) const { return value() == vtos(v); }
+			template<typename type> bool operator !=(const type& v) const { return value() != vtos(v); }
+
+			template<typename type = std::string>
+			bool is(const type& val = {}) const {
+				return token.find(vtos(val)) != std::string::npos;
+			}
+		private:
+			item(std::string& opt, std::string token) : opt(opt), token(token) {}
+			std::string& opt;
+			std::string token;
+		};
 
 		bool operator ()(const std::string& ext) const {
-			for (const std::string& label : stov(ext)) {
-				auto pos = opt.find(label);
-				if (pos == std::string::npos) continue;
-				if (pos != 0 && opt[pos - 1] > ' ') continue;
-				if (opt[pos + label.size()] <= ' ') return true;
-				if (opt[pos + label.size()] == '=') return true;
-			}
+			for (std::string token : split(opt))
+				if (item(opt, token).label() == ext)
+					return true;
 			return false;
 		}
 
-		std::string operator [](const std::string& ext) {
-			std::string label = " " + ext + " ";
-			for (const std::string& token : stov(opt))
-				if (label.find(" " + token.substr(0, token.find('=')) + " ") != std::string::npos)
-					return token.substr(token.find('=') + 1);
-			opt += ext;
-			return ext.substr(ext.find('=') + 1);
+		item operator [](const std::string& ext) {
+			for (std::string token : split(opt))
+				if (item(opt, token).label() == ext)
+					return item(opt, token);
+			return item(opt.append(" ").append(ext), ext);
 		}
 
-		std::string find(const std::string& ext, const std::string& def = "") const {
-			return operator() (ext) ? const_cast<option&>(*this)[ext] : def;
+		template<typename type = std::string>
+		std::string find(const std::string& ext, const type& def = {}) const {
+			return operator() (ext) ? const_cast<option&>(*this)[ext] : vtos(def);
+		}
+
+		template<typename type = std::string>
+		bool is(const type& val = {}) const {
+			return opt.find(vtos(val)) != std::string::npos;
 		}
 	private:
 		std::string& opt;
-
 		option(std::string& opt) : opt(opt) {}
-		std::vector<std::string> stov(const std::string& s) const {
-			std::stringstream ss(s);
-			std::istream_iterator<std::string> begin(ss), end;
-			return std::vector<std::string>(begin, end);
-		}
 	};
 
 	bool operator ()(const std::string& opt) const {
@@ -462,20 +492,37 @@ public:
 		return opts[opt];
 	}
 
-	std::string find(const std::string& opt, const std::string& def = "") const {
-		return operator()(opt) ? const_cast<options&>(*this)[opt] : def;
+	template<typename type = std::string>
+	std::string find(const std::string& opt, const type& def = {}) const {
+		return operator()(opt) ? const_cast<options&>(*this)[opt] : vtos(def);
 	}
 
 	operator std::string() const {
-		std::string options;
+		std::stringstream ss;
 		for (auto v : opts)
-			options += (v.second.size() ? (v.first + "=" + v.second) : v.first) + " ";
-		if (options.size()) options.pop_back();
-		return options;
+			ss << encode(v.first, v.second) << " ";
+		return ss.str();
 	}
 
 private:
 	std::map<std::string, std::string> opts;
+
+	static std::string encode(const std::string& label, const std::string& value) {
+		return value.size() ? (label + "=" + value) : label;
+	}
+
+	template<typename type>
+	static std::string vtos(const type& v) {
+		std::stringstream ss;
+		ss << v;
+		return ss.str();
+	}
+
+	static std::vector<std::string> split(const std::string& s) {
+		std::stringstream ss(s);
+		std::istream_iterator<std::string> begin(ss), end;
+		return std::vector<std::string>(begin, end);
+	}
 };
 
 inline u32 hashpatt(const std::vector<int>& patt) {
@@ -1489,10 +1536,16 @@ struct statistic {
 	u64 unit;
 	u32 winv;
 
-	std::string indexf;
-	std::string localf;
-	std::string totalf;
-	std::string summaf;
+	class format_t : public std::array<char, 64> {
+	public:
+		inline void operator =(const std::string& s) { std::copy_n(s.begin(), s.size() + 1, begin()); }
+		inline const char* c_str() const { return &(operator[](0)); }
+	};
+
+	format_t indexf;
+	format_t localf;
+	format_t totalf;
+	format_t summaf;
 
 	struct control {
 		u64 loop;
@@ -1513,7 +1566,7 @@ struct statistic {
 		u64 opers;
 		u32 max;
 		u32 hash;
-		record& operator <<(const record& rec) {
+		record& operator +=(const record& rec) {
 			score += rec.score;
 			win += rec.win;
 			time += rec.time;
@@ -1528,7 +1581,7 @@ struct statistic {
 		std::array<u64, 32> score;
 		std::array<u64, 32> opers;
 		std::array<u64, 32> count;
-		each& operator <<(const each& ea) {
+		each& operator +=(const each& ea) {
 			std::transform(count.begin(), count.end(), ea.count.begin(), count.begin(), std::plus<u64>());
 			std::transform(score.begin(), score.end(), ea.score.begin(), score.begin(), std::plus<u64>());
 			std::transform(opers.begin(), opers.end(), ea.opers.begin(), opers.begin(), std::plus<u64>());
@@ -1539,28 +1592,34 @@ struct statistic {
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	statistic(const statistic& stat) = default;
 
-	void init(const control& ctrl = control()) {
+	void init(control ctrl = {}, utils::options opts = {}) {
+		u32 thdid = std::stol(opts.find("thread-id", "0"));
+		u32 thread = std::stol(opts.find("thread", "1"));
+		std::string suffix = (thread > 1) ? (" [" + std::to_string(thdid) + "]") : "";
+		ctrl.split(thdid, thread);
+
 		limit = ctrl.loop * ctrl.unit;
 		loop = 1;
 		unit = ctrl.unit;
 		winv = ctrl.winv;
-		format();
+		format(suffix);
 
 		every = {};
 		total = {};
 		local = {};
+		for (u32 i = 0; i <= thdid; i++) std::rand();
 		local.time = moporgic::millisec();
 	}
-	void format() {
+	void format(const std::string& suffix = "") {
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
-//		summaf = "%7llu %llums %.2fops";
+//		summaf = "summary %llums %.2fops";
 		u32 dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
-		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
-		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		summaf = "%0" + std::to_string(dec * 2 + 1) + "llu %llums %.2fops";
+		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops" + suffix;
+		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%llums %.2fops" + suffix;
 	}
 
 	u64 operator++(int) { return (++loop) - 1; }
@@ -1568,7 +1627,7 @@ struct statistic {
 	operator bool() const { return loop <= limit; }
 	bool checked() const { return (loop % unit) == 0; }
 
-	void update(const u32& score, const u32& hash, const u32& opers, const std::string& suffix = "") {
+	void update(const u32& score, const u32& hash, const u32& opers) {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
@@ -1596,7 +1655,7 @@ struct statistic {
 				limit / unit,
 				local.time,
 				local.opers * 1000.0 / local.time);
-		std::cout << buf << suffix << std::endl;
+		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / unit,
 				local.max,
@@ -1614,11 +1673,10 @@ struct statistic {
 		local.time = current_time;
 	}
 
-	void summary(const std::string& suffix = "") const {
-		std::cout << std::endl << "summary" << suffix << std::endl;
+	void summary() const {
+		std::cout << std::endl;
 		char buf[80];
 		snprintf(buf, sizeof(buf), summaf.c_str(),
-				limit / unit,
 				total.time,
 				total.opers * 1000.0 / total.time);
 		std::cout << buf << std::endl;
@@ -1645,22 +1703,16 @@ struct statistic {
 		}
 	}
 
-	statistic& operator <<(const statistic& stat) {
+	statistic& operator +=(const statistic& stat) {
 		limit += stat.limit;
 		loop += stat.loop;
-		unit = std::max(unit, stat.unit);
-		winv = std::max(winv, stat.winv);
-		total << stat.total;
-		local << stat.local;
-		every << stat.every;
+		if (!unit) unit = stat.unit;
+		if (!winv) winv = stat.winv;
+		total += stat.total;
+		local += stat.local;
+		every += stat.every;
 		format();
 		return *this;
-	}
-
-	static statistic merge(const statistic* first, const statistic* last) {
-		statistic stat;
-		for (auto it = first; it != last; it++) stat << (*it);
-		return stat;
 	}
 };
 
@@ -1792,7 +1844,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-shm"):
 		case to_hash("--shm"):
-			opts["shm-hook"] = find_opt(i, "./2048");
+			opts["shm-hook"] = find_opt(i, argv[0]);
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1804,12 +1856,6 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 statistic train(statistic::control trainctl, utils::options opts = {}) {
-	const u32 thdid = std::stol(opts.find("thread-id", "0"));
-	const u32 thread = std::stol(opts.find("thread", "1"));
-	std::string suffix = (thread > 1) ? (" [" + std::to_string(thdid) + "]") : "";
-	for (u32 i = 0; i <= thdid; i++) std::rand();
-	trainctl.split(thdid, thread);
-
 	board b;
 	state last;
 	select best;
@@ -1822,7 +1868,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 	switch (to_hash(opts["train-mode"])) {
 	case to_hash("backward"):
 	case to_hash("backward-best"):
-		for (stats.init(trainctl); stats; stats++) {
+		for (stats.init(trainctl, opts); stats; stats++) {
 
 			score = 0;
 			opers = 0;
@@ -1839,14 +1885,14 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 				v = path.back().update(v);
 			}
 
-			stats.update(score, b.hash(), opers, suffix);
+			stats.update(score, b.hash(), opers);
 		}
 		break;
 
 	default:
 	case to_hash("forward"):
 	case to_hash("forward-best"):
-		for (stats.init(trainctl); stats; stats++) {
+		for (stats.init(trainctl, opts); stats; stats++) {
 
 			score = 0;
 			opers = 0;
@@ -1868,7 +1914,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 			}
 			last += 0;
 
-			stats.update(score, b.hash(), opers, suffix);
+			stats.update(score, b.hash(), opers);
 		}
 		break;
 	}
@@ -1877,12 +1923,6 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 }
 
 statistic test(statistic::control testctl, utils::options opts = {}) {
-	const u32 thdid = std::stol(opts.find("thread-id", "0"));
-	const u32 thread = std::stol(opts.find("thread", "1"));
-	std::string suffix = (thread > 1) ? (" [" + std::to_string(thdid) + "]") : "";
-	for (u32 i = 0; i <= thdid; i++) std::rand();
-	testctl.split(thdid, thread);
-
 	board b;
 	select best;
 	statistic stats;
@@ -1892,7 +1932,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 	switch (to_hash(opts["test-mode"])) {
 	default:
 	case to_hash("best"):
-		for (stats.init(testctl); stats; stats++) {
+		for (stats.init(testctl, opts); stats; stats++) {
 
 			score = 0;
 			opers = 0;
@@ -1903,7 +1943,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 				best >> b;
 			}
 
-			stats.update(score, b.hash(), opers, suffix);
+			stats.update(score, b.hash(), opers);
 		}
 		break;
 	}
@@ -1931,7 +1971,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("seed")) seed = std::stol(opts["seed"]);
 	if (opts("thread")) thread = std::max(std::stol(opts["thread"]), 1l);
 	if (!opts("thread")) opts["thread"] = std::to_string(thread);
-	if (!opts("options", "summary")) opts["options"] += "summary=test";
+	if (!opts("options", "summary")) opts["options"]["summary"] = "test";
 	shm::hook = opts.find("shm-hook", argv[0]);
 
 	std::srand(seed);
@@ -1962,13 +2002,14 @@ int main(int argc, const char* argv[]) {
 	if (trainctl) {
 		std::cout << std::endl << "start training..." << std::endl;
 		statistic* stats = shm::alloc<statistic>(thread);
-		for (thdid = thread - 1; thdid > 0 && fork() != 0; thdid--);
-		opts["thread-id"] = std::to_string(thdid);
+		for (thdid = thread - 1; std::stol(opts["thread-id"] = thdid) && fork() != 0; thdid--);
 		stats[thdid] = train(trainctl, opts);
 		if (thdid != 0) return 0;
 		while (wait(nullptr) > 0);
-		if (opts["options"].find("summary").find("train") != std::string::npos)
-			statistic::merge(stats, stats + thread).summary();
+		for (u32 i = 1; i < thread; i++)
+			stats[0] += stats[i];
+		if (opts["options"]["summary"].is("train"))
+			stats[0].summary();
 		shm::free(stats);
 	}
 
@@ -1980,13 +2021,14 @@ int main(int argc, const char* argv[]) {
 	if (testctl) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		statistic* stats = shm::alloc<statistic>(thread);
-		for (thdid = thread - 1; thdid > 0 && fork() != 0; thdid--);
-		opts["thread-id"] = std::to_string(thdid);
+		for (thdid = thread - 1; std::stol(opts["thread-id"] = thdid) && fork() != 0; thdid--);
 		stats[thdid] = test(testctl, opts);
 		if (thdid != 0) return 0;
 		while (wait(nullptr) > 0);
-		if (opts["options"].find("summary").find("test") != std::string::npos)
-			statistic::merge(stats, stats + thread).summary();
+		for (u32 i = 1; i < thread; i++)
+			stats[0] += stats[i];
+		if (opts["options"]["summary"].is("test"))
+			stats[0].summary();
 		shm::free(stats);
 	}
 
