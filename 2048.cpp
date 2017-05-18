@@ -46,13 +46,12 @@ namespace shm {
 typedef std::pair<int, void*> shm_t;
 std::vector<shm_t> info;
 std::string hook = "./2048";
-int mode = IPC_CREAT | IPC_EXCL;
 
 template<typename type>
 type* alloc(size_t size, byte seq = 0) {
 	if (++seq == 0) throw std::bad_alloc();
 	auto key = ftok(hook.c_str(), seq);
-	int id = shmget(key, size * sizeof(type), mode | 0600);
+	int id = shmget(key, size * sizeof(type), IPC_CREAT | IPC_EXCL | 0600);
 	void* shm = shmat(id, nullptr, 0);
 	if (shm == cast<void*>(-1ull)) {
 		if (errno & EEXIST) return alloc<type>(size, seq);
@@ -1974,7 +1973,6 @@ int main(int argc, const char* argv[]) {
 	if (opts("thread")) thread = std::max(std::stol(opts["thread"]), 1l);
 	if (!opts("thread")) opts["thread"] = std::to_string(thread);
 	if (!opts("options", "summary")) opts["options"]["summary"] = "test";
-	if (opts("shared-memory", "mode")) shm::mode = std::stol(opts["shared-memory"]["mode"]);
 	shm::hook = opts["shared-memory"].find("hook", argv[0]);
 
 	std::srand(seed);
