@@ -1554,7 +1554,7 @@ struct statistic {
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	statistic(const statistic& stat) = default;
 
-	void init(const control& ctrl = control()) {
+	void init(const control& ctrl = control(), utils::options opts = {}) {
 		limit = ctrl.loop * ctrl.unit;
 		loop = 1;
 		unit = ctrl.unit;
@@ -1570,12 +1570,12 @@ struct statistic {
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
-//		summaf = "%7llu %llums %.2fops";
+//		summaf = "summary %llums %.2fops";
 		u32 dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
 		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
-		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		summaf = "%0" + std::to_string(dec * 2 + 1) + "llu %llums %.2fops";
+		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%llums %.2fops";
 	}
 
 	u64 operator++(int) { return (++loop) - 1; }
@@ -1583,7 +1583,7 @@ struct statistic {
 	operator bool() const { return loop <= limit; }
 	bool checked() const { return (loop % unit) == 0; }
 
-	void update(const u32& score, const u32& hash, const u32& opers, const std::string& suffix = "") {
+	void update(const u32& score, const u32& hash, const u32& opers) {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
@@ -1611,7 +1611,7 @@ struct statistic {
 				limit / unit,
 				local.time,
 				local.opers * 1000.0 / local.time);
-		std::cout << buf << suffix << std::endl;
+		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / unit,
 				local.max,
@@ -1629,11 +1629,10 @@ struct statistic {
 		local.time = current_time;
 	}
 
-	void summary(const std::string& suffix = "") const {
-		std::cout << std::endl << "summary" << suffix << std::endl;
+	void summary() const {
+		std::cout << std::endl;
 		char buf[80];
 		snprintf(buf, sizeof(buf), summaf.c_str(),
-				limit / unit,
 				total.time,
 				total.opers * 1000.0 / total.time);
 		std::cout << buf << std::endl;
