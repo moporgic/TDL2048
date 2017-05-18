@@ -49,7 +49,7 @@ std::string hook = "./2048";
 int mode = IPC_CREAT | IPC_EXCL;
 
 template<typename type>
-type* alloc(size_t size, byte seq = 0) throw(std::bad_alloc) {
+type* alloc(size_t size, byte seq = 0) {
 	if (++seq == 0) throw std::bad_alloc();
 	auto key = ftok(hook.c_str(), seq);
 	int id = shmget(key, size * sizeof(type), mode | 0600);
