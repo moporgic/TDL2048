@@ -46,16 +46,17 @@ namespace shm {
 typedef std::pair<int, void*> shm_t;
 std::vector<shm_t> info;
 std::string hook = "./2048";
-int total = 0;
+int mode = IPC_CREAT | IPC_EXCL;
 
 template<typename type>
-type* alloc(size_t size) {
-	auto key = ftok(hook.c_str(), ++total);
-	int id = shmget(key, size * sizeof(type), IPC_CREAT | 0600);
+type* alloc(size_t size, byte seq = 0) throw(std::bad_alloc) {
+	if (++seq == 0) throw std::bad_alloc();
+	auto key = ftok(hook.c_str(), seq);
+	int id = shmget(key, size * sizeof(type), mode | 0600);
 	void* shm = shmat(id, nullptr, 0);
 	if (shm == cast<void*>(-1ull)) {
-		std::cerr << "shared memory allocation failed: " << size << std::endl;
-		std::exit(111);
+		if (errno & EEXIST) return alloc<type>(size, seq);
+		throw std::bad_alloc();
 	}
 	std::fill_n(cast<type*>(shm), size, type());
 	info.emplace_back(id, shm);
@@ -1844,7 +1845,8 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-shm"):
 		case to_hash("--shm"):
-			opts["shm-hook"] = find_opt(i, argv[0]);
+		case to_hash("--shared-memory"):
+			opts["shared-memory"] = find_opts(i, ' ');
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i] << std::endl;
@@ -1972,7 +1974,8 @@ int main(int argc, const char* argv[]) {
 	if (opts("thread")) thread = std::max(std::stol(opts["thread"]), 1l);
 	if (!opts("thread")) opts["thread"] = std::to_string(thread);
 	if (!opts("options", "summary")) opts["options"]["summary"] = "test";
-	shm::hook = opts.find("shm-hook", argv[0]);
+	if (opts("shared-memory", "mode")) shm::mode = std::stol(opts["shared-memory"]["mode"]);
+	shm::hook = opts["shared-memory"].find("hook", argv[0]);
 
 	std::srand(seed);
 	std::cout << "TDL2048+ LOG" << std::endl;
