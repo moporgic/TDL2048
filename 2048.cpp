@@ -1564,12 +1564,12 @@ struct statistic {
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
-//		summaf = "%7llu %llums %.2fops";
+//		summaf = "summary %llums %.2fops";
 		u32 dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
 		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
-		localf = "local:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		totalf = "total:" + std::string((dec << 1) - 4, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		summaf = "%0" + std::to_string(dec * 2 + 1) + "llu %llums %.2fops";
+		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
+		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%llums %.2fops";
 	}
 
 	u64 operator++(int) { return (++loop) - 1; }
@@ -1624,9 +1624,9 @@ struct statistic {
 	}
 
 	void summary() const {
+		std::cout << std::endl;
 		char buf[80];
 		snprintf(buf, sizeof(buf), summaf.c_str(),
-				limit / unit,
 				total.time,
 				total.opers * 1000.0 / total.time);
 		std::cout << buf << std::endl;
