@@ -1548,7 +1548,7 @@ struct statistic {
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	statistic(const statistic& stat) = default;
 
-	void init(const control& ctrl = control()) {
+	void init(const control& ctrl = control(), utils::options opts = {}) {
 		limit = ctrl.loop * ctrl.unit;
 		loop = 1;
 		unit = ctrl.unit;
@@ -1577,7 +1577,7 @@ struct statistic {
 	operator bool() const { return loop <= limit; }
 	bool checked() const { return (loop % unit) == 0; }
 
-	void update(const u32& score, const u32& hash, const u32& opers, const std::string& suffix = "") {
+	void update(const u32& score, const u32& hash, const u32& opers) {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
@@ -1605,7 +1605,7 @@ struct statistic {
 				limit / unit,
 				local.time,
 				local.opers * 1000.0 / local.time);
-		std::cout << buf << suffix << std::endl;
+		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / unit,
 				local.max,
@@ -1623,8 +1623,7 @@ struct statistic {
 		local.time = current_time;
 	}
 
-	void summary(const std::string& suffix = "") const {
-		std::cout << std::endl << "summary" << suffix << std::endl;
+	void summary() const {
 		char buf[80];
 		snprintf(buf, sizeof(buf), summaf.c_str(),
 				limit / unit,
