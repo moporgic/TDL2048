@@ -1554,28 +1554,34 @@ struct statistic {
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	statistic(const statistic& stat) = default;
 
-	void init(const control& ctrl = control(), utils::options opts = {}) {
+	void init(control ctrl = {}, utils::options opts = {}) {
+		u32 thdid = std::stol(opts.find("thread-id", "0"));
+		u32 thread = std::stol(opts.find("thread", "1"));
+		std::string suffix = (thread > 1) ? (" [" + std::to_string(thdid) + "]") : "";
+		ctrl.split(thdid, thread);
+
 		limit = ctrl.loop * ctrl.unit;
 		loop = 1;
 		unit = ctrl.unit;
 		winv = ctrl.winv;
-		format();
+		format(suffix);
 
 		every = {};
 		total = {};
 		local = {};
+		for (u32 i = 0; i <= thdid; i++) std::rand();
 		local.time = moporgic::millisec();
 	}
-	void format() {
+	void format(const std::string& suffix = "") {
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		summaf = "summary %llums %.2fops";
 		u32 dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
-		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
+		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops" + suffix;
 		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
 		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%llums %.2fops";
+		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%llums %.2fops" + suffix;
 	}
 
 	u64 operator++(int) { return (++loop) - 1; }
@@ -1807,12 +1813,6 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 statistic train(statistic::control trainctl, utils::options opts = {}) {
-	const u32 thdid = std::stol(opts.find("thread-id", "0"));
-	const u32 thread = std::stol(opts.find("thread", "1"));
-	std::string suffix = (thread > 1) ? (" [" + std::to_string(thdid) + "]") : "";
-	for (u32 i = 0; i <= thdid; i++) std::rand();
-	trainctl.split(thdid, thread);
-
 	board b;
 	state last;
 	select best;
@@ -1825,7 +1825,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 	switch (to_hash(opts["train-mode"])) {
 	case to_hash("backward"):
 	case to_hash("backward-best"):
-		for (stats.init(trainctl); stats; stats++) {
+		for (stats.init(trainctl, opts); stats; stats++) {
 
 			score = 0;
 			opers = 0;
@@ -1842,14 +1842,14 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 				v = path.back().update(v);
 			}
 
-			stats.update(score, b.hash(), opers, suffix);
+			stats.update(score, b.hash(), opers);
 		}
 		break;
 
 	default:
 	case to_hash("forward"):
 	case to_hash("forward-best"):
-		for (stats.init(trainctl); stats; stats++) {
+		for (stats.init(trainctl, opts); stats; stats++) {
 
 			score = 0;
 			opers = 0;
@@ -1871,7 +1871,7 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 			}
 			last += 0;
 
-			stats.update(score, b.hash(), opers, suffix);
+			stats.update(score, b.hash(), opers);
 		}
 		break;
 	}
@@ -1880,12 +1880,6 @@ statistic train(statistic::control trainctl, utils::options opts = {}) {
 }
 
 statistic test(statistic::control testctl, utils::options opts = {}) {
-	const u32 thdid = std::stol(opts.find("thread-id", "0"));
-	const u32 thread = std::stol(opts.find("thread", "1"));
-	std::string suffix = (thread > 1) ? (" [" + std::to_string(thdid) + "]") : "";
-	for (u32 i = 0; i <= thdid; i++) std::rand();
-	testctl.split(thdid, thread);
-
 	board b;
 	select best;
 	statistic stats;
@@ -1895,7 +1889,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 	switch (to_hash(opts["test-mode"])) {
 	default:
 	case to_hash("best"):
-		for (stats.init(testctl); stats; stats++) {
+		for (stats.init(testctl, opts); stats; stats++) {
 
 			score = 0;
 			opers = 0;
@@ -1906,7 +1900,7 @@ statistic test(statistic::control testctl, utils::options opts = {}) {
 				best >> b;
 			}
 
-			stats.update(score, b.hash(), opers, suffix);
+			stats.update(score, b.hash(), opers);
 		}
 		break;
 	}
