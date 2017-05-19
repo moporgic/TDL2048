@@ -379,6 +379,7 @@ public:
 		bool operator ==(const std::string& v) const { return value() == v; }
 		bool operator !=(const std::string& v) const { return value() != v; }
 		bool operator ()(const std::string& v) const { return value().find(v) != std::string::npos; }
+		static bool comp(std::string token, std::string label) { return opinion(token).label() == label; }
 	private:
 		std::string& token;
 	};
@@ -398,22 +399,16 @@ public:
 		bool operator !=(const std::string& v) const { return value() != v; }
 
 		bool operator ()(const std::string& ext) const {
-			return std::find_if(cbegin(), cend(),
-					[=](std::string token) { return opinion(token).label() == ext; }) != cend();
+			return std::find_if(cbegin(), cend(), std::bind(opinion::comp, std::placeholders::_1, ext)) != cend();
 		}
 
 		opinion operator [](const std::string& ext) {
-			auto pos = std::find_if(begin(), end(),
-					[=](std::string token) { return opinion(token).label() == ext; });
+			auto pos = std::find_if(begin(), end(), std::bind(opinion::comp, std::placeholders::_1, ext));
 			return (pos != end()) ? opinion(*pos) : operator +=(ext)[ext];
 		}
 
 		std::string find(const std::string& ext, const std::string& val = {}) const {
 			return operator() (ext) ? const_cast<option&>(*this)[ext] : val;
-		}
-
-		bool is(const std::string& val) const {
-			return value().find(val) != std::string::npos;
 		}
 	};
 
