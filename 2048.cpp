@@ -1626,6 +1626,9 @@ struct statistic {
 		}
 	}
 
+	statistic  operator + (const statistic& stat) const {
+		return statistic(*this) += stat;
+	}
 	statistic& operator +=(const statistic& stat) {
 		limit += stat.limit;
 		loop += stat.loop;
