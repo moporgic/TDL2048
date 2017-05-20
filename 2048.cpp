@@ -1922,9 +1922,8 @@ int main(int argc, const char* argv[]) {
 		u32 thdid = thread;
 		while (std::stol(opts["thread-id"] = std::to_string(--thdid)))
 			agents.push_back(std::async(std::launch::async, train, trainctl, opts));
-		statistic stat = train(trainctl, opts);
-		for (std::future<statistic>& agent : agents)
-			stat += agent.get();
+		statistic stat = std::accumulate(agents.begin(), agents.end(), train(trainctl, opts),
+				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
 		if (opts["options"]["summary"]("train"))
 			stat.summary();
 	}
@@ -1940,9 +1939,8 @@ int main(int argc, const char* argv[]) {
 		u32 thdid = thread;
 		while (std::stol(opts["thread-id"] = std::to_string(--thdid)))
 			agents.push_back(std::async(std::launch::async, test, testctl, opts));
-		statistic stat = test(testctl, opts);
-		for (std::future<statistic>& agent : agents)
-			stat += agent.get();
+		statistic stat = std::accumulate(agents.begin(), agents.end(), test(testctl, opts),
+				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
 		if (opts["options"]["summary"]("test"))
 			stat.summary();
 	}
