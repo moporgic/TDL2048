@@ -127,7 +127,8 @@ public:
 		return in;
 	}
 
-	static void save(std::ostream& out) {
+	static u32 save(std::ostream& out) {
+		u32 succ = 0;
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -138,12 +139,14 @@ public:
 		case 0:
 			write_cast<u32>(out, wghts().size());
 			for (weight w : wghts())
-				out << w;
+				out << w, succ++;
 			break;
 		}
 		out.flush();
+		return succ;
 	}
-	static void load(std::istream& in) {
+	static u32 load(std::istream& in) {
+		u32 succ = 0;
 		u32 code;
 		read_cast<u8>(in, code);
 		switch (code) {
@@ -153,11 +156,12 @@ public:
 			// no break
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
-				weight w; in >> w;
+				weight w; in >> w, succ++;
 				wghts().push_back(w);
 			}
 			break;
 		}
+		return succ;
 	}
 
 	static weight& make(const u32& sign, const size_t& size) {
@@ -292,28 +296,31 @@ public:
 		return in;
 	}
 
-	static void save(std::ostream& out) {
+	static u32 save(std::ostream& out) {
+		u32 succ = 0;
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
 		case 0:
 			write_cast<u32>(out, feats().size());
 			for (feature f : feature::list())
-				out << f;
+				out << f, succ++;
 			break;
 		default:
 			std::cerr << "unknown serial (" << code << ") at feature::save" << std::endl;
 			break;
 		}
 		out.flush();
+		return succ;
 	}
-	static void load(std::istream& in) {
-		u32 code;
+	static u32 load(std::istream& in) {
+		u32 succ = 0;
+		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
-				feature f; in >> f;
+				feature f; in >> f, succ++;
 				feats().push_back(f);
 			}
 			break;
@@ -321,6 +328,7 @@ public:
 			std::cerr << "unknown serial (" << code << ") at feature::load" << std::endl;
 			break;
 		}
+		return succ;
 	}
 
 	static feature& make(const u32& wgt, const u32& idx) {
@@ -720,7 +728,7 @@ u64 indexmax(const board& b) { // 16-bit
 	return k.mask(k.max());
 }
 
-u32 make_indexers(const std::string& res = "") {
+u32 make_indexers(std::string res = "") {
 	u32 succ = 0;
 	auto imake = [&](u32 sign, indexer::mapper func) {
 		if (indexer::find(sign) != indexer::end()) return;
@@ -1107,71 +1115,60 @@ u32 make_indexers(const std::string& res = "") {
 	return succ;
 }
 
-u32 save_weights(const std::string& res) {
-	u32 succ = 0;
-	std::string path(res);
-	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
-		std::ofstream out;
-		char buf[1 << 20];
-		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
-		out.open(path.substr(0, last), std::ios::out | std::ios::binary | std::ios::trunc);
-		if (!out.is_open()) continue;
-		weight::save(out);
-		out.flush();
-		out.close();
-		succ++;
-	}
+u32 save_weights(std::string path) {
+	std::ofstream out;
+	char buf[1 << 20];
+	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out.is_open()) return 0;
+	u32 succ = weight::save(out);
+	out.flush();
+	out.close();
 	return succ;
 }
-u32 load_weights(const std::string& res) {
-	u32 succ = 0;
-	std::string path(res);
-	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
-		std::ifstream in;
-		char buf[1 << 20];
-		in.rdbuf()->pubsetbuf(buf, sizeof(buf));
-		in.open(path.substr(0, last), std::ios::in | std::ios::binary);
-		if (!in.is_open()) continue;
-		weight::load(in);
-		in.close();
-		succ++;
-	}
+u32 load_weights(std::string path) {
+	std::ifstream in;
+	char buf[1 << 20];
+	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	in.open(path, std::ios::in | std::ios::binary);
+	if (!in.is_open()) return 0;
+	u32 succ = weight::load(in);
+	in.close();
 	return succ;
 }
-u32 make_weights(const std::string& res = "") {
+u32 make_weights(std::string res = "") {
 	u32 succ = 0;
 	auto wmake = [&](u32 sign, u64 size) {
 		if (weight::find(sign) != weight::end()) return;
 		weight::make(sign, size); succ++;
 	};
 
-	// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit
-	std::string in(res);
-	if (in.empty() && weight::list().empty())
-		in = "default";
-	std::map<std::string, std::string> predefined;
-	predefined["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt ";
-	predefined["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt ";
-	predefined["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt ";
-	predefined["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:? ";
-	predefined["monotonic"] = "fd012301:^24 fd456701:^24 ";
-	predefined["default"] = predefined["khyeh"] + predefined["monotonic"] + "fe000005:^24 fe000015:^24 ";
-	predefined["4x6patt"] = predefined["khyeh"];
-	predefined["5x6patt"] = predefined["patt/42-33"];
-	predefined["8x6patt"] = predefined["k.matsuzaki"];
-	predefined["5x4patt"] = predefined["patt/4-22"];
-	for (auto predef : predefined) {
-		if (in.find(predef.first) != std::string::npos) { // insert predefined weights
-			in.insert(in.find(predef.first), predef.second);
-			in.replace(in.find(predef.first), predef.first.size(), "");
-		}
-	}
+	std::map<std::string, std::string> alias;
+	alias["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt ";
+	alias["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt ";
+	alias["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt ";
+	alias["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:? ";
+	alias["monotonic"] = "fd012301:^24 fd456701:^24 ";
+	alias["default"] = alias["khyeh"] + alias["monotonic"] + "fe000005:^24 fe000015:^24 ";
+	alias["4x6patt"] = alias["khyeh"];
+	alias["5x6patt"] = alias["patt/42-33"];
+	alias["8x6patt"] = alias["k.matsuzaki"];
+	alias["5x4patt"] = alias["patt/4-22"];
 
-	while (in.find_first_of(":|()[],") != std::string::npos)
-		in[in.find_first_of(":|()[],")] = ' ';
-	std::stringstream wghtin(in);
+	// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit
+	if (res.empty() && weight::list().empty())
+		res = { "default" };
+	for (auto predef : alias)
+		if (res.find(predef.first) != std::string::npos) { // insert predefined weights
+			res.insert(res.find(predef.first), predef.second);
+			res.replace(res.find(predef.first), predef.first.size(), "");
+		}
+	while (res.find_first_of(":|()[],") != std::string::npos)
+		res[res.find_first_of(":|()[],")] = ' ';
+
+	std::stringstream in(res);
 	std::string signs, sizes;
-	while (wghtin >> signs && wghtin >> sizes) {
+	while (in >> signs && in >> sizes) {
 		u32 sign = 0; u64 size = 0;
 		std::stringstream(signs) >> std::hex >> sign;
 		if (sizes == "patt" || sizes == "?") {
@@ -1186,72 +1183,61 @@ u32 make_weights(const std::string& res = "") {
 	return succ;
 }
 
-u32 save_features(const std::string& res) {
-	u32 succ = 0;
-	std::string path(res);
-	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
-		std::ofstream out;
-		out.open(path.substr(0, last), std::ios::out | std::ios::binary | std::ios::trunc);
-		if (!out.is_open()) continue;
-		feature::save(out);
-		out.flush();
-		out.close();
-		succ++;
-	}
+u32 save_features(std::string path) {
+	std::ofstream out;
+	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out.is_open()) return 0;
+	u32 succ = feature::save(out);
+	out.flush();
+	out.close();
 	return succ;
 }
-u32 load_features(const std::string& res) {
-	u32 succ = 0;
-	std::string path(res);
-	for (auto last = path.find('|'); (last = path.find('|')) != std::string::npos; path = path.substr(last + 1)) {
-		std::ifstream in;
-		in.open(path.substr(0, last), std::ios::in | std::ios::binary);
-		if (!in.is_open()) continue;
-		feature::load(in);
-		in.close();
-		succ++;
-	}
+u32 load_features(std::string path) {
+	std::ifstream in;
+	in.open(path, std::ios::in | std::ios::binary);
+	if (!in.is_open()) return 0;
+	u32 succ = feature::load(in);
+	in.close();
 	return succ;
 }
-u32 make_features(const std::string& res = "") {
+u32 make_features(std::string res = "") {
 	u32 succ = 0;
 	auto fmake = [&](u32 wght, u32 idxr) {
 		if (feature::find(wght, idxr) != feature::end()) return;
 		feature::make(wght, idxr); succ++;
 	};
 
-	// weight:indexer weight(indexer) weight[indexer]
-	std::string in(res);
-	if (in.empty() && feature::list().empty())
-		in = "default";
-	std::map<std::string, std::string> predefined;
-	predefined["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] ";
-	predefined["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!] ";
-	predefined["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!] ";
-	predefined["monotonic"] = "fd012301[fd012301] fd012301[fd37bf01] fd012301[fdfedc01] fd012301[fdc84001] "
-							  "fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01] "
-							  "fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101] "
-							  "fd456701[fd765401] fd456701[fdea6201] fd456701[fd89ab01] fd456701[fd159d01] ";
-	predefined["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
-								"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
-	predefined["default"] = predefined["khyeh"] + predefined["monotonic"] + "fe000005[fe000005] fe000015[fe000015] ";
-	predefined["4x6patt"] = predefined["khyeh"];
-	predefined["5x6patt"] = predefined["patt/42-33"];
-	predefined["8x6patt"] = predefined["k.matsuzaki"];
-	predefined["5x4patt"] = predefined["patt/4-22"];
-	predefined["mono"] = predefined["monotonic"];
-	for (auto predef : predefined) {
-		if (in.find(predef.first) != std::string::npos) { // insert predefined features
-			in.insert(in.find(predef.first), predef.second);
-			in.replace(in.find(predef.first), predef.first.size(), "");
-		}
-	}
+	std::map<std::string, std::string> alias;
+	alias["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] ";
+	alias["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!] ";
+	alias["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!] ";
+	alias["monotonic"] = "fd012301[fd012301] fd012301[fd37bf01] fd012301[fdfedc01] fd012301[fdc84001] "
+	                     "fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01] "
+	                     "fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101] "
+	                     "fd456701[fd765401] fd456701[fdea6201] fd456701[fd89ab01] fd456701[fd159d01] ";
+	alias["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
+	                       "01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
+	alias["default"] = alias["khyeh"] + alias["monotonic"] + "fe000005[fe000005] fe000015[fe000015] ";
+	alias["4x6patt"] = alias["khyeh"];
+	alias["5x6patt"] = alias["patt/42-33"];
+	alias["8x6patt"] = alias["k.matsuzaki"];
+	alias["5x4patt"] = alias["patt/4-22"];
+	alias["mono"] = alias["monotonic"];
 
-	while (in.find_first_of(":|()[],") != std::string::npos)
-		in[in.find_first_of(":|()[],")] = ' ';
-	std::stringstream featin(in);
+	// weight:indexer weight(indexer) weight[indexer]
+	if (res.empty() && feature::list().empty())
+		res = { "default" };
+	for (auto predef : alias)
+		if (res.find(predef.first) != std::string::npos) { // insert predefined features
+			res.insert(res.find(predef.first), predef.second);
+			res.replace(res.find(predef.first), predef.first.size(), "");
+		}
+	while (res.find_first_of(":|()[],") != std::string::npos)
+		res[res.find_first_of(":|()[],")] = ' ';
+
+	std::stringstream in(res);
 	std::string wghts, idxrs;
-	while (featin >> wghts && featin >> idxrs) {
+	while (in >> wghts && in >> idxrs) {
 		u32 wght = 0, idxr = 0;
 
 		std::stringstream(wghts) >> std::hex >> wght;
@@ -1263,9 +1249,7 @@ u32 make_features(const std::string& res = "") {
 
 		std::vector<int> isomorphic = { 0 };
 		for (; !std::isxdigit(idxrs.back()); idxrs.pop_back()) {
-			switch (idxrs.back()) {
-			case '!': isomorphic = { 0, 1, 2, 3, 4, 5, 6, 7 }; break;
-			}
+			if (idxrs.back() == '!') isomorphic = { 0, 1, 2, 3, 4, 5, 6, 7 };
 		}
 		for (int iso : isomorphic) {
 			auto xpatt = utils::hashpatt(idxrs);
@@ -1617,7 +1601,7 @@ struct statistic {
 				total.win * 100.0 / limit);
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
-								   "tile", "count", "score", "move", "rate", "win");
+		                           "tile", "count", "score", "move", "rate", "win");
 		std::cout << buf << std::endl;
 		const auto& count = every.count;
 		const auto& score = every.score;
