@@ -12,6 +12,7 @@
 #include "type.h"
 #include <math.h>
 #include <cmath>
+#include <numeric>
 
 #ifndef DEBUG
 #define constexpr constexpr
@@ -350,6 +351,32 @@ N pow_tail(N v, N b, P p) noexcept { return p ? pow_tail(v * b, b, p - 1) : v; }
  */
 template<typename N, typename P> constexpr inline
 N pow(N b, P p) noexcept { return pow_tail(1, b, p); }
+
+/**
+ * main
+ */
+template<typename numeric, typename iter> constexpr inline
+numeric mean(iter first, iter last, numeric init = 0) noexcept {
+	return std::accumulate(first, last, 0) / numeric(last - first);
+}
+
+/**
+ * standard deviation
+ */
+template<typename numeric, typename iter> constexpr inline
+numeric deviation(iter first, iter last, numeric mean) noexcept {
+	numeric sumofsqr = 0;
+	for (iter it = first; it != last; it++) sumofsqr += std::pow(*it - mean, 2);
+	return std::sqrt(sumofsqr / (last - first));
+}
+
+/**
+ * standard deviation
+ */
+template<typename numeric, typename iter> constexpr inline
+numeric deviation(iter first, iter last) noexcept {
+	return deviation<numeric>(first, last, mean<numeric>(first, last));
+}
 
 #undef constexpr
 } /* math */
