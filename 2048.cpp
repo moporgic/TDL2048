@@ -1220,11 +1220,11 @@ u32 make_features(std::vector<std::string> res = {}) {
 	alias["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!] ";
 	alias["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!] ";
 	alias["monotonic"] = "fd012301[fd012301] fd012301[fd37bf01] fd012301[fdfedc01] fd012301[fdc84001] "
-						"fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01] "
-						"fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101] "
-						"fd456701[fd765401] fd456701[fdea6201] fd456701[fd89ab01] fd456701[fd159d01] ";
+	                     "fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01] "
+	                     "fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101] "
+	                     "fd456701[fd765401] fd456701[fdea6201] fd456701[fd89ab01] fd456701[fd159d01] ";
 	alias["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
-						"01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
+	                       "01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
 	alias["default"] = alias["khyeh"] + alias["monotonic"] + "fe000005[fe000005] fe000015[fe000015] ";
 	alias["4x6patt"] = alias["khyeh"];
 	alias["5x6patt"] = alias["patt/42-33"];
@@ -1609,7 +1609,7 @@ struct statistic {
 				total.win * 100.0 / limit);
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
-								   "tile", "count", "score", "move", "rate", "win");
+		                           "tile", "count", "score", "move", "rate", "win");
 		std::cout << buf << std::endl;
 		const auto& count = every.count;
 		const auto& score = every.score;
