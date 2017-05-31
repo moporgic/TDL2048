@@ -194,7 +194,6 @@ private:
 		delete[] v;
 	}
 
-
 	u32 id;
 	size_t length;
 	numeric* value;
@@ -1464,26 +1463,13 @@ struct statistic {
 	class format_t : public std::array<char, 64> {
 	public:
 		inline void operator =(const std::string& s) { std::copy_n(s.begin(), s.size() + 1, begin()); }
-		inline const char* c_str() const { return &(operator[](0)); }
+		inline operator const char*() const { return &(operator[](0)); }
 	};
 
 	format_t indexf;
 	format_t localf;
 	format_t totalf;
 	format_t summaf;
-
-//	struct control {
-//		u64 loop;
-//		u64 unit;
-//		u32 winv;
-//		control(u64 loop = 1000, u64 unit = 1000, u32 winv = 2048) : loop(loop), unit(unit), winv(winv) {}
-//		control(utils::options::option& opt) {
-//			loop = std::stol(opt.find("loop", "1000"));
-//			unit = std::stol(opt.find("unit", "1000"));
-//			winv = std::stol(opt.find("win", "2048"));
-//		}
-//		operator bool() const { return loop; }
-//	};
 
 	struct record {
 		u64 score;
@@ -1588,19 +1574,19 @@ struct statistic {
 
 		std::cout << std::endl;
 		char buf[64];
-		snprintf(buf, sizeof(buf), indexf.c_str(), // "%03llu/%03llu %llums %.2fops",
+		snprintf(buf, sizeof(buf), indexf, // "%03llu/%03llu %llums %.2fops",
 				loop / unit,
 				limit / unit,
 				local.time,
 				local.opers * 1000.0 / local.time);
 		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), localf.c_str(), // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
+		snprintf(buf, sizeof(buf), localf, // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / unit,
 				local.max,
 				math::msb32(local.hash),
 				local.win * 100.0 / unit);
 		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), totalf.c_str(), // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
+		snprintf(buf, sizeof(buf), totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / loop,
 				total.max,
 				math::msb32(total.hash),
@@ -1614,11 +1600,11 @@ struct statistic {
 	void summary() const {
 		std::cout << std::endl;
 		char buf[80];
-		snprintf(buf, sizeof(buf), summaf.c_str(),
+		snprintf(buf, sizeof(buf), summaf,
 				total.time,
 				total.opers * 1000.0 / total.time);
 		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), totalf.c_str(), // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
+		snprintf(buf, sizeof(buf), totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / limit,
 				total.max,
 				math::msb32(total.hash),
@@ -1927,7 +1913,6 @@ int main(int argc, const char* argv[]) {
 	}
 
 	std::cout << std::endl;
-
 	return 0;
 }
 
