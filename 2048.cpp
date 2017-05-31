@@ -125,7 +125,8 @@ public:
 		return in;
 	}
 
-	static void save(std::ostream& out) {
+	static u32 save(std::ostream& out) {
+		u32 succ = 0;
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -136,12 +137,14 @@ public:
 		case 0:
 			write_cast<u32>(out, wghts().size());
 			for (weight w : wghts())
-				out << w;
+				out << w, succ++;
 			break;
 		}
 		out.flush();
+		return succ;
 	}
-	static void load(std::istream& in) {
+	static u32 load(std::istream& in) {
+		u32 succ = 0;
 		u32 code;
 		read_cast<u8>(in, code);
 		switch (code) {
@@ -151,11 +154,12 @@ public:
 			// no break
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
-				weight w; in >> w;
+				weight w; in >> w, succ++;
 				wghts().push_back(w);
 			}
 			break;
 		}
+		return succ;
 	}
 
 	static weight& make(const u32& sign, const size_t& size) {
@@ -290,28 +294,31 @@ public:
 		return in;
 	}
 
-	static void save(std::ostream& out) {
+	static u32 save(std::ostream& out) {
+		u32 succ = 0;
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
 		case 0:
 			write_cast<u32>(out, feats().size());
 			for (feature f : feature::list())
-				out << f;
+				out << f, succ++;
 			break;
 		default:
 			std::cerr << "unknown serial (" << code << ") at feature::save" << std::endl;
 			break;
 		}
 		out.flush();
+		return succ;
 	}
-	static void load(std::istream& in) {
-		u32 code;
+	static u32 load(std::istream& in) {
+		u32 succ = 0;
+		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
-				feature f; in >> f;
+				feature f; in >> f, succ++;
 				feats().push_back(f);
 			}
 			break;
@@ -319,6 +326,7 @@ public:
 			std::cerr << "unknown serial (" << code << ") at feature::load" << std::endl;
 			break;
 		}
+		return succ;
 	}
 
 	static feature& make(const u32& wgt, const u32& idx) {
@@ -718,7 +726,7 @@ u64 indexmax(const board& b) { // 16-bit
 	return k.mask(k.max());
 }
 
-u32 make_indexers(std::vector<std::string> res = {}) {
+u32 make_indexers(std::string res = "") {
 	u32 succ = 0;
 	auto imake = [&](u32 sign, indexer::mapper func) {
 		if (indexer::find(sign) != indexer::end()) return;
@@ -1105,36 +1113,28 @@ u32 make_indexers(std::vector<std::string> res = {}) {
 	return succ;
 }
 
-u32 save_weights(std::vector<std::string> res = {}) {
-	u32 succ = 0;
-	for (std::string path : res) {
-		std::ofstream out;
-		char buf[1 << 20];
-		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
-		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-		if (!out.is_open()) continue;
-		weight::save(out);
-		out.flush();
-		out.close();
-		succ++;
-	}
+u32 save_weights(std::string path) {
+	std::ofstream out;
+	char buf[1 << 20];
+	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out.is_open()) return 0;
+	u32 succ = weight::save(out);
+	out.flush();
+	out.close();
 	return succ;
 }
-u32 load_weights(std::vector<std::string> res = {}) {
-	u32 succ = 0;
-	for (std::string path : res) {
-		std::ifstream in;
-		char buf[1 << 20];
-		in.rdbuf()->pubsetbuf(buf, sizeof(buf));
-		in.open(path, std::ios::in | std::ios::binary);
-		if (!in.is_open()) continue;
-		weight::load(in);
-		in.close();
-		succ++;
-	}
+u32 load_weights(std::string path) {
+	std::ifstream in;
+	char buf[1 << 20];
+	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	in.open(path, std::ios::in | std::ios::binary);
+	if (!in.is_open()) return 0;
+	u32 succ = weight::load(in);
+	in.close();
 	return succ;
 }
-u32 make_weights(std::vector<std::string> res = {}) {
+u32 make_weights(std::string res = "") {
 	u32 succ = 0;
 	auto wmake = [&](u32 sign, u64 size) {
 		if (weight::find(sign) != weight::end()) return;
@@ -1156,59 +1156,49 @@ u32 make_weights(std::vector<std::string> res = {}) {
 	// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit
 	if (res.empty() && weight::list().empty())
 		res = { "default" };
-	for (std::string& in : res) {
-		for (auto predef : alias)
-			if (in.find(predef.first) != std::string::npos) { // insert predefined weights
-				in.insert(in.find(predef.first), predef.second);
-				in.replace(in.find(predef.first), predef.first.size(), "");
-			}
-		while (in.find_first_of(":|()[],") != std::string::npos)
-			in[in.find_first_of(":|()[],")] = ' ';
-
-		std::stringstream wghtin(in);
-		std::string signs, sizes;
-		while (wghtin >> signs && wghtin >> sizes) {
-			u32 sign = 0; u64 size = 0;
-			std::stringstream(signs) >> std::hex >> sign;
-			if (sizes == "patt" || sizes == "?") {
-				size = std::pow(16ull, signs.size());
-			} else if (sizes.front() == '^') {
-				size = std::pow(2ull, std::stol(sizes.substr(1)));
-			} else {
-				std::stringstream(sizes) >> std::dec >> size;
-			}
-			wmake(sign, size);
+	for (auto predef : alias)
+		if (res.find(predef.first) != std::string::npos) { // insert predefined weights
+			res.insert(res.find(predef.first), predef.second);
+			res.replace(res.find(predef.first), predef.first.size(), "");
 		}
+	while (res.find_first_of(":|()[],") != std::string::npos)
+		res[res.find_first_of(":|()[],")] = ' ';
+
+	std::stringstream in(res);
+	std::string signs, sizes;
+	while (in >> signs && in >> sizes) {
+		u32 sign = 0; u64 size = 0;
+		std::stringstream(signs) >> std::hex >> sign;
+		if (sizes == "patt" || sizes == "?") {
+			size = std::pow(16ull, signs.size());
+		} else if (sizes.front() == '^') {
+			size = std::pow(2ull, std::stol(sizes.substr(1)));
+		} else {
+			std::stringstream(sizes) >> std::dec >> size;
+		}
+		wmake(sign, size);
 	}
 	return succ;
 }
 
-u32 save_features(std::vector<std::string> res = {}) {
-	u32 succ = 0;
-	for (std::string path : res) {
-		std::ofstream out;
-		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-		if (!out.is_open()) continue;
-		feature::save(out);
-		out.flush();
-		out.close();
-		succ++;
-	}
+u32 save_features(std::string path) {
+	std::ofstream out;
+	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out.is_open()) return 0;
+	u32 succ = feature::save(out);
+	out.flush();
+	out.close();
 	return succ;
 }
-u32 load_features(std::vector<std::string> res = {}) {
-	u32 succ = 0;
-	for (std::string path : res) {
-		std::ifstream in;
-		in.open(path, std::ios::in | std::ios::binary);
-		if (!in.is_open()) continue;
-		feature::load(in);
-		in.close();
-		succ++;
-	}
+u32 load_features(std::string path) {
+	std::ifstream in;
+	in.open(path, std::ios::in | std::ios::binary);
+	if (!in.is_open()) return 0;
+	u32 succ = feature::load(in);
+	in.close();
 	return succ;
 }
-u32 make_features(std::vector<std::string> res = {}) {
+u32 make_features(std::string res = "") {
 	u32 succ = 0;
 	auto fmake = [&](u32 wght, u32 idxr) {
 		if (feature::find(wght, idxr) != feature::end()) return;
@@ -1235,48 +1225,44 @@ u32 make_features(std::vector<std::string> res = {}) {
 	// weight:indexer weight(indexer) weight[indexer]
 	if (res.empty() && feature::list().empty())
 		res = { "default" };
-	for (std::string& in : res) {
-		for (auto predef : alias)
-			if (in.find(predef.first) != std::string::npos) { // insert predefined features
-				in.insert(in.find(predef.first), predef.second);
-				in.replace(in.find(predef.first), predef.first.size(), "");
-			}
-		while (in.find_first_of(":|()[],") != std::string::npos)
-			in[in.find_first_of(":|()[],")] = ' ';
+	for (auto predef : alias)
+		if (res.find(predef.first) != std::string::npos) { // insert predefined features
+			res.insert(res.find(predef.first), predef.second);
+			res.replace(res.find(predef.first), predef.first.size(), "");
+		}
+	while (res.find_first_of(":|()[],") != std::string::npos)
+		res[res.find_first_of(":|()[],")] = ' ';
 
-		std::stringstream featin(in);
-		std::string wghts, idxrs;
-		while (featin >> wghts && featin >> idxrs) {
-			u32 wght = 0, idxr = 0;
+	std::stringstream in(res);
+	std::string wghts, idxrs;
+	while (in >> wghts && in >> idxrs) {
+		u32 wght = 0, idxr = 0;
 
-			std::stringstream(wghts) >> std::hex >> wght;
-			if (weight::find(wght) == weight::end()) {
-				std::cerr << "unknown weight (" << wghts << ") at make_features, ";
+		std::stringstream(wghts) >> std::hex >> wght;
+		if (weight::find(wght) == weight::end()) {
+			std::cerr << "unknown weight (" << wghts << ") at make_features, ";
+			std::cerr << "assume as pattern descriptor..." << std::endl;
+			weight::make(wght, std::pow(16ull, wghts.size()));
+		}
+
+		std::vector<int> isomorphic = { 0 };
+		for (; !std::isxdigit(idxrs.back()); idxrs.pop_back()) {
+			if (idxrs.back() == '!') isomorphic = { 0, 1, 2, 3, 4, 5, 6, 7 };
+		}
+		for (int iso : isomorphic) {
+			auto xpatt = utils::hashpatt(idxrs);
+			board x(0xfedcba9876543210ull);
+			x.isomorphic(-iso);
+			for (size_t i = 0; i < xpatt.size(); i++)
+				xpatt[i] = x[xpatt[i]];
+			idxr = utils::hashpatt(xpatt);
+			if (indexer::find(idxr) == indexer::end()) {
+				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
 				std::cerr << "assume as pattern descriptor..." << std::endl;
-				weight::make(wght, std::pow(16ull, wghts.size()));
+				auto patt = new std::vector<int>(xpatt); // will NOT be deleted
+				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
 			}
-
-			std::vector<int> isomorphic = { 0 };
-			for (; !std::isxdigit(idxrs.back()); idxrs.pop_back()) {
-				switch (idxrs.back()) {
-				case '!': isomorphic = { 0, 1, 2, 3, 4, 5, 6, 7 }; break;
-				}
-			}
-			for (int iso : isomorphic) {
-				auto xpatt = utils::hashpatt(idxrs);
-				board x(0xfedcba9876543210ull);
-				x.isomorphic(-iso);
-				for (size_t i = 0; i < xpatt.size(); i++)
-					xpatt[i] = x[xpatt[i]];
-				idxr = utils::hashpatt(xpatt);
-				if (indexer::find(idxr) == indexer::end()) {
-					std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
-					std::cerr << "assume as pattern descriptor..." << std::endl;
-					auto patt = new std::vector<int>(xpatt); // will NOT be deleted
-					indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
-				}
-				fmake(wght, idxr);
-			}
+			fmake(wght, idxr);
 		}
 	}
 	return succ;
