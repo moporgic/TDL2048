@@ -1969,7 +1969,7 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["train"])) {
 		std::cout << std::endl << "start training..." << std::endl;
 		statistic stat = train(opts);
-		if (opts["train"]["statistic"]("summary"))
+		if (opts["train"]["info"]("summary"))
 			stat.summary();
 	}
 
