@@ -1746,47 +1746,54 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
-			opts["weight-input"] = opts["weight-output"] = find_opts(i);
+			opts["temporary"] = find_opts(i);
+			opts["weight-input"] += opts["temporary"];
+			opts["weight-output"] += opts["temporary"];
 			break;
 		case to_hash("-wi"):
 		case to_hash("--weight-input"):
-			opts["weight-input"] = find_opts(i);
+			opts["weight-input"] += find_opts(i);
 			break;
 		case to_hash("-wo"):
 		case to_hash("--weight-output"):
-			opts["weight-output"] = find_opts(i);
+			opts["weight-output"] += find_opts(i);
 			break;
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			opts["feature-input"] = opts["feature-output"] = find_opts(i);
+			opts["temporary"] = find_opts(i);
+			opts["feature-input"] += opts["temporary"];
+			opts["feature-output"] += opts["temporary"];
 			break;
 		case to_hash("-fi"):
 		case to_hash("--feature-input"):
-			opts["feature-input"] = find_opts(i);
+			opts["feature-input"] += find_opts(i);
 			break;
 		case to_hash("-fo"):
 		case to_hash("--feature-output"):
-			opts["feature-output"] = find_opts(i);
+			opts["feature-output"] += find_opts(i);
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
 		case to_hash("--weight-value"):
-			opts["weight-value"] = find_opts(i);
+			opts["weight-value"] += find_opts(i);
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
 		case to_hash("--feature-value"):
-			opts["feature-value"] = find_opts(i);
+			opts["feature-value"] += find_opts(i);
 			break;
 		case to_hash("-wf"):
 		case to_hash("-fw"):
-			opts["feature-value"] = opts["weight-value"] = find_opts(i);
+			opts["temporary"] = find_opts(i);
+			opts["feature-value"] += opts["temporary"];
+			opts["weight-value"] += opts["temporary"];
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 		case to_hash("--extra"):
-			opts["options"] = find_opts(i);
+			opts["temporary"] = find_opts(i);
+			opts["options"] += opts["temporary"];
 			break;
 		case to_hash("-tt"):
 		case to_hash("-tm"):
@@ -1934,7 +1941,7 @@ int main(int argc, const char* argv[]) {
 	if (!opts("test")) opts["test"] = 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.0025;
 	if (!opts("seed")) opts["seed"] = rdtsc();
-	if (!opts("options", "summary")) opts["options"]["summary"] = "test";
+	if (!opts("test", "info")) opts["test"]["info"] = "summary";
 
 	std::cout << "TDL2048+ LOG" << std::endl;
 	std::cout << "develop-coherence" << " build C++" << __cplusplus;
@@ -1962,7 +1969,7 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["train"])) {
 		std::cout << std::endl << "start training..." << std::endl;
 		statistic stat = train(opts);
-		if (opts["options"]["summary"]("train"))
+		if (opts["train"]["statistic"]("summary"))
 			stat.summary();
 	}
 
@@ -1972,7 +1979,7 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["test"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		statistic stat = test(opts);
-		if (opts["options"]["summary"]("test"))
+		if (opts["test"]["info"]("summary"))
 			stat.summary();
 	}
 
