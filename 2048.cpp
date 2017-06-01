@@ -1854,7 +1854,7 @@ int main(int argc, const char* argv[]) {
 	if (!opts("test")) opts["test"] = 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.0025;
 	if (!opts("seed")) opts["seed"] = rdtsc();
-	if (!opts("options", "summary")) opts["options"]["summary"] = "test";
+	if (!opts("test", "info")) opts["test"]["info"] = "summary";
 
 	std::cout << "TDL2048+ LOG" << std::endl;
 	std::cout << "develop" << " build C++" << __cplusplus;
@@ -1882,7 +1882,7 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["train"])) {
 		std::cout << std::endl << "start training..." << std::endl;
 		statistic stat = train(opts);
-		if (opts["options"]["summary"]("train"))
+		if (opts["train"]["statistic"]("summary"))
 			stat.summary();
 	}
 
@@ -1892,7 +1892,7 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["test"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		statistic stat = test(opts);
-		if (opts["options"]["summary"]("test"))
+		if (opts["test"]["info"]("summary"))
 			stat.summary();
 	}
 
