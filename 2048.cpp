@@ -1907,7 +1907,7 @@ int main(int argc, const char* argv[]) {
 			agents.push_back(std::async(std::launch::async, train, opts));
 		statistic stat = std::accumulate(agents.begin(), agents.end(), train(opts),
 				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
-		if (opts["train"]["statistic"]("summary"))
+		if (opts["train"]["info"]("summary"))
 			stat.summary();
 	}
 
