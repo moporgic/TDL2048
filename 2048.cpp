@@ -1175,8 +1175,8 @@ u32 make_weights(std::string res = "") {
 	std::stringstream split(res);
 	std::string token;
 	while (split >> token) {
-		while (token.find_first_of(":|()[],") != std::string::npos)
-			token[token.find_first_of(":|()[],")] = ' ';
+		while (token.find_first_of(":()[],") != std::string::npos)
+			token[token.find_first_of(":()[],")] = ' ';
 		std::stringstream info(token);
 
 		std::string signs;
@@ -1267,8 +1267,8 @@ u32 make_features(std::string res = "") {
 	std::stringstream split(res);
 	std::string token;
 	while (split >> token) {
-		while (token.find_first_of(":|()[],") != std::string::npos)
-			token[token.find_first_of(":|()[],")] = ' ';
+		while (token.find_first_of(":()[],") != std::string::npos)
+			token[token.find_first_of(":()[],")] = ' ';
 		std::stringstream info(token);
 
 		std::string wghts, idxrs;
