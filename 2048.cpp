@@ -182,11 +182,6 @@ public:
 		if (it->value) free(it->value);
 		return wghts().erase(it);
 	}
-	static inline std::vector<weight> erase(const iter& first, const iter& last) {
-		std::vector<weight> ws(first, last);
-		wghts().erase(first, last);
-		return ws;
-	}
 private:
 	weight(const u32& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
@@ -235,11 +230,6 @@ public:
 		throw std::out_of_range("indexer::at");
 	}
 	static inline iter erase(const iter& it) { return idxrs().erase(it); }
-	static inline std::vector<indexer> erase(const iter& first, const iter& last) {
-		std::vector<indexer> idx(first, last);
-		idxrs().erase(first, last);
-		return idx;
-	}
 private:
 	indexer(const u32& sign, mapper map) : id(sign), map(map) {}
 	static inline std::vector<indexer>& idxrs() { static std::vector<indexer> i; return i; }
@@ -353,11 +343,6 @@ public:
 		throw std::out_of_range("feature::at");
 	}
 	static inline iter erase(const iter& it) { return feats().erase(it); }
-	static inline std::vector<feature> erase(const iter& first, const iter& last) {
-		std::vector<feature> ft(first, last);
-		feats().erase(first, last);
-		return ft;
-	}
 
 	struct clip {
 		feature::iter first;
