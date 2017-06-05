@@ -1151,10 +1151,10 @@ u32 make_weights(std::string res = "") {
 	};
 
 	std::map<std::string, std::string> alias;
-	alias["khyeh"] = "012345:patt 456789:patt 012456:patt 45689a:patt ";
-	alias["patt/42-33"] = "012345:patt 456789:patt 89abcd:patt 012456:patt 45689a:patt ";
-	alias["patt/4-22"] = "0123:patt 4567:patt 0145:patt 1256:patt 569a:patt ";
-	alias["k.matsuzaki"] = "012456:? 12569d:? 012345:? 01567a:? 01259a:? 0159de:? 01589d:? 01246a:? ";
+	alias["khyeh"] = "012345 456789 012456 45689a ";
+	alias["patt/42-33"] = "012345 456789 89abcd 012456 45689a ";
+	alias["patt/4-22"] = "0123 4567 0145 1256 569a ";
+	alias["k.matsuzaki"] = "012456 12569d 012345 01567a 01259a 0159de 01589d 01246a ";
 	alias["monotonic"] = "fd012301:^24 fd456701:^24 ";
 	alias["default"] = alias["khyeh"] + alias["monotonic"] + "fe000005:^24 fe000015:^24 ";
 	alias["4x6patt"] = alias["khyeh"];
@@ -1162,7 +1162,6 @@ u32 make_weights(std::string res = "") {
 	alias["8x6patt"] = alias["k.matsuzaki"];
 	alias["5x4patt"] = alias["patt/4-22"];
 
-	// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit
 	if (res.empty() && weight::list().empty())
 		res = { "default" };
 	for (auto predef : alias)
@@ -1170,22 +1169,45 @@ u32 make_weights(std::string res = "") {
 			res.insert(res.find(predef.first), predef.second);
 			res.replace(res.find(predef.first), predef.first.size(), "");
 		}
-	while (res.find_first_of(":|()[],") != std::string::npos)
-		res[res.find_first_of(":|()[],")] = ' ';
 
-	std::stringstream in(res);
-	std::string signs, sizes;
-	while (in >> signs && in >> sizes) {
-		u32 sign = 0; u64 size = 0;
-		std::stringstream(signs) >> std::hex >> sign;
-		if (sizes == "patt" || sizes == "?") {
-			size = std::pow(16ull, signs.size());
-		} else if (sizes.front() == '^') {
-			size = std::pow(2ull, std::stol(sizes.substr(1)));
-		} else {
-			std::stringstream(sizes) >> std::dec >> size;
+	// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit old=new old=new:size
+	std::stringstream split(res);
+	std::string token;
+	while (split >> token) {
+		while (token.find_first_of(":|()[],") != std::string::npos)
+			token[token.find_first_of(":|()[],")] = ' ';
+		std::stringstream info(token);
+
+		std::string signs;
+		if (!(info >> signs)) continue;
+		weight::sign_t sign, sign_prev;
+		std::stringstream(signs.substr(0, signs.find('='))) >> std::hex >> sign_prev;
+		std::stringstream(signs.substr(signs.find('=') + 1)) >> std::hex >> sign;
+		if (sign_prev != sign && weight::find(sign_prev) != weight::end()) {
+			std::cerr << "move weight to a new sign (" << signs << ")..." << std::endl;
+			signs = signs.substr(signs.find('=') + 1);
+			weight prev = weight::at(sign_prev);
+			wmake(sign, prev.size());
+			std::copy_n(prev.data(), prev.size() * prev.stride(), weight::at(sign).data());
+			weight::erase(weight::find(sign_prev));
+		}
+
+		std::string sizes;
+		if (!(info >> sizes)) sizes = "?";
+		size_t size;
+		switch (sizes.front()) {
+		case 'p':
+		case '?': size = std::pow(16ull, signs.size()); break;
+		case '^': size = std::pow(2ull, std::stol(sizes.substr(1))); break;
+		default: std::stringstream(sizes) >> std::dec >> size;
 		}
 		wmake(sign, size);
+		if (weight::at(sign).size() != size) {
+			std::cerr << "size mismatch for weight (" << signs << ") at make_weights, ";
+			std::cerr << "override previous weight table..." << std::endl;
+			weight::erase(weight::find(sign));
+			wmake(sign, size);
+		}
 	}
 	return succ;
 }
