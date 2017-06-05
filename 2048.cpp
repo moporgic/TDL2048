@@ -181,8 +181,9 @@ public:
 		if (it != last) return (*it);
 		throw std::out_of_range("weight::at");
 	}
-	static inline iter erase(const iter& it) {
-		if (it->value) free(it->value);
+	static inline iter erase(const sign_t& sign) {
+		auto it = find(sign);
+		if (it != end()) free(it->data());
 		return wghts().erase(it);
 	}
 private:
@@ -233,7 +234,7 @@ public:
 		if (it != last) return (*it);
 		throw std::out_of_range("indexer::at");
 	}
-	static inline iter erase(const iter& it) { return idxrs().erase(it); }
+	static inline iter erase(const sign_t& sign) { return idxrs().erase(find(sign)); }
 private:
 	indexer(const sign_t& sign, mapper map) : id(sign), map(map) {}
 	static inline std::vector<indexer>& idxrs() { static std::vector<indexer> i; return i; }
@@ -348,7 +349,7 @@ public:
 		if (it != last) return (*it);
 		throw std::out_of_range("feature::at");
 	}
-	static inline iter erase(const iter& it) { return feats().erase(it); }
+	static inline iter erase(const sign_t& wgt, const sign_t& idx) { return feats().erase(find(wgt, idx)); }
 
 	struct clip {
 		feature::iter first;
@@ -1189,7 +1190,7 @@ u32 make_weights(std::string res = "") {
 			weight prev = weight::at(sign_prev);
 			wmake(sign, prev.size());
 			std::copy_n(prev.data(), prev.size() * prev.stride(), weight::at(sign).data());
-			weight::erase(weight::find(sign_prev));
+			weight::erase(sign_prev);
 		}
 
 		std::string sizes;
@@ -1205,7 +1206,7 @@ u32 make_weights(std::string res = "") {
 		if (weight::at(sign).size() != size) {
 			std::cerr << "size mismatch for weight (" << signs << ") at make_weights, ";
 			std::cerr << "override previous weight table..." << std::endl;
-			weight::erase(weight::find(sign));
+			weight::erase(sign);
 			wmake(sign, size);
 		}
 	}
@@ -1320,7 +1321,7 @@ void list_mapping() {
 		} else {
 			snprintf(buf, sizeof(buf), "%08llx", w.sign());
 			std::cerr << "unused weight (" << buf << ") at list_mapping" << std::endl;
-			weight::erase(weight::find(w.sign()));
+			weight::erase(w.sign());
 		}
 	}
 }
