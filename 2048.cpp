@@ -182,7 +182,7 @@ public:
 		if (it->value) free(it->value);
 		return wghts().erase(it);
 	}
-	static inline std::vector<weight> transfer(const iter& first = begin(), const iter& last = end()) {
+	static inline std::vector<weight> erase(const iter& first, const iter& last) {
 		std::vector<weight> ws(first, last);
 		wghts().erase(first, last);
 		return ws;
@@ -233,6 +233,12 @@ public:
 		const auto it = find(sign, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("indexer::at");
+	}
+	static inline iter erase(const iter& it) { return idxrs().erase(it); }
+	static inline std::vector<indexer> erase(const iter& first, const iter& last) {
+		std::vector<indexer> idx(first, last);
+		idxrs().erase(first, last);
+		return idx;
 	}
 private:
 	indexer(const u32& sign, mapper map) : id(sign), map(map) {}
@@ -347,7 +353,7 @@ public:
 		throw std::out_of_range("feature::at");
 	}
 	static inline iter erase(const iter& it) { return feats().erase(it); }
-	static inline std::vector<feature> transfer(const iter& first = begin(), const iter& last = end()) {
+	static inline std::vector<feature> erase(const iter& first, const iter& last) {
 		std::vector<feature> ft(first, last);
 		feats().erase(first, last);
 		return ft;
