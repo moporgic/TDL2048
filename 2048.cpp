@@ -362,7 +362,7 @@ public:
 	struct clip {
 		feature::iter first;
 		feature::iter last;
-		inline clip(iter first = begin(), iter last = end()) : first(first), last(last) {
+		inline clip(iter first = feature::begin(), iter last = feature::end()) : first(first), last(last) {
 			if (first < begin() || first >= end()) throw std::out_of_range("feature::clip it:first");
 			if (last < begin() || last > end())    throw std::out_of_range("feature::clip it:last");
 		}
@@ -370,6 +370,7 @@ public:
 		inline iter end() { return last; }
 	};
 	static inline clip make_clip(const iter& first = begin(), const iter& last = end()) { return clip(first, last); }
+
 private:
 	feature(const weight& value, const indexer& index) : index(index), value(value) {}
 	static inline std::vector<feature>& feats() { static std::vector<feature> f; return f; }
