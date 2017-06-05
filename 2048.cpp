@@ -1939,7 +1939,7 @@ int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (!opts("train")) opts["train"] = 1000;
 	if (!opts("test")) opts["test"] = 1000;
-	if (!opts("alpha")) opts["alpha"] = 0.0025;
+	if (!opts("alpha")) opts["alpha"] = 0.01;
 	if (!opts("seed")) opts["seed"] = rdtsc();
 	if (!opts("test", "info")) opts["test"]["info"] = "summary";
 
