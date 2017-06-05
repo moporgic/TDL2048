@@ -736,7 +736,7 @@ u64 indexmax(const board& b) { // 16-bit
 
 u32 make_indexers(std::string res = "") {
 	u32 succ = 0;
-	auto imake = [&](u32 sign, indexer::mapper func) {
+	auto imake = [&](indexer::sign_t sign, indexer::mapper func) {
 		if (indexer::find(sign) != indexer::end()) return;
 		indexer::make(sign, func); succ++;
 	};
@@ -1144,7 +1144,7 @@ u32 load_weights(std::string path) {
 }
 u32 make_weights(std::string res = "") {
 	u32 succ = 0;
-	auto wmake = [&](u32 sign, u64 size) {
+	auto wmake = [&](weight::sign_t sign, size_t size) {
 		if (weight::find(sign) != weight::end()) return;
 		weight::make(sign, size); succ++;
 	};
@@ -1208,7 +1208,7 @@ u32 load_features(std::string path) {
 }
 u32 make_features(std::string res = "") {
 	u32 succ = 0;
-	auto fmake = [&](u32 wght, u32 idxr) {
+	auto fmake = [&](weight::sign_t wght, indexer::sign_t idxr) {
 		if (feature::find(wght, idxr) != feature::end()) return;
 		feature::make(wght, idxr); succ++;
 	};
