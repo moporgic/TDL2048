@@ -39,8 +39,10 @@ public:
 	weight(const weight& w) = default;
 	~weight() {}
 
-	inline u64 sign() const { return id; }
-	inline u64 size() const { return length; }
+	typedef u64 sign_t;
+
+	inline sign_t sign() const { return id; }
+	inline size_t size() const { return length; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
 	inline numeric* data(const u64& i = 0) { return value + i; }
 
@@ -162,7 +164,7 @@ public:
 		return succ;
 	}
 
-	static weight& make(const u32& sign, const size_t& size) {
+	static weight& make(const sign_t& sign, const size_t& size) {
 		wghts().push_back(weight(sign, size));
 		return wghts().back();
 	}
@@ -170,10 +172,10 @@ public:
 	static inline const std::vector<weight>& list() { return wghts(); }
 	static inline iter begin() { return wghts().begin(); }
 	static inline iter end()   { return wghts().end(); }
-	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+	static inline iter find(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
 		return std::find_if(first, last, [=](const weight& w) { return w.sign() == sign; });
 	}
-	static inline weight& at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+	static inline weight& at(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
 		const auto it = find(sign, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("weight::at");
@@ -183,7 +185,7 @@ public:
 		return wghts().erase(it);
 	}
 private:
-	weight(const u32& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
+	weight(const sign_t& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
@@ -193,7 +195,7 @@ private:
 		delete[] v;
 	}
 
-	u32 id;
+	sign_t id;
 	size_t length;
 	numeric* value;
 };
@@ -204,16 +206,17 @@ public:
 	indexer(const indexer& i) = default;
 	~indexer() {}
 
+	typedef u64 sign_t;
 	typedef std::function<u64(const board&)> mapper;
 
-	inline u64 sign() const { return id; }
+	inline sign_t sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return map(b); }
 
 	inline bool operator ==(const indexer& i) const { return id == i.id; }
 	inline bool operator !=(const indexer& i) const { return id != i.id; }
 
-	static indexer& make(const u32& sign, mapper map) {
+	static indexer& make(const sign_t& sign, mapper map) {
 		idxrs().push_back(indexer(sign, map));
 		return idxrs().back();
 	}
@@ -221,20 +224,20 @@ public:
 	static inline const std::vector<indexer>& list() { return idxrs(); }
 	static inline iter begin() { return idxrs().begin(); }
 	static inline iter end() { return idxrs().end(); }
-	static inline iter find(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+	static inline iter find(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
 		return std::find_if(first, last, [=](const indexer& i) { return i.sign() == sign; });
 	}
-	static inline indexer& at(const u32& sign, const iter& first = begin(), const iter& last = end()) {
+	static inline indexer& at(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
 		const auto it = find(sign, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("indexer::at");
 	}
 	static inline iter erase(const iter& it) { return idxrs().erase(it); }
 private:
-	indexer(const u32& sign, mapper map) : id(sign), map(map) {}
+	indexer(const sign_t& sign, mapper map) : id(sign), map(map) {}
 	static inline std::vector<indexer>& idxrs() { static std::vector<indexer> i; return i; }
 
-	u32 id;
+	sign_t id;
 	mapper map;
 };
 
@@ -244,7 +247,9 @@ public:
 	feature(const feature& t) = default;
 	~feature() {}
 
-	inline u64 sign() const { return (value.sign() << 32) | index.sign(); }
+	typedef u64 sign_t;
+
+	inline sign_t sign() const { return (value.sign() << 32) | index.sign(); }
 	inline numeric& operator [](const board& b) { return value[index(b)]; }
 	inline numeric& operator [](const u64& idx) { return value[idx]; }
 	inline u64 operator ()(const board& b) const { return index(b); }
@@ -325,7 +330,7 @@ public:
 		return succ;
 	}
 
-	static feature& make(const u32& wgt, const u32& idx) {
+	static feature& make(const sign_t& wgt, const sign_t& idx) {
 		feats().push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
@@ -333,11 +338,11 @@ public:
 	static inline const std::vector<feature>& list() { return feats(); }
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end()   { return feats().end(); }
-	static inline iter find(const u32& wght, const u32& idxr, const iter& first = begin(), const iter& last = end()) {
+	static inline iter find(const sign_t& wght, const sign_t& idxr, const iter& first = begin(), const iter& last = end()) {
 		return std::find_if(first, last,
 			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
 	}
-	static feature& at(const u32& wgt, const u32& idx, const iter& first = begin(), const iter& last = end()) {
+	static feature& at(const sign_t& wgt, const sign_t& idx, const iter& first = begin(), const iter& last = end()) {
 		const auto it = find(wgt, idx, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("feature::at");
