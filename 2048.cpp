@@ -1254,7 +1254,6 @@ u32 make_features(std::string res = "") {
 	alias["5x4patt"] = alias["patt/4-22"];
 	alias["mono"] = alias["monotonic"];
 
-	// weight:indexer weight(indexer) weight[indexer]
 	if (res.empty() && feature::list().empty())
 		res = { "default" };
 	for (auto predef : alias)
@@ -1262,14 +1261,20 @@ u32 make_features(std::string res = "") {
 			res.insert(res.find(predef.first), predef.second);
 			res.replace(res.find(predef.first), predef.first.size(), "");
 		}
-	while (res.find_first_of(":|()[],") != std::string::npos)
-		res[res.find_first_of(":|()[],")] = ' ';
 
-	std::stringstream in(res);
-	std::string wghts, idxrs;
-	while (in >> wghts && in >> idxrs) {
-		u32 wght = 0, idxr = 0;
 
+	// weight:indexer weight(indexer) weight[indexer]
+	std::stringstream split(res);
+	std::string token;
+	while (split >> token) {
+		while (token.find_first_of(":|()[],") != std::string::npos)
+			token[token.find_first_of(":|()[],")] = ' ';
+		std::stringstream info(token);
+
+		std::string wghts, idxrs;
+		if (!(info >> wghts && info >> idxrs)) continue;
+
+		weight::sign_t wght;
 		std::stringstream(wghts) >> std::hex >> wght;
 		if (weight::find(wght) == weight::end()) {
 			std::cerr << "unknown weight (" << wghts << ") at make_features, ";
@@ -1287,7 +1292,7 @@ u32 make_features(std::string res = "") {
 			x.isomorphic(-iso);
 			for (size_t i = 0; i < xpatt.size(); i++)
 				xpatt[i] = x[xpatt[i]];
-			idxr = utils::hashpatt(xpatt);
+			indexer::sign_t idxr = utils::hashpatt(xpatt);
 			if (indexer::find(idxr) == indexer::end()) {
 				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
 				std::cerr << "assume as pattern descriptor..." << std::endl;
