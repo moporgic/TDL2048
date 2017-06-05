@@ -43,6 +43,7 @@ public:
 
 	inline sign_t sign() const { return id; }
 	inline size_t size() const { return length; }
+	inline size_t stride() const { return 1ull; }
 	inline numeric& operator [](const u64& i) { return value[i]; }
 	inline numeric* data(const u64& i = 0) { return value + i; }
 
