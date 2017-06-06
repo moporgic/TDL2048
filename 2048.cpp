@@ -1181,26 +1181,31 @@ u32 make_weights(std::string res = "") {
 
 		std::string signs;
 		if (!(info >> signs)) continue;
-		weight::sign_t sign, sign_prev;
-		std::stringstream(signs.substr(0, signs.find('='))) >> std::hex >> sign_prev;
-		std::stringstream(signs.substr(signs.find('=') + 1)) >> std::hex >> sign;
-		if (sign_prev != sign && weight::find(sign_prev) != weight::end()) {
+		weight::sign_t prev = std::stoull(signs.substr(0), nullptr, 16);
+		weight::sign_t sign = std::stoull(signs.substr(signs.find('=') + 1), nullptr, 16);
+		if (prev != sign && weight::find(prev) != weight::end()) {
 			std::cerr << "move weight to a new sign (" << signs << ")..." << std::endl;
 			signs = signs.substr(signs.find('=') + 1);
-			weight prev = weight::at(sign_prev);
-			wmake(sign, prev.size());
-			std::copy_n(prev.data(), prev.size() * prev.stride(), weight::at(sign).data());
-			weight::erase(sign_prev);
+			weight wsrc = weight::at(prev);
+			weight wdst = weight::make(sign, wsrc.size());
+			std::copy_n(wsrc.data(), wsrc.size() * wsrc.stride(), wdst.data());
+			weight::erase(prev);
 		}
 
 		std::string sizes;
 		if (!(info >> sizes)) sizes = "?";
-		size_t size;
+		size_t size = 0;
 		switch (sizes.front()) {
 		case 'p':
-		case '?': size = std::pow(16ull, signs.size()); break;
-		case '^': size = std::pow(2ull, std::stol(sizes.substr(1))); break;
-		default: std::stringstream(sizes) >> std::dec >> size;
+		case '?':
+			size = std::pow(16ull, signs.size());
+			break;
+		case '^':
+			size = std::pow(2ull, std::stol(sizes.substr(1)));
+			break;
+		default:
+			size = std::stoull(sizes);
+			break;
 		}
 		wmake(sign, size);
 		if (weight::at(sign).size() != size) {
@@ -1262,8 +1267,7 @@ u32 make_features(std::string res = "") {
 			res.replace(res.find(predef.first), predef.first.size(), "");
 		}
 
-
-	// weight:indexer weight(indexer) weight[indexer]
+	// weight:indexer weight(indexer) weight[indexer] weight[XXX&XXX|XXX!]
 	std::stringstream split(res);
 	std::string token;
 	while (split >> token) {
@@ -1282,22 +1286,47 @@ u32 make_features(std::string res = "") {
 			weight::make(wght, std::pow(16ull, wghts.size()));
 		}
 
-		std::vector<int> isomorphic = { 0 };
-		for (; !std::isxdigit(idxrs.back()); idxrs.pop_back()) {
-			if (idxrs.back() == '!') isomorphic = { 0, 1, 2, 3, 4, 5, 6, 7 };
+		int isomorphic = 1;
+		u64 op_bitand  = -1ull;
+		u64 op_bitor   = 0ull;
+		std::vector<int> patt;
+
+		idxrs += "$";
+		while (std::isxdigit(idxrs[0])) {
+			size_t pos = 0;
+			u64 buf = std::stoull(idxrs, &pos, 16);
+			switch (idxrs[pos]) {
+			case '!':
+				isomorphic = 8;
+				// no break;
+			case '$':
+				patt = utils::hashpatt(idxrs.substr(0, pos));
+				break;
+			case '&':
+				op_bitand = buf;
+				pos++;
+				break;
+			case '|':
+				op_bitor = buf;
+				pos++;
+				break;
+			}
+			idxrs = idxrs.substr(pos);
 		}
-		for (int iso : isomorphic) {
-			auto xpatt = utils::hashpatt(idxrs);
-			board x(0xfedcba9876543210ull);
-			x.isomorphic(-iso);
-			for (size_t i = 0; i < xpatt.size(); i++)
-				xpatt[i] = x[xpatt[i]];
-			indexer::sign_t idxr = utils::hashpatt(xpatt);
+
+		for (int iso = 0; iso < isomorphic; iso++) {
+			std::vector<int> xpatt(patt);
+			std::transform(patt.begin(), patt.end(), xpatt.begin(), [=](int v) {
+				board x(0xfedcba9876543210ull);
+				x.isomorphic(-iso);
+				return x[v];
+			});
+			indexer::sign_t idxr = (utils::hashpatt(xpatt) & op_bitand) | op_bitor;
 			if (indexer::find(idxr) == indexer::end()) {
 				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
 				std::cerr << "assume as pattern descriptor..." << std::endl;
-				auto patt = new std::vector<int>(xpatt); // will NOT be deleted
-				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*patt)));
+				std::vector<int>* npatt = new std::vector<int>(xpatt); // will NOT be deleted
+				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*npatt)));
 			}
 			fmake(wght, idxr);
 		}
