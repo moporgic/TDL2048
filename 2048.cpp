@@ -2055,7 +2055,7 @@ int main(int argc, const char* argv[]) {
 	}
 
 	for (weight w : weight::list())
-		shm::free(w.raw());
+		shm::free(w.data());
 	std::cout << std::endl;
 	return 0;
 }
