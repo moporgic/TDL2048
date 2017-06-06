@@ -1786,6 +1786,11 @@ inline utils::options parse(int argc, const char* argv[]) {
 			opts["feature-value"] += opts["temporary"];
 			opts["weight-value"] += opts["temporary"];
 			break;
+		case to_hash("-i"):
+		case to_hash("--info"):
+			opts["info"] = find_opt(i, "full");
+			opts["info"] += find_opts(i);
+			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
@@ -1938,7 +1943,6 @@ int main(int argc, const char* argv[]) {
 	if (!opts("test")) opts["test"] = 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.0025;
 	if (!opts("seed")) opts["seed"] = rdtsc();
-	if (!opts("test", "info")) opts["test"]["info"] = "summary";
 
 	std::cout << "TDL2048+ LOG" << std::endl;
 	std::cout << "develop" << " build C++" << __cplusplus;
@@ -1966,8 +1970,7 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["train"])) {
 		std::cout << std::endl << "start training..." << std::endl;
 		statistic stat = train(opts);
-		if (opts["train"]["info"]("summary"))
-			stat.summary();
+		if (opts["info"] == "full") stat.summary();
 	}
 
 	utils::save_weights(opts["weight-output"]);
@@ -1976,8 +1979,7 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["test"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		statistic stat = test(opts);
-		if (opts["test"]["info"]("summary"))
-			stat.summary();
+		if (opts["info"] != "none") stat.summary();
 	}
 
 	std::cout << std::endl;
