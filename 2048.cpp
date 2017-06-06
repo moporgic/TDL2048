@@ -399,12 +399,12 @@ public:
 		operator std::string() const { return value(); }
 		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
 		opinion& operator =(const opinion& opt) { token  = opt.token; return (*this); }
-		opinion& operator =(const numeric& v) { return operator =(std::to_string(v)); }
-		opinion& operator =(const std::string& v) { token = v.size() ? (label() + "=" + v) : label(); return (*this); }
+		opinion& operator =(const numeric& val) { return operator =(std::to_string(val)); }
+		opinion& operator =(const std::string& val) { token = label() + (val.size() ? ("=" + val) : ""); return (*this); }
 		opinion& operator =(const vector& vec) { return operator  =(vtos(vec)); }
-		bool operator ==(const std::string& v) const { return value() == v; }
-		bool operator !=(const std::string& v) const { return value() != v; }
-		bool operator ()(const std::string& v) const { return value().find(v) != std::string::npos; }
+		bool operator ==(const std::string& val) const { return value() == val; }
+		bool operator !=(const std::string& val) const { return value() != val; }
+		bool operator ()(const std::string& val) const { return value().find(val) != std::string::npos; }
 		static bool comp(std::string token, std::string label) { return opinion(token).label() == label; }
 	private:
 		std::string& token;
@@ -417,18 +417,18 @@ public:
 		std::string value() const { return vtos(*this); }
 		operator std::string() const { return value(); }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
-		option& operator  =(const numeric& v) { return operator =(std::to_string(v)); }
-		option& operator  =(const std::string& v) { clear(); return operator +=(v); }
-		option& operator +=(const std::string& v) { push_back(v); return *this; }
+		option& operator  =(const numeric& val) { return operator =(std::to_string(val)); }
+		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
+		option& operator +=(const std::string& val) { push_back(val); return *this; }
 		option& operator  =(const vector& vec) { clear(); return operator +=(vec); }
 		option& operator +=(const vector& vec) { insert(end(), vec.begin(), vec.end()); return *this; }
-		bool operator ==(const std::string& v) const { return value() == v; }
-		bool operator !=(const std::string& v) const { return value() != v; }
+		bool operator ==(const std::string& val) const { return value() == val; }
+		bool operator !=(const std::string& val) const { return value() != val; }
 		bool operator ()(const std::string& ext) const {
 			return std::find_if(cbegin(), cend(), std::bind(opinion::comp, std::placeholders::_1, ext)) != cend();
 		}
-		bool operator ()(const std::string& ext, const std::string& v) const {
-			return operator ()(ext) && const_cast<option&>(*this)[ext](v);
+		bool operator ()(const std::string& ext, const std::string& val) const {
+			return operator ()(ext) && const_cast<option&>(*this)[ext](val);
 		}
 		opinion operator [](const std::string& ext) {
 			auto pos = std::find_if(begin(), end(), std::bind(opinion::comp, std::placeholders::_1, ext));
@@ -445,8 +445,8 @@ public:
 	bool operator ()(const std::string& opt, const std::string& ext) const {
 		return operator ()(opt) && const_cast<options&>(*this)[opt](ext);
 	}
-	bool operator ()(const std::string& opt, const std::string& ext, const std::string& v) const {
-		return operator ()(opt, ext) && const_cast<options&>(*this)[opt][ext](v);
+	bool operator ()(const std::string& opt, const std::string& ext, const std::string& val) const {
+		return operator ()(opt, ext) && const_cast<options&>(*this)[opt][ext](val);
 	}
 	option& operator [](const std::string& opt) {
 		if (opts.find(opt) == opts.end()) opts[opt] = option();
