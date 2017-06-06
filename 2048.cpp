@@ -1659,7 +1659,7 @@ struct statistic {
 		local.time = current_time;
 	}
 
-	void summary() const {
+	void summary(const utils::options::option& opt = {}) const {
 		std::cout << std::endl;
 		char buf[80];
 		snprintf(buf, sizeof(buf), summaf,
