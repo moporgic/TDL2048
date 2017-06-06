@@ -1665,12 +1665,17 @@ struct statistic {
 		local.time = current_time;
 	}
 
-	void summary() const {
+	void summary(const utils::options::option& opt = {}) const {
+		u32 thdnum = std::stol(opt.find("thread", "1"));
 		std::cout << std::endl;
 		char buf[80];
 		snprintf(buf, sizeof(buf), summaf,
-				total.time,
-				total.opers * 1000.0 / total.time);
+				total.time / thdnum,
+				total.opers * 1000.0 * thdnum / total.time);
+		if (thdnum > 1) {
+			auto len = std::find(buf, buf + sizeof(buf), '\0') - buf;
+			snprintf(buf + len, sizeof(buf) - len, " (%dx)", thdnum);
+		}
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / limit,
@@ -1986,7 +1991,7 @@ int main(int argc, const char* argv[]) {
 		statistic stat = std::accumulate(agents.begin(), agents.end(), train(opts),
 				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
 		if (opts["train"]["info"]("summary"))
-			stat.summary();
+			stat.summary(opts["train"]);
 	}
 
 	utils::save_weights(opts["weight-output"]);
@@ -2001,7 +2006,7 @@ int main(int argc, const char* argv[]) {
 		statistic stat = std::accumulate(agents.begin(), agents.end(), test(opts),
 				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
 		if (opts["test"]["info"]("summary"))
-			stat.summary();
+			stat.summary(opts["test"]);
 	}
 
 	std::cout << std::endl;
