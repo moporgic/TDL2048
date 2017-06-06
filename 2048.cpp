@@ -1703,12 +1703,17 @@ struct statistic {
 		local.time = current_time;
 	}
 
-	void summary() const {
+	void summary(const utils::options::option& opt = {}) const {
+		u32 thdnum = std::stol(opt.find("thread", "1"));
 		std::cout << std::endl;
 		char buf[80];
 		snprintf(buf, sizeof(buf), summaf,
-				total.time,
-				total.opers * 1000.0 / total.time);
+				total.time / thdnum,
+				total.opers * 1000.0 * thdnum / total.time);
+		if (thdnum > 1) {
+			auto len = std::find(buf, buf + sizeof(buf), '\0') - buf;
+			snprintf(buf + len, sizeof(buf) - len, " (%dx)", thdnum);
+		}
 		std::cout << buf << std::endl;
 		snprintf(buf, sizeof(buf), totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / limit,
@@ -2033,7 +2038,7 @@ int main(int argc, const char* argv[]) {
 		for (u32 i = 1; i < std::stoul(opts.find("thread", "1")); i++)
 			stats[0] += stats[i];
 		if (opts["train"]["info"]("summary"))
-			stats[0].summary();
+			stats[0].summary(opts["train"]);
 		shm::free(stats);
 	}
 
@@ -2050,7 +2055,7 @@ int main(int argc, const char* argv[]) {
 		for (u32 i = 1; i < std::stoul(opts.find("thread", "1")); i++)
 			stats[0] += stats[i];
 		if (opts["test"]["info"]("summary"))
-			stats[0].summary();
+			stats[0].summary(opts["test"]);
 		shm::free(stats);
 	}
 
