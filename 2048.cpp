@@ -1790,8 +1790,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--option"):
 		case to_hash("--options"):
 		case to_hash("--extra"):
-			opts["temporary"] = find_opts(i);
-			opts["options"] += opts["temporary"];
+			opts["options"] += find_opts(i);
 			break;
 		case to_hash("-tt"):
 		case to_hash("-tm"):
