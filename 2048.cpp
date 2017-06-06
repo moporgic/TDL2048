@@ -177,14 +177,15 @@ public:
 		return std::find_if(first, last, [=](const weight& w) { return w.sign() == sign; });
 	}
 	static inline weight& at(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
-		const auto it = find(sign, first, last);
+		auto it = find(sign, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("weight::at");
 	}
-	static inline iter erase(const sign_t& sign) {
-		auto it = find(sign);
-		if (it != end()) free(it->data());
-		return wghts().erase(it);
+	static inline weight erase(const sign_t& sign, const bool& del = true) {
+		weight w = at(sign);
+		if (del) free(w.data());
+		wghts().erase(find(sign));
+		return w;
 	}
 private:
 	weight(const sign_t& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
@@ -234,7 +235,11 @@ public:
 		if (it != last) return (*it);
 		throw std::out_of_range("indexer::at");
 	}
-	static inline iter erase(const sign_t& sign) { return idxrs().erase(find(sign)); }
+	static inline indexer erase(const sign_t& sign) {
+		indexer i = at(sign);
+		idxrs().erase(find(sign));
+		return i;
+	}
 private:
 	indexer(const sign_t& sign, mapper map) : id(sign), map(map) {}
 	static inline std::vector<indexer>& idxrs() { static std::vector<indexer> i; return i; }
@@ -349,7 +354,11 @@ public:
 		if (it != last) return (*it);
 		throw std::out_of_range("feature::at");
 	}
-	static inline iter erase(const sign_t& wgt, const sign_t& idx) { return feats().erase(find(wgt, idx)); }
+	static inline feature erase(const sign_t& wgt, const sign_t& idx) {
+		feature f = at(wgt, idx);
+		feats().erase(find(wgt, idx));
+		return f;
+	}
 
 	struct clip {
 		feature::iter first;
