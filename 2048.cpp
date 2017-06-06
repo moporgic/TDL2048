@@ -424,16 +424,16 @@ public:
 		option& operator +=(const vector& vec) { insert(end(), vec.begin(), vec.end()); return *this; }
 		bool operator ==(const std::string& v) const { return value() == v; }
 		bool operator !=(const std::string& v) const { return value() != v; }
-
 		bool operator ()(const std::string& ext) const {
 			return std::find_if(cbegin(), cend(), std::bind(opinion::comp, std::placeholders::_1, ext)) != cend();
 		}
-
+		bool operator ()(const std::string& ext, const std::string& v) const {
+			return operator ()(ext) && const_cast<option&>(*this)[ext](v);
+		}
 		opinion operator [](const std::string& ext) {
 			auto pos = std::find_if(begin(), end(), std::bind(opinion::comp, std::placeholders::_1, ext));
 			return (pos != end()) ? opinion(*pos) : operator +=(ext)[ext];
 		}
-
 		std::string find(const std::string& ext, const std::string& val = {}) const {
 			return operator() (ext) ? const_cast<option&>(*this)[ext] : val;
 		}
@@ -442,16 +442,16 @@ public:
 	bool operator ()(const std::string& opt) const {
 		return opts.find(opt) != opts.end();
 	}
-
 	bool operator ()(const std::string& opt, const std::string& ext) const {
-		return operator ()(opt) ? const_cast<options&>(*this)[opt](ext) : false;
+		return operator ()(opt) && const_cast<options&>(*this)[opt](ext);
 	}
-
+	bool operator ()(const std::string& opt, const std::string& ext, const std::string& v) const {
+		return operator ()(opt, ext) && const_cast<options&>(*this)[opt][ext](v);
+	}
 	option& operator [](const std::string& opt) {
 		if (opts.find(opt) == opts.end()) opts[opt] = option();
 		return opts[opt];
 	}
-
 	std::string find(const std::string& opt, const std::string& val = {}) const {
 		return operator()(opt) ? const_cast<options&>(*this)[opt] : val;
 	}
@@ -464,7 +464,6 @@ private:
 		std::istream_iterator<std::string> begin(ss), end;
 		return std::vector<std::string>(begin, end);
 	}
-
 	static std::string vtos(const vector& vec) {
 		std::string str = std::accumulate(vec.cbegin(), vec.cend(), std::string(),
 		    [](std::string& r, const std::string& v){ return std::move(r) + v + " "; });
