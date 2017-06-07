@@ -1936,8 +1936,8 @@ statistic test(utils::options opts = {}) {
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts("train")) opts["train"] = 1000;
-	if (!opts("test")) opts["test"] = 1000;
+	if (!opts("train")) opts["train"] = !opts("test") ? 1000 : 0;
+	if (!opts("test")) opts["test"] = !opts("train") ? 10 : 0;
 	if (!opts("alpha")) opts["alpha"] = 0.0025;
 	if (!opts("seed")) opts["seed"] = rdtsc();
 	if (opts["info"] == "full") opts["train"] += "summary";
