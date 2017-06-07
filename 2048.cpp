@@ -401,12 +401,12 @@ public:
 		operator std::string() const { return value(); }
 		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
 		opinion& operator =(const opinion& opt) { token  = opt.token; return (*this); }
-		opinion& operator =(const numeric& v) { return operator =(std::to_string(v)); }
-		opinion& operator =(const std::string& v) { token = v.size() ? (label() + "=" + v) : label(); return (*this); }
+		opinion& operator =(const numeric& val) { return operator =(std::to_string(val)); }
+		opinion& operator =(const std::string& val) { token = label() + (val.size() ? ("=" + val) : ""); return (*this); }
 		opinion& operator =(const vector& vec) { return operator  =(vtos(vec)); }
-		bool operator ==(const std::string& v) const { return value() == v; }
-		bool operator !=(const std::string& v) const { return value() != v; }
-		bool operator ()(const std::string& v) const { return value().find(v) != std::string::npos; }
+		bool operator ==(const std::string& val) const { return value() == val; }
+		bool operator !=(const std::string& val) const { return value() != val; }
+		bool operator ()(const std::string& val) const { return value().find(val) != std::string::npos; }
 		static bool comp(std::string token, std::string label) { return opinion(token).label() == label; }
 	private:
 		std::string& token;
@@ -419,23 +419,23 @@ public:
 		std::string value() const { return vtos(*this); }
 		operator std::string() const { return value(); }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
-		option& operator  =(const numeric& v) { return operator =(std::to_string(v)); }
-		option& operator  =(const std::string& v) { clear(); return operator +=(v); }
-		option& operator +=(const std::string& v) { push_back(v); return *this; }
+		option& operator  =(const numeric& val) { return operator =(std::to_string(val)); }
+		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
+		option& operator +=(const std::string& val) { push_back(val); return *this; }
 		option& operator  =(const vector& vec) { clear(); return operator +=(vec); }
 		option& operator +=(const vector& vec) { insert(end(), vec.begin(), vec.end()); return *this; }
-		bool operator ==(const std::string& v) const { return value() == v; }
-		bool operator !=(const std::string& v) const { return value() != v; }
-
+		bool operator ==(const std::string& val) const { return value() == val; }
+		bool operator !=(const std::string& val) const { return value() != val; }
 		bool operator ()(const std::string& ext) const {
 			return std::find_if(cbegin(), cend(), std::bind(opinion::comp, std::placeholders::_1, ext)) != cend();
 		}
-
+		bool operator ()(const std::string& ext, const std::string& val) const {
+			return operator ()(ext) && const_cast<option&>(*this)[ext](val);
+		}
 		opinion operator [](const std::string& ext) {
 			auto pos = std::find_if(begin(), end(), std::bind(opinion::comp, std::placeholders::_1, ext));
 			return (pos != end()) ? opinion(*pos) : operator +=(ext)[ext];
 		}
-
 		std::string find(const std::string& ext, const std::string& val = {}) const {
 			return operator() (ext) ? const_cast<option&>(*this)[ext] : val;
 		}
@@ -444,16 +444,16 @@ public:
 	bool operator ()(const std::string& opt) const {
 		return opts.find(opt) != opts.end();
 	}
-
 	bool operator ()(const std::string& opt, const std::string& ext) const {
-		return operator ()(opt) ? const_cast<options&>(*this)[opt](ext) : false;
+		return operator ()(opt) && const_cast<options&>(*this)[opt](ext);
 	}
-
+	bool operator ()(const std::string& opt, const std::string& ext, const std::string& val) const {
+		return operator ()(opt, ext) && const_cast<options&>(*this)[opt][ext](val);
+	}
 	option& operator [](const std::string& opt) {
 		if (opts.find(opt) == opts.end()) opts[opt] = option();
 		return opts[opt];
 	}
-
 	std::string find(const std::string& opt, const std::string& val = {}) const {
 		return operator()(opt) ? const_cast<options&>(*this)[opt] : val;
 	}
@@ -466,7 +466,6 @@ private:
 		std::istream_iterator<std::string> begin(ss), end;
 		return std::vector<std::string>(begin, end);
 	}
-
 	static std::string vtos(const vector& vec) {
 		std::string str = std::accumulate(vec.cbegin(), vec.cend(), std::string(),
 		    [](std::string& r, const std::string& v){ return std::move(r) + v + " "; });
@@ -1797,12 +1796,16 @@ inline utils::options parse(int argc, const char* argv[]) {
 			opts["feature-value"] += opts["temporary"];
 			opts["weight-value"] += opts["temporary"];
 			break;
+		case to_hash("-i"):
+		case to_hash("--info"):
+			opts["info"] = find_opt(i, "full");
+			opts["info"] += find_opts(i);
+			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 		case to_hash("--extra"):
-			opts["temporary"] = find_opts(i);
-			opts["options"] += opts["temporary"];
+			opts["options"] += find_opts(i);
 			break;
 		case to_hash("-tt"):
 		case to_hash("-tm"):
@@ -1956,7 +1959,8 @@ int main(int argc, const char* argv[]) {
 	if (!opts("test")) opts["test"] = 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.0025;
 	if (!opts("seed")) opts["seed"] = rdtsc();
-	if (!opts("test", "info")) opts["test"]["info"] = "summary";
+	if (opts["info"] == "full") opts["train"] += "summary";
+	if (opts["info"] != "none") opts["test"] += "summary";
 
 	std::cout << "TDL2048+ LOG" << std::endl;
 	std::cout << "develop-parallel" << " build C++" << __cplusplus;
@@ -1990,8 +1994,7 @@ int main(int argc, const char* argv[]) {
 			agents.push_back(std::async(std::launch::async, train, opts));
 		statistic stat = std::accumulate(agents.begin(), agents.end(), train(opts),
 				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
-		if (opts["train"]["info"]("summary"))
-			stat.summary(opts["train"]);
+		if (opts["train"]("summary")) stat.summary(opts["train"]);
 	}
 
 	utils::save_weights(opts["weight-output"]);
@@ -2005,8 +2008,7 @@ int main(int argc, const char* argv[]) {
 			agents.push_back(std::async(std::launch::async, test, opts));
 		statistic stat = std::accumulate(agents.begin(), agents.end(), test(opts),
 				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
-		if (opts["test"]["info"]("summary"))
-			stat.summary(opts["test"]);
+		if (opts["test"]("summary")) stat.summary(opts["test"]);
 	}
 
 	std::cout << std::endl;
