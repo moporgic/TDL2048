@@ -1969,7 +1969,8 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["train"])) {
 		std::cout << std::endl << "start training..." << std::endl;
 		statistic stat = train(opts);
-		if (opts["info"] == "full") stat.summary();
+		if (opts["info"] == "full" || opts["info"]("summary", "train"))
+			stat.summary();
 	}
 
 	utils::save_weights(opts["weight-output"]);
@@ -1978,7 +1979,8 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["test"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		statistic stat = test(opts);
-		if (opts["info"] != "none") stat.summary();
+		if (opts["info"] != "none" || opts["info"]("summary", "test"))
+			stat.summary();
 	}
 
 	std::cout << std::endl;
