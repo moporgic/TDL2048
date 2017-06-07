@@ -399,7 +399,7 @@ public:
 		operator std::string() const { return value(); }
 		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
 		opinion& operator =(const opinion& opt) { token  = opt.token; return (*this); }
-		opinion& operator =(const numeric& val) { return operator =(std::to_string(val)); }
+		opinion& operator =(const numeric& val) { return operator =(ntos(val)); }
 		opinion& operator =(const std::string& val) { token = label() + (val.size() ? ("=" + val) : ""); return (*this); }
 		opinion& operator =(const vector& vec) { return operator  =(vtos(vec)); }
 		bool operator ==(const std::string& val) const { return value() == val; }
@@ -417,7 +417,7 @@ public:
 		std::string value() const { return vtos(*this); }
 		operator std::string() const { return value(); }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
-		option& operator  =(const numeric& val) { return operator =(std::to_string(val)); }
+		option& operator  =(const numeric& val) { return operator =(ntos(val)); }
 		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
 		option& operator +=(const std::string& val) { push_back(val); return *this; }
 		option& operator  =(const vector& vec) { clear(); return operator +=(vec); }
@@ -459,16 +459,19 @@ public:
 private:
 	std::map<std::string, option> opts;
 
-	static std::vector<std::string> stov(const std::string& str) {
-		std::stringstream ss(str);
-		std::istream_iterator<std::string> begin(ss), end;
-		return std::vector<std::string>(begin, end);
-	}
 	static std::string vtos(const vector& vec) {
 		std::string str = std::accumulate(vec.cbegin(), vec.cend(), std::string(),
 		    [](std::string& r, const std::string& v){ return std::move(r) + v + " "; });
 		if (str.size()) str.pop_back();
 		return str;
+	}
+	static std::string ntos(const numeric& num) {
+		std::string val = std::to_string(num);
+		if (val.find('.') != std::string::npos) {
+			while (val.back() == '0') val.pop_back();
+			if (val.back() == '.') val.pop_back();
+		}
+		return val;
 	}
 };
 
