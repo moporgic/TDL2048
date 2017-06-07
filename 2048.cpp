@@ -1734,12 +1734,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-s"):
 		case to_hash("--seed"):
 		case to_hash("--srand"):
-			try {
-				opts["seed"] = find_opt(i, "moporgic");
-				std::stoull(opts["seed"]);
-			} catch (std::invalid_argument&) {
-				opts["seed"] = to_hash(opts["seed"]);
-			}
+			opts["seed"] = find_opt(i, "moporgic");
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
@@ -1951,11 +1946,11 @@ int main(int argc, const char* argv[]) {
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 	std::cout << "time = " << moporgic::millisec() << std::endl;
-	std::cout << "seed = " << std::stoull(opts["seed"]) << std::endl;
-	std::cout << "alpha = " << std::stod(opts["alpha"]) << std::endl;
+	std::cout << "seed = " << opts["seed"] << std::endl;
+	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << std::endl;
 
-	std::srand(std::stoull(opts["seed"]));
+	std::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
 
 	utils::make_indexers();
