@@ -1178,7 +1178,7 @@ u32 make_weights(std::string res = "") {
 	if (res.empty() && weight::list().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined weights
-		auto pos = res.find(def.first);
+		auto pos = (" " + res + " ").find(" " + def.first + " ");
 		if (pos != std::string::npos)
 			res.replace(pos, def.first.size(), def.second);
 	}
@@ -1273,7 +1273,7 @@ u32 make_features(std::string res = "") {
 	if (res.empty() && feature::list().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined features
-		auto pos = res.find(def.first);
+		auto pos = (" " + res + " ").find(" " + def.first + " ");
 		if (pos != std::string::npos)
 			res.replace(pos, def.first.size(), def.second);
 	}
