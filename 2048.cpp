@@ -444,8 +444,10 @@ public:
 			if (first < begin() || first >= end()) throw std::out_of_range("feature::clip it:first");
 			if (last < begin() || last > end())    throw std::out_of_range("feature::clip it:last");
 		}
-		inline iter begin() { return first; }
-		inline iter end() { return last; }
+		inline clip(iter first, size_t num) : clip(first, first + num) {}
+		inline feature::iter begin() const { return first; }
+		inline feature::iter end() const { return last; }
+		inline size_t size() const { return last - first; }
 	};
 	static inline clip make_clip(const iter& first = begin(), const iter& last = end()) { return clip(first, last); }
 
@@ -1253,7 +1255,7 @@ u32 make_weights(std::string res = "") {
 	if (res.empty() && weight::list().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined weights
-		auto pos = res.find(def.first);
+		auto pos = (" " + res + " ").find(" " + def.first + " ");
 		if (pos != std::string::npos)
 			res.replace(pos, def.first.size(), def.second);
 	}
@@ -1348,7 +1350,7 @@ u32 make_features(std::string res = "") {
 	if (res.empty() && feature::list().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined features
-		auto pos = res.find(def.first);
+		auto pos = (" " + res + " ").find(" " + def.first + " ");
 		if (pos != std::string::npos)
 			res.replace(pos, def.first.size(), def.second);
 	}
