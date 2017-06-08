@@ -1990,7 +1990,7 @@ int main(int argc, const char* argv[]) {
 		std::cout << std::endl << "start training..." << std::endl;
 		std::list<std::future<statistic>> agents;
 		u32 thdid = std::stol(opts["train"]["thread"] = opts.find("thread", "1"));
-		while (std::stol(opts["train"]["thread-id"] = std::to_string(--thdid)))
+		while (std::stol(opts["train"]["thread-id"] = (--thdid)))
 			agents.push_back(std::async(std::launch::async, train, opts));
 		statistic stat = std::accumulate(agents.begin(), agents.end(), train(opts),
 				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
@@ -2004,7 +2004,7 @@ int main(int argc, const char* argv[]) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		std::list<std::future<statistic>> agents;
 		u32 thdid = std::stol(opts["test"]["thread"] = opts.find("thread", "1"));
-		while (std::stol(opts["test"]["thread-id"] = std::to_string(--thdid)))
+		while (std::stol(opts["test"]["thread-id"] = (--thdid)))
 			agents.push_back(std::async(std::launch::async, test, opts));
 		statistic stat = std::accumulate(agents.begin(), agents.end(), test(opts),
 				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
