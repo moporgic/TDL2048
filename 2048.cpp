@@ -368,8 +368,8 @@ public:
 			if (last < begin() || last > end())    throw std::out_of_range("feature::clip it:last");
 		}
 		inline clip(iter first, size_t num) : clip(first, first + num) {}
-		inline iter begin() const { return first; }
-		inline iter end() const { return last; }
+		inline feature::iter begin() const { return first; }
+		inline feature::iter end() const { return last; }
 		inline size_t size() const { return last - first; }
 	};
 	static inline clip make_clip(const iter& first = begin(), const iter& last = end()) { return clip(first, last); }
