@@ -578,18 +578,21 @@ public:
 		static constexpr oper left = 3;
 		static constexpr oper null = 4;
 		oper op;
-		optype(const oper& op = null) : op(op) {}
-		optype(const optype& opt) = default;
-		operator oper() const { return op; }
-		const char* name() const {
+		inline optype(const oper& op = null) : op(op) {}
+		inline optype(const optype& opt) = default;
+		inline operator oper() const { return op; }
+		inline bool operator ==(const optype& opt) const { return op == opt.op; }
+		inline bool operator !=(const optype& opt) const { return op != opt.op; }
+		inline bool operator < (const optype& opt) const { return op <  opt.op; }
+		inline const char* name() const {
 			const char* res[] = { "up", "right", "down", "left", "null" };
 			return res[op];
 		}
-		action function() const {
+		inline action function() const {
 			action res[] = { &board::up, &board::right, &board::down, &board::left, nullptr };
 			return res[op];
 		}
-		friend std::ostream& operator <<(std::ostream& out, const optype& o) {
+		inline friend std::ostream& operator <<(std::ostream& out, const optype& o) {
 			return out << o.name();
 		}
 		static inline std::array<optype, 4> operations() { return { up, right, down, left }; }
