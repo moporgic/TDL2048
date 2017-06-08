@@ -367,8 +367,10 @@ public:
 			if (first < begin() || first >= end()) throw std::out_of_range("feature::clip it:first");
 			if (last < begin() || last > end())    throw std::out_of_range("feature::clip it:last");
 		}
-		inline iter begin() { return first; }
-		inline iter end() { return last; }
+		inline clip(iter first, size_t num) : clip(first, first + num) {}
+		inline iter begin() const { return first; }
+		inline iter end() const { return last; }
+		inline size_t size() const { return last - first; }
 	};
 	static inline clip make_clip(const iter& first = begin(), const iter& last = end()) { return clip(first, last); }
 
