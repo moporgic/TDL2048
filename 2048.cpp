@@ -369,8 +369,10 @@ public:
 			if (first < begin() || first >= end()) throw std::out_of_range("feature::clip it:first");
 			if (last < begin() || last > end())    throw std::out_of_range("feature::clip it:last");
 		}
-		inline iter begin() { return first; }
-		inline iter end() { return last; }
+		inline clip(iter first, size_t num) : clip(first, first + num) {}
+		inline feature::iter begin() const { return first; }
+		inline feature::iter end() const { return last; }
+		inline size_t size() const { return last - first; }
 	};
 	static inline clip make_clip(const iter& first = begin(), const iter& last = end()) { return clip(first, last); }
 
@@ -401,7 +403,7 @@ public:
 		operator std::string() const { return value(); }
 		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
 		opinion& operator =(const opinion& opt) { token  = opt.token; return (*this); }
-		opinion& operator =(const numeric& val) { return operator =(std::to_string(val)); }
+		opinion& operator =(const numeric& val) { return operator =(ntos(val)); }
 		opinion& operator =(const std::string& val) { token = label() + (val.size() ? ("=" + val) : ""); return (*this); }
 		opinion& operator =(const vector& vec) { return operator  =(vtos(vec)); }
 		bool operator ==(const std::string& val) const { return value() == val; }
@@ -419,7 +421,7 @@ public:
 		std::string value() const { return vtos(*this); }
 		operator std::string() const { return value(); }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
-		option& operator  =(const numeric& val) { return operator =(std::to_string(val)); }
+		option& operator  =(const numeric& val) { return operator =(ntos(val)); }
 		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
 		option& operator +=(const std::string& val) { push_back(val); return *this; }
 		option& operator  =(const vector& vec) { clear(); return operator +=(vec); }
@@ -461,16 +463,19 @@ public:
 private:
 	std::map<std::string, option> opts;
 
-	static std::vector<std::string> stov(const std::string& str) {
-		std::stringstream ss(str);
-		std::istream_iterator<std::string> begin(ss), end;
-		return std::vector<std::string>(begin, end);
-	}
 	static std::string vtos(const vector& vec) {
 		std::string str = std::accumulate(vec.cbegin(), vec.cend(), std::string(),
 		    [](std::string& r, const std::string& v){ return std::move(r) + v + " "; });
 		if (str.size()) str.pop_back();
 		return str;
+	}
+	static std::string ntos(const numeric& num) {
+		std::string val = std::to_string(num);
+		if (val.find('.') != std::string::npos) {
+			while (val.back() == '0') val.pop_back();
+			if (val.back() == '.') val.pop_back();
+		}
+		return val;
 	}
 };
 
@@ -1175,7 +1180,7 @@ u32 make_weights(std::string res = "") {
 	if (res.empty() && weight::list().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined weights
-		auto pos = res.find(def.first);
+		auto pos = (" " + res + " ").find(" " + def.first + " ");
 		if (pos != std::string::npos)
 			res.replace(pos, def.first.size(), def.second);
 	}
@@ -1270,7 +1275,7 @@ u32 make_features(std::string res = "") {
 	if (res.empty() && feature::list().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined features
-		auto pos = res.find(def.first);
+		auto pos = (" " + res + " ").find(" " + def.first + " ");
 		if (pos != std::string::npos)
 			res.replace(pos, def.first.size(), def.second);
 	}
@@ -1745,12 +1750,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-s"):
 		case to_hash("--seed"):
 		case to_hash("--srand"):
-			try {
-				opts["seed"] = find_opt(i, "moporgic");
-				std::stoull(opts["seed"]);
-			} catch (std::invalid_argument&) {
-				opts["seed"] = to_hash(opts["seed"]);
-			}
+			opts["seed"] = find_opt(i, "moporgic");
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
@@ -1955,12 +1955,10 @@ statistic test(utils::options opts = {}) {
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts("train")) opts["train"] = 1000;
-	if (!opts("test")) opts["test"] = 1000;
+	if (!opts("train")) opts["train"] = opts("test") ? 0 : 1000;
+	if (!opts("test")) opts["test"] = opts("train") ? 0 : 10;
 	if (!opts("alpha")) opts["alpha"] = 0.0025;
 	if (!opts("seed")) opts["seed"] = rdtsc();
-	if (opts["info"] == "full") opts["train"] += "summary";
-	if (opts["info"] != "none") opts["test"] += "summary";
 
 	std::cout << "TDL2048+ LOG" << std::endl;
 	std::cout << "develop-parallel" << " build C++" << __cplusplus;
@@ -1968,12 +1966,12 @@ int main(int argc, const char* argv[]) {
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 	std::cout << "time = " << moporgic::millisec() << std::endl;
-	std::cout << "seed = " << std::stoull(opts["seed"]) << std::endl;
-	std::cout << "alpha = " << std::stod(opts["alpha"]) << std::endl;
+	std::cout << "seed = " << opts["seed"] << std::endl;
+	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "agent = " << opts.find("thread", "1") << "x" << std::endl;
 	std::cout << std::endl;
 
-	std::srand(std::stoull(opts["seed"]));
+	std::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
 
 	utils::make_indexers();
@@ -1994,7 +1992,7 @@ int main(int argc, const char* argv[]) {
 			agents.push_back(std::async(std::launch::async, train, opts));
 		statistic stat = std::accumulate(agents.begin(), agents.end(), train(opts),
 				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
-		if (opts["train"]("summary")) stat.summary(opts["train"]);
+		if (opts["info"] == "full") stat.summary(opts["train"]);
 	}
 
 	utils::save_weights(opts["weight-output"]);
@@ -2008,7 +2006,7 @@ int main(int argc, const char* argv[]) {
 			agents.push_back(std::async(std::launch::async, test, opts));
 		statistic stat = std::accumulate(agents.begin(), agents.end(), test(opts),
 				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
-		if (opts["test"]("summary")) stat.summary(opts["test"]);
+		if (opts["info"] != "none") stat.summary(opts["test"]);
 	}
 
 	std::cout << std::endl;
