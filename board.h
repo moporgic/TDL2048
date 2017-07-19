@@ -55,13 +55,13 @@ public:
 		friend class board;
 		friend class cache;
 		public:
-			const u32 rawh; // horizontal move (16-bit raw)
-			const u32 exth; // horizontal move (4-bit extra)
-			const u64 rawv; // vertical move (64-bit raw)
-			const u32 extv; // vertical move (16-bit extra)
-			const u32 score; // merge score
-			const i32 moved; // moved or not (moved: 0, otherwise -1)
-			const u32 mono; // monotonic decreasing value (12-bit)
+			u32 rawh; // horizontal move (16-bit raw)
+			u32 exth; // horizontal move (4-bit extra)
+			u64 rawv; // vertical move (64-bit raw)
+			u32 extv; // vertical move (16-bit extra)
+			u32 score; // merge score
+			i32 moved; // moved or not (moved: 0, otherwise -1)
+			u32 mono; // monotonic decreasing value (12-bit)
 
 			template<int i>
 			inline void moveh64(u64& raw, u32& sc, i32& mv) const {
@@ -88,29 +88,30 @@ public:
 			}
 
 			move(const move& op) = default;
-			move() = delete;
 			~move() = default;
+
 		private:
 			move(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved, u32 mono)
 				: rawh(rawh), exth(exth), rawv(rawv), extv(extv), score(score), moved(moved), mono(mono) {}
+			move() : move(0, 0, 0, 0, 0, -1, 0) {}
+			move& operator =(const move& op) = default;
 		};
 
 		typedef std::array<u16, 32> info;
-		const u32 raw; // base row (16-bit raw)
-		const u32 ext; // base row (4-bit extra)
-		const u32 species; // species of this row
-		const u32 merge; // number of merged tiles
-		const move left; // left operation
-		const move right; // right operation
-		const info numof; // number of each tile-type
-		const info mask; // mask of each tile-type
-		const list num; // number of 0~f tile-type
-		const list layout; // layout of board-type
-		const i32 moved; // moved or not
-		const u32 legal; // legal actions
+		u32 raw; // base row (16-bit raw)
+		u32 ext; // base row (4-bit extra)
+		u32 species; // species of this row
+		u32 merge; // number of merged tiles
+		move left; // left operation
+		move right; // right operation
+		info numof; // number of each tile-type
+		info mask; // mask of each tile-type
+		list num; // number of 0~f tile-type
+		list layout; // layout of board-type
+		i32 moved; // moved or not
+		u32 legal; // legal actions
 
 		cache(const cache& c) = default;
-		cache() = delete;
 		~cache() = default;
 
 		static cache make(const u32& r) {
@@ -176,6 +177,9 @@ public:
 			  info numof, info mask, list num, list layout, i32 moved, u32 legal)
 		: raw(raw), ext(ext), species(species), merge(merge), left(left), right(right),
 		  numof(numof), mask(mask), num(num), layout(layout), moved(moved), legal(legal) {}
+//		cache() : cache(0, 0, 0, 0, {}, {}, {}, {}, {}, {}, -1, 0) {}
+		cache() : cache(make(seq32_static())) {}
+		cache& operator =(const cache& c) = default;
 
 		static void assign(u32 src[], u32& raw, u32& ext, u64& vraw, u32& vext) {
 			u32 lo[4], hi[4];
@@ -234,11 +238,12 @@ public:
 		}
 	};
 
-	inline static const cache& lookup(const u32& i) {
-		static cache look[1 << 20](cache::make(cache::seq32_static()));
-		return look[i];
-	}
+private:
+	static cache look[1 << 20];
+public:
+	inline static const cache& lookup(const u32& i) { return look[i]; }
 
+public:
 	u64 raw;
 	u32 ext;
 	u32 inf;
@@ -1035,5 +1040,6 @@ public:
 	}
 
 };
+board::cache board::look[1 << 20];
 
 } // namespace moporgic
