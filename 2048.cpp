@@ -737,7 +737,7 @@ template<int p0, int p1, int p2, int p3, int p4, int p5, int p6, int p7>
 u64 indexmono(const board& b) { // 24-bit
 	u32 h0 = (b.at(p0)) | (b.at(p1) << 4) | (b.at(p2) << 8) | (b.at(p3) << 12);
 	u32 h1 = (b.at(p4)) | (b.at(p5) << 4) | (b.at(p6) << 8) | (b.at(p7) << 12);
-	return (board::lookup(h0).left.mono) | (board::lookup(h1).left.mono << 12);
+	return (board::lookup[h0].left.mono) | (board::lookup[h1].left.mono << 12);
 }
 
 template<u32 tile, int isomorphic>
