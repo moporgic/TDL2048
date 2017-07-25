@@ -450,7 +450,7 @@ public:
 		query16(2).left.moveh64<2>(rawn, score);
 		query16(3).left.moveh64<3>(rawn, score);
 		raw = rawn;
-		return rawp ^ rawn ? score : -1;
+		return (rawp ^ rawn) ? score : -1;
 	}
 	inline i32 right64() {
 		register u64 rawp = raw;
@@ -461,7 +461,7 @@ public:
 		query16(2).right.moveh64<2>(rawn, score);
 		query16(3).right.moveh64<3>(rawn, score);
 		raw = rawn;
-		return rawp ^ rawn ? score : -1;
+		return (rawp ^ rawn) ? score : -1;
 	}
 	inline i32 up64() {
 		register u64 rawp = raw;
@@ -473,7 +473,7 @@ public:
 		query16(2).left.movev64<2>(rawn, score);
 		query16(3).left.movev64<3>(rawn, score);
 		raw = rawn;
-		return rawp ^ rawn ? score : -1;
+		return (rawp ^ rawn) ? score : -1;
 	}
 	inline i32 down64() {
 		register u64 rawp = raw;
@@ -485,7 +485,7 @@ public:
 		query16(2).right.movev64<2>(rawn, score);
 		query16(3).right.movev64<3>(rawn, score);
 		raw = rawn;
-		return rawp ^ rawn ? score : -1;
+		return (rawp ^ rawn) ? score : -1;
 	}
 
 	inline i32 left80() {
@@ -578,9 +578,7 @@ public:
 		static inline std::array<optype, 4> actions() { return operations(); }
 	};
 
-	inline i32 operate(const optype::oper& op) {
-		return operate64(op);
-	}
+	inline i32 operate(const optype::oper& op) { return operate64(op); }
 	inline i32 operate64(const optype::oper& op) {
 		switch (op) {
 		case optype::up:    return up64();
@@ -604,9 +602,7 @@ public:
 	inline i32 move64(const optype::oper& op) { return operate64(op); }
 	inline i32 move80(const optype::oper& op) { return operate80(op); }
 
-	inline u32 species() const {
-		return species64();
-	}
+	inline u32 species() const { return species64(); }
 	inline u32 species64() const {
 		return query16(0).species | query16(1).species | query16(2).species | query16(3).species;
 	}
@@ -614,20 +610,18 @@ public:
 		return query20(0).species | query20(1).species | query20(2).species | query20(3).species;
 	}
 
-	inline u32 scale() const   { return species(); }
+	inline u32 scale() const   { return scale64(); }
 	inline u32 scale64() const { return species64(); }
 	inline u32 scale80() const { return species80(); }
 
-	inline u32 hash() const {
-		return hash64();
-	}
+	inline u32 hash() const { return hash64(); }
 	inline u32 hash64() const {
-		u32 h = 0;
+		register u32 h = 0;
 		for (u32 i = 0; i < 16; i++) h |= (1 << at4(i));
 		return h;
 	}
 	inline u32 hash80() const {
-		u32 h = 0;
+		register u32 h = 0;
 		for (u32 i = 0; i < 16; i++) h |= (1 << at5(i));
 		return h;
 	}
@@ -641,9 +635,7 @@ public:
 		return list(num, 16);
 	}
 
-	inline u32 numof(const u32& t) const {
-		return numof64(t);
-	}
+	inline u32 numof(const u32& t) const { return numof64(t); }
 	inline u32 numof64(const u32& t) const {
 		return query16(0).numof[t] + query16(1).numof[t] + query16(2).numof[t] + query16(3).numof[t];
 	}
@@ -652,9 +644,7 @@ public:
 	}
 
 	template<typename numa>
-	inline void numof(numa num, const u32& min, const u32& max) const {
-		return numof64(num, min, max);
-	}
+	inline void numof(numa num, const u32& min, const u32& max) const { return numof64(num, min, max); }
 	template<typename numa>
 	inline void numof64(numa num, const u32& min, const u32& max) const {
 		const cache::info& numof0 = query16(0).numof;
@@ -676,9 +666,7 @@ public:
 		}
 	}
 
-	inline u32 count(const u32& t) const {
-		return count64(t);
-	}
+	inline u32 count(const u32& t) const { return count64(t); }
 	inline u32 count64(const u32& t) const {
 		register u32 num = 0;
 		for (u32 i = 0; i < 16; i++)
@@ -693,9 +681,7 @@ public:
 	}
 
 	template<typename numa>
-	inline void count(numa num, const u32& min, const u32& max) const {
-		return count64(num, min, max);
-	}
+	inline void count(numa num, const u32& min, const u32& max) const { return count64(num, min, max); }
 	template<typename numa>
 	inline void count64(numa num, const u32& min, const u32& max) const {
 		std::fill(num + min, num + max, 0);
@@ -718,9 +704,7 @@ public:
 	}
 
 	template<typename numa>
-	inline void mask(numa msk, const u32& min, const u32& max) const {
-		return mask64(msk, min, max);
-	}
+	inline void mask(numa msk, const u32& min, const u32& max) const { return mask64(msk, min, max); }
 	template<typename numa>
 	inline void mask64(numa msk, const u32& min, const u32& max) const {
 		const cache::info& mask0 = query16(0).mask;
@@ -746,9 +730,7 @@ public:
 	inline list find64(const u32& t) const { return board::lookup[mask64(t)].layout; }
 	inline list find80(const u32& t) const { return board::lookup[mask80(t)].layout; }
 
-	inline u64 monoleft() const {
-		return monoleft64();
-	}
+	inline u64 monoleft() const { return monoleft64(); }
 	inline u64 monoleft64() const {
 		register u64 mono = 0;
 		mono |= u64(query16(0).left.mono) <<  0;
@@ -766,9 +748,7 @@ public:
 		return mono;
 	}
 
-	inline u64 monoright() const {
-		return monoright64();
-	}
+	inline u64 monoright() const { return monoright64(); }
 	inline u64 monoright64() const {
 		register u64 mono = 0;
 		mono |= u64(query16(0).right.mono) <<  0;
@@ -918,12 +898,8 @@ public:
 			ext    = 0x80000000,
 		};
 
-		static item flag(const board& b) {
-			return static_cast<item>(b.inf);
-		}
-		static void setf(board& b, const item& f) {
-			b.inf = f;
-		}
+		static item flag(const board& b) { return static_cast<item>(b.inf); }
+		static void setf(board& b, const item& f) { b.inf = f; }
 	};
 	inline board& format(const style::item& style = style::at) {
 		style::setf(*this, style);
