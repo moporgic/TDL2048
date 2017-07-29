@@ -11,7 +11,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 3.3
+// Version     : 3.5
 // Description : bitboard of 2048
 //============================================================================
 
@@ -55,13 +55,14 @@ public:
 		friend class board;
 		friend class cache;
 		public:
-			const u32 rawh; // horizontal move (16-bit raw)
-			const u32 exth; // horizontal move (4-bit extra)
-			const u64 rawv; // vertical move (64-bit raw)
-			const u32 extv; // vertical move (16-bit extra)
-			const u32 score; // merge score
-			const i32 moved; // moved or not (moved: 0, otherwise -1)
-			const u32 mono; // monotonic decreasing value (12-bit)
+			u32 rawh; // horizontal move (16-bit raw)
+			u32 exth; // horizontal move (4-bit extra)
+			u64 rawv; // vertical move (64-bit raw)
+			u32 extv; // vertical move (16-bit extra)
+			u32 score; // merge score (reward)
+			i32 moved; // moved or not (moved: 0, otherwise -1)
+			u16 merge; // number of merged tiles
+			u16 mono; // monotonic decreasing value (12-bit)
 
 			template<int i>
 			inline void moveh64(u64& raw, u32& sc, i32& mv) const {
@@ -88,82 +89,110 @@ public:
 			}
 
 			move(const move& op) = default;
-			move() = delete;
 			~move() = default;
+
+			static move make(const u32& r, const bool& reverse) {
+				u32 row[] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
+							((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
+				if (reverse) std::reverse(row, row + 4);
+
+				u32 mono = 0;
+				u32 monores[6][2] = { { 0, 1 }, { 0, 2 }, { 0, 3 }, { 1, 2 }, { 1, 3 }, { 2, 3 }, };
+				for (u32 i = 0; i < 6; i++) {
+					u32 a = row[monores[i][0]], b = row[monores[i][1]];
+					mono |= ((a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b01 : 0b10)) << (i << 1));
+				}
+
+				u32 merge = 0;
+				u32 score = 0;
+				u32 top = 0, hold = 0;
+
+				for (u32 i = 0; i < 4; i++) {
+					u32 tile = row[i];
+					if (tile == 0) continue;
+					row[i] = 0;
+					if (hold) {
+						if (tile == hold) {
+							row[top++] = ++tile;
+							score += (1 << tile);
+							merge++;
+							hold = 0;
+						} else {
+							row[top++] = hold;
+							hold = tile;
+						}
+					} else {
+						hold = tile;
+					}
+				}
+				if (hold) row[top] = hold;
+				if (reverse) std::reverse(row, row + 4);
+
+				u32 lo[4], hi[4];
+				for (u32 i = 0; i < 4; i++) {
+					hi[i] = (row[i] & 0x10) >> 4;
+					lo[i] = (row[i] & 0x0f);
+				}
+				u32 hraw = ((lo[0] << 0) | (lo[1] << 4) | (lo[2] << 8) | (lo[3] << 12));
+				u32 hext = ((hi[0] << 0) | (hi[1] << 1) | (hi[2] << 2) | (hi[3] << 3)) << 16;
+				u64 vraw = (u64(lo[0]) << 0) | (u64(lo[1]) << 16) | (u64(lo[2]) << 32) | (u64(lo[3]) << 48);
+				u32 vext = ((hi[0] << 0) | (hi[1] << 4) | (hi[2] << 8) | (hi[3] << 12)) << 16;
+				i32 moved = ((hraw | hext) == r) ? -1 : 0;
+
+				return move(hraw, hext, vraw, vext, score, moved, merge, mono);
+			}
+
 		private:
-			move(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved, u32 mono)
-				: rawh(rawh), exth(exth), rawv(rawv), extv(extv), score(score), moved(moved), mono(mono) {}
+			move(u32 rawh, u32 exth, u64 rawv, u32 extv, u32 score, i32 moved, u16 merge, u16 mono)
+				: rawh(rawh), exth(exth), rawv(rawv), extv(extv), score(score), moved(moved), merge(merge), mono(mono) {}
+			move() : move(0, 0, 0, 0, 0, -1, 0, 0) {}
+			move& operator =(const move& op) = default;
 		};
 
 		typedef std::array<u16, 32> info;
-		const u32 raw; // base row (16-bit raw)
-		const u32 ext; // base row (4-bit extra)
-		const u32 species; // species of this row
-		const u32 merge; // number of merged tiles
-		const move left; // left operation
-		const move right; // right operation
-		const info numof; // number of each tile-type
-		const info mask; // mask of each tile-type
-		const list num; // number of 0~f tile-type
-		const list layout; // layout of board-type
-		const i32 moved; // moved or not
-		const u32 legal; // legal actions
+		u32 raw; // base row (16-bit raw)
+		u32 ext; // base row (4-bit extra)
+		u32 species; // species of this row
+		u32 merge; // number of merged tiles
+		move left; // left operation
+		move right; // right operation
+		info numof; // number of each tile-type
+		info mask; // mask of each tile-type
+		list num; // number of 0~f tile-type
+		list layout; // layout of board-type
+		i32 moved; // moved or not
+		u32 legal; // legal actions
 
 		cache(const cache& c) = default;
-		cache() = delete;
 		~cache() = default;
 
 		static cache make(const u32& r) {
-			// HIGH [null][N0~N3 high 1-bit (totally 4-bit)][N0~N3 low 4-bit (totally 16-bit)] LOW
-
 			u32 raw = r & 0x0ffff;
 			u32 ext = r & 0xf0000;
 
-			u32 V[4] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
-						((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
-			u32 L[4] = { V[0], V[1], V[2], V[3] };
-			u32 R[4] = { V[3], V[2], V[1], V[0] }; // mirrored
-
-			u32 merge;
-			u32 hraw;
-			u32 hext;
-			u64 vraw;
-			u32 vext;
-			u32 score;
-			i32 moved;
-			u32 mono;
-
-			monoprobe(L, mono);
-			mvleft(L, score, merge);
-			assign(L, hraw, hext, vraw, vext);
-			moved = ((hraw | hext) == r) ? -1 : 0;
-			move left(hraw, hext, vraw, vext, score, moved, mono);
-
-			monoprobe(R, mono);
-			mvleft(R, score, merge); std::reverse(R, R + 4);
-			assign(R, hraw, hext, vraw, vext);
-			moved = ((hraw | hext) == r) ? -1 : 0;
-			move right(hraw, hext, vraw, vext, score, moved, mono);
+			move left = move::make(r, false);
+			move right = move::make(r, true);
 
 			u32 species = 0;
 			info numof = {};
 			info mask = {};
 			list num(0, 16);
 			for (int i = 0; i < 4; i++) {
-				species |= (1 << V[i]);
-				numof[V[i]]++;
-				mask[V[i]] |= (1 << i);
-				num.raw += (1ULL << (V[i] << 2));
+				u32 tile = ((r >> (i << 2)) & 0x0f) | ((r >> (12 + i)) & 0x10);
+				species |= (1 << tile);
+				numof[tile]++;
+				mask[tile] |= (1 << i);
+				num.raw += (1ULL << (tile << 2));
 			}
 
 			list layout;
-			auto tilemask = r;
 			for (int i = 0; i < 16; i++) {
-				if ((tilemask >> i) & 1) // map bit-location to index
+				if ((r >> i) & 1) // map bit-location to index
 					layout.raw |= (u64(i) << ((layout.num++) << 2));
 			}
 
-			moved = left.moved & right.moved;
+			u32 merge = left.merge | right.merge;
+			i32 moved = left.moved & right.moved;
 
 			u32 legal = 0;
 			if (left.moved == 0)  legal |= (0x08 | 0x01);
@@ -171,74 +200,22 @@ public:
 
 			return cache(raw, ext, species, merge, left, right, numof, mask, num, layout, moved, legal);
 		}
+
 	private:
 		cache(u32 raw, u32 ext, u32 species, u32 merge, move left, move right,
 			  info numof, info mask, list num, list layout, i32 moved, u32 legal)
 		: raw(raw), ext(ext), species(species), merge(merge), left(left), right(right),
 		  numof(numof), mask(mask), num(num), layout(layout), moved(moved), legal(legal) {}
+		cache() : cache(0, 0, 0, 0, {}, {}, {}, {}, {}, {}, -1, 0) {
+			static u32 seq = 0;
+			operator =(make(seq++));
+		}
+		cache& operator =(const cache& c) = default;
 
-		static void assign(u32 src[], u32& raw, u32& ext, u64& vraw, u32& vext) {
-			u32 lo[4], hi[4];
-			for (u32 i = 0; i < 4; i++) {
-				hi[i] = (src[i] & 0x10) >> 4;
-				lo[i] = (src[i] & 0x0f);
-			}
-			raw = ((lo[0] << 0) | (lo[1] << 4) | (lo[2] << 8) | (lo[3] << 12));
-			ext = ((hi[0] << 0) | (hi[1] << 1) | (hi[2] << 2) | (hi[3] << 3)) << 16;
-
-			vraw = (u64(lo[0]) << 0) | (u64(lo[1]) << 16) | (u64(lo[2]) << 32) | (u64(lo[3]) << 48);
-			vext = ((hi[0] << 0) | (hi[1] << 4) | (hi[2] << 8) | (hi[3] << 12)) << 16;
-		}
-		static void mvleft(u32 row[], u32& score, u32& merge) {
-			u32 top = 0;
-			u32 tmp = 0;
-			score = merge = 0;
-
-			for (u32 i = 0; i < 4; i++) {
-				u32 tile = row[i];
-				if (tile == 0) continue;
-				row[i] = 0;
-				if (tmp != 0) {
-					if (tile == tmp) {
-						tile = tile + 1;
-						row[top++] = tile;
-						score += (1 << tile);
-						merge++;
-						tmp = 0;
-					} else {
-						row[top++] = tmp;
-						tmp = tile;
-					}
-				} else {
-					tmp = tile;
-				}
-			}
-			if (tmp != 0) row[top] = tmp;
-		}
-		static void monoprobe(u32 row[], u32& mono) {
-			mono = 0;
-			mono |= monoprobe(row[0], row[1]) <<  0;
-			mono |= monoprobe(row[0], row[2]) <<  2;
-			mono |= monoprobe(row[0], row[3]) <<  4;
-			mono |= monoprobe(row[1], row[2]) <<  6;
-			mono |= monoprobe(row[1], row[3]) <<  8;
-			mono |= monoprobe(row[2], row[3]) << 10;
-		}
-		static u32 monoprobe(const u32& a, const u32& b) {
-			return a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b01 : 0b10);
-		}
-
-		static u32 seq32_static() {
-			static u32 seq32 = 0;
-			return seq32++;
-		}
 	};
+	static const cache lookup[1 << 20];
 
-	inline static const cache& lookup(const u32& i) {
-		static cache look[1 << 20](cache::make(cache::seq32_static()));
-		return look[i];
-	}
-
+public:
 	u64 raw;
 	u32 ext;
 	u32 inf;
@@ -263,8 +240,8 @@ public:
 	inline bool   operator  >(const u64& raw) const { return this->raw  > raw || this->ext != 0; }
 
 	inline const cache& query(const u32& r) const { return query16(r); }
-	inline const cache& query16(const u32& r) const { return board::lookup(fetch16(r)); }
-	inline const cache& query20(const u32& r) const { return board::lookup(fetch20(r)); }
+	inline const cache& query16(const u32& r) const { return board::lookup[fetch16(r)]; }
+	inline const cache& query20(const u32& r) const { return board::lookup[fetch20(r)]; }
 
 	inline u32 fetch(const u32& i) const { return fetch16(i); }
 	inline u32 fetch16(const u32& i) const {
@@ -599,9 +576,7 @@ public:
 		static inline std::array<optype, 4> actions() { return operations(); }
 	};
 
-	inline i32 operate(const optype::oper& op) {
-		return operate64(op);
-	}
+	inline i32 operate(const optype::oper& op) { return operate64(op); }
 	inline i32 operate64(const optype::oper& op) {
 		switch (op) {
 		case optype::up:    return up64();
@@ -625,9 +600,7 @@ public:
 	inline i32 move64(const optype::oper& op) { return operate64(op); }
 	inline i32 move80(const optype::oper& op) { return operate80(op); }
 
-	inline u32 species() const {
-		return species64();
-	}
+	inline u32 species() const { return species64(); }
 	inline u32 species64() const {
 		return query16(0).species | query16(1).species | query16(2).species | query16(3).species;
 	}
@@ -635,20 +608,18 @@ public:
 		return query20(0).species | query20(1).species | query20(2).species | query20(3).species;
 	}
 
-	inline u32 scale() const   { return species(); }
+	inline u32 scale() const   { return scale64(); }
 	inline u32 scale64() const { return species64(); }
 	inline u32 scale80() const { return species80(); }
 
-	inline u32 hash() const {
-		return hash64();
-	}
+	inline u32 hash() const { return hash64(); }
 	inline u32 hash64() const {
-		u32 h = 0;
+		register u32 h = 0;
 		for (u32 i = 0; i < 16; i++) h |= (1 << at4(i));
 		return h;
 	}
 	inline u32 hash80() const {
-		u32 h = 0;
+		register u32 h = 0;
 		for (u32 i = 0; i < 16; i++) h |= (1 << at5(i));
 		return h;
 	}
@@ -662,9 +633,7 @@ public:
 		return list(num, 16);
 	}
 
-	inline u32 numof(const u32& t) const {
-		return numof64(t);
-	}
+	inline u32 numof(const u32& t) const { return numof64(t); }
 	inline u32 numof64(const u32& t) const {
 		return query16(0).numof[t] + query16(1).numof[t] + query16(2).numof[t] + query16(3).numof[t];
 	}
@@ -673,9 +642,7 @@ public:
 	}
 
 	template<typename numa>
-	inline void numof(numa num, const u32& min, const u32& max) const {
-		return numof64(num, min, max);
-	}
+	inline void numof(numa num, const u32& min, const u32& max) const { return numof64(num, min, max); }
 	template<typename numa>
 	inline void numof64(numa num, const u32& min, const u32& max) const {
 		const cache::info& numof0 = query16(0).numof;
@@ -697,9 +664,7 @@ public:
 		}
 	}
 
-	inline u32 count(const u32& t) const {
-		return count64(t);
-	}
+	inline u32 count(const u32& t) const { return count64(t); }
 	inline u32 count64(const u32& t) const {
 		register u32 num = 0;
 		for (u32 i = 0; i < 16; i++)
@@ -714,9 +679,7 @@ public:
 	}
 
 	template<typename numa>
-	inline void count(numa num, const u32& min, const u32& max) const {
-		return count64(num, min, max);
-	}
+	inline void count(numa num, const u32& min, const u32& max) const { return count64(num, min, max); }
 	template<typename numa>
 	inline void count64(numa num, const u32& min, const u32& max) const {
 		std::fill(num + min, num + max, 0);
@@ -739,9 +702,7 @@ public:
 	}
 
 	template<typename numa>
-	inline void mask(numa msk, const u32& min, const u32& max) const {
-		return mask64(msk, min, max);
-	}
+	inline void mask(numa msk, const u32& min, const u32& max) const { return mask64(msk, min, max); }
 	template<typename numa>
 	inline void mask64(numa msk, const u32& min, const u32& max) const {
 		const cache::info& mask0 = query16(0).mask;
@@ -764,12 +725,10 @@ public:
 	}
 
 	inline list find(const u32& t) const { return find64(t); }
-	inline list find64(const u32& t) const { return board::lookup(mask64(t)).layout; }
-	inline list find80(const u32& t) const { return board::lookup(mask80(t)).layout; }
+	inline list find64(const u32& t) const { return board::lookup[mask64(t)].layout; }
+	inline list find80(const u32& t) const { return board::lookup[mask80(t)].layout; }
 
-	inline u64 monoleft() const {
-		return monoleft64();
-	}
+	inline u64 monoleft() const { return monoleft64(); }
 	inline u64 monoleft64() const {
 		register u64 mono = 0;
 		mono |= u64(query16(0).left.mono) <<  0;
@@ -787,9 +746,7 @@ public:
 		return mono;
 	}
 
-	inline u64 monoright() const {
-		return monoright64();
-	}
+	inline u64 monoright() const { return monoright64(); }
 	inline u64 monoright64() const {
 		register u64 mono = 0;
 		mono |= u64(query16(0).right.mono) <<  0;
@@ -939,12 +896,8 @@ public:
 			ext    = 0x80000000,
 		};
 
-		static item flag(const board& b) {
-			return static_cast<item>(b.inf);
-		}
-		static void setf(board& b, const item& f) {
-			b.inf = f;
-		}
+		static item flag(const board& b) { return static_cast<item>(b.inf); }
+		static void setf(board& b, const item& f) { b.inf = f; }
 	};
 	inline board& format(const style::item& style = style::at) {
 		style::setf(*this, style);
@@ -1035,5 +988,6 @@ public:
 	}
 
 };
+const board::cache board::lookup[1 << 20];
 
 } // namespace moporgic
