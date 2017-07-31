@@ -37,9 +37,9 @@ typedef float numeric;
 
 class weight {
 public:
-	weight() : id(0), length(0), value(nullptr) {}
-	weight(const weight& w) = default;
-	~weight() {}
+	inline weight() : id(0), length(0), value(nullptr) {}
+	inline weight(const weight& w) = default;
+	inline ~weight() {}
 
 	typedef u64 sign_t;
 
@@ -190,7 +190,7 @@ public:
 		return w;
 	}
 private:
-	weight(const sign_t& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
+	inline weight(const sign_t& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
 	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
@@ -207,9 +207,9 @@ private:
 
 class indexer {
 public:
-	indexer() : id(0), map(nullptr) {}
-	indexer(const indexer& i) = default;
-	~indexer() {}
+	inline indexer() : id(0), map(nullptr) {}
+	inline indexer(const indexer& i) = default;
+	inline ~indexer() {}
 
 	typedef u64 sign_t;
 	typedef std::function<u64(const board&)> mapper;
@@ -243,7 +243,7 @@ public:
 		return i;
 	}
 private:
-	indexer(const sign_t& sign, mapper map) : id(sign), map(map) {}
+	inline indexer(const sign_t& sign, mapper map) : id(sign), map(map) {}
 	static inline std::vector<indexer>& idxrs() { static std::vector<indexer> i; return i; }
 
 	sign_t id;
@@ -252,9 +252,9 @@ private:
 
 class feature {
 public:
-	feature() {}
-	feature(const feature& t) = default;
-	~feature() {}
+	inline feature() {}
+	inline feature(const feature& t) = default;
+	inline ~feature() {}
 
 	typedef u64 sign_t;
 
@@ -339,7 +339,7 @@ public:
 		return succ;
 	}
 
-	static feature& make(const sign_t& wgt, const sign_t& idx) {
+	static inline feature& make(const sign_t& wgt, const sign_t& idx) {
 		feats().push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
@@ -351,7 +351,7 @@ public:
 		return std::find_if(first, last,
 			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
 	}
-	static feature& at(const sign_t& wgt, const sign_t& idx, const iter& first = begin(), const iter& last = end()) {
+	static inline feature& at(const sign_t& wgt, const sign_t& idx, const iter& first = begin(), const iter& last = end()) {
 		const auto it = find(wgt, idx, first, last);
 		if (it != last) return (*it);
 		throw std::out_of_range("feature::at");
@@ -377,7 +377,7 @@ public:
 	static inline clip make_clip(const iter& first = begin(), const iter& last = end()) { return clip(first, last); }
 
 private:
-	feature(const weight& value, const indexer& index) : index(index), value(value) {}
+	inline feature(const weight& value, const indexer& index) : index(index), value(value) {}
 	static inline std::vector<feature>& feats() { static std::vector<feature> f; return f; }
 
 	indexer index;
