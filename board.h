@@ -11,7 +11,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 3.3
+// Version     : 3.5
 // Description : bitboard of 2048
 //============================================================================
 
@@ -65,24 +65,26 @@ public:
 			u16 mono; // monotonic decreasing value (12-bit)
 
 			template<int i>
-			inline void moveh64(u64& raw, u32& sc) const {
+			inline void moveh64(u64& raw, u32& sc, i32& mv) const {
 				raw |= u64(rawh) << (i << 4);
 				sc += score;
+				mv &= moved;
 			}
 			template<int i>
-			inline void moveh80(u64& raw, u32& ext, u32& sc) const {
-				moveh64<i>(raw, sc);
+			inline void moveh80(u64& raw, u32& ext, u32& sc, i32& mv) const {
+				moveh64<i>(raw, sc, mv);
 				ext |= exth << (i << 2);
 			}
 
 			template<int i>
-			inline void movev64(u64& raw, u32& sc) const {
+			inline void movev64(u64& raw, u32& sc, i32& mv) const {
 				raw |= rawv << (i << 2);
 				sc += score;
+				mv &= moved;
 			}
 			template<int i>
-			inline void movev80(u64& raw, u32& ext, u32& sc) const {
-				movev64<i>(raw, sc);
+			inline void movev80(u64& raw, u32& ext, u32& sc, i32& mv) const {
+				movev64<i>(raw, sc, mv);
 				ext |= extv << i;
 			}
 
@@ -442,109 +444,105 @@ public:
 	inline i32 down()  { return down64(); }
 
 	inline i32 left64() {
-		register u64 rawp = raw;
 		register u64 rawn = 0;
 		register u32 score = 0;
-		query16(0).left.moveh64<0>(rawn, score);
-		query16(1).left.moveh64<1>(rawn, score);
-		query16(2).left.moveh64<2>(rawn, score);
-		query16(3).left.moveh64<3>(rawn, score);
+		register i32 moved = -1;
+		query16(0).left.moveh64<0>(rawn, score, moved);
+		query16(1).left.moveh64<1>(rawn, score, moved);
+		query16(2).left.moveh64<2>(rawn, score, moved);
+		query16(3).left.moveh64<3>(rawn, score, moved);
 		raw = rawn;
-		return (rawp ^ rawn) ? score : -1;
+		return score | moved;
 	}
 	inline i32 right64() {
-		register u64 rawp = raw;
 		register u64 rawn = 0;
 		register u32 score = 0;
-		query16(0).right.moveh64<0>(rawn, score);
-		query16(1).right.moveh64<1>(rawn, score);
-		query16(2).right.moveh64<2>(rawn, score);
-		query16(3).right.moveh64<3>(rawn, score);
+		register i32 moved = -1;
+		query16(0).right.moveh64<0>(rawn, score, moved);
+		query16(1).right.moveh64<1>(rawn, score, moved);
+		query16(2).right.moveh64<2>(rawn, score, moved);
+		query16(3).right.moveh64<3>(rawn, score, moved);
 		raw = rawn;
-		return (rawp ^ rawn) ? score : -1;
+		return score | moved;
 	}
 	inline i32 up64() {
-		register u64 rawp = raw;
 		register u64 rawn = 0;
 		register u32 score = 0;
+		register i32 moved = -1;
 		transpose64();
-		query16(0).left.movev64<0>(rawn, score);
-		query16(1).left.movev64<1>(rawn, score);
-		query16(2).left.movev64<2>(rawn, score);
-		query16(3).left.movev64<3>(rawn, score);
+		query16(0).left.movev64<0>(rawn, score, moved);
+		query16(1).left.movev64<1>(rawn, score, moved);
+		query16(2).left.movev64<2>(rawn, score, moved);
+		query16(3).left.movev64<3>(rawn, score, moved);
 		raw = rawn;
-		return (rawp ^ rawn) ? score : -1;
+		return score | moved;
 	}
 	inline i32 down64() {
-		register u64 rawp = raw;
 		register u64 rawn = 0;
 		register u32 score = 0;
+		register i32 moved = -1;
 		transpose64();
-		query16(0).right.movev64<0>(rawn, score);
-		query16(1).right.movev64<1>(rawn, score);
-		query16(2).right.movev64<2>(rawn, score);
-		query16(3).right.movev64<3>(rawn, score);
+		query16(0).right.movev64<0>(rawn, score, moved);
+		query16(1).right.movev64<1>(rawn, score, moved);
+		query16(2).right.movev64<2>(rawn, score, moved);
+		query16(3).right.movev64<3>(rawn, score, moved);
 		raw = rawn;
-		return (rawp ^ rawn) ? score : -1;
+		return score | moved;
 	}
 
 	inline i32 left80() {
-		register u64 rawp = raw;
-		register u32 extp = ext;
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
-		query20(0).left.moveh80<0>(rawn, extn, score);
-		query20(1).left.moveh80<1>(rawn, extn, score);
-		query20(2).left.moveh80<2>(rawn, extn, score);
-		query20(3).left.moveh80<3>(rawn, extn, score);
+		register i32 moved = -1;
+		query20(0).left.moveh80<0>(rawn, extn, score, moved);
+		query20(1).left.moveh80<1>(rawn, extn, score, moved);
+		query20(2).left.moveh80<2>(rawn, extn, score, moved);
+		query20(3).left.moveh80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
-		return (rawp ^ rawn) | (extp ^ extn) ? score : -1;
+		return score | moved;
 	}
 	inline i32 right80() {
-		register u64 rawp = raw;
-		register u32 extp = ext;
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
-		query20(0).right.moveh80<0>(rawn, extn, score);
-		query20(1).right.moveh80<1>(rawn, extn, score);
-		query20(2).right.moveh80<2>(rawn, extn, score);
-		query20(3).right.moveh80<3>(rawn, extn, score);
+		register i32 moved = -1;
+		query20(0).right.moveh80<0>(rawn, extn, score, moved);
+		query20(1).right.moveh80<1>(rawn, extn, score, moved);
+		query20(2).right.moveh80<2>(rawn, extn, score, moved);
+		query20(3).right.moveh80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
-		return (rawp ^ rawn) | (extp ^ extn) ? score : -1;
+		return score | moved;
 	}
 	inline i32 up80() {
-		register u64 rawp = raw;
-		register u32 extp = ext;
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
+		register i32 moved = -1;
 		transpose80();
-		query20(0).left.movev80<0>(rawn, extn, score);
-		query20(1).left.movev80<1>(rawn, extn, score);
-		query20(2).left.movev80<2>(rawn, extn, score);
-		query20(3).left.movev80<3>(rawn, extn, score);
+		query20(0).left.movev80<0>(rawn, extn, score, moved);
+		query20(1).left.movev80<1>(rawn, extn, score, moved);
+		query20(2).left.movev80<2>(rawn, extn, score, moved);
+		query20(3).left.movev80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
-		return (rawp ^ rawn) | (extp ^ extn) ? score : -1;
+		return score | moved;
 	}
 	inline i32 down80() {
-		register u64 rawp = raw;
-		register u32 extp = ext;
 		register u64 rawn = 0;
 		register u32 extn = 0;
 		register u32 score = 0;
+		register i32 moved = -1;
 		transpose80();
-		query20(0).right.movev80<0>(rawn, extn, score);
-		query20(1).right.movev80<1>(rawn, extn, score);
-		query20(2).right.movev80<2>(rawn, extn, score);
-		query20(3).right.movev80<3>(rawn, extn, score);
+		query20(0).right.movev80<0>(rawn, extn, score, moved);
+		query20(1).right.movev80<1>(rawn, extn, score, moved);
+		query20(2).right.movev80<2>(rawn, extn, score, moved);
+		query20(3).right.movev80<3>(rawn, extn, score, moved);
 		raw = rawn;
 		ext = extn;
-		return (rawp ^ rawn) | (extp ^ extn) ? score : -1;
+		return score | moved;
 	}
 
 	class optype {
