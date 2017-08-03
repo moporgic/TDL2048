@@ -158,7 +158,13 @@ public:
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				weight w; in >> w, succ++;
-				wghts().push_back(w);
+				weight::iter it = weight::find(w.sign());
+				if (it == weight::end()) {
+					wghts().push_back(w);
+				} else {
+					free(it->data());
+					(*it) = w;
+				}
 			}
 			break;
 		}
@@ -327,7 +333,9 @@ public:
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				feature f; in >> f, succ++;
-				feats().push_back(f);
+				if (feature::find(weight(f).sign(), indexer(f).sign()) == feature::end()) {
+					feats().push_back(f);
+				}
 			}
 			break;
 		default:
