@@ -192,7 +192,10 @@ public:
 		list<weight>::as(wghts()).erase(find(sign));
 		return w;
 	}
-	static inline clip<weight> view(const iter& first = begin(), const iter& last = end()) { return { first, last }; }
+	static inline clip<weight> view(const iter& first = begin(), const iter& last = end()) {
+		if (first <= last && first >= begin() && last <= end()) return { first, last };
+		throw std::out_of_range("weight::view");
+	}
 
 private:
 	inline weight(const sign_t& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
@@ -246,7 +249,10 @@ public:
 		list<indexer>::as(idxrs()).erase(find(sign));
 		return i;
 	}
-	static inline clip<indexer> view(const iter& first = begin(), const iter& last = end()) { return { first, last }; }
+	static inline clip<indexer> view(const iter& first = begin(), const iter& last = end()) {
+		if (first <= last && first >= begin() && last <= end()) return { first, last };
+		throw std::out_of_range("indexer::view");
+	}
 
 private:
 	inline indexer(const sign_t& sign, mapper map) : id(sign), map(map) {}
@@ -368,7 +374,10 @@ public:
 		list<feature>::as(feats()).erase(find(wgt, idx));
 		return f;
 	}
-	static inline clip<feature> view(const iter& first = begin(), const iter& last = end()) { return { first, last }; }
+	static inline clip<feature> view(const iter& first = begin(), const iter& last = end()) {
+		if (first <= last && first >= begin() && last <= end()) return { first, last };
+		throw std::out_of_range("feature::view");
+	}
 
 private:
 	inline feature(const weight& value, const indexer& index) : index(index), value(value) {}
