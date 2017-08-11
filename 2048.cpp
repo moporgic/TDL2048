@@ -649,12 +649,20 @@ public:
 	inline size_t length() const { return zsize; }
 	inline size_t size() const { return zsize + limit; }
 
+	inline u64 min_isomorphic(board t) const {
+		u64 x = u64(t);
+		t.transpose(); x = std::min(x, u64(t));
+		t.mirror();    x = std::min(x, u64(t));
+		t.transpose(); x = std::min(x, u64(t));
+		t.mirror();    x = std::min(x, u64(t));
+		t.transpose(); x = std::min(x, u64(t));
+		t.mirror();    x = std::min(x, u64(t));
+		t.transpose(); x = std::min(x, u64(t));
+		return x;
+	}
+
 	inline position& operator[] (const board& b) {
-		auto x = u64(b);
-		for (auto i = 1; i < 8; i++) {
-			board t = b; t.isomorphic(i);
-			x = std::min(x, u64(t));
-		}
+		auto x = min_isomorphic(b);
 		auto hash = zhash(x) & zmask;
 
 		auto& data = cache[hash];
@@ -683,8 +691,8 @@ public:
 			hits += it->info;
 			it->info -= mini;
 		}
-		if (mini <= (hits / (size * 2))) return list[last](x);
-		if (size == 65536)               return list[last](x);
+		if (mini <= hits / (size * 2)) return list[last](x);
+		if (size == 65536)             return list[last](x);
 
 		auto temp = mpool_realloc(list, size);
 		if (!temp) return list[last](x);
