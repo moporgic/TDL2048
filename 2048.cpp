@@ -2163,8 +2163,8 @@ struct select {
 	inline state* end() { return move + 4; }
 };
 struct search : select {
-	u32 policy[16];
-	search(const u32* depth = search::depth()) : select() { std::copy(depth, depth + 16, policy); }
+	std::array<u32, 16> policy;
+	search(const std::array<u32, 16>& res = search::depth()) : select(), policy(res) {}
 
 	inline select& operator ()(const board& b) {
 		return operator ()(b, feature::begin(), feature::end());
@@ -2183,9 +2183,22 @@ struct search : select {
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
 
-	static u32* depth() {
-		static u32 dd[16] = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 3, 3, 3, 3 };
-		return dd;
+	static std::array<u32, 16>& depth() {
+		static std::array<u32, 16> res = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 1, 1, 1, 1 };
+		return res;
+	}
+	static std::array<u32, 16>& depth(const std::array<u32, 16>& res) { return (depth() = res); }
+
+	static void parse(const std::string& res) {
+		std::array<u32, 16> depthres;
+		std::string dyndepth(res);
+		for (u32 d = 0, e = 0; e < 16; depthres[e++] = d) {
+			if (dyndepth.empty()) continue;
+			auto it = dyndepth.find_first_of(", ");
+			d = std::stol(dyndepth.substr(0, it));
+			dyndepth = dyndepth.substr(it + 1);
+		}
+		depth(depthres);
 	}
 };
 struct statistic {
@@ -2655,15 +2668,7 @@ int main(int argc, const char* argv[]) {
 	if (!opts("test")) opts["test"] = opts("train") ? 0 : 10;
 	if (!opts("alpha")) opts["alpha"] = 0.0025;
 	if (!opts("seed")) opts["seed"] = rdtsc();
-	if (opts("depth")) {
-		std::string dyndepth(opts["depth"]);
-		for (u32 d = 0, e = 0; e < 16; search::depth()[e++] = d) {
-			if (dyndepth.empty()) continue;
-			auto it = dyndepth.find_first_of(", ");
-			d = std::stol(dyndepth.substr(0, it));
-			dyndepth = dyndepth.substr(it + 1);
-		}
-	}
+	if (!opts("depth")) opts["depth"] = "7 7 7 7 5 5 5 5 3 3 3 3 1 1 1 1";
 
 	std::cout << "TDL2048+ LOG" << std::endl;
 	std::cout << "develop-search" << " build C++" << __cplusplus;
@@ -2673,13 +2678,12 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << moporgic::millisec() << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
-	std::cout << "depth = ";
-	std::copy(search::depth(), search::depth() + 16, std::ostream_iterator<u32>(std::cout, " "));
-	std::cout << std::endl;
+	std::cout << "depth = " << opts["depth"] << std::endl;
 	std::cout << std::endl;
 
 	std::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
+	search::parse(opts["depth"]);
 
 	utils::make_indexers();
 
