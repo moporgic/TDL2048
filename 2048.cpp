@@ -160,7 +160,7 @@ public:
 				weight w; in >> w, succ++;
 				weight::iter it = weight::find(w.sign());
 				if (it == weight::end()) {
-					list<weight>::as(wghts()).push_back(w);
+					moporgic::list<weight>::as(wghts()).push_back(w);
 				} else {
 					free(it->data());
 					(*it) = w;
@@ -172,7 +172,7 @@ public:
 	}
 
 	static weight& make(const sign_t& sign, const size_t& size) {
-		list<weight>::as(wghts()).push_back(weight(sign, size));
+		moporgic::list<weight>::as(wghts()).push_back(weight(sign, size));
 		return wghts().back();
 	}
 	typedef clip<weight>::iterator iter;
@@ -189,12 +189,12 @@ public:
 	static inline weight erase(const sign_t& sign, const bool& del = true) {
 		weight w = at(sign);
 		if (del) free(w.data());
-		list<weight>::as(wghts()).erase(find(sign));
+		moporgic::list<weight>::as(wghts()).erase(find(sign));
 		return w;
 	}
-	static inline clip<weight> view(const iter& first = begin(), const iter& last = end()) {
+	static inline list<weight> list(const iter& first = begin(), const iter& last = end()) {
 		if (first <= last && first >= begin() && last <= end()) return { first, last };
-		throw std::out_of_range("weight::view");
+		throw std::out_of_range("weight::list");
 	}
 
 private:
@@ -230,7 +230,7 @@ public:
 	inline bool operator !=(const indexer& i) const { return id != i.id; }
 
 	static indexer& make(const sign_t& sign, mapper map) {
-		list<indexer>::as(idxrs()).push_back(indexer(sign, map));
+		moporgic::list<indexer>::as(idxrs()).push_back(indexer(sign, map));
 		return idxrs().back();
 	}
 	typedef clip<indexer>::iterator iter;
@@ -246,12 +246,12 @@ public:
 	}
 	static inline indexer erase(const sign_t& sign) {
 		indexer i = at(sign);
-		list<indexer>::as(idxrs()).erase(find(sign));
+		moporgic::list<indexer>::as(idxrs()).erase(find(sign));
 		return i;
 	}
-	static inline clip<indexer> view(const iter& first = begin(), const iter& last = end()) {
+	static inline list<indexer> list(const iter& first = begin(), const iter& last = end()) {
 		if (first <= last && first >= begin() && last <= end()) return { first, last };
-		throw std::out_of_range("indexer::view");
+		throw std::out_of_range("indexer::list");
 	}
 
 private:
@@ -323,7 +323,7 @@ public:
 		switch (code) {
 		case 0:
 			write_cast<u32>(out, feats().size());
-			for (feature f : feature::view())
+			for (feature f : feature::list())
 				out << f, succ++;
 			break;
 		default:
@@ -342,7 +342,7 @@ public:
 			for (read_cast<u32>(in, code); code; code--) {
 				feature f; in >> f, succ++;
 				if (feature::find(weight(f).sign(), indexer(f).sign()) == feature::end()) {
-					list<feature>::as(feats()).push_back(f);
+					moporgic::list<feature>::as(feats()).push_back(f);
 				}
 			}
 			break;
@@ -354,7 +354,7 @@ public:
 	}
 
 	static inline feature& make(const sign_t& wgt, const sign_t& idx) {
-		list<feature>::as(feats()).push_back(feature(weight::at(wgt), indexer::at(idx)));
+		moporgic::list<feature>::as(feats()).push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
 	typedef clip<feature>::iterator iter;
@@ -371,12 +371,12 @@ public:
 	}
 	static inline feature erase(const sign_t& wgt, const sign_t& idx) {
 		feature f = at(wgt, idx);
-		list<feature>::as(feats()).erase(find(wgt, idx));
+		moporgic::list<feature>::as(feats()).erase(find(wgt, idx));
 		return f;
 	}
-	static inline clip<feature> view(const iter& first = begin(), const iter& last = end()) {
+	static inline list<feature> list(const iter& first = begin(), const iter& last = end()) {
 		if (first <= last && first >= begin() && last <= end()) return { first, last };
-		throw std::out_of_range("feature::view");
+		throw std::out_of_range("feature::list");
 	}
 
 private:
@@ -1180,7 +1180,7 @@ u32 make_weights(std::string res = "") {
 	alias["8x6patt"] = alias["k.matsuzaki"];
 	alias["5x4patt"] = alias["patt/4-22"];
 
-	if (res.empty() && weight::view().empty())
+	if (res.empty() && weight::list().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined weights
 		auto pos = (" " + res + " ").find(" " + def.first + " ");
@@ -1275,7 +1275,7 @@ u32 make_features(std::string res = "") {
 	alias["5x4patt"] = alias["patt/4-22"];
 	alias["mono"] = alias["monotonic"];
 
-	if (res.empty() && feature::view().empty())
+	if (res.empty() && feature::list().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined features
 		auto pos = (" " + res + " ").find(" " + def.first + " ");
@@ -1356,10 +1356,10 @@ u32 make_features(std::string res = "") {
 }
 
 void list_mapping() {
-	for (weight w : list<weight>(weight::view())) {
+	for (weight w : weight::list()) {
 		char buf[64];
 		std::string feats;
-		for (feature f : feature::view()) {
+		for (feature f : feature::list()) {
 			if (weight(f) == w) {
 				snprintf(buf, sizeof(buf), " %08llx", indexer(f).sign());
 				feats += buf;
