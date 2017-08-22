@@ -192,7 +192,7 @@ public:
 		moporgic::list<weight>::as(wghts()).erase(find(sign));
 		return w;
 	}
-	static inline list<weight> list(const iter& first = begin(), const iter& last = end()) {
+	static inline moporgic::list<weight> list(const iter& first = begin(), const iter& last = end()) {
 		if (first <= last && first >= begin() && last <= end()) return { first, last };
 		throw std::out_of_range("weight::list");
 	}
@@ -249,7 +249,7 @@ public:
 		moporgic::list<indexer>::as(idxrs()).erase(find(sign));
 		return i;
 	}
-	static inline list<indexer> list(const iter& first = begin(), const iter& last = end()) {
+	static inline moporgic::list<indexer> list(const iter& first = begin(), const iter& last = end()) {
 		if (first <= last && first >= begin() && last <= end()) return { first, last };
 		throw std::out_of_range("indexer::list");
 	}
@@ -374,7 +374,7 @@ public:
 		moporgic::list<feature>::as(feats()).erase(find(wgt, idx));
 		return f;
 	}
-	static inline list<feature> list(const iter& first = begin(), const iter& last = end()) {
+	static inline moporgic::list<feature> list(const iter& first = begin(), const iter& last = end()) {
 		if (first <= last && first >= begin() && last <= end()) return { first, last };
 		throw std::out_of_range("feature::list");
 	}
