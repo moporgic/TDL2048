@@ -14,11 +14,10 @@
 #include <cmath>
 #include <numeric>
 
-#ifndef DEBUG
-#define constexpr constexpr
-#else /* DEBUG */
+#if !defined(__cplusplus) || __cplusplus < 201103L
 #define constexpr
-#endif /* DEBUG */
+#define noexcept
+#endif
 
 namespace moporgic {
 
@@ -30,7 +29,7 @@ namespace math {
  * Reversing the bits in an integer x is somewhat painful, but here's a SWAR algorithm for a 32-bit value
  */
 static inline constexpr
-unsigned int reverse(register unsigned int x) {
+unsigned int reverse(register unsigned int x) noexcept {
 	x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1));
 	x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2));
 	x = (((x & 0xf0f0f0f0) >> 4) | ((x & 0x0f0f0f0f) << 4));
@@ -42,7 +41,7 @@ unsigned int reverse(register unsigned int x) {
  * Reversing the bits in an integer x is somewhat painful, but here's a SWAR algorithm for a 32-bit value
  */
 static inline constexpr
-unsigned int reverse_v2(register unsigned int x) {
+unsigned int reverse_v2(register unsigned int x) noexcept {
 	register unsigned int y = 0x55555555;
 	x = (((x >> 1) & y) | ((x & y) << 1));
 	y = 0x33333333;
@@ -58,7 +57,7 @@ unsigned int reverse_v2(register unsigned int x) {
  * A non-negative binary integer value x is a power of 2 iff (x&(x-1)) is 0 using 2's complement arithmetic.
  */
 static inline constexpr
-bool ispw2(register unsigned int x) {
+bool ispw2(register unsigned int x) noexcept {
 	return (x & (x - 1)) == 0;
 }
 
@@ -72,7 +71,7 @@ bool ispw2(register unsigned int x) {
  * reduction adding the bits in a 32-bit value:
  */
 static inline constexpr
-unsigned int ones32(register unsigned int x) {
+unsigned int ones32(register unsigned int x) noexcept {
 	x -= ((x >> 1) & 0x55555555);
 	x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
 	x = (((x >> 4) + x) & 0x0f0f0f0f);
@@ -82,14 +81,14 @@ unsigned int ones32(register unsigned int x) {
 }
 
 static inline constexpr
-unsigned int ones64(register unsigned long long x) {
+unsigned int ones64(register unsigned long long x) noexcept {
 	x = (x & 0x5555555555555555ull) + ((x >> 1) & 0x5555555555555555ull);
 	x = (x & 0x3333333333333333ull) + ((x >> 2) & 0x3333333333333333ull);
 	return (((x + (x >> 4)) & 0x0f0f0f0f0f0f0f0full) * 0x0101010101010101ull) >> 56;
 }
 
 static inline constexpr
-unsigned int ones16(register unsigned int x) {
+unsigned int ones16(register unsigned int x) noexcept {
 	x -= ((x >> 1) & 0x5555);
 	x = (((x >> 2) & 0x3333) + (x & 0x3333));
 	x = (((x >> 4) + x) & 0x0f0f);
@@ -98,7 +97,7 @@ unsigned int ones16(register unsigned int x) {
 }
 
 static inline constexpr
-unsigned int ones8(register unsigned int x) {
+unsigned int ones8(register unsigned int x) noexcept {
 	x -= ((x >> 1) & 0x5555);
 	x = (((x >> 2) & 0x3333) + (x & 0x3333));
 	x = (((x >> 4) + x) & 0x0f0f);
@@ -113,7 +112,7 @@ unsigned int ones8(register unsigned int x) {
  * into quite a few algorithms, so it is useful to have an efficient implementation:
  */
 static inline constexpr
-unsigned int lzc(register unsigned int x) {
+unsigned int lzc(register unsigned int x) noexcept {
 	x |= (x >> 1);
 	x |= (x >> 2);
 	x |= (x >> 4);
@@ -134,12 +133,12 @@ unsigned int lzc(register unsigned int x) {
  *
  */
 static inline constexpr
-unsigned int lsb32(register unsigned int x) {
+unsigned int lsb32(register unsigned int x) noexcept {
 	return (x ^ (x & (x - 1)));
 }
 
 static inline constexpr
-unsigned long long int lsb64(register unsigned long long int x) {
+unsigned long long int lsb64(register unsigned long long int x) noexcept {
 	return (x ^ (x & (x - 1)));
 }
 
@@ -152,7 +151,7 @@ unsigned long long int lsb64(register unsigned long long int x) {
  * the complement of the "folded" value shifted down by one yields the most significant bit. For a 32-bit value:
  */
 static inline constexpr
-unsigned int msb32(register unsigned int x) {
+unsigned int msb32(register unsigned int x) noexcept {
 	x |= (x >> 1);
 	x |= (x >> 2);
 	x |= (x >> 4);
@@ -162,7 +161,7 @@ unsigned int msb32(register unsigned int x) {
 }
 
 static inline constexpr
-unsigned long long int msb64(register unsigned long long int x) {
+unsigned long long int msb64(register unsigned long long int x) noexcept {
 	x |= (x >> 1);
 	x |= (x >> 2);
 	x |= (x >> 4);
@@ -173,7 +172,7 @@ unsigned long long int msb64(register unsigned long long int x) {
 }
 
 static inline constexpr
-unsigned int msb16(register unsigned int x) {
+unsigned int msb16(register unsigned int x) noexcept {
 	x |= (x >> 1);
 	x |= (x >> 2);
 	x |= (x >> 4);
@@ -182,7 +181,7 @@ unsigned int msb16(register unsigned int x) {
 }
 
 static inline constexpr
-unsigned int msb8(register unsigned int x) {
+unsigned int msb8(register unsigned int x) noexcept {
 	x |= (x >> 1);
 	x |= (x >> 2);
 	x |= (x >> 4);
@@ -202,7 +201,7 @@ unsigned int msb8(register unsigned int x) {
  *
  */
 static inline constexpr
-unsigned int log2(register unsigned int x) {
+unsigned int log2(register unsigned int x) noexcept {
 	x |= (x >> 1);
 	x |= (x >> 2);
 	x |= (x >> 4);
@@ -216,17 +215,17 @@ unsigned int log2(register unsigned int x) {
 }
 
 static inline constexpr
-unsigned int lg(register unsigned int x) {
+unsigned int lg(register unsigned int x) noexcept {
 	return log2(x);
 }
 
 static inline constexpr
-unsigned int lg32(register unsigned int x) {
+unsigned int lg32(register unsigned int x) noexcept {
 	return log2(x);
 }
 
 static inline constexpr
-unsigned int lg64(register unsigned long long int x) {
+unsigned int lg64(register unsigned long long int x) noexcept {
 	x |= (x >> 1);
 	x |= (x >> 2);
 	x |= (x >> 4);
@@ -241,7 +240,7 @@ unsigned int lg64(register unsigned long long int x) {
 }
 
 static inline constexpr
-unsigned int lg16(register unsigned int x) {
+unsigned int lg16(register unsigned int x) noexcept {
 	x |= (x >> 1);
 	x |= (x >> 2);
 	x |= (x >> 4);
@@ -254,7 +253,7 @@ unsigned int lg16(register unsigned int x) {
 }
 
 static inline constexpr
-unsigned int lg8(register unsigned int x) {
+unsigned int lg8(register unsigned int x) noexcept {
 	x |= (x >> 1);
 	x |= (x >> 2);
 	x |= (x >> 4);
@@ -274,7 +273,7 @@ unsigned int lg8(register unsigned int x) {
  * The result is:
  */
 static inline constexpr
-unsigned int log2_unstable(register unsigned int x) {
+unsigned int log2_unstable(register unsigned int x) noexcept {
 	register int y = (x & (x - 1));
 
 	y |= -y;
@@ -299,7 +298,7 @@ unsigned int log2_unstable(register unsigned int x) {
  *  Adding 1 to that value yields the next largest power of 2. For a 32-bit value:
  */
 static inline constexpr
-unsigned int nlpo2(register unsigned int x) {
+unsigned int nlpo2(register unsigned int x) noexcept {
 	x |= (x >> 1);
 	x |= (x >> 2);
 	x |= (x >> 4);
@@ -311,9 +310,8 @@ unsigned int nlpo2(register unsigned int x) {
 /**
  * Swap without temporary
  */
-template<typename T>
-static inline
-void swap(T& x, T& y) {
+template<typename T> static inline constexpr
+void swap(T& x, T& y) noexcept {
 	x ^= y; /* x' = (x^y) */
 	y ^= x; /* y' = (y^(x^y)) = x */
 	x ^= y; /* x' = (x^y)^x = y */
@@ -322,9 +320,8 @@ void swap(T& x, T& y) {
 /**
  * Swap without temporary
  */
-template<typename T>
-static inline
-void swap_v2(T& x, T& y) {
+template<typename T> static inline constexpr
+void swap_v2(T& x, T& y) noexcept {
 	x += y; /* x' = (x+y) */
 	y = x - y; /* y' = (x+y)-y = x */
 	x -= y; /* x' = (x+y)-x = y */
@@ -336,26 +333,26 @@ void swap_v2(T& x, T& y) {
  * it is trivial to combine them to construct a trailing zero count (as pointed-out by Joe Bowbeer):
  */
 static inline constexpr
-unsigned int tzc(register int x) {
+unsigned int tzc(register int x) noexcept {
 	return (ones32((x & -x) - 1));
 }
 
 /**
  * Tail recursive pow
  */
-template<typename N, typename P> constexpr
+template<typename N, typename P> static inline constexpr
 N pow_tail(N v, N b, P p) noexcept { return p ? pow_tail(v * b, b, p - 1) : v; }
 
 /**
  * Tail recursive pow
  */
-template<typename N, typename P> constexpr inline
+template<typename N, typename P> static inline constexpr
 N pow(N b, P p) noexcept { return pow_tail(1, b, p); }
 
 /**
  * main
  */
-template<typename numeric, typename iter> constexpr inline
+template<typename numeric, typename iter> static inline constexpr
 numeric mean(iter first, iter last, numeric init = 0) noexcept {
 	return std::accumulate(first, last, 0) / numeric(last - first);
 }
@@ -363,7 +360,7 @@ numeric mean(iter first, iter last, numeric init = 0) noexcept {
 /**
  * standard deviation
  */
-template<typename numeric, typename iter> constexpr inline
+template<typename numeric, typename iter> static inline constexpr
 numeric deviation(iter first, iter last, numeric mean) noexcept {
 	numeric sumofsqr = 0;
 	for (iter it = first; it != last; it++) sumofsqr += std::pow(*it - mean, 2);
@@ -373,46 +370,22 @@ numeric deviation(iter first, iter last, numeric mean) noexcept {
 /**
  * standard deviation
  */
-template<typename numeric, typename iter> constexpr inline
+template<typename numeric, typename iter> static inline constexpr
 numeric deviation(iter first, iter last) noexcept {
 	return deviation<numeric>(first, last, mean<numeric>(first, last));
 }
 
-#undef constexpr
 } /* math */
+
+/**
+ * the full declaration of half is inside type.h
+ * here is the 16-bit floating point operation
+ */
+constexpr half::half(const f32& num) noexcept : hf(to_half(num)) {}
+constexpr half::operator f32() const noexcept { return to_float(hf); }
+constexpr half half::operator +(const half& f) const noexcept { return half::as(half_add(hf, f.hf)); }
+constexpr half half::operator -(const half& f) const noexcept { return half::as(half_sub(hf, f.hf)); }
+constexpr half half::operator *(const half& f) const noexcept { return half::as(half_mul(hf, f.hf)); }
+constexpr half half::operator /(const half& f) const noexcept { return half::as(half_div(hf, f.hf)); }
+
 } /* moporgic */
-
-// the declaration of half is inside type.h
-half::half(const half& num) : hf(num.hf) {}
-half::half(const f32& num) : hf(to_half(num)) {}
-half::half(const f64& num) : half(f32(num)) {}
-half::half(const u64& num) : half(f32(num)) {}
-half::half(const i64& num) : half(f32(num)) {}
-half::half(const u32& num) : half(f32(num)) {}
-half::half(const i32& num) : half(f32(num)) {}
-half::half(const u16& num) : half(f32(num)) {}
-half::half(const i16& num) : half(f32(num)) {}
-inline half::operator f32() const { return to_float(hf); }
-inline f32 half::operator +(const f32& f) const { return operator f32() + f; }
-inline f32 half::operator -(const f32& f) const { return operator f32() - f; }
-inline f32 half::operator *(const f32& f) const { return operator f32() * f; }
-inline f32 half::operator /(const f32& f) const { return operator f32() / f; }
-inline f32 half::operator ++(int) { f32 f = to_float(hf); hf = to_half(f + 1); return f; }
-inline f32 half::operator --(int) { f32 f = to_float(hf); hf = to_half(f - 1); return f; }
-inline f32 half::operator ++() { f32 f = to_float(hf) + 1; hf = to_half(f); return f; }
-inline f32 half::operator --() { f32 f = to_float(hf) - 1; hf = to_half(f); return f; }
-inline half& half::operator  =(const half& f) { hf = f.hf; return *this; }
-inline half& half::operator  =(const f32& f) { hf = to_float(f32(f)); return *this; }
-inline half& half::operator +=(const f32& f) { return operator =(operator +(f)); }
-inline half& half::operator -=(const f32& f) { return operator =(operator -(f)); }
-inline half& half::operator *=(const f32& f) { return operator =(operator *(f)); }
-inline half& half::operator /=(const f32& f) { return operator =(operator /(f)); }
-inline bool half::operator ==(const f32& f) const { return operator f32() == f; }
-inline bool half::operator !=(const f32& f) const { return operator f32() != f; }
-inline bool half::operator <=(const f32& f) const { return operator f32() <= f; }
-inline bool half::operator >=(const f32& f) const { return operator f32() >= f; }
-inline bool half::operator < (const f32& f) const { return operator f32() <  f; }
-inline bool half::operator > (const f32& f) const { return operator f32() >  f; }
-inline u16& hfat(const f32& v) { return ((u16*)&v)[moporgic::endian::is_le() ? 1 : 0]; }
-inline u32& hfat(const f64& v) { return ((u32*)&v)[moporgic::endian::is_le() ? 1 : 0]; }
-

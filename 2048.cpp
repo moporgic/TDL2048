@@ -160,7 +160,13 @@ public:
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				weight w; in >> w, succ++;
-				wghts().push_back(w);
+				weight::iter it = weight::find(w.sign());
+				if (it == weight::end()) {
+					moporgic::list<weight>::as(wghts()).push_back(w);
+				} else {
+					free(it->data());
+					(*it) = w;
+				}
 			}
 			break;
 		}
@@ -168,11 +174,10 @@ public:
 	}
 
 	static weight& make(const sign_t& sign, const size_t& size) {
-		wghts().push_back(weight(sign, size));
+		moporgic::list<weight>::as(wghts()).push_back(weight(sign, size));
 		return wghts().back();
 	}
-	typedef std::vector<weight>::iterator iter;
-	static inline const std::vector<weight>& list() { return wghts(); }
+	typedef clip<weight>::iterator iter;
 	static inline iter begin() { return wghts().begin(); }
 	static inline iter end()   { return wghts().end(); }
 	static inline iter find(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
@@ -186,12 +191,17 @@ public:
 	static inline weight erase(const sign_t& sign, const bool& del = true) {
 		weight w = at(sign);
 		if (del) free(w.data());
-		wghts().erase(find(sign));
+		moporgic::list<weight>::as(wghts()).erase(find(sign));
 		return w;
 	}
+	static inline list<weight> list(const iter& first = begin(), const iter& last = end()) {
+		if (first <= last && first >= begin() && last <= end()) return { first, last };
+		throw std::out_of_range("weight::list");
+	}
+
 private:
 	inline weight(const sign_t& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
-	static inline std::vector<weight>& wghts() { static std::vector<weight> w; return w; }
+	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
 		return new numeric[size]();
@@ -222,11 +232,10 @@ public:
 	inline bool operator !=(const indexer& i) const { return id != i.id; }
 
 	static indexer& make(const sign_t& sign, mapper map) {
-		idxrs().push_back(indexer(sign, map));
+		moporgic::list<indexer>::as(idxrs()).push_back(indexer(sign, map));
 		return idxrs().back();
 	}
-	typedef std::vector<indexer>::iterator iter;
-	static inline const std::vector<indexer>& list() { return idxrs(); }
+	typedef clip<indexer>::iterator iter;
 	static inline iter begin() { return idxrs().begin(); }
 	static inline iter end() { return idxrs().end(); }
 	static inline iter find(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
@@ -239,12 +248,17 @@ public:
 	}
 	static inline indexer erase(const sign_t& sign) {
 		indexer i = at(sign);
-		idxrs().erase(find(sign));
+		moporgic::list<indexer>::as(idxrs()).erase(find(sign));
 		return i;
 	}
+	static inline list<indexer> list(const iter& first = begin(), const iter& last = end()) {
+		if (first <= last && first >= begin() && last <= end()) return { first, last };
+		throw std::out_of_range("indexer::list");
+	}
+
 private:
 	inline indexer(const sign_t& sign, mapper map) : id(sign), map(map) {}
-	static inline std::vector<indexer>& idxrs() { static std::vector<indexer> i; return i; }
+	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
 	sign_t id;
 	mapper map;
@@ -329,7 +343,9 @@ public:
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				feature f; in >> f, succ++;
-				feats().push_back(f);
+				if (feature::find(weight(f).sign(), indexer(f).sign()) == feature::end()) {
+					moporgic::list<feature>::as(feats()).push_back(f);
+				}
 			}
 			break;
 		default:
@@ -340,11 +356,10 @@ public:
 	}
 
 	static inline feature& make(const sign_t& wgt, const sign_t& idx) {
-		feats().push_back(feature(weight::at(wgt), indexer::at(idx)));
+		moporgic::list<feature>::as(feats()).push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
-	typedef std::vector<feature>::iterator iter;
-	static inline const std::vector<feature>& list() { return feats(); }
+	typedef clip<feature>::iterator iter;
 	static inline iter begin() { return feats().begin(); }
 	static inline iter end()   { return feats().end(); }
 	static inline iter find(const sign_t& wght, const sign_t& idxr, const iter& first = begin(), const iter& last = end()) {
@@ -358,27 +373,17 @@ public:
 	}
 	static inline feature erase(const sign_t& wgt, const sign_t& idx) {
 		feature f = at(wgt, idx);
-		feats().erase(find(wgt, idx));
+		moporgic::list<feature>::as(feats()).erase(find(wgt, idx));
 		return f;
 	}
-
-	struct clip {
-		feature::iter first;
-		feature::iter last;
-		inline clip(iter first = feature::begin(), iter last = feature::end()) : first(first), last(last) {
-			if (first < begin() || first >= end()) throw std::out_of_range("feature::clip it:first");
-			if (last < begin() || last > end())    throw std::out_of_range("feature::clip it:last");
-		}
-		inline clip(iter first, size_t num) : clip(first, first + num) {}
-		inline feature::iter begin() const { return first; }
-		inline feature::iter end() const { return last; }
-		inline size_t size() const { return last - first; }
-	};
-	static inline clip make_clip(const iter& first = begin(), const iter& last = end()) { return clip(first, last); }
+	static inline list<feature> list(const iter& first = begin(), const iter& last = end()) {
+		if (first <= last && first >= begin() && last <= end()) return { first, last };
+		throw std::out_of_range("feature::list");
+	}
 
 private:
 	inline feature(const weight& value, const indexer& index) : index(index), value(value) {}
-	static inline std::vector<feature>& feats() { static std::vector<feature> f; return f; }
+	static inline clip<feature>& feats() { static clip<feature> f; return f; }
 
 	indexer index;
 	weight value;
@@ -1353,7 +1358,7 @@ u32 make_features(std::string res = "") {
 }
 
 void list_mapping() {
-	for (weight w : std::vector<weight>(weight::list())) {
+	for (weight w : weight::list()) {
 		char buf[64];
 		std::string feats;
 		for (feature f : feature::list()) {
@@ -1372,8 +1377,8 @@ void list_mapping() {
 			std::cout << buf << " :" << feats << std::endl;
 		} else {
 			snprintf(buf, sizeof(buf), "%08llx", w.sign());
-			std::cerr << "unused weight (" << buf << ") at list_mapping" << std::endl;
 			weight::erase(w.sign());
+			std::cerr << "unused weight (" << buf << ") at list_mapping, erased" << std::endl;
 		}
 	}
 }
