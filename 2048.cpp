@@ -1334,7 +1334,7 @@ u32 make_features(std::string res = "") {
 			std::transform(xpatt.begin(), xpatt.end(), xpatt.begin(), [=](int v) {
 				board x(0xfedcba9876543210ull);
 				x.isomorphic(-iso);
-				return x[v];
+				return x.at(v);
 			});
 
 			indexer::sign_t idxr = (utils::hashpatt(xpatt) & op_bitand) | op_bitor;
