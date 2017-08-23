@@ -1384,18 +1384,18 @@ void list_mapping() {
 
 
 inline numeric estimate(const board& state,
-		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+		const clip<feature>& range = { feature::begin(), feature::end() }) {
 	register numeric esti = 0;
-	for (auto f = begin; f != end; f++)
-		esti += (*f)[state];
+	for (register feature& feat : range)
+		esti += feat[state];
 	return esti;
 }
 
 inline numeric update(const board& state, const numeric& updv,
-		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+		const clip<feature>& range = { feature::begin(), feature::end() }) {
 	register numeric esti = 0;
-	for (auto f = begin; f != end; f++)
-		esti += ((*f)[state] += updv);
+	for (register feature& feat : range)
+		esti += (feat[state] += updv);
 	return esti;
 }
 
@@ -1421,17 +1421,17 @@ struct state {
 	inline numeric reward() const { return score; }
 
 	inline numeric estimate(
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+			const clip<feature>& range = { feature::begin(), feature::end() }) {
 		if (score >= 0) {
-			esti = state::reward() + utils::estimate(move, begin, end);
+			esti = state::reward() + utils::estimate(move, range);
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
 		return esti;
 	}
 	inline numeric update(const numeric& accu, const numeric& alpha = state::alpha(),
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
-		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), begin, end);
+			const clip<feature>& range = { feature::begin(), feature::end() }) {
+		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), range);
 		return esti;
 	}
 
@@ -1485,15 +1485,15 @@ struct select {
 		move[3] << b;
 		return update();
 	}
-	inline select& operator ()(const board& b, const feature::iter begin, const feature::iter end) {
+	inline select& operator ()(const board& b, const clip<feature>& range) {
 		move[0].assign(b);
 		move[1].assign(b);
 		move[2].assign(b);
 		move[3].assign(b);
-		move[0].estimate(begin, end);
-		move[1].estimate(begin, end);
-		move[2].estimate(begin, end);
-		move[3].estimate(begin, end);
+		move[0].estimate(range);
+		move[1].estimate(range);
+		move[2].estimate(range);
+		move[3].estimate(range);
 		return update();
 	}
 	inline select& update() {
