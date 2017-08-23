@@ -323,7 +323,7 @@ public:
 		switch (code) {
 		case 0:
 			write_cast<u32>(out, feats().size());
-			for (feature f : feature::list())
+			for (feature f : feature::feats())
 				out << f, succ++;
 			break;
 		default:
@@ -1356,7 +1356,7 @@ u32 make_features(std::string res = "") {
 }
 
 void list_mapping() {
-	for (weight w : weight::list()) {
+	for (weight w : list<weight>(weight::list())) {
 		char buf[64];
 		std::string feats;
 		for (feature f : feature::list()) {
