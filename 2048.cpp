@@ -158,9 +158,9 @@ public:
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				weight w; in >> w, succ++;
-				weight::iter it = weight::find(w.sign());
-				if (it == weight::end()) {
-					moporgic::list<weight>::as(wghts()).push_back(w);
+				weight* it = weight::find(w.sign());
+				if (it == weight::wghts().end()) {
+					list<weight>::as(wghts()).push_back(w);
 				} else {
 					free(it->data());
 					(*it) = w;
@@ -171,35 +171,29 @@ public:
 		return succ;
 	}
 
-	static weight& make(const sign_t& sign, const size_t& size) {
-		moporgic::list<weight>::as(wghts()).push_back(weight(sign, size));
+	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
+
+	static inline weight& make(const sign_t& sign, const size_t& size) {
+		list<weight>::as(wghts()).push_back(weight(sign, size));
 		return wghts().back();
 	}
-	typedef clip<weight>::iterator iter;
-	static inline iter begin() { return wghts().begin(); }
-	static inline iter end()   { return wghts().end(); }
-	static inline iter find(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
-		return std::find_if(first, last, [=](const weight& w) { return w.sign() == sign; });
+	static inline weight* find(const sign_t& sign, const clip<weight>& range = wghts()) {
+		return std::find_if(range.begin(), range.end(), [=](const weight& w) { return w.sign() == sign; });
 	}
-	static inline weight& at(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
-		auto it = find(sign, first, last);
-		if (it != last) return (*it);
+	static inline weight& at(const sign_t& sign, const clip<weight>& range = wghts()) {
+		auto it = find(sign, range);
+		if (it != range.end()) return (*it);
 		throw std::out_of_range("weight::at");
 	}
 	static inline weight erase(const sign_t& sign, const bool& del = true) {
 		weight w = at(sign);
 		if (del) free(w.data());
-		moporgic::list<weight>::as(wghts()).erase(find(sign));
+		list<weight>::as(wghts()).erase(find(sign));
 		return w;
-	}
-	static inline moporgic::list<weight> list(const iter& first = begin(), const iter& last = end()) {
-		if (first <= last && first >= begin() && last <= end()) return { first, last };
-		throw std::out_of_range("weight::list");
 	}
 
 private:
 	inline weight(const sign_t& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
-	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
 
 	static inline numeric* alloc(const size_t& size) {
 		return new numeric[size]();
@@ -229,34 +223,28 @@ public:
 	inline bool operator ==(const indexer& i) const { return id == i.id; }
 	inline bool operator !=(const indexer& i) const { return id != i.id; }
 
-	static indexer& make(const sign_t& sign, mapper map) {
-		moporgic::list<indexer>::as(idxrs()).push_back(indexer(sign, map));
+	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
+
+	static inline indexer& make(const sign_t& sign, mapper map) {
+		list<indexer>::as(idxrs()).push_back(indexer(sign, map));
 		return idxrs().back();
 	}
-	typedef clip<indexer>::iterator iter;
-	static inline iter begin() { return idxrs().begin(); }
-	static inline iter end() { return idxrs().end(); }
-	static inline iter find(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
-		return std::find_if(first, last, [=](const indexer& i) { return i.sign() == sign; });
+	static inline indexer* find(const sign_t& sign, const clip<indexer>& range = idxrs()) {
+		return std::find_if(range.begin(), range.end(), [=](const indexer& i) { return i.sign() == sign; });
 	}
-	static inline indexer& at(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
-		const auto it = find(sign, first, last);
-		if (it != last) return (*it);
+	static inline indexer& at(const sign_t& sign, const clip<indexer>& range = idxrs()) {
+		const auto it = find(sign, range);
+		if (it != range.end()) return (*it);
 		throw std::out_of_range("indexer::at");
 	}
 	static inline indexer erase(const sign_t& sign) {
 		indexer i = at(sign);
-		moporgic::list<indexer>::as(idxrs()).erase(find(sign));
+		list<indexer>::as(idxrs()).erase(find(sign));
 		return i;
-	}
-	static inline moporgic::list<indexer> list(const iter& first = begin(), const iter& last = end()) {
-		if (first <= last && first >= begin() && last <= end()) return { first, last };
-		throw std::out_of_range("indexer::list");
 	}
 
 private:
 	inline indexer(const sign_t& sign, mapper map) : id(sign), map(map) {}
-	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
 	sign_t id;
 	mapper map;
@@ -341,8 +329,8 @@ public:
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				feature f; in >> f, succ++;
-				if (feature::find(weight(f).sign(), indexer(f).sign()) == feature::end()) {
-					moporgic::list<feature>::as(feats()).push_back(f);
+				if (feature::find(weight(f).sign(), indexer(f).sign()) == feature::feats().end()) {
+					list<feature>::as(feats()).push_back(f);
 				}
 			}
 			break;
@@ -353,35 +341,29 @@ public:
 		return succ;
 	}
 
+	static inline clip<feature>& feats() { static clip<feature> f; return f; }
+
 	static inline feature& make(const sign_t& wgt, const sign_t& idx) {
-		moporgic::list<feature>::as(feats()).push_back(feature(weight::at(wgt), indexer::at(idx)));
+		list<feature>::as(feats()).push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
-	typedef clip<feature>::iterator iter;
-	static inline iter begin() { return feats().begin(); }
-	static inline iter end()   { return feats().end(); }
-	static inline iter find(const sign_t& wght, const sign_t& idxr, const iter& first = begin(), const iter& last = end()) {
-		return std::find_if(first, last,
+	static inline feature* find(const sign_t& wght, const sign_t& idxr, const clip<feature>& range = feats()) {
+		return std::find_if(range.begin(), range.end(),
 			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
 	}
-	static inline feature& at(const sign_t& wgt, const sign_t& idx, const iter& first = begin(), const iter& last = end()) {
-		const auto it = find(wgt, idx, first, last);
-		if (it != last) return (*it);
+	static inline feature& at(const sign_t& wgt, const sign_t& idx, const clip<feature>& range = feats()) {
+		const auto it = find(wgt, idx, range);
+		if (it != range.end()) return (*it);
 		throw std::out_of_range("feature::at");
 	}
 	static inline feature erase(const sign_t& wgt, const sign_t& idx) {
 		feature f = at(wgt, idx);
-		moporgic::list<feature>::as(feats()).erase(find(wgt, idx));
+		list<feature>::as(feats()).erase(find(wgt, idx));
 		return f;
-	}
-	static inline moporgic::list<feature> list(const iter& first = begin(), const iter& last = end()) {
-		if (first <= last && first >= begin() && last <= end()) return { first, last };
-		throw std::out_of_range("feature::list");
 	}
 
 private:
 	inline feature(const weight& value, const indexer& index) : index(index), value(value) {}
-	static inline clip<feature>& feats() { static clip<feature> f; return f; }
 
 	indexer index;
 	weight value;
@@ -762,7 +744,7 @@ u64 indexmax(const board& b) { // 16-bit
 u32 make_indexers(std::string res = "") {
 	u32 succ = 0;
 	auto make = [&](indexer::sign_t sign, indexer::mapper func) {
-		if (indexer::find(sign) != indexer::end()) return;
+		if (indexer::find(sign) != indexer::idxrs().end()) return;
 		indexer::make(sign, func); succ++;
 	};
 
@@ -1180,7 +1162,7 @@ u32 make_weights(std::string res = "") {
 	alias["8x6patt"] = alias["k.matsuzaki"];
 	alias["5x4patt"] = alias["patt/4-22"];
 
-	if (res.empty() && weight::list().empty())
+	if (res.empty() && weight::wghts().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined weights
 		auto pos = (" " + res + " ").find(" " + def.first + " ");
@@ -1201,7 +1183,7 @@ u32 make_weights(std::string res = "") {
 		if (!(info >> signs)) continue;
 		weight::sign_t prev = std::stoull(signs.substr(0), nullptr, 16);
 		weight::sign_t sign = std::stoull(signs.substr(signs.find('=') + 1), nullptr, 16);
-		if (prev != sign && weight::find(prev) != weight::end()) {
+		if (prev != sign && weight::find(prev) != weight::wghts().end()) {
 			std::cerr << "move weight to a new sign (" << signs << ")..." << std::endl;
 			signs = signs.substr(signs.find('=') + 1);
 			weight wsrc = weight::at(prev);
@@ -1226,7 +1208,7 @@ u32 make_weights(std::string res = "") {
 			break;
 		}
 
-		if (weight::find(sign) == weight::end()) {
+		if (weight::find(sign) == weight::wghts().end()) {
 			weight::make(sign, size);
 			succ++;
 		} else if (weight::at(sign).size() != size) {
@@ -1275,7 +1257,7 @@ u32 make_features(std::string res = "") {
 	alias["5x4patt"] = alias["patt/4-22"];
 	alias["mono"] = alias["monotonic"];
 
-	if (res.empty() && feature::list().empty())
+	if (res.empty() && feature::feats().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined features
 		auto pos = (" " + res + " ").find(" " + def.first + " ");
@@ -1296,7 +1278,7 @@ u32 make_features(std::string res = "") {
 		if (!(info >> wghts && info >> idxrs)) continue;
 
 		weight::sign_t wght = std::stoull(wghts, nullptr, 16);
-		if (weight::find(wght) == weight::end()) {
+		if (weight::find(wght) == weight::wghts().end()) {
 			std::cerr << "unknown weight (" << wghts << ") at make_features, ";
 			std::cerr << "assume as pattern descriptor..." << std::endl;
 			weight::make(wght, std::pow(16ull, wghts.size()));
@@ -1338,7 +1320,7 @@ u32 make_features(std::string res = "") {
 			});
 
 			indexer::sign_t idxr = (utils::hashpatt(xpatt) & op_bitand) | op_bitor;
-			if (indexer::find(idxr) == indexer::end()) {
+			if (indexer::find(idxr) == indexer::idxrs().end()) {
 				idxrs = utils::hashpatt(idxr, idxv.size());
 				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
 				std::cerr << "assume as pattern descriptor..." << std::endl;
@@ -1346,7 +1328,7 @@ u32 make_features(std::string res = "") {
 				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*npatt)));
 			}
 
-			if (feature::find(wght, idxr) == feature::end()) {
+			if (feature::find(wght, idxr) == feature::feats().end()) {
 				feature::make(wght, idxr);
 				succ++;
 			}
@@ -1356,10 +1338,10 @@ u32 make_features(std::string res = "") {
 }
 
 void list_mapping() {
-	for (weight w : list<weight>(weight::list())) {
+	for (weight w : list<weight>(weight::wghts())) {
 		char buf[64];
 		std::string feats;
-		for (feature f : feature::list()) {
+		for (feature f : feature::feats()) {
 			if (weight(f) == w) {
 				snprintf(buf, sizeof(buf), " %08llx", indexer(f).sign());
 				feats += buf;
@@ -1384,7 +1366,7 @@ void list_mapping() {
 
 
 inline numeric estimate(const board& state,
-		const clip<feature>& range = { feature::begin(), feature::end() }) {
+		const clip<feature>& range = feature::feats()) {
 	register numeric esti = 0;
 	for (register feature& feat : range)
 		esti += feat[state];
@@ -1392,7 +1374,7 @@ inline numeric estimate(const board& state,
 }
 
 inline numeric update(const board& state, const numeric& updv,
-		const clip<feature>& range = { feature::begin(), feature::end() }) {
+		const clip<feature>& range = feature::feats()) {
 	register numeric esti = 0;
 	for (register feature& feat : range)
 		esti += (feat[state] += updv);
@@ -1421,7 +1403,7 @@ struct state {
 	inline numeric reward() const { return score; }
 
 	inline numeric estimate(
-			const clip<feature>& range = { feature::begin(), feature::end() }) {
+			const clip<feature>& range = feature::feats()) {
 		if (score >= 0) {
 			esti = state::reward() + utils::estimate(move, range);
 		} else {
@@ -1430,7 +1412,7 @@ struct state {
 		return esti;
 	}
 	inline numeric update(const numeric& accu, const numeric& alpha = state::alpha(),
-			const clip<feature>& range = { feature::begin(), feature::end() }) {
+			const clip<feature>& range = feature::feats()) {
 		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), range);
 		return esti;
 	}
