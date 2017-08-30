@@ -155,6 +155,12 @@ template <typename... types>\
 inline auto alias(types&&... args) __VA_ARGS__ -> decltype(name(std::forward<types>(args)...))\
 { return name(std::forward<types>(args)...); }
 
+#define declare_operators(type)\
+bool operator !=(const type& v) const { return !(*this == v); }\
+bool operator > (const type& v) const { return v < *this; }\
+bool operator <=(const type& v) const { return !(v < *this); }\
+bool operator >=(const type& v) const { return !(*this < v); }
+
 } /* moporgic */
 
 namespace moporgic {
