@@ -35,7 +35,7 @@ typedef float numeric;
 
 class weight {
 public:
-	inline weight() : id(0), length(0), value(nullptr) {}
+	inline weight() : id(0), length(0), raw(nullptr) {}
 	inline weight(const weight& w) = default;
 	inline ~weight() {}
 
@@ -44,8 +44,10 @@ public:
 	inline sign_t sign() const { return id; }
 	inline size_t size() const { return length; }
 	inline size_t stride() const { return 1ull; }
-	inline numeric& operator [](const u64& i) { return value[i]; }
-	inline numeric* data(const u64& i = 0) { return value + i; }
+	inline numeric& operator [](const u64& i) { return raw[i]; }
+	inline numeric* data(const u64& i = 0) { return raw + i; }
+
+	inline clip<numeric> value() const { return { raw, raw + length }; }
 
 	inline bool operator ==(const weight& w) const { return id == w.id; }
 	inline bool operator !=(const weight& w) const { return id != w.id; }
@@ -53,7 +55,7 @@ public:
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
 		auto& id = w.id;
 		auto& length = w.length;
-		auto& value = w.value;
+		auto& raw = w.raw;
 		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -66,7 +68,7 @@ public:
 			write_cast<u32>(out, 0);
 			write_cast<u16>(out, sizeof(numeric));
 			write_cast<u64>(out, length);
-			write_cast<numeric>(out, value, value + length);
+			write_cast<numeric>(out, raw, raw + length);
 			write_cast<u16>(out, 0);
 			break;
 		}
@@ -75,7 +77,7 @@ public:
 	friend std::istream& operator >>(std::istream& in, weight& w) {
 		auto& id = w.id;
 		auto& length = w.length;
-		auto& value = w.value;
+		auto& raw = w.raw;
 		u32 code;
 		read_cast<u8>(in, code);
 		switch (code) {
@@ -88,20 +90,20 @@ public:
 				read_cast<u16>(in, code);
 			else
 				code = code == 1 ? 8 : 4;
-			value = alloc(length);
+			raw = alloc(length);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + length); break;
-			case 8: read_cast<f64>(in, value, value + length); break;
+			case 4: read_cast<f32>(in, raw, raw + length); break;
+			case 8: read_cast<f64>(in, raw, raw + length); break;
 			}
 			break;
 		case 127:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
 			read_cast<u16>(in, code);
-			value = alloc(length);
+			raw = alloc(length);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + length); break;
-			case 8: read_cast<f64>(in, value, value + length); break;
+			case 4: read_cast<f32>(in, raw, raw + length); break;
+			case 8: read_cast<f64>(in, raw, raw + length); break;
 			}
 			in.ignore(code * length * 2);
 			break;
@@ -114,10 +116,10 @@ public:
 			read_cast<u32>(in, code);
 			read_cast<u16>(in, code);
 			read_cast<u64>(in, length);
-			value = alloc(length);
+			raw = alloc(length);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + length); break;
-			case 8: read_cast<f64>(in, value, value + length); break;
+			case 4: read_cast<f32>(in, raw, raw + length); break;
+			case 8: read_cast<f64>(in, raw, raw + length); break;
 			}
 			while (read_cast<u16>(in, code) && code) {
 				u64 skip; read_cast<u64>(in, skip);
@@ -193,7 +195,7 @@ public:
 	}
 
 private:
-	inline weight(const sign_t& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
+	inline weight(const sign_t& sign, const size_t& size) : id(sign), length(size), raw(alloc(size)) {}
 
 	static inline numeric* alloc(const size_t& size) {
 		return new numeric[size]();
@@ -204,7 +206,7 @@ private:
 
 	sign_t id;
 	size_t length;
-	numeric* value;
+	numeric* raw;
 };
 
 class indexer {
