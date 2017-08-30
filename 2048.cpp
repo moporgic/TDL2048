@@ -67,6 +67,9 @@ public:
 		inline operator const numeric&() const { return raw[i]; }
 		inline numeric& operator =(const f32& f) { raw[i] = f; return raw[i]; }
 		inline numeric& operator =(const f64& f) { raw[i] = f; return raw[i]; }
+		inline bool operator ==(const block<i>& blk) const { return raw[i] == blk.raw[i]; }
+		inline bool operator < (const block<i>& blk) const { return raw[i] <  blk.raw[i]; }
+		declare_operators(block<i>);
 	};
 	inline clip<block<0>> value() const { return { cast<block<0>*>(raw), cast<block<0>*>(raw) + length }; }
 	inline clip<block<1>> accum() const { return { cast<block<1>*>(raw), cast<block<1>*>(raw) + length }; }
