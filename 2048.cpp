@@ -56,7 +56,6 @@ public:
 		updvu += std::abs(error);
 		return value;
 	}
-	inline numeric* data(const u64& i = 0) { return raw + ((i << 1) + i); }
 
 	template<size_t i>
 	struct block {
@@ -67,16 +66,14 @@ public:
 		inline operator const numeric&() const { return raw[i]; }
 		inline numeric& operator =(const f32& f) { raw[i] = f; return raw[i]; }
 		inline numeric& operator =(const f64& f) { raw[i] = f; return raw[i]; }
-		inline bool operator ==(const block<i>& blk) const { return raw[i] == blk.raw[i]; }
-		inline bool operator < (const block<i>& blk) const { return raw[i] <  blk.raw[i]; }
-		declare_operators(block<i>);
+		declare_comparators(block<i>, raw[i]);
 	};
 	inline clip<block<0>> value() const { return { cast<block<0>*>(raw), cast<block<0>*>(raw) + length }; }
 	inline clip<block<1>> accum() const { return { cast<block<1>*>(raw), cast<block<1>*>(raw) + length }; }
 	inline clip<block<2>> updvu() const { return { cast<block<2>*>(raw), cast<block<2>*>(raw) + length }; }
 
-	inline bool operator ==(const weight& w) const { return id == w.id; }
-	inline bool operator !=(const weight& w) const { return id != w.id; }
+	inline numeric* data(const u64& i = 0) { return raw + ((i << 1) + i); }
+	declare_comparators(weight, sign());
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
 		auto& id = w.id;
@@ -301,9 +298,7 @@ public:
 	inline sign_t sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return map(b); }
-
-	inline bool operator ==(const indexer& i) const { return id == i.id; }
-	inline bool operator !=(const indexer& i) const { return id != i.id; }
+	declare_comparators(indexer, sign());
 
 	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
@@ -347,9 +342,7 @@ public:
 
 	inline operator indexer() const { return index; }
 	inline operator weight() const { return value; }
-
-	inline bool operator ==(const feature& f) const { return sign() == f.sign(); }
-	inline bool operator !=(const feature& f) const { return sign() != f.sign(); }
+	declare_comparators(feature, sign());
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
 		auto& index = f.index;
