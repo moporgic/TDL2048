@@ -66,6 +66,9 @@ public:
 		inline operator const numeric&() const { return raw[i]; }
 		inline numeric& operator =(const f32& f) { raw[i] = f; return raw[i]; }
 		inline numeric& operator =(const f64& f) { raw[i] = f; return raw[i]; }
+		inline numeric& operator =(const block<i>& blk) { return operator =(blk.raw[i]); }
+		declare_comparators_with(f32, f32(raw[i]), v);
+		declare_comparators_with(f64, f64(raw[i]), v);
 		declare_comparators(block<i>, raw[i]);
 	};
 	inline clip<block<0>> value() const { return { cast<block<0>*>(raw), cast<block<0>*>(raw) + length }; }
