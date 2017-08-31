@@ -46,11 +46,8 @@ public:
 	inline size_t stride() const { return 1ull; }
 	inline numeric& operator [](const u64& i) { return raw[i]; }
 	inline numeric* data(const u64& i = 0) { return raw + i; }
-
 	inline clip<numeric> value() const { return { raw, raw + length }; }
-
-	inline bool operator ==(const weight& w) const { return id == w.id; }
-	inline bool operator !=(const weight& w) const { return id != w.id; }
+	declare_comparators(weight, sign());
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
 		auto& id = w.id;
@@ -221,9 +218,7 @@ public:
 	inline sign_t sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return map(b); }
-
-	inline bool operator ==(const indexer& i) const { return id == i.id; }
-	inline bool operator !=(const indexer& i) const { return id != i.id; }
+	declare_comparators(indexer, sign());
 
 	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
@@ -267,9 +262,7 @@ public:
 
 	inline operator indexer() const { return index; }
 	inline operator weight() const { return value; }
-
-	inline bool operator ==(const feature& f) const { return sign() == f.sign(); }
-	inline bool operator !=(const feature& f) const { return sign() != f.sign(); }
+	declare_comparators(feature, sign());
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
 		auto& index = f.index;
