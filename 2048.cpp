@@ -678,21 +678,23 @@ public:
 
 		auto& list = raw_cast<position*>(data.sign);
 		auto& last = raw_cast<u16>(data.depth);
-		auto  size = last + 1;
-		for (auto it = list; it != list + size; it++)
-			if ((*it) == x) return (*it)(x);
-		if (size != (1 << math::ones16(last))) return list[++last](x);
+		auto  size = last + 1u;
 
-		for (auto it = list; it != list + last; it++)
-			if (*(it) < *(it + 1)) std::swap(*(it), *(it + 1));
+		for (auto i = 0u; i < last; i++) {
+			if (list[i] < list[i + 1]) std::swap(list[i], list[i + 1]);
+			if (list[i] == x) return list[i](x);
+		}
+		if (list[last] == x) return list[last](x);
+		if (size != (1u << math::ones16(last))) return list[++last](x);
+
 		auto mini = list[last].info;
-		auto hits = 0;
-		for (auto it = list; it != list + size; it++) {
-			hits += it->info;
-			it->info -= mini;
+		auto hits = 0u;
+		for (auto i = 0u; i < size; i++) {
+			hits += list[i].info;
+			list[i].info -= mini;
 		}
 		if (mini <= hits / (size * 2)) return list[last](x);
-		if (size == 65536)             return list[last](x);
+		if (size == 65536u)            return list[last](x);
 
 		auto temp = mpool_realloc(list, size);
 		if (!temp) return list[last](x);
