@@ -401,8 +401,8 @@ public:
 		z.ztile = nullptr;
 	}
 	~zhasher() {
-		if (zhash) delete[] zhash;
-		if (ztile) delete[] ztile;
+		delete[] zhash;
+		delete[] ztile;
 	}
 
 	zhasher& operator =(const zhasher& z) {
@@ -518,9 +518,7 @@ public:
 		inline size_t size()  const { return space; }
 		inline byte*  begin() const { return alloc; }
 		inline byte*  end()   const { return alloc + space; }
-
-		inline bool operator <(const piece& i) const { return alloc < i.alloc; }
-		inline bool operator >(const piece& i) const { return alloc > i.alloc; }
+		declare_comparators(piece, alloc);
 
 	private:
 		byte*  alloc;
@@ -594,20 +592,18 @@ public:
 		position(const position& e) = default;
 		position(const u64& sign = 0) : sign(sign), esti(0), depth(-1), info(0) {}
 
-		inline operator numeric() const { return esti; }
-		inline operator bool()    const { return sign; }
-		inline bool operator ==(const u64& s) const { return sign == s; }
-		inline bool operator >=(const i32& d) const { return depth >= d; }
+		operator numeric() const { return esti; }
+		operator bool()    const { return sign; }
+		bool operator ==(const u64& s) const { return sign == s; }
+		bool operator >=(const i32& d) const { return depth >= d; }
+		declare_comparators(position, info);
 
-		inline bool operator < (const position& en) const { return info < en.info; }
-		inline bool operator > (const position& en) const { return info > en.info; }
-
-		inline position& save(const f32& e, const i32& d) {
+		position& save(const f32& e, const i32& d) {
 			esti = e;
 			depth = d;
 			return *this;
 		}
-		inline position& operator()(const u64& s) {
+		position& operator()(const u64& s) {
 			if (sign != s) {
 				sign = s;
 				esti = 0;
