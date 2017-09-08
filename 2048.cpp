@@ -1965,13 +1965,13 @@ bool save_transposition(const std::string& path) {
 }
 
 numeric search_expt(const board& after, const i32& depth,
-		const feature::iter begin = feature::begin(), const feature::iter end = feature::end());
+		const clip<feature>& range = feature::feats());
 numeric search_max(const board& before, const i32& depth,
-		const feature::iter begin = feature::begin(), const feature::iter end = feature::end());
+		const clip<feature>& range = feature::feats());
 
 numeric search_expt(const board& after, const i32& depth,
-		const feature::iter begin, const feature::iter end) {
-	if (depth <= 0) return utils::estimate(after, begin, end);
+		const clip<feature>& range) {
+	if (depth <= 0) return utils::estimate(after, range);
 	auto& t = transposition::find(after);
 	if (t >= depth) return t;
 	const auto spaces = after.spaces();
@@ -1980,9 +1980,9 @@ numeric search_expt(const board& after, const i32& depth,
 	for (size_t i = 0; i < spaces.size(); i++) {
 		const u32 pos = spaces[i];
 		before.set(pos, 1);
-		expt += 9 * search_max(before, depth - 1, begin, end);
+		expt += 9 * search_max(before, depth - 1, range);
 		before.set(pos, 2);
-		expt += 1 * search_max(before, depth - 1, begin, end);
+		expt += 1 * search_max(before, depth - 1, range);
 		before = after;
 	}
 	numeric esti = expt / (10 * spaces.size());
@@ -1990,24 +1990,24 @@ numeric search_expt(const board& after, const i32& depth,
 }
 
 numeric search_max(const board& before, const i32& depth,
-		const feature::iter begin, const feature::iter end) {
+		const clip<feature>& range) {
 	numeric expt = 0;
 	board after = before;
 	register i32 reward;
 	if ((reward = after.up()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1, begin, end));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, range));
 		after = before;
 	}
 	if ((reward = after.right()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1, begin, end));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, range));
 		after = before;
 	}
 	if ((reward = after.down()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1, begin, end));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, range));
 		after = before;
 	}
 	if ((reward = after.left()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1, begin, end));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, range));
 		after = before;
 	}
 	return expt;
@@ -2049,9 +2049,9 @@ struct state {
 		return esti;
 	}
 	inline numeric search(const i32& depth,
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+			const clip<feature>& range = feature::feats()) {
 		if (score >= 0) {
-			esti = state::reward() + utils::search_expt(move, depth, begin, end);
+			esti = state::reward() + utils::search_expt(move, depth, range);
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
@@ -2154,18 +2154,18 @@ struct search : select {
 	search(const std::array<u32, 16>& res = search::depth()) : select(), policy(res) {}
 
 	inline select& operator ()(const board& b) {
-		return operator ()(b, feature::begin(), feature::end());
+		return operator ()(b, feature::feats());
 	}
-	inline select& operator ()(const board& b, const feature::iter begin, const feature::iter end) {
+	inline select& operator ()(const board& b, const clip<feature>& range) {
 		u32 depth = policy[b.spaces().size()] - 1;
 		move[0].assign(b);
 		move[1].assign(b);
 		move[2].assign(b);
 		move[3].assign(b);
-		move[0].search(depth, begin, end);
-		move[1].search(depth, begin, end);
-		move[2].search(depth, begin, end);
-		move[3].search(depth, begin, end);
+		move[0].search(depth, range);
+		move[1].search(depth, range);
+		move[2].search(depth, range);
+		move[3].search(depth, range);
 		return update();
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
