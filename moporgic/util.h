@@ -155,6 +155,20 @@ template <typename... types>\
 inline auto alias(types&&... args) __VA_ARGS__ -> decltype(name(std::forward<types>(args)...))\
 { return name(std::forward<types>(args)...); }
 
+#define declare_comparators_rel(type)\
+bool operator !=(const type& v) const { return !(*this == v); }\
+bool operator > (const type& v) const { return v < *this; }\
+bool operator <=(const type& v) const { return !(v < *this); }\
+bool operator >=(const type& v) const { return !(*this < v); }
+
+#define declare_comparators_with(type, lhs, rhs)\
+bool operator ==(const type& v) const { return lhs == rhs; }\
+bool operator < (const type& v) const { return lhs < rhs; }\
+declare_comparators_rel(type)
+
+#define declare_comparators(type, cmp)\
+declare_comparators_with(type, cmp, v.cmp)
+
 } /* moporgic */
 
 namespace moporgic {
