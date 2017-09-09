@@ -37,7 +37,7 @@ typedef float numeric;
 
 class weight {
 public:
-	inline weight() : id(0), length(0), value(nullptr) {}
+	inline weight() : id(0), length(0), raw(nullptr) {}
 	inline weight(const weight& w) = default;
 	inline ~weight() {}
 
@@ -46,16 +46,15 @@ public:
 	inline sign_t sign() const { return id; }
 	inline size_t size() const { return length; }
 	inline size_t stride() const { return 1ull; }
-	inline numeric& operator [](const u64& i) { return value[i]; }
-	inline numeric* data(const u64& i = 0) { return value + i; }
-
-	inline bool operator ==(const weight& w) const { return id == w.id; }
-	inline bool operator !=(const weight& w) const { return id != w.id; }
+	inline numeric& operator [](const u64& i) { return raw[i]; }
+	inline numeric* data(const u64& i = 0) { return raw + i; }
+	inline clip<numeric> value() const { return { raw, raw + length }; }
+	declare_comparators(weight, sign());
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
 		auto& id = w.id;
 		auto& length = w.length;
-		auto& value = w.value;
+		auto& raw = w.raw;
 		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -68,7 +67,7 @@ public:
 			write_cast<u32>(out, 0);
 			write_cast<u16>(out, sizeof(numeric));
 			write_cast<u64>(out, length);
-			write_cast<numeric>(out, value, value + length);
+			write_cast<numeric>(out, raw, raw + length);
 			write_cast<u16>(out, 0);
 			break;
 		}
@@ -77,7 +76,7 @@ public:
 	friend std::istream& operator >>(std::istream& in, weight& w) {
 		auto& id = w.id;
 		auto& length = w.length;
-		auto& value = w.value;
+		auto& raw = w.raw;
 		u32 code;
 		read_cast<u8>(in, code);
 		switch (code) {
@@ -90,20 +89,20 @@ public:
 				read_cast<u16>(in, code);
 			else
 				code = code == 1 ? 8 : 4;
-			value = alloc(length);
+			raw = alloc(length);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + length); break;
-			case 8: read_cast<f64>(in, value, value + length); break;
+			case 4: read_cast<f32>(in, raw, raw + length); break;
+			case 8: read_cast<f64>(in, raw, raw + length); break;
 			}
 			break;
 		case 127:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
 			read_cast<u16>(in, code);
-			value = alloc(length);
+			raw = alloc(length);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + length); break;
-			case 8: read_cast<f64>(in, value, value + length); break;
+			case 4: read_cast<f32>(in, raw, raw + length); break;
+			case 8: read_cast<f64>(in, raw, raw + length); break;
 			}
 			in.ignore(code * length * 2);
 			break;
@@ -116,10 +115,10 @@ public:
 			read_cast<u32>(in, code);
 			read_cast<u16>(in, code);
 			read_cast<u64>(in, length);
-			value = alloc(length);
+			raw = alloc(length);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + length); break;
-			case 8: read_cast<f64>(in, value, value + length); break;
+			case 4: read_cast<f32>(in, raw, raw + length); break;
+			case 8: read_cast<f64>(in, raw, raw + length); break;
 			}
 			while (read_cast<u16>(in, code) && code) {
 				u64 skip; read_cast<u64>(in, skip);
@@ -160,9 +159,9 @@ public:
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				weight w; in >> w, succ++;
-				weight::iter it = weight::find(w.sign());
-				if (it == weight::end()) {
-					moporgic::list<weight>::as(wghts()).push_back(w);
+				weight* it = weight::find(w.sign());
+				if (it == weight::wghts().end()) {
+					list<weight>::as(wghts()).push_back(w);
 				} else {
 					free(it->data());
 					(*it) = w;
@@ -173,35 +172,29 @@ public:
 		return succ;
 	}
 
-	static weight& make(const sign_t& sign, const size_t& size) {
-		moporgic::list<weight>::as(wghts()).push_back(weight(sign, size));
+	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
+
+	static inline weight& make(const sign_t& sign, const size_t& size) {
+		list<weight>::as(wghts()).push_back(weight(sign, size));
 		return wghts().back();
 	}
-	typedef clip<weight>::iterator iter;
-	static inline iter begin() { return wghts().begin(); }
-	static inline iter end()   { return wghts().end(); }
-	static inline iter find(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
-		return std::find_if(first, last, [=](const weight& w) { return w.sign() == sign; });
+	static inline weight* find(const sign_t& sign, const clip<weight>& range = wghts()) {
+		return std::find_if(range.begin(), range.end(), [=](const weight& w) { return w.sign() == sign; });
 	}
-	static inline weight& at(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
-		auto it = find(sign, first, last);
-		if (it != last) return (*it);
+	static inline weight& at(const sign_t& sign, const clip<weight>& range = wghts()) {
+		auto it = find(sign, range);
+		if (it != range.end()) return (*it);
 		throw std::out_of_range("weight::at");
 	}
 	static inline weight erase(const sign_t& sign, const bool& del = true) {
 		weight w = at(sign);
 		if (del) free(w.data());
-		moporgic::list<weight>::as(wghts()).erase(find(sign));
+		list<weight>::as(wghts()).erase(find(sign));
 		return w;
-	}
-	static inline list<weight> list(const iter& first = begin(), const iter& last = end()) {
-		if (first <= last && first >= begin() && last <= end()) return { first, last };
-		throw std::out_of_range("weight::list");
 	}
 
 private:
-	inline weight(const sign_t& sign, const size_t& size) : id(sign), length(size), value(alloc(size)) {}
-	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
+	inline weight(const sign_t& sign, const size_t& size) : id(sign), length(size), raw(alloc(size)) {}
 
 	static inline numeric* alloc(const size_t& size) {
 		return new numeric[size]();
@@ -212,7 +205,7 @@ private:
 
 	sign_t id;
 	size_t length;
-	numeric* value;
+	numeric* raw;
 };
 
 class indexer {
@@ -227,38 +220,30 @@ public:
 	inline sign_t sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return map(b); }
+	declare_comparators(indexer, sign());
 
-	inline bool operator ==(const indexer& i) const { return id == i.id; }
-	inline bool operator !=(const indexer& i) const { return id != i.id; }
+	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
-	static indexer& make(const sign_t& sign, mapper map) {
-		moporgic::list<indexer>::as(idxrs()).push_back(indexer(sign, map));
+	static inline indexer& make(const sign_t& sign, mapper map) {
+		list<indexer>::as(idxrs()).push_back(indexer(sign, map));
 		return idxrs().back();
 	}
-	typedef clip<indexer>::iterator iter;
-	static inline iter begin() { return idxrs().begin(); }
-	static inline iter end() { return idxrs().end(); }
-	static inline iter find(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
-		return std::find_if(first, last, [=](const indexer& i) { return i.sign() == sign; });
+	static inline indexer* find(const sign_t& sign, const clip<indexer>& range = idxrs()) {
+		return std::find_if(range.begin(), range.end(), [=](const indexer& i) { return i.sign() == sign; });
 	}
-	static inline indexer& at(const sign_t& sign, const iter& first = begin(), const iter& last = end()) {
-		const auto it = find(sign, first, last);
-		if (it != last) return (*it);
+	static inline indexer& at(const sign_t& sign, const clip<indexer>& range = idxrs()) {
+		const auto it = find(sign, range);
+		if (it != range.end()) return (*it);
 		throw std::out_of_range("indexer::at");
 	}
 	static inline indexer erase(const sign_t& sign) {
 		indexer i = at(sign);
-		moporgic::list<indexer>::as(idxrs()).erase(find(sign));
+		list<indexer>::as(idxrs()).erase(find(sign));
 		return i;
-	}
-	static inline list<indexer> list(const iter& first = begin(), const iter& last = end()) {
-		if (first <= last && first >= begin() && last <= end()) return { first, last };
-		throw std::out_of_range("indexer::list");
 	}
 
 private:
 	inline indexer(const sign_t& sign, mapper map) : id(sign), map(map) {}
-	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
 	sign_t id;
 	mapper map;
@@ -279,9 +264,7 @@ public:
 
 	inline operator indexer() const { return index; }
 	inline operator weight() const { return value; }
-
-	inline bool operator ==(const feature& f) const { return sign() == f.sign(); }
-	inline bool operator !=(const feature& f) const { return sign() != f.sign(); }
+	declare_comparators(feature, sign());
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
 		auto& index = f.index;
@@ -325,7 +308,7 @@ public:
 		switch (code) {
 		case 0:
 			write_cast<u32>(out, feats().size());
-			for (feature f : feature::list())
+			for (feature f : feature::feats())
 				out << f, succ++;
 			break;
 		default:
@@ -343,8 +326,8 @@ public:
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				feature f; in >> f, succ++;
-				if (feature::find(weight(f).sign(), indexer(f).sign()) == feature::end()) {
-					moporgic::list<feature>::as(feats()).push_back(f);
+				if (feature::find(weight(f).sign(), indexer(f).sign()) == feature::feats().end()) {
+					list<feature>::as(feats()).push_back(f);
 				}
 			}
 			break;
@@ -355,35 +338,29 @@ public:
 		return succ;
 	}
 
+	static inline clip<feature>& feats() { static clip<feature> f; return f; }
+
 	static inline feature& make(const sign_t& wgt, const sign_t& idx) {
-		moporgic::list<feature>::as(feats()).push_back(feature(weight::at(wgt), indexer::at(idx)));
+		list<feature>::as(feats()).push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
-	typedef clip<feature>::iterator iter;
-	static inline iter begin() { return feats().begin(); }
-	static inline iter end()   { return feats().end(); }
-	static inline iter find(const sign_t& wght, const sign_t& idxr, const iter& first = begin(), const iter& last = end()) {
-		return std::find_if(first, last,
+	static inline feature* find(const sign_t& wght, const sign_t& idxr, const clip<feature>& range = feats()) {
+		return std::find_if(range.begin(), range.end(),
 			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
 	}
-	static inline feature& at(const sign_t& wgt, const sign_t& idx, const iter& first = begin(), const iter& last = end()) {
-		const auto it = find(wgt, idx, first, last);
-		if (it != last) return (*it);
+	static inline feature& at(const sign_t& wgt, const sign_t& idx, const clip<feature>& range = feats()) {
+		const auto it = find(wgt, idx, range);
+		if (it != range.end()) return (*it);
 		throw std::out_of_range("feature::at");
 	}
 	static inline feature erase(const sign_t& wgt, const sign_t& idx) {
 		feature f = at(wgt, idx);
-		moporgic::list<feature>::as(feats()).erase(find(wgt, idx));
+		list<feature>::as(feats()).erase(find(wgt, idx));
 		return f;
-	}
-	static inline list<feature> list(const iter& first = begin(), const iter& last = end()) {
-		if (first <= last && first >= begin() && last <= end()) return { first, last };
-		throw std::out_of_range("feature::list");
 	}
 
 private:
 	inline feature(const weight& value, const indexer& index) : index(index), value(value) {}
-	static inline clip<feature>& feats() { static clip<feature> f; return f; }
 
 	indexer index;
 	weight value;
@@ -764,7 +741,7 @@ u64 indexmax(const board& b) { // 16-bit
 u32 make_indexers(std::string res = "") {
 	u32 succ = 0;
 	auto make = [&](indexer::sign_t sign, indexer::mapper func) {
-		if (indexer::find(sign) != indexer::end()) return;
+		if (indexer::find(sign) != indexer::idxrs().end()) return;
 		indexer::make(sign, func); succ++;
 	};
 
@@ -1182,7 +1159,7 @@ u32 make_weights(std::string res = "") {
 	alias["8x6patt"] = alias["k.matsuzaki"];
 	alias["5x4patt"] = alias["patt/4-22"];
 
-	if (res.empty() && weight::list().empty())
+	if (res.empty() && weight::wghts().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined weights
 		auto pos = (" " + res + " ").find(" " + def.first + " ");
@@ -1203,7 +1180,7 @@ u32 make_weights(std::string res = "") {
 		if (!(info >> signs)) continue;
 		weight::sign_t prev = std::stoull(signs.substr(0), nullptr, 16);
 		weight::sign_t sign = std::stoull(signs.substr(signs.find('=') + 1), nullptr, 16);
-		if (prev != sign && weight::find(prev) != weight::end()) {
+		if (prev != sign && weight::find(prev) != weight::wghts().end()) {
 			std::cerr << "move weight to a new sign (" << signs << ")..." << std::endl;
 			signs = signs.substr(signs.find('=') + 1);
 			weight wsrc = weight::at(prev);
@@ -1228,7 +1205,7 @@ u32 make_weights(std::string res = "") {
 			break;
 		}
 
-		if (weight::find(sign) == weight::end()) {
+		if (weight::find(sign) == weight::wghts().end()) {
 			weight::make(sign, size);
 			succ++;
 		} else if (weight::at(sign).size() != size) {
@@ -1277,7 +1254,7 @@ u32 make_features(std::string res = "") {
 	alias["5x4patt"] = alias["patt/4-22"];
 	alias["mono"] = alias["monotonic"];
 
-	if (res.empty() && feature::list().empty())
+	if (res.empty() && feature::feats().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined features
 		auto pos = (" " + res + " ").find(" " + def.first + " ");
@@ -1298,7 +1275,7 @@ u32 make_features(std::string res = "") {
 		if (!(info >> wghts && info >> idxrs)) continue;
 
 		weight::sign_t wght = std::stoull(wghts, nullptr, 16);
-		if (weight::find(wght) == weight::end()) {
+		if (weight::find(wght) == weight::wghts().end()) {
 			std::cerr << "unknown weight (" << wghts << ") at make_features, ";
 			std::cerr << "assume as pattern descriptor..." << std::endl;
 			weight::make(wght, std::pow(16ull, wghts.size()));
@@ -1336,11 +1313,11 @@ u32 make_features(std::string res = "") {
 			std::transform(xpatt.begin(), xpatt.end(), xpatt.begin(), [=](int v) {
 				board x(0xfedcba9876543210ull);
 				x.isomorphic(-iso);
-				return x[v];
+				return x.at(v);
 			});
 
 			indexer::sign_t idxr = (utils::hashpatt(xpatt) & op_bitand) | op_bitor;
-			if (indexer::find(idxr) == indexer::end()) {
+			if (indexer::find(idxr) == indexer::idxrs().end()) {
 				idxrs = utils::hashpatt(idxr, idxv.size());
 				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
 				std::cerr << "assume as pattern descriptor..." << std::endl;
@@ -1348,7 +1325,7 @@ u32 make_features(std::string res = "") {
 				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*npatt)));
 			}
 
-			if (feature::find(wght, idxr) == feature::end()) {
+			if (feature::find(wght, idxr) == feature::feats().end()) {
 				feature::make(wght, idxr);
 				succ++;
 			}
@@ -1358,10 +1335,10 @@ u32 make_features(std::string res = "") {
 }
 
 void list_mapping() {
-	for (weight w : weight::list()) {
+	for (weight w : list<weight>(weight::wghts())) {
 		char buf[64];
 		std::string feats;
-		for (feature f : feature::list()) {
+		for (feature f : feature::feats()) {
 			if (weight(f) == w) {
 				snprintf(buf, sizeof(buf), " %08llx", indexer(f).sign());
 				feats += buf;
@@ -1386,18 +1363,18 @@ void list_mapping() {
 
 
 inline numeric estimate(const board& state,
-		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+		const clip<feature>& range = feature::feats()) {
 	register numeric esti = 0;
-	for (auto f = begin; f != end; f++)
-		esti += (*f)[state];
+	for (register feature& feat : range)
+		esti += feat[state];
 	return esti;
 }
 
 inline numeric update(const board& state, const numeric& updv,
-		const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+		const clip<feature>& range = feature::feats()) {
 	register numeric esti = 0;
-	for (auto f = begin; f != end; f++)
-		esti += ((*f)[state] += updv);
+	for (register feature& feat : range)
+		esti += (feat[state] += updv);
 	return esti;
 }
 
@@ -1423,17 +1400,17 @@ struct state {
 	inline numeric reward() const { return score; }
 
 	inline numeric estimate(
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
+			const clip<feature>& range = feature::feats()) {
 		if (score >= 0) {
-			esti = state::reward() + utils::estimate(move, begin, end);
+			esti = state::reward() + utils::estimate(move, range);
 		} else {
 			esti = -std::numeric_limits<numeric>::max();
 		}
 		return esti;
 	}
 	inline numeric update(const numeric& accu, const numeric& alpha = state::alpha(),
-			const feature::iter begin = feature::begin(), const feature::iter end = feature::end()) {
-		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), begin, end);
+			const clip<feature>& range = feature::feats()) {
+		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), range);
 		return esti;
 	}
 
@@ -1487,15 +1464,15 @@ struct select {
 		move[3] << b;
 		return update();
 	}
-	inline select& operator ()(const board& b, const feature::iter begin, const feature::iter end) {
+	inline select& operator ()(const board& b, const clip<feature>& range) {
 		move[0].assign(b);
 		move[1].assign(b);
 		move[2].assign(b);
 		move[3].assign(b);
-		move[0].estimate(begin, end);
-		move[1].estimate(begin, end);
-		move[2].estimate(begin, end);
-		move[3].estimate(begin, end);
+		move[0].estimate(range);
+		move[1].estimate(range);
+		move[2].estimate(range);
+		move[3].estimate(range);
 		return update();
 	}
 	inline select& update() {
