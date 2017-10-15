@@ -502,78 +502,52 @@ private:
 	u64 seedb;
 };
 
-class segment {
+class segment : public std::allocator<byte> {
 public:
-	class piece {
-	friend class segment;
-	public:
-		inline piece(const piece& i) = default;
-		inline piece(byte* alloc = nullptr, size_t space = 0) : alloc(alloc), space(space) {}
-
-		template<typename pointer>
-		inline operator pointer() { return cast<pointer>(alloc); }
-		inline operator byte*()   { return alloc; }
-		inline operator bool()    { return alloc && space; }
-
-		inline size_t size()  const { return space; }
-		inline byte*  begin() const { return alloc; }
-		inline byte*  end()   const { return alloc + space; }
-		declare_comparators(piece, alloc);
-
-	private:
-		byte*  alloc;
-		size_t space;
-	};
+	typedef moporgic::clip<byte> piece;
 	typedef std::list<piece> plist;
 
 	segment() { free.emplace_back(); }
 	segment(const segment& seg) = delete;
+	segment(segment&& seg) : free(std::move(seg.free)) {}
 
-	template<typename pointer = piece>
-	pointer allocate(size_t space) {
+	byte* allocate(size_t space) {
 		for (auto it = free.begin(); it != free.end(); it++) {
-			if (it->space >= space) {
-				byte* alloc = it->alloc;
-				it->alloc += space;
-				it->space -= space;
-				if (it->space == 0) free.erase(it);
-				return piece(alloc, space);
+			if (it->size() >= space) {
+				byte* alloc = it->begin();
+				*it = { it->begin() + space, it->end() };
+				if (it->size() == 0) free.erase(it);
+				return alloc;
 			}
 		}
-		return piece();
+		return nullptr;
 	}
 
-	template<typename pointer = piece>
-	pointer release(byte* alloc, size_t space) {
-		piece tok(alloc, space);
+	byte* deallocate(byte* alloc, size_t space) {
+		piece tok(alloc, alloc + space);
 		auto it = std::lower_bound(free.begin(), free.end(), tok);
 		auto pt = it; pt--;
 		if (it != free.begin() && pt->end() == tok.begin()) { // -=
-			pt->space += tok.space;
+			*pt = { pt->begin(), pt->end() + tok.size() };
 			if (pt->end() == it->begin() && it->size()) { // -=-
-				pt->space += it->space;
-				tok.space += it->space;
+				*pt = { pt->begin(), pt->end() + it->size() };
+				tok = { tok.begin(), tok.end() + it->size() };
 				free.erase(it);
 			}
 		} else if (tok.end() == it->begin() && it->size()) { // =-
-			it->alloc -= tok.space;
-			it->space += tok.space;
+			*it = { it->begin() - tok.size(), it->end() };
 		} else { // = -
 			free.insert(it, tok);
 		}
-		return piece(tok.end());
+		return tok.end();
 	}
 
-	inline byte* poll(size_t size) {
-		return allocate(size);
-	}
-
-	inline void offer(byte* data, size_t size) {
+	void offer(byte* data, size_t size) {
 		if (size == 0) return;
-		if (free.back().alloc < data + size) {
-			free.back().alloc = data + size;
+		if (free.back().begin() < data + size) {
+			free.back() = { data + size, data + size };
 		}
-		release(data, size);
+		deallocate(data, size);
 	}
 
 private:
@@ -817,10 +791,10 @@ private:
 	static inline void free(position* alloc) { delete[] alloc; }
 
 	inline position* mpool_alloc(size_t num) {
-		return mpool.allocate<position*>(sizeof(position) * num);
+		return cast<position*>(mpool.allocate(sizeof(position) * num));
 	}
 	inline position* mpool_free(position* pos, size_t now) {
-		return mpool.release(cast<byte*>(pos), sizeof(position) * now);
+		return cast<position*>(mpool.deallocate(cast<byte*>(pos), sizeof(position) * now));
 	}
 	inline position* mpool_realloc(position* pos, size_t now) {
 		auto alloc = mpool_alloc(now + now);
