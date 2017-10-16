@@ -823,12 +823,17 @@ private:
 	}
 
 	void mpool_offer(size_t total) {
-		try {
-			mpool.deallocate(cast<byte*>(alloc(total)), sizeof(position) * total);
-		} catch (std::bad_alloc&) {	// try allocate block size 1G
-			for (auto block = 0ull; total; total -= block) {
-				block = std::min(size_t(1ull << 30) / sizeof(position), total);
+		for (std::list<size_t> blocks = { total }; blocks.size(); blocks.pop_front()) {
+			auto block = blocks.front();
+			try {
 				mpool.deallocate(cast<byte*>(alloc(block)), sizeof(position) * block);
+			} catch (std::bad_alloc&) {
+				if (sizeof(position) * block >= (64ull << 20) /* 64 MB */ ) {
+					blocks.push_back(block >> 1); // try allocate smaller block size
+					blocks.push_back(block - blocks.back());
+				} else {
+					std::cerr << "insufficient memory for transposition block " << block << std::endl;
+				}
 			}
 		}
 	}
