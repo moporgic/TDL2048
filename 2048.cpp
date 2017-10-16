@@ -366,10 +366,18 @@ private:
 };
 
 class zhasher {
+private:
+	typedef u64(*zhash_t)[1<<20];
+	typedef u64(*ztile_t)[32];
+	zhasher(bool alloc, u64 id = 0, u64 sa = 0, u64 sb = 0) :
+		id(id),
+		zhash(alloc ? new u64[4][1 << 20]() : nullptr),
+		ztile(alloc ? new u64[16][32]() : nullptr),
+		seeda(sa),
+		seedb(sb) {}
 public:
-	zhasher(const u64& seed  = moporgic::millisec(),
-			const u64& seeda = 0x0000000000000000ULL, const u64& seedb = 0xffffffffffffffffULL)
-	: id(seed ^ seeda ^ seedb), zhash(new u64[4][1 << 20]), ztile(new u64[16][32]), seeda(seeda), seedb(seedb) {
+	zhasher(u64 seed = moporgic::millisec(), u64 seeda = 0ull, u64 seedb = -1ull) :
+		zhasher(true, seed ^ seeda ^ seedb, seeda, seedb) {
 		std::default_random_engine engine(seed);
 		std::uniform_int_distribution<u64> dist;
 		for (u32 idx = 0; idx < 16; idx++) {
@@ -390,20 +398,9 @@ public:
 			}
 		}
 	}
-	zhasher(const zhasher& z)
-	: id(z.id), zhash(new u64[4][1 << 20]), ztile(new u64[16][32]), seeda(z.seeda), seedb(z.seedb) {
-		std::copy(cast<u64*>(z.zhash), cast<u64*>(z.zhash) + sizeof(u64[4][1 << 20]), cast<u64*>(zhash));
-		std::copy(cast<u64*>(z.ztile), cast<u64*>(z.ztile) + sizeof(u64[16][32]),     cast<u64*>(ztile));
-	}
-	zhasher(zhasher&& z)
-	: id(z.id), zhash(z.zhash), ztile(z.ztile), seeda(z.seeda), seedb(z.seedb) {
-		z.zhash = nullptr;
-		z.ztile = nullptr;
-	}
-	~zhasher() {
-		delete[] zhash;
-		delete[] ztile;
-	}
+	zhasher(const zhasher& z) : zhasher(true) { operator=(z); }
+	zhasher(zhasher&& z) : zhasher(false) { operator=(std::move(z)); }
+	~zhasher() { delete[] zhash; delete[] ztile; }
 
 	zhasher& operator =(const zhasher& z) {
 		id = z.id;
@@ -415,15 +412,14 @@ public:
 	}
 	zhasher& operator =(zhasher&& z) {
 		id = z.id;
-		zhash = z.zhash; z.zhash = nullptr;
-		ztile = z.ztile; z.ztile = nullptr;
+		zhash = std::exchange(z.zhash, nullptr);
+		ztile = std::exchange(z.ztile, nullptr);
 		seeda = z.seeda;
 		seedb = z.seedb;
 		return *this;
 	}
 
-	inline u64 sign() const { return id; }
-
+public:
 	inline u64 operator ()(const board& b, const bool& after = true) const {
 		register u64 hash = after ? seeda : seedb;
 		hash ^= zhash[0][b.fetch(0)];
@@ -435,6 +431,9 @@ public:
 	inline u64 operator ()(const board::tile& t, const bool& after = true) const {
 		return (after ? seeda : seedb) ^ ztile[t.i][u32(t)];
 	}
+
+public:
+	inline u64 sign() const { return id; }
 
     friend std::ostream& operator <<(std::ostream& out, const zhasher& z) {
     	auto& seeda = z.seeda;
@@ -490,12 +489,7 @@ public:
 		return in;
 	}
 private:
-	typedef u64(*zhash_t)[1<<20];
-	typedef u64(*ztile_t)[32];
-
 	u64 id;
-//	u64 zhash[4][1 << 20];
-//	u64 ztile[16][32];
 	zhash_t zhash;
 	ztile_t ztile;
 	u64 seeda;
