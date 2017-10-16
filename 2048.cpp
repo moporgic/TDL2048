@@ -504,10 +504,10 @@ private:
 
 class segment : public std::allocator<byte> {
 public:
-	typedef moporgic::clip<byte> piece;
-	typedef std::list<piece> plist;
+	typedef moporgic::clip<byte>  piece;
+	typedef moporgic::list<piece> plist;
 
-	segment() { free.emplace_back(); }
+	segment() { free.emplace_back(cast<byte*>(-1ull), cast<byte*>(-1ull)); }
 	segment(const segment& seg) = delete;
 	segment(segment&& seg) : free(std::move(seg.free)) {}
 
@@ -526,7 +526,7 @@ public:
 	byte* deallocate(byte* alloc, size_t space) {
 		piece tok(alloc, alloc + space);
 		auto it = std::lower_bound(free.begin(), free.end(), tok);
-		auto pt = it; pt--;
+		auto pt = std::prev(it);
 		if (it != free.begin() && pt->end() == tok.begin()) { // -=
 			*pt = { pt->begin(), pt->end() + tok.size() };
 			if (pt->end() == it->begin() && it->size()) { // -=-
@@ -536,22 +536,14 @@ public:
 			}
 		} else if (tok.end() == it->begin() && it->size()) { // =-
 			*it = { it->begin() - tok.size(), it->end() };
-		} else { // = -
+		} else if (tok.size()) { // = -
 			free.insert(it, tok);
 		}
 		return tok.end();
 	}
 
-	void offer(byte* data, size_t size) {
-		if (size == 0) return;
-		if (free.back().begin() < data + size) {
-			free.back() = { data + size, data + size };
-		}
-		deallocate(data, size);
-	}
-
 private:
-	plist  free;
+	plist free;
 };
 
 class transposition {
@@ -705,7 +697,7 @@ public:
 			read_cast<u64>(in, limit);
 			zmask = zsize - 1;
 			cache = alloc(zsize + limit);
-			mpool.offer(cast<byte*>(cache + zsize), sizeof(position) * limit);
+			mpool.deallocate(cast<byte*>(cache + zsize), sizeof(position) * limit);
 			for (u64 i = 0; i < zsize; i++) {
 				auto& data = cache[i];
 				read_cast<u64>(in, data.sign);
@@ -785,7 +777,7 @@ public:
 private:
 	transposition(const size_t& len, const size_t& lim) : zsize(len), limit(lim), zmask(len - 1) {
 		cache = zsize ? alloc(zsize) : nullptr;
-		mpool.offer(cast<byte*>(limit ? alloc(limit) : nullptr), sizeof(position) * limit);
+		mpool.deallocate(cast<byte*>(limit ? alloc(limit) : nullptr), sizeof(position) * limit);
 	}
 	static inline position* alloc(size_t len) { return new position[len](); }
 	static inline void free(position* alloc) { delete[] alloc; }
@@ -832,11 +824,11 @@ private:
 
 	void mpool_offer(size_t total) {
 		try {
-			mpool.offer(cast<byte*>(alloc(total)), sizeof(position) * total);
+			mpool.deallocate(cast<byte*>(alloc(total)), sizeof(position) * total);
 		} catch (std::bad_alloc&) {	// try allocate block size 1G
 			for (auto block = 0ull; total; total -= block) {
 				block = std::min(size_t(1ull << 30) / sizeof(position), total);
-				mpool.offer(cast<byte*>(alloc(block)), sizeof(position) * block);
+				mpool.deallocate(cast<byte*>(alloc(block)), sizeof(position) * block);
 			}
 		}
 	}
