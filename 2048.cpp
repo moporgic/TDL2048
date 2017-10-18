@@ -139,10 +139,13 @@ public:
 		case 0:
 			write_cast<u32>(out, wghts().size());
 			for (weight w : wghts())
-				out << w, succ++;
+				if (out << w) succ++;
 			break;
 		}
 		out.flush();
+		if (!out) {
+			std::cerr << "output failed at weight::save" << std::endl;
+		}
 		return succ;
 	}
 	static u32 load(std::istream& in) {
@@ -156,16 +159,14 @@ public:
 			// no break
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
-				weight w; in >> w, succ++;
-				weight* it = weight::find(w.sign());
-				if (it == weight::wghts().end()) {
-					list<weight>::as(wghts()).push_back(w);
-				} else {
-					free(it->data());
-					(*it) = w;
-				}
+				list<weight>::as(wghts()).emplace_back();
+				if (in >> wghts().back()) succ++;
 			}
 			break;
+		}
+		if (!in) {
+			std::cerr << "input failed at weight::load" << std::endl;
+			std::exit(-1);
 		}
 		return succ;
 	}
@@ -314,6 +315,9 @@ public:
 			break;
 		}
 		out.flush();
+		if (!out) {
+			std::cerr << "output failed at feature::save" << std::endl;
+		}
 		return succ;
 	}
 	static u32 load(std::istream& in) {
@@ -323,15 +327,17 @@ public:
 		switch (code) {
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
-				feature f; in >> f, succ++;
-				if (feature::find(weight(f).sign(), indexer(f).sign()) == feature::feats().end()) {
-					list<feature>::as(feats()).push_back(f);
-				}
+				list<feature>::as(feats()).emplace_back();
+				if (in >> feats().back()) succ++;
 			}
 			break;
 		default:
 			std::cerr << "unknown serial (" << code << ") at feature::load" << std::endl;
 			break;
+		}
+		if (!in) {
+			std::cerr << "input failed at feature::load" << std::endl;
+			std::exit(-1);
 		}
 		return succ;
 	}
