@@ -864,15 +864,14 @@ public:
 
 	class tile {
 	friend class board;
-	public:
-		board& b;
-		const u32 i;
 	private:
 		inline tile(const board& b, const u32& i) : b(const_cast<board&>(b)), i(i) {}
 	public:
 		inline tile(const tile& t) = default;
-		tile() = delete;
-		inline tile& operator =(const tile& t) { return operator =(t.operator u32()); }
+		inline tile() = delete;
+		inline u32 where() const { return i; }
+		inline board& source() const { return b; }
+
 		inline bool operator ==(const u32& k) const { return operator u32() == k; }
 		inline bool operator !=(const u32& k) const { return operator u32() != k; }
 		inline operator u32() const {
@@ -886,6 +885,9 @@ public:
 			if (flag & style::ext) b.set5(i, at); else b.set4(i, at);
 			return *this;
 		}
+	private:
+		board& b;
+		u32 i;
 	};
 	inline tile operator [](const u32& i) const { return tile(*this, i); }
 
