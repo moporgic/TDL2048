@@ -600,6 +600,28 @@ public:
 	inline i32 move64(const optype::oper& op) { return operate64(op); }
 	inline i32 move80(const optype::oper& op) { return operate80(op); }
 
+	inline void shift(const u32& m = 0) { return shift64(m); }
+	inline void shift64(const u32& m = 0) {
+		u32 hash = hash64();
+		u32 mask = m ? m : (math::msb16(hash) << 1) - 1;
+		u32 msne = math::lg16(~hash & mask);
+		if (msne == 0) return;
+		for (u32 i = 0; i < 16; i++) {
+			u32 t = at4(i);
+			set4(i, t > msne ? t - 1 : t);
+		}
+	}
+	inline void shift80(const u32& m = 0) {
+		u32 hash = hash80();
+		u32 mask = m ? m : (math::msb16(hash) << 1) - 1;
+		u32 msne = math::lg16(~hash & mask);
+		if (msne == 0) return;
+		for (u32 i = 0; i < 16; i++) {
+			u32 t = at5(i);
+			set5(i, t > msne ? t - 1 : t);
+		}
+	}
+
 	inline u32 species() const { return species64(); }
 	inline u32 species64() const {
 		return query16(0).species | query16(1).species | query16(2).species | query16(3).species;
