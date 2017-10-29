@@ -869,11 +869,11 @@ public:
 	public:
 		inline tile(const tile& t) = default;
 		inline tile() = delete;
+		inline board& whole() const { return b; }
 		inline u32 where() const { return i; }
-		inline board& source() const { return b; }
 
-		inline bool operator ==(const u32& k) const { return operator u32() == k; }
-		inline bool operator !=(const u32& k) const { return operator u32() != k; }
+		declare_comparators_with(u32, operator u32(), v);
+
 		inline operator u32() const {
 			auto flag = style::flag(b);
 			u32 at = (flag & style::ext) ? b.at5(i) : b.at4(i);
