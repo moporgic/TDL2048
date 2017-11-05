@@ -885,6 +885,36 @@ public:
 			if (flag & style::ext) b.set5(i, at); else b.set4(i, at);
 			return *this;
 		}
+
+		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
+			auto& b = t.b;
+			auto flag = style::flag(b);
+			if (flag & style::binary) {
+				moporgic::write_cast<byte>(out, (flag & style::extend) ? b.at5(i) : b.at4(i));
+			} else {
+				if (flag & style::exact) {
+					out << ((flag & style::extend) ? b.exact5(i) : b.exact4(i));
+				} else {
+					out << ((flag & style::extend) ? b.at5(i) : b.at4(i));
+				}
+			}
+			return out;
+		}
+		friend std::istream& operator >>(std::istream& in, tile& t) {
+			auto& b = t.b;
+			auto flag = style::flag(b);
+			u32 v;
+			if (flag & style::binary) {
+				moporgic::read_cast<byte>(in, v);
+			} else {
+				in >> v;
+				if (flag & style::exact) {
+					v = math::lg(v);
+				}
+			}
+			if (flag & style::extend) b.set5(i, v); else b.set4(i, v);
+			return in;
+		}
 	private:
 		board& b;
 		u32 i;
