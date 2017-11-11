@@ -886,6 +886,10 @@ public:
 				t.set(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return in;
 		}
+		inline tile& operator ++() { set(at(is(style::extend), false) + 1, is(style::extend), false); return *this; }
+		inline tile& operator --() { set(at(is(style::extend), false) - 1, is(style::extend), false); return *this; }
+		inline u32 operator ++(int) { u32 v(*this); ++(*this); return v; }
+		inline u32 operator --(int) { u32 v(*this); --(*this); return v; }
 	private:
 		board& b;
 		u32 i;
