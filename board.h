@@ -865,7 +865,7 @@ public:
 	class tile {
 	friend class board;
 	private:
-		inline tile(const board& b, const u32& i) : b(const_cast<board&>(b)), i(i) {}
+		inline tile(const board& b, u32 i) : b(const_cast<board&>(b)), i(i) {}
 	public:
 		inline tile(const tile& t) = default;
 		inline tile() = delete;
@@ -874,28 +874,32 @@ public:
 
 		declare_comparators_with(u32, operator u32(), v);
 
-		inline operator u32() const {
-			auto flag = style::flag(b);
-			u32 at = (flag & style::ext) ? b.at5(i) : b.at4(i);
-			return (flag & style::exact) ? (1 << at) & 0xfffffffeu : at;
-		}
-		inline tile& operator =(const u32& k) {
-			auto flag = style::flag(b);
-			u32 at = (flag & style::exact) ? math::lg(k) : k;
-			if (flag & style::ext) b.set5(i, at); else b.set4(i, at);
-			return *this;
-		}
-
+		inline operator u32() const { return at(is(style::extend), is(style::exact)); }
+		inline tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
-			return (style::flag(t.b) & style::binary) ? moporgic::write_cast<byte>(out, u32(t)) : (out << u32(t));
+			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
+			return t.is(style::binary) ? moporgic::write_cast<byte>(out, v) : (out << v);
 		}
 		friend std::istream& operator >>(std::istream& in, tile& t) {
-			u32 v; if ((style::flag(t.b) & style::binary) ? moporgic::read_cast<byte>(in, v) : (in >> v)) t = v;
+			u32 v;
+			if (t.is(style::binary) ? moporgic::read_cast<byte>(in, v) : (in >> v))
+				t.set(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return in;
 		}
 	private:
 		board& b;
 		u32 i;
+
+		bool is(const u32& item) const { return style::flag(b) & item; }
+
+		u32 at(bool extend, bool exact) const {
+			if (extend) return exact ? b.exact5(i) : b.at5(i);
+			else        return exact ? b.exact4(i) : b.at4(i);
+		}
+		void set(u32 k, bool extend, bool exact) {
+			if (extend) b.set5(i, exact ? math::lg(k) : k);
+			else        b.set4(i, exact ? math::lg(k) : k);
+		}
 	};
 	inline tile operator [](const u32& i) const { return tile(*this, i); }
 
@@ -905,7 +909,7 @@ public:
 	class style {
 	public:
 		style() = delete;
-		enum item {
+		enum item : u32 {
 			index  = 0x00000000u,
 			exact  = 0x10000000u,
 			alter  = 0x20000000u,
