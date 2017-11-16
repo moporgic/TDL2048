@@ -4,8 +4,8 @@
 #include "moporgic/math.h"
 #include <algorithm>
 #include <iostream>
-#include <sstream>
 #include <cstdio>
+#include <cctype>
 #include <array>
 
 //============================================================================
@@ -880,7 +880,7 @@ public:
 			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return t.is(style::binary) ? moporgic::write_cast<byte>(out, v) : (out << v);
 		}
-		friend std::istream& operator >>(std::istream& in, tile& t) {
+		friend std::istream& operator >>(std::istream& in, const tile& t) {
 			u32 v;
 			if (t.is(style::binary) ? moporgic::read_cast<byte>(in, v) : (in >> v))
 				t.set(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
@@ -900,7 +900,7 @@ public:
 			if (extend) return exact ? b.exact5(i) : b.at5(i);
 			else        return exact ? b.exact4(i) : b.at4(i);
 		}
-		void set(u32 k, bool extend, bool exact) {
+		void set(u32 k, bool extend, bool exact) const {
 			if (extend) b.set5(i, exact ? math::lg(k) : k);
 			else        b.set4(i, exact ? math::lg(k) : k);
 		}
@@ -946,84 +946,50 @@ public:
 	}
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
-		const char* edge = style::flag(b) & style::actual ? "+------------------------+" : "+----------------+";
-		const char* grid = style::flag(b) & style::actual ? "|%6u%6u%6u%6u|" : "|%4u%4u%4u%4u|";
-		char buff[32];
-		switch (style::flag(b)) {
-		case style::raw:
+		auto flag = style::flag(b);
+		if (flag & style::binary) {
 			moporgic::write<u64>(out, b.raw);
-			moporgic::write<u32>(out, b.ext);
-			moporgic::write<u32>(out, b.inf);
-			break;
-		case style::raw64:
-			moporgic::write<u64>(out, b.raw);
-			break;
-		case style::raw80:
-			moporgic::write<u64>(out, b.raw);
-			moporgic::write_cast<u16>(out, b.ext >> 16);
-			break;
-		case style::lite80:
-			snprintf(buff, sizeof(buff), "[%016llx|%04x]", b.raw, b.ext >> 16);
-			out << buff;
-			break;
-		case style::lite64:
-			snprintf(buff, sizeof(buff), "[%016llx]", b.raw);
-			out << buff;
-			break;
-		default:
-		case style::index:
-		case style::actual:
-			out << edge << std::endl;
+			if (flag & style::extend) moporgic::write_cast<u16>(out, b.ext >> 16);
+			if (flag & style::alter)  moporgic::write_cast<u16>(out, b.ext & 0xffff);
+			if (flag & style::exact)  moporgic::write<u32>(out, b.inf);
+		} else if (flag & style::alter) {
+			char buf[32];
+			std::snprintf(buf, sizeof(buf), "[%016llx]", b.raw);
+			if (flag & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext >> 16);
+			out << buf;
+		} else {
+			char buf[32];
+			u32 w = (flag & style::exact) ? 6 : 4;
+			std::snprintf(buf, sizeof(buf), "+%.*s+", (w * 4), "------------------------");
+			out << buf << std::endl;
 			for (u32 i = 0; i < 16; i += 4) {
-				snprintf(buff, sizeof(buff), grid, u32(b[i + 0]), u32(b[i + 1]), u32(b[i + 2]), u32(b[i + 3]));
-				out << buff << std::endl;
+				u32 t[4] = { b[i + 0], b[i + 1], b[i + 2], b[i + 3] };
+				std::snprintf(buf, sizeof(buf), "|%*u%*u%*u%*u|", w, t[0], w, t[1], w, t[2], w, t[3]);
+				out << buf << std::endl;
 			}
-			out << edge << std::endl;
-			break;
+			std::snprintf(buf, sizeof(buf), "+%.*s+", (w * 4), "------------------------");
+			out << buf << std::endl;
 		}
 		return out;
 	}
 
 	friend std::istream& operator >>(std::istream& in, board& b) {
-		std::string s;
-		switch (style::flag(b)) {
-		case style::raw:
+		auto flag = style::flag(b);
+		if (flag & style::binary) {
 			moporgic::read<u64>(in, b.raw);
-			moporgic::read<u32>(in, b.ext);
-			moporgic::read<u32>(in, b.inf);
-			break;
-		case style::raw64:
-			moporgic::read<u64>(in, b.raw);
-			break;
-		case style::raw80:
-			moporgic::read<u64>(in, b.raw);
-			moporgic::read_cast<u16>(in, b.ext); b.ext <<= 16;
-			break;
-		case style::lite64:
-		case style::lite80:
-			in >> s;
-			std::stringstream(s.substr(s.find('[') + 1)) >> std::hex >> b.raw;
-			if ((style::flag(b) & style::ext) == 0) break;
-			if (s.find('[') == std::string::npos) in >> s;
-			std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
-			break;
-		default:
-		case style::index:
-		case style::actual:
-			in >> s;
-			if (s.find('+') != std::string::npos) {
-				in >> s;
-				for (int t, i = 0; i < 16 && in >> t; i++) {
-					b[i] = t;
-					if (i % 4 == 3) in >> s >> s;
-				}
-			} else {
-				b[0] = std::stol(s);
-				for (int t, i = 1; i < 16 && in >> t; i++) {
-					b[i] = t;
-				}
+			if (flag & style::extend) moporgic::read_cast<u16>(in, raw_cast<u16, 1>(b.ext));
+			if (flag & style::alter)  moporgic::read_cast<u16>(in, raw_cast<u16, 0>(b.ext));
+			if (flag & style::exact)  moporgic::read<u32>(in, b.inf);
+		} else if (flag & style::alter) {
+			bool nobox(in >> std::hex >> b.raw);
+			if (!nobox) (in.clear(), in.ignore(1)) >> std::hex >> b.raw;
+			if (flag & style::extend) in.ignore(1) >> std::hex >> raw_cast<u16, 1>(b.ext);
+			if (!nobox) in.ignore(1);
+		} else {
+			for (u32 k, i = 0; i < 16; i++) {
+				for (k = 0; !(in >> k) && !in.eof(); in.clear(), in.ignore(1));
+				b[i] = k;
 			}
-			break;
 		}
 		return in;
 	}
