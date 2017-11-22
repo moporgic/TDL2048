@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <iostream>
 #include <cstdio>
-#include <cctype>
 #include <array>
 
 //============================================================================
@@ -356,7 +355,6 @@ public:
 		u32 k = std::rand();
 		u32 i = (k) % 16;
 		u32 j = (i + 1 + (k >> 4) % 15) % 16;
-//		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
 		u32 r = std::rand() % 100;
 		raw =  (r >=  1 ? 1ULL : 2ULL) << (i << 2);
 		raw |= (r >= 19 ? 1ULL : 2ULL) << (j << 2);
@@ -894,7 +892,7 @@ public:
 		board& b;
 		u32 i;
 
-		bool is(const u32& item) const { return style::flag(b) & item; }
+		bool is(u32 item) const { return style::flag(b) & item; }
 
 		u32 at(bool extend, bool exact) const {
 			if (extend) return exact ? b.exact5(i) : b.at5(i);
@@ -920,30 +918,26 @@ public:
 			binary = 0x40000000u,
 			extend = 0x80000000u,
 			full   = 0xf0000000u,
-			raw    = binary,
-			ext    = extend,
 
 			at     = index,
 			at4    = index,
 			at5    = index | extend,
+			ext    = extend,
 			exact4 = index | exact,
 			exact5 = index | exact | extend,
 			actual = index | exact | extend,
 			lite   = alter,
 			lite64 = alter,
 			lite80 = alter | extend,
+			raw    = binary,
 			raw64  = binary,
 			raw80  = binary | extend,
-			stdio  = binary | extend | alter,
 		};
 
-		static item flag(const board& b) { return static_cast<item>(b.inf); }
-		static void setf(board& b, const item& f) { b.inf = f; }
+		static item flag(const board& b) { return static_cast<item>(b.inf & full); }
+		static board& set(board& b, u32 f) { b.inf = (f & full) | (b.inf & ~full); return b; }
 	};
-	inline board& format(const style::item& style = style::at) {
-		style::setf(*this, style);
-		return *this;
-	}
+	inline board& format(u32 flags = style::index) { return style::set(*this, flags); }
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
 		auto flag = style::flag(b);
