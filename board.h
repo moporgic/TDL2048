@@ -4,7 +4,6 @@
 #include "moporgic/math.h"
 #include <algorithm>
 #include <iostream>
-#include <sstream>
 #include <cstdio>
 #include <array>
 
@@ -356,7 +355,6 @@ public:
 		u32 k = std::rand();
 		u32 i = (k) % 16;
 		u32 j = (i + 1 + (k >> 4) % 15) % 16;
-//		raw = (1ULL << (i << 2)) | (1ULL << (j << 2));
 		u32 r = std::rand() % 100;
 		raw =  (r >=  1 ? 1ULL : 2ULL) << (i << 2);
 		raw |= (r >= 19 ? 1ULL : 2ULL) << (j << 2);
@@ -600,6 +598,34 @@ public:
 	inline i32 move64(const optype::oper& op) { return operate64(op); }
 	inline i32 move80(const optype::oper& op) { return operate80(op); }
 
+	inline u32 shift(const u32& k = 0, const u32& u = 0) { return shift64(k, u); }
+	inline u32 shift64(const u32& k = 0, const u32& u = 0) {
+		u32 hash = hash64();
+		u32 tile = math::msb16(hash);
+		u32 mask = (((k ? (1 << k) : tile) << 1) - 1) & ~((2 << u) - 1);
+		u32 hole = ~hash & mask;
+		if (hole == 0 || hole > tile) return 0;
+		u32 h = math::lg16(hole);
+		for (u32 i = 0; i < 16; i++) {
+			u32 t = at4(i);
+			set4(i, t > h ? t - 1 : t);
+		}
+		return h;
+	}
+	inline u32 shift80(const u32& k = 0, const u32& u = 0) {
+		u32 hash = hash80();
+		u32 tile = math::msb16(hash);
+		u32 mask = (((k ? (1 << k) : tile) << 1) - 1) & ~((2 << u) - 1);
+		u32 hole = ~hash & mask;
+		if (hole == 0 || hole > tile) return 0;
+		u32 h = math::lg16(hole);
+		for (u32 i = 0; i < 16; i++) {
+			u32 t = at5(i);
+			set5(i, t > h ? t - 1 : t);
+		}
+		return h;
+	}
+
 	inline u32 species() const { return species64(); }
 	inline u32 species64() const {
 		return query16(0).species | query16(1).species | query16(2).species | query16(3).species;
@@ -842,27 +868,45 @@ public:
 
 	class tile {
 	friend class board;
-	public:
-		board& b;
-		const u32 i;
 	private:
-		inline tile(const board& b, const u32& i) : b(const_cast<board&>(b)), i(i) {}
+		inline tile(const board& b, u32 i) : b(const_cast<board&>(b)), i(i) {}
 	public:
 		inline tile(const tile& t) = default;
-		tile() = delete;
-		inline tile& operator =(const tile& t) { return operator =(t.operator u32()); }
-		inline bool operator ==(const u32& k) const { return operator u32() == k; }
-		inline bool operator !=(const u32& k) const { return operator u32() != k; }
-		inline operator u32() const {
-			auto flag = style::flag(b);
-			u32 at = (flag & style::ext) ? b.at5(i) : b.at4(i);
-			return (flag & style::exact) ? (1 << at) & 0xfffffffeu : at;
+		inline tile() = delete;
+		inline board& whole() const { return b; }
+		inline u32 where() const { return i; }
+
+		declare_comparators_with(u32, operator u32(), v);
+
+		inline operator u32() const { return at(is(style::extend), is(style::exact)); }
+		inline tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
+		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
+			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
+			return t.is(style::binary) ? moporgic::write_cast<byte>(out, v) : (out << v);
 		}
-		inline tile& operator =(const u32& k) {
-			auto flag = style::flag(b);
-			u32 at = (flag & style::exact) ? math::lg(k) : k;
-			if (flag & style::ext) b.set5(i, at); else b.set4(i, at);
-			return *this;
+		friend std::istream& operator >>(std::istream& in, const tile& t) {
+			u32 v;
+			if (t.is(style::binary) ? moporgic::read_cast<byte>(in, v) : (in >> v))
+				t.set(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
+			return in;
+		}
+		inline tile& operator ++() { set(at(is(style::extend), false) + 1, is(style::extend), false); return *this; }
+		inline tile& operator --() { set(at(is(style::extend), false) - 1, is(style::extend), false); return *this; }
+		inline u32 operator ++(int) { u32 v(*this); ++(*this); return v; }
+		inline u32 operator --(int) { u32 v(*this); --(*this); return v; }
+	private:
+		board& b;
+		u32 i;
+
+		bool is(u32 item) const { return style::flag(b) & item; }
+
+		u32 at(bool extend, bool exact) const {
+			if (extend) return exact ? b.exact5(i) : b.at5(i);
+			else        return exact ? b.exact4(i) : b.at4(i);
+		}
+		void set(u32 k, bool extend, bool exact) const {
+			if (extend) b.set5(i, exact ? math::lg(k) : k);
+			else        b.set4(i, exact ? math::lg(k) : k);
 		}
 	};
 	inline tile operator [](const u32& i) const { return tile(*this, i); }
@@ -873,116 +917,79 @@ public:
 	class style {
 	public:
 		style() = delete;
-		enum item {
-			at     = 0x00000000,
-			at4    = 0x00000000,
-			index  = 0x00000000,
-			exact  = 0x10000000,
-			exact4 = 0x10000000,
-			actual = 0x10000000,
-			at5    = 0x80000000,
-			exact5 = 0x90000000,
-			line   = 0xa0000000,
-			lite80 = 0xa0000000,
-			line80 = 0xa0000000,
-			lite   = 0x20000000,
-			lite64 = 0x20000000,
-			line64 = 0x20000000,
-			full   = 0xf0000000,
-			raw    = 0xf0000000,
-			raw64  = 0x30000000,
-			raw80  = 0xb0000000,
+		enum item : u32 {
+			index  = 0x00000000u,
+			exact  = 0x10000000u,
+			alter  = 0x20000000u,
+			binary = 0x40000000u,
+			extend = 0x80000000u,
+			full   = 0xf0000000u,
 
-			ext    = 0x80000000,
+			at     = index,
+			at4    = index,
+			at5    = index | extend,
+			ext    = extend,
+			exact4 = index | exact,
+			exact5 = index | exact | extend,
+			actual = index | exact | extend,
+			lite   = alter,
+			lite64 = alter,
+			lite80 = alter | extend,
+			raw    = binary,
+			raw64  = binary,
+			raw80  = binary | extend,
 		};
 
-		static item flag(const board& b) { return static_cast<item>(b.inf); }
-		static void setf(board& b, const item& f) { b.inf = f; }
+		static item flag(const board& b) { return static_cast<item>(b.inf & full); }
+		static board& set(board& b, u32 f) { b.inf = (f & full) | (b.inf & ~full); return b; }
 	};
-	inline board& format(const style::item& style = style::at) {
-		style::setf(*this, style);
-		return *this;
-	}
+	inline board& format(u32 flags = style::index) { return style::set(*this, flags); }
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
-		const char* edge = style::flag(b) & style::actual ? "+------------------------+" : "+----------------+";
-		const char* grid = style::flag(b) & style::actual ? "|%6u%6u%6u%6u|" : "|%4u%4u%4u%4u|";
-		char buff[32];
-		switch (style::flag(b)) {
-		case style::raw:
+		auto flag = style::flag(b);
+		if (flag & style::binary) {
 			moporgic::write<u64>(out, b.raw);
-			moporgic::write<u32>(out, b.ext);
-			moporgic::write<u32>(out, b.inf);
-			break;
-		case style::raw64:
-			moporgic::write<u64>(out, b.raw);
-			break;
-		case style::raw80:
-			moporgic::write<u64>(out, b.raw);
-			moporgic::write_cast<u16>(out, b.ext >> 16);
-			break;
-		case style::lite80:
-			snprintf(buff, sizeof(buff), "[%016llx|%04x]", b.raw, b.ext >> 16);
-			out << buff;
-			break;
-		case style::lite64:
-			snprintf(buff, sizeof(buff), "[%016llx]", b.raw);
-			out << buff;
-			break;
-		default:
-		case style::index:
-		case style::actual:
-			out << edge << std::endl;
+			if (flag & style::extend) moporgic::write_cast<u16>(out, b.ext >> 16);
+			if (flag & style::alter)  moporgic::write_cast<u16>(out, b.ext & 0xffff);
+			if (flag & style::exact)  moporgic::write<u32>(out, b.inf);
+		} else if (flag & style::alter) {
+			char buf[32];
+			std::snprintf(buf, sizeof(buf), "[%016llx]", b.raw);
+			if (flag & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext >> 16);
+			out << buf;
+		} else {
+			char buf[32];
+			u32 w = (flag & style::exact) ? 6 : 4;
+			std::snprintf(buf, sizeof(buf), "+%.*s+", (w * 4), "------------------------");
+			out << buf << std::endl;
 			for (u32 i = 0; i < 16; i += 4) {
-				snprintf(buff, sizeof(buff), grid, u32(b[i + 0]), u32(b[i + 1]), u32(b[i + 2]), u32(b[i + 3]));
-				out << buff << std::endl;
+				u32 t[4] = { b[i + 0], b[i + 1], b[i + 2], b[i + 3] };
+				std::snprintf(buf, sizeof(buf), "|%*u%*u%*u%*u|", w, t[0], w, t[1], w, t[2], w, t[3]);
+				out << buf << std::endl;
 			}
-			out << edge << std::endl;
-			break;
+			std::snprintf(buf, sizeof(buf), "+%.*s+", (w * 4), "------------------------");
+			out << buf << std::endl;
 		}
 		return out;
 	}
 
 	friend std::istream& operator >>(std::istream& in, board& b) {
-		std::string s;
-		switch (style::flag(b)) {
-		case style::raw:
+		auto flag = style::flag(b);
+		if (flag & style::binary) {
 			moporgic::read<u64>(in, b.raw);
-			moporgic::read<u32>(in, b.ext);
-			moporgic::read<u32>(in, b.inf);
-			break;
-		case style::raw64:
-			moporgic::read<u64>(in, b.raw);
-			break;
-		case style::raw80:
-			moporgic::read<u64>(in, b.raw);
-			moporgic::read_cast<u16>(in, b.ext); b.ext <<= 16;
-			break;
-		case style::lite64:
-		case style::lite80:
-			in >> s;
-			std::stringstream(s.substr(s.find('[') + 1)) >> std::hex >> b.raw;
-			if ((style::flag(b) & style::ext) == 0) break;
-			if (s.find('[') == std::string::npos) in >> s;
-			std::stringstream(s.substr(s.find('|') + 1)) >> std::hex >> b.ext; b.ext <<= 16;
-			break;
-		default:
-		case style::index:
-		case style::actual:
-			in >> s;
-			if (s.find('+') != std::string::npos) {
-				in >> s;
-				for (int t, i = 0; i < 16 && in >> t; i++) {
-					b[i] = t;
-					if (i % 4 == 3) in >> s >> s;
-				}
-			} else {
-				b[0] = std::stol(s);
-				for (int t, i = 1; i < 16 && in >> t; i++) {
-					b[i] = t;
-				}
+			if (flag & style::extend) moporgic::read_cast<u16>(in, raw_cast<u16, 1>(b.ext));
+			if (flag & style::alter)  moporgic::read_cast<u16>(in, raw_cast<u16, 0>(b.ext));
+			if (flag & style::exact)  moporgic::read<u32>(in, b.inf);
+		} else if (flag & style::alter) {
+			bool nobox(in >> std::hex >> b.raw);
+			if (!nobox) (in.clear(), in.ignore(1)) >> std::hex >> b.raw;
+			if (flag & style::extend) in.ignore(1) >> std::hex >> raw_cast<u16, 1>(b.ext);
+			if (!nobox) in.ignore(1);
+		} else {
+			for (u32 k, i = 0; i < 16; i++) {
+				for (k = 0; !(in >> k) && !in.eof(); in.clear(), in.ignore(1));
+				b[i] = k;
 			}
-			break;
 		}
 		return in;
 	}

@@ -333,6 +333,11 @@ std::istream& read(std::istream& in, type& v, const size_t& len = sizeof(type)) 
 }
 
 template<typename type> static inline
+type read(std::istream& in) {
+	type buf; read(in, buf); return buf;
+}
+
+template<typename type> static inline
 std::ostream& write(std::ostream& out, const type* begin, const type* end, const size_t& len = sizeof(type)) {
 	for (type* value = const_cast<type*>(begin); value != end; value++)
 		write(out, *value, len);
@@ -355,6 +360,11 @@ template<typename cast, typename type> static inline
 std::istream& read_cast(std::istream& in, type& v, const size_t& len = sizeof(cast)) {
 	cast buf; read(in, buf, len); v = buf;
 	return in;
+}
+
+template<typename cast, typename type> static inline
+type read_cast(std::istream& in) {
+	type buf; read_cast<cast>(in, buf); return buf;
 }
 
 template<typename cast, typename type> static inline

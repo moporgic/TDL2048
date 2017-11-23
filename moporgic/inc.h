@@ -26,7 +26,7 @@
 #include <tuple>
 #include <ctime>
 #include <chrono>
-#include <stdarg.h>
+#include <cstdarg>
 #include <cctype>
 #include <cmath>
 #include <typeinfo>
@@ -45,10 +45,13 @@
 #include <iterator>
 #include <utility>
 #include <iomanip>
-// #define INC_MOPORGIC_LIB // to include moporgious library
-#ifdef INC_MOPORGIC_LIB
+#include <random>
+
+#ifdef INC_MOPORGIOUS_LIB
 #include "type.h"
 #include "util.h"
 #include "math.h"
 #include "half.h"
+#else
+#define INC_MOPORGIOUS_LIB
 #endif
