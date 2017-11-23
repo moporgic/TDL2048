@@ -13,6 +13,8 @@
 #include <math.h>
 #include <cmath>
 #include <numeric>
+#include <iterator>
+#include <algorithm>
 
 #if !defined(__cplusplus) || __cplusplus < 201103L
 #define constexpr
@@ -347,14 +349,14 @@ N pow_tail(N v, N b, P p) noexcept { return p ? pow_tail(v * b, b, p - 1) : v; }
  * Tail recursive pow
  */
 template<typename N, typename P> static inline constexpr
-N pow(N b, P p) noexcept { return pow_tail(1, b, p); }
+N pow(N b, P p) noexcept { return pow_tail(N(1), b, p); }
 
 /**
- * main
+ * mean
  */
 template<typename numeric, typename iter> static inline constexpr
 numeric mean(iter first, iter last, numeric init = 0) noexcept {
-	return std::accumulate(first, last, 0) / numeric(last - first);
+	return numeric(std::accumulate(first, last, init)) / std::distance(first, last);
 }
 
 /**
@@ -363,8 +365,8 @@ numeric mean(iter first, iter last, numeric init = 0) noexcept {
 template<typename numeric, typename iter> static inline constexpr
 numeric deviation(iter first, iter last, numeric mean) noexcept {
 	numeric sumofsqr = 0;
-	for (iter it = first; it != last; it++) sumofsqr += std::pow(*it - mean, 2);
-	return std::sqrt(sumofsqr / (last - first));
+	for (iter it = first; it != last; std::advance(it, 1)) sumofsqr += std::pow(*it - mean, 2);
+	return std::sqrt(sumofsqr / std::distance(first, last));
 }
 
 /**
