@@ -598,26 +598,32 @@ public:
 	inline i32 move64(const optype::oper& op) { return operate64(op); }
 	inline i32 move80(const optype::oper& op) { return operate80(op); }
 
-	inline void shift(const u32& k = 0) { return shift64(k); }
-	inline void shift64(const u32& k = 0) {
+	inline u32 shift(const u32& k = 0, const u32& u = 0) { return shift64(k, u); }
+	inline u32 shift64(const u32& k = 0, const u32& u = 0) {
 		u32 hash = hash64();
-		u32 mask = ((k ? (1 << k) : math::msb16(hash)) << 1) - 1;
-		u32 hole = math::lg16(~hash & mask);
-		if (hole == 0) return;
+		u32 tile = math::msb16(hash);
+		u32 mask = (((k ? (1 << k) : tile) << 1) - 1) & ~((2 << u) - 1);
+		u32 hole = ~hash & mask;
+		if (hole == 0 || hole > tile) return 0;
+		u32 h = math::lg16(hole);
 		for (u32 i = 0; i < 16; i++) {
 			u32 t = at4(i);
-			set4(i, t > hole ? t - 1 : t);
+			set4(i, t > h ? t - 1 : t);
 		}
+		return h;
 	}
-	inline void shift80(const u32& k = 0) {
+	inline u32 shift80(const u32& k = 0, const u32& u = 0) {
 		u32 hash = hash80();
-		u32 mask = ((k ? (1 << k) : math::msb16(hash)) << 1) - 1;
-		u32 hole = math::lg16(~hash & mask);
-		if (hole == 0) return;
+		u32 tile = math::msb16(hash);
+		u32 mask = (((k ? (1 << k) : tile) << 1) - 1) & ~((2 << u) - 1);
+		u32 hole = ~hash & mask;
+		if (hole == 0 || hole > tile) return 0;
+		u32 h = math::lg16(hole);
 		for (u32 i = 0; i < 16; i++) {
 			u32 t = at5(i);
-			set5(i, t > hole ? t - 1 : t);
+			set5(i, t > h ? t - 1 : t);
 		}
+		return h;
 	}
 
 	inline u32 species() const { return species64(); }
