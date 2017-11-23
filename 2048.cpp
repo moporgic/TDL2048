@@ -1588,14 +1588,7 @@ struct select {
 		move[2] = state(down);
 		move[3] = state(left);
 	}
-	inline select& operator ()(const board& b) {
-		move[0] << b;
-		move[1] << b;
-		move[2] << b;
-		move[3] << b;
-		return update();
-	}
-	inline select& operator ()(const board& b, const clip<feature>& range) {
+	inline select& operator ()(const board& b, const clip<feature>& range = feature::feats()) {
 		move[0].assign(b);
 		move[1].assign(b);
 		move[2].assign(b);
