@@ -954,7 +954,7 @@ public:
 			if (flag & style::exact)  moporgic::write<u32>(out, b.inf);
 		} else if (flag & style::alter) {
 			char buf[32];
-			std::snprintf(buf, sizeof(buf), "[%016llx]", b.raw);
+			std::snprintf(buf, sizeof(buf), "[%016" PRIx64 "]", b.raw);
 			if (flag & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext >> 16);
 			out << buf;
 		} else {

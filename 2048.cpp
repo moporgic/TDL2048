@@ -1387,7 +1387,7 @@ void list_mapping() {
 		std::string feats;
 		for (feature f : feature::feats()) {
 			if (weight(f) == w) {
-				snprintf(buf, sizeof(buf), " %08llx", indexer(f).sign());
+				snprintf(buf, sizeof(buf), " %08" PRIx64, indexer(f).sign());
 				feats += buf;
 			}
 		}
@@ -1397,10 +1397,10 @@ void list_mapping() {
 			u32 usageG = usageM >> 10;
 			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
 			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-			snprintf(buf, sizeof(buf), "weight(%08llx)[%llu] = %d%c", w.sign(), w.size(), usage, scale);
+			snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c", w.sign(), w.size(), usage, scale);
 			std::cout << buf << " :" << feats << std::endl;
 		} else {
-			snprintf(buf, sizeof(buf), "%08llx", w.sign());
+			snprintf(buf, sizeof(buf), "%08" PRIx64, w.sign());
 			weight::erase(w.sign());
 			std::cerr << "unused weight (" << buf << ") at list_mapping, erased" << std::endl;
 		}
@@ -1630,10 +1630,10 @@ struct statistic {
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		summaf = "summary %llums %.2fops";
 		u32 dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
-		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
-		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%llums %.2fops";
+		indexf = "%0" + std::to_string(dec) + PRIu64 "/%0" + std::to_string(dec) + PRIu64 " %" PRIu64 "ms %.2fops";
+		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
+		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
+		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%" PRIu64 "ms %.2fops";
 	}
 
 	u64 operator++(int) { return (++loop) - 1; }

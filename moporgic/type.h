@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cinttypes>
 
 typedef int64_t  ll;
 typedef uint64_t ull;
