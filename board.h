@@ -876,10 +876,14 @@ public:
 		inline board& whole() const { return b; }
 		inline u32 where() const { return i; }
 
-		declare_comparators_with(u32, operator u32(), v);
-
 		inline operator u32() const { return at(is(style::extend), is(style::exact)); }
 		inline tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
+		inline tile& operator ++() { set(at(is(style::extend), false) + 1, is(style::extend), false); return *this; }
+		inline tile& operator --() { set(at(is(style::extend), false) - 1, is(style::extend), false); return *this; }
+		inline u32 operator ++(int) { u32 v(*this); ++(*this); return v; }
+		inline u32 operator --(int) { u32 v(*this); --(*this); return v; }
+		declare_comparators_with(u32, operator u32(), v);
+
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
 			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return t.is(style::binary) ? moporgic::write_cast<byte>(out, v) : (out << v);
@@ -890,10 +894,6 @@ public:
 				t.set(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return in;
 		}
-		inline tile& operator ++() { set(at(is(style::extend), false) + 1, is(style::extend), false); return *this; }
-		inline tile& operator --() { set(at(is(style::extend), false) - 1, is(style::extend), false); return *this; }
-		inline u32 operator ++(int) { u32 v(*this); ++(*this); return v; }
-		inline u32 operator --(int) { u32 v(*this); --(*this); return v; }
 	private:
 		board& b;
 		u32 i;
