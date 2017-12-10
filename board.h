@@ -552,13 +552,11 @@ public:
 		static constexpr oper down = 2;
 		static constexpr oper left = 3;
 		static constexpr oper null = 4;
-		oper op;
 		inline optype(const oper& op = null) : op(op) {}
 		inline optype(const optype& opt) = default;
 		inline operator oper() const { return op; }
-		inline bool operator ==(const optype& opt) const { return op == opt.op; }
-		inline bool operator !=(const optype& opt) const { return op != opt.op; }
-		inline bool operator < (const optype& opt) const { return op <  opt.op; }
+		declare_comparators(optype, op);
+
 		inline const char* name() const {
 			const char* res[] = { "up", "right", "down", "left", "null" };
 			return res[op];
@@ -572,6 +570,8 @@ public:
 		}
 		static inline std::array<optype, 4> operations() { return { up, right, down, left }; }
 		static inline std::array<optype, 4> actions() { return operations(); }
+	private:
+		oper op;
 	};
 
 	inline i32 operate(const optype::oper& op) { return operate64(op); }
