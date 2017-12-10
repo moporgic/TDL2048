@@ -1438,14 +1438,16 @@ struct state {
 	state(action oper) : oper(oper), score(-1), esti(0) {}
 	state(const state& s) = default;
 
-	inline void assign(const board& b) {
-		move = b;
-		score = (move.*oper)();
-	}
+	inline operator bool() const { return score >= 0; }
+	inline operator board() const { return move; }
 
 	inline numeric value() const { return esti - score; }
 	inline numeric reward() const { return score; }
 
+	inline void assign(const board& b) {
+		move = b;
+		score = (move.*oper)();
+	}
 	inline numeric estimate(
 			const clip<feature>& range = feature::feats()) {
 		if (score >= 0) {
@@ -1461,30 +1463,13 @@ struct state {
 		return esti;
 	}
 
-	inline void operator <<(const board& b) {
-		assign(b);
-		estimate();
-	}
-	inline numeric operator +=(const numeric& v) {
-		return update(v);
-	}
-	inline numeric operator +=(const state& s) {
-		return update(s.esti);
-	}
-
+	inline void operator <<(const board& b) { assign(b); estimate(); }
 	inline void operator >>(board& b) const { b = move; }
-	inline bool operator >(const state& s) const { return esti > s.esti; }
-	inline operator bool() const { return score >= 0; }
-	inline operator board() const { return move; }
 
-	void operator >>(std::ostream& out) const {
-		move >> out;
-		moporgic::write(out, score);
-	}
-	void operator <<(std::istream& in) {
-		move << in;
-		moporgic::read(in, score);
-	}
+	inline numeric operator +=(const numeric& v) { return update(v); }
+	inline numeric operator +=(const state& s) { return update(s.esti); }
+
+	declare_comparators(state, esti);
 
 	inline static numeric& alpha() {
 		static numeric a = numeric(0.0025);
@@ -1513,33 +1498,18 @@ struct select {
 		move[1].estimate(range);
 		move[2].estimate(range);
 		move[3].estimate(range);
-		return update();
-	}
-	inline select& update() {
-		return update_ordered();
-	}
-	inline select& update_ordered() {
-		best = move;
-		if (move[1] > *best) best = move + 1;
-		if (move[2] > *best) best = move + 2;
-		if (move[3] > *best) best = move + 3;
-		return *this;
-	}
-	inline select& update_random() {
-		const u32 i = std::rand() % 4;
-		best = move + i;
-		if (move[(i + 1) % 4] > *best) best = move + ((i + 1) % 4);
-		if (move[(i + 2) % 4] > *best) best = move + ((i + 2) % 4);
-		if (move[(i + 3) % 4] > *best) best = move + ((i + 3) % 4);
+		best = std::max_element(move, move + 4);
 		return *this;
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
 	inline void operator >>(board& b) const { *best >> b; }
+
 	inline operator bool() const { return score() != -1; }
 	inline i32 score() const { return best->score; }
 	inline numeric esti() const { return best->esti; }
+	inline u32 opcode() const { return best - move; }
 
 	inline state* begin() { return move; }
 	inline state* end() { return move + 4; }
