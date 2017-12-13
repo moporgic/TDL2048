@@ -214,7 +214,7 @@ public:
 	};
 	static const cache lookup[1 << 20];
 
-public:
+private:
 	u64 raw;
 	u32 ext;
 	u32 inf;
@@ -233,10 +233,6 @@ public:
 	inline bool   operator !=(const board& b) const { return raw != b.raw || ext != b.ext; }
 	inline bool   operator  <(const board& b) const { return ext == b.ext ? raw < b.raw : ext < b.ext; }
 	inline bool   operator  >(const board& b) const { return ext == b.ext ? raw > b.raw : ext > b.ext; }
-	inline bool   operator ==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
-	inline bool   operator !=(const u64& raw) const { return this->raw != raw || this->ext != 0; }
-	inline bool   operator  <(const u64& raw) const { return this->raw  < raw && this->ext == 0; }
-	inline bool   operator  >(const u64& raw) const { return this->raw  > raw || this->ext != 0; }
 
 	inline const cache& query(const u32& r) const { return query16(r); }
 	inline const cache& query16(const u32& r) const { return board::lookup[fetch16(r)]; }
@@ -543,60 +539,35 @@ public:
 		return score | moved;
 	}
 
-	class optype {
+	class action {
 	public:
-		typedef i32 oper;
-		typedef i32 (board::*action)();
-		static constexpr oper up = 0;
-		static constexpr oper right = 1;
-		static constexpr oper down = 2;
-		static constexpr oper left = 3;
-		static constexpr oper null = 4;
-		inline optype(const oper& op = null) : op(op) {}
-		inline optype(const optype& opt) = default;
-		inline operator oper() const { return op; }
-		declare_comparators(optype, op);
-
-		inline const char* name() const {
-			const char* res[] = { "up", "right", "down", "left", "null" };
-			return res[op];
-		}
-		inline action function() const {
-			action res[] = { &board::up, &board::right, &board::down, &board::left, nullptr };
-			return res[op];
-		}
-		inline friend std::ostream& operator <<(std::ostream& out, const optype& o) {
-			return out << o.name();
-		}
-		static inline std::array<optype, 4> operations() { return { up, right, down, left }; }
-		static inline std::array<optype, 4> actions() { return operations(); }
-	private:
-		oper op;
+		action() = delete;
+		enum opcode : u32 { up, right, down, left };
 	};
 
-	inline i32 operate(const optype::oper& op) { return operate64(op); }
-	inline i32 operate64(const optype::oper& op) {
+	inline i32 operate(const u32& op) { return operate64(op); }
+	inline i32 operate64(const u32& op) {
 		switch (op) {
-		case optype::up:    return up64();
-		case optype::right: return right64();
-		case optype::down:  return down64();
-		case optype::left:  return left64();
+		case action::up:    return up64();
+		case action::right: return right64();
+		case action::down:  return down64();
+		case action::left:  return left64();
 		default:            return -1;
 		}
 	}
-	inline i32 operate80(const optype::oper& op) {
+	inline i32 operate80(const u32& op) {
 		switch (op) {
-		case optype::up:    return up80();
-		case optype::right: return right80();
-		case optype::down:  return down80();
-		case optype::left:  return left80();
+		case action::up:    return up80();
+		case action::right: return right80();
+		case action::down:  return down80();
+		case action::left:  return left80();
 		default:            return -1;
 		}
 	}
 
-	inline i32 move(const optype::oper& op)   { return operate(op); }
-	inline i32 move64(const optype::oper& op) { return operate64(op); }
-	inline i32 move80(const optype::oper& op) { return operate80(op); }
+	inline i32 move(const u32& op)   { return operate(op); }
+	inline i32 move64(const u32& op) { return operate64(op); }
+	inline i32 move80(const u32& op) { return operate80(op); }
 
 	inline u32 shift(const u32& k = 0, const u32& u = 0) { return shift64(k, u); }
 	inline u32 shift64(const u32& k = 0, const u32& u = 0) {
@@ -898,7 +869,7 @@ public:
 		board& b;
 		u32 i;
 
-		bool is(u32 item) const { return style::flag(b) & item; }
+		bool is(u32 item) const { return b.inf & item; }
 
 		u32 at(bool extend, bool exact) const {
 			if (extend) return exact ? b.exact5(i) : b.at5(i);
@@ -939,27 +910,26 @@ public:
 			raw64  = binary,
 			raw80  = binary | extend,
 		};
-
-		static item flag(const board& b) { return static_cast<item>(b.inf & full); }
-		static board& set(board& b, u32 f) { b.inf = (f & full) | (b.inf & ~full); return b; }
 	};
-	inline board& format(u32 flags = style::index) { return style::set(*this, flags); }
+	inline board& format(u32 i = style::index) { info((i & style::full) | (inf & ~style::full)); return *this; }
+
+	inline u32 info(u32 i) { return std::exchange(inf, i); }
+	inline u32 info() const { return inf; }
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
-		auto flag = style::flag(b);
-		if (flag & style::binary) {
+		if (b.inf & style::binary) {
 			moporgic::write<u64>(out, b.raw);
-			if (flag & style::extend) moporgic::write_cast<u16>(out, b.ext >> 16);
-			if (flag & style::alter)  moporgic::write_cast<u16>(out, b.ext & 0xffff);
-			if (flag & style::exact)  moporgic::write<u32>(out, b.inf);
-		} else if (flag & style::alter) {
+			if (b.inf & style::extend) moporgic::write_cast<u16>(out, b.ext >> 16);
+			if (b.inf & style::alter)  moporgic::write_cast<u16>(out, b.ext & 0xffff);
+			if (b.inf & style::exact)  moporgic::write<u32>(out, b.inf);
+		} else if (b.inf & style::alter) {
 			char buf[32];
 			std::snprintf(buf, sizeof(buf), "[%016" PRIx64 "]", b.raw);
-			if (flag & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext >> 16);
+			if (b.inf & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext >> 16);
 			out << buf;
 		} else {
 			char buf[32];
-			u32 w = (flag & style::exact) ? 6 : 4;
+			u32 w = (b.inf & style::exact) ? 6 : 4;
 			std::snprintf(buf, sizeof(buf), "+%.*s+", (w * 4), "------------------------");
 			out << buf << std::endl;
 			for (u32 i = 0; i < 16; i += 4) {
@@ -974,16 +944,15 @@ public:
 	}
 
 	friend std::istream& operator >>(std::istream& in, board& b) {
-		auto flag = style::flag(b);
-		if (flag & style::binary) {
+		if (b.inf & style::binary) {
 			moporgic::read<u64>(in, b.raw);
-			if (flag & style::extend) moporgic::read_cast<u16>(in, raw_cast<u16, 1>(b.ext));
-			if (flag & style::alter)  moporgic::read_cast<u16>(in, raw_cast<u16, 0>(b.ext));
-			if (flag & style::exact)  moporgic::read<u32>(in, b.inf);
-		} else if (flag & style::alter) {
+			if (b.inf & style::extend) moporgic::read_cast<u16>(in, raw_cast<u16, 1>(b.ext));
+			if (b.inf & style::alter)  moporgic::read_cast<u16>(in, raw_cast<u16, 0>(b.ext));
+			if (b.inf & style::exact)  moporgic::read<u32>(in, b.inf);
+		} else if (b.inf & style::alter) {
 			bool nobox(in >> std::hex >> b.raw);
 			if (!nobox) (in.clear(), in.ignore(1)) >> std::hex >> b.raw;
-			if (flag & style::extend) in.ignore(1) >> std::hex >> raw_cast<u16, 1>(b.ext);
+			if (b.inf & style::extend) in.ignore(1) >> std::hex >> raw_cast<u16, 1>(b.ext);
 			if (!nobox) in.ignore(1);
 		} else {
 			for (u32 k, i = 0; i < 16; i++) {
