@@ -18,34 +18,31 @@ namespace moporgic {
 
 class board {
 public:
-	struct list {
+	class list {
+	public:
+		constexpr list(u64 t, u32 i) : raw(t), idx(i) {}
+		constexpr list(const list& l) = default;
+		constexpr list() : raw(0), idx(0) {}
+		constexpr u32 operator[] (u32 i) const noexcept { return (raw >> (i << 2)) & 0x0f; }
+		constexpr u32 at(u32 i) const noexcept { return operator[](i); }
+		constexpr u32 front() const noexcept { return operator[](0); }
+		constexpr u32 back() const noexcept { return operator[](size() - 1); }
+		constexpr size_t size() const noexcept { return idx; }
+		constexpr bool empty() const noexcept { return size() == 0; }
+		constexpr list begin() const noexcept { return list(raw, 0); }
+		constexpr list end() const noexcept { return list(raw, idx); }
+	public:
+		constexpr u32 operator *() const noexcept { return operator[](idx); }
+		constexpr bool operator==(list i) const noexcept { return (raw == i.raw) & (idx == i.idx); }
+		constexpr bool operator!=(list i) const noexcept { return (raw != i.raw) | (idx != i.idx); }
+		constexpr bool operator< (list i) const noexcept { return ((raw == i.raw) & (idx < i.idx)) | (raw < i.raw); }
+		constexpr list& operator++() noexcept { ++idx; return *this; }
+		constexpr list& operator--() noexcept { --idx; return *this; }
+		constexpr list operator++(int) noexcept { return list(raw, ++idx - 1); }
+		constexpr list operator--(int) noexcept { return list(raw, --idx + 1); }
+	public:
 		u64 raw;
-		u32 num;
-		list(const u64& t, const u32& s) : raw(t), num(s) {}
-		list(const list& t) = default;
-		list() : raw(0), num(0) {}
-		~list() = default;
-		inline u32 operator[] (const u32& i) const { return (raw >> (i << 2)) & 0x0f; }
-		inline u32 at(const u32& i) const {
-			if (i >= num) throw std::out_of_range("board::list");
-			return operator[](i);
-		}
-		struct iter {
-			u64 raw;
-			i32 idx;
-			iter(const u64& raw, const i32& idx) : raw(raw), idx(idx) {}
-			inline u32 operator *() const { return (raw >> (idx << 2)) & 0x0f; }
-			inline bool operator==(const iter& i) const { return idx == i.idx; }
-			inline bool operator!=(const iter& i) const { return idx != i.idx; }
-			inline iter& operator++() { ++idx; return *this; }
-			inline iter& operator--() { --idx; return *this; }
-			inline iter  operator++(int) { return iter(raw, ++idx - 1); }
-			inline iter  operator--(int) { return iter(raw, --idx + 1); }
-		};
-		inline iter begin() const { return iter(raw, 0); }
-		inline iter end() const { return iter(raw, num); }
-		inline size_t size() const { return num; }
-		inline bool empty() const { return num == 0; }
+		u32 idx;
 	};
 	class cache {
 	friend class board;
@@ -187,7 +184,7 @@ public:
 			list layout;
 			for (int i = 0; i < 16; i++) {
 				if ((r >> i) & 1) // map bit-location to index
-					layout.raw |= (u64(i) << ((layout.num++) << 2));
+					layout.raw |= (u64(i) << ((layout.idx++) << 2));
 			}
 
 			u32 merge = left.merge | right.merge;
@@ -360,27 +357,27 @@ public:
 	inline void next() { return next64(); }
 	inline void next64() {
 		list empty = spaces64();
-		u32 p = empty[std::rand() % empty.num];
+		u32 p = empty[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
 	inline void next80() {
 		list empty = spaces80();
-		u32 p = empty[std::rand() % empty.num];
+		u32 p = empty[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
 
 	inline bool popup() { return popup64(); }
 	inline bool popup64() {
 		list empty = spaces64();
-		if (empty.num == 0) return false;
-		u32 p = empty[std::rand() % empty.num];
+		if (empty.size() == 0) return false;
+		u32 p = empty[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
 	inline bool popup80() {
 		list empty = spaces80();
-		if (empty.num == 0) return false;
-		u32 p = empty[std::rand() % empty.num];
+		if (empty.size() == 0) return false;
+		u32 p = empty[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
