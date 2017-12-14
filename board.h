@@ -756,9 +756,9 @@ public:
 		return mono;
 	}
 
-	inline u64 mono(const bool& left = true) const   { return left ? monoleft() : monoright(); }
-	inline u64 mono64(const bool& left = true) const { return left ? monoleft64() : monoright64(); }
-	inline u64 mono80(const bool& left = true) const { return left ? monoleft80() : monoright80(); }
+	inline u64 monotonic(const bool& left = true) const   { return left ? monoleft() : monoright(); }
+	inline u64 monotonic64(const bool& left = true) const { return left ? monoleft64() : monoright64(); }
+	inline u64 monotonic80(const bool& left = true) const { return left ? monoleft80() : monoright80(); }
 
 	inline u32 operations() const { return operations64(); }
 	inline u32 operations64() const {
