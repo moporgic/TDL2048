@@ -777,29 +777,37 @@ public:
 	inline list actions() const { return actions64(); }
 	inline list actions64() const {
 		u32 o = operations64();
-		using moporgic::math::ones4;
-		using moporgic::math::msb4;
-		using moporgic::math::lg4;
-		u32 x = ones4(o);
-		u32 a = msb4(o);
-		u32 b = msb4(o & ~a);
-		u32 c = msb4(o & ~a & ~b);
-		u32 d = msb4(o & ~a & ~b & ~c);
-		u32 k = (lg4(a) << 4*(x-1)) | (lg4(b) << 4*(x-2)) | (lg4(c) << 4*(x-3)) | (lg4(d) << 4*(x-4));
-		return list(k, x);
+		u32 k = 0, x = 0;
+		u32 u = o & 1;
+		k |= (u ? 0 : 0) << x;
+		x += (u << 2);
+		u32 r = o & 2;
+		k |= (r ? 1 : 0) << x;
+		x += (r << 1);
+		u32 d = o & 4;
+		k |= (d ? 2 : 0) << x;
+		x += (d >> 0);
+		u32 l = o & 8;
+		k |= (l ? 3 : 0) << x;
+		x += (l >> 1);
+		return { k, x >> 2 };
 	}
 	inline list actions80() const {
 		u32 o = operations80();
-		using moporgic::math::ones4;
-		using moporgic::math::msb4;
-		using moporgic::math::lg4;
-		u32 x = ones4(o);
-		u32 a = msb4(o);
-		u32 b = msb4(o & ~a);
-		u32 c = msb4(o & ~a & ~b);
-		u32 d = msb4(o & ~a & ~b & ~c);
-		u32 k = (lg4(a) << 4*(x-1)) | (lg4(b) << 4*(x-2)) | (lg4(c) << 4*(x-3)) | (lg4(d) << 4*(x-4));
-		return list(k, x);
+		u32 k = 0, x = 0;
+		u32 u = o & 1;
+		k |= (u ? 0 : 0) << x;
+		x += (u << 2);
+		u32 r = o & 2;
+		k |= (r ? 1 : 0) << x;
+		x += (r << 1);
+		u32 d = o & 4;
+		k |= (d ? 2 : 0) << x;
+		x += (d >> 0);
+		u32 l = o & 8;
+		k |= (l ? 3 : 0) << x;
+		x += (l >> 1);
+		return { k, x >> 2 };
 	}
 
 	inline bool operable() const { return operable64(); }
