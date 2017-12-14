@@ -222,14 +222,12 @@ public:
 	inline board(const u64& raw, const u16& ext) : board(raw, u32(ext) << 16) {}
 	inline board(const board& b) = default;
 	inline ~board() = default;
+	inline board& operator =(const u64& raw) { this->raw = raw; return *this; }
+	inline board& operator =(const board& b) = default;
+
 	inline operator u64() const { return raw; }
 	inline operator bool() const { return raw | ext; }
-	inline board& operator  =(const u64& raw) { this->raw = raw; return *this; }
-	inline board& operator  =(const board& b) { raw = b.raw, ext = b.ext; return *this; }
-	inline bool   operator ==(const board& b) const { return raw == b.raw && ext == b.ext; }
-	inline bool   operator !=(const board& b) const { return raw != b.raw || ext != b.ext; }
-	inline bool   operator  <(const board& b) const { return ext == b.ext ? raw < b.raw : ext < b.ext; }
-	inline bool   operator  >(const board& b) const { return ext == b.ext ? raw > b.raw : ext > b.ext; }
+	declare_comparators_with(const board&, raw_cast<u128>(*this), raw_cast<u128>(v))
 
 	inline const cache& query(const u32& r) const { return query16(r); }
 	inline const cache& query16(const u32& r) const { return board::lookup[fetch16(r)]; }
@@ -779,28 +777,28 @@ public:
 	inline list actions() const { return actions64(); }
 	inline list actions64() const {
 		u32 o = operations64();
-		using moporgic::math::ones32;
-		using moporgic::math::msb32;
-		using moporgic::math::log2;
-		u32 x = ones32(o);
-		u32 a = msb32(o);
-		u32 b = msb32(o & ~a);
-		u32 c = msb32(o & ~a & ~b);
-		u32 d = msb32(o & ~a & ~b & ~c);
-		u32 k = (log2(a) << 4*(x-1)) | (log2(b) << 4*(x-2)) | (log2(c) << 4*(x-3)) | (log2(d) << 4*(x-4));
+		using moporgic::math::ones4;
+		using moporgic::math::msb4;
+		using moporgic::math::lg4;
+		u32 x = ones4(o);
+		u32 a = msb4(o);
+		u32 b = msb4(o & ~a);
+		u32 c = msb4(o & ~a & ~b);
+		u32 d = msb4(o & ~a & ~b & ~c);
+		u32 k = (lg4(a) << 4*(x-1)) | (lg4(b) << 4*(x-2)) | (lg4(c) << 4*(x-3)) | (lg4(d) << 4*(x-4));
 		return list(k, x);
 	}
 	inline list actions80() const {
 		u32 o = operations80();
-		using moporgic::math::ones32;
-		using moporgic::math::msb32;
-		using moporgic::math::log2;
-		u32 x = ones32(o);
-		u32 a = msb32(o);
-		u32 b = msb32(o & ~a);
-		u32 c = msb32(o & ~a & ~b);
-		u32 d = msb32(o & ~a & ~b & ~c);
-		u32 k = (log2(a) << 4*(x-1)) | (log2(b) << 4*(x-2)) | (log2(c) << 4*(x-3)) | (log2(d) << 4*(x-4));
+		using moporgic::math::ones4;
+		using moporgic::math::msb4;
+		using moporgic::math::lg4;
+		u32 x = ones4(o);
+		u32 a = msb4(o);
+		u32 b = msb4(o & ~a);
+		u32 c = msb4(o & ~a & ~b);
+		u32 d = msb4(o & ~a & ~b & ~c);
+		u32 k = (lg4(a) << 4*(x-1)) | (lg4(b) << 4*(x-2)) | (lg4(c) << 4*(x-3)) | (lg4(d) << 4*(x-4));
 		return list(k, x);
 	}
 
@@ -846,10 +844,6 @@ public:
 
 		inline operator u32() const { return at(is(style::extend), is(style::exact)); }
 		inline tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
-		inline tile& operator ++() { set(at(is(style::extend), false) + 1, is(style::extend), false); return *this; }
-		inline tile& operator --() { set(at(is(style::extend), false) - 1, is(style::extend), false); return *this; }
-		inline u32 operator ++(int) { u32 v(*this); ++(*this); return v; }
-		inline u32 operator --(int) { u32 v(*this); --(*this); return v; }
 		declare_comparators_with(u32, operator u32(), v);
 
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
@@ -878,9 +872,6 @@ public:
 		}
 	};
 	inline tile operator [](const u32& i) const { return tile(*this, i); }
-
-	inline void operator >>(std::ostream& out) const { out << (*this); }
-	inline void operator <<(std::istream& in) { in >> (*this); }
 
 	class style {
 	public:
