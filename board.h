@@ -633,10 +633,8 @@ public:
 		return query20(0).numof[t] + query20(1).numof[t] + query20(2).numof[t] + query20(3).numof[t];
 	}
 
-	template<typename numa>
-	inline void numof(numa num, const u32& min, const u32& max) const { return numof64(num, min, max); }
-	template<typename numa>
-	inline void numof64(numa num, const u32& min, const u32& max) const {
+	inline void numof(u32 num[], const u32& min, const u32& max) const { return numof64(num, min, max); }
+	inline void numof64(u32 num[], const u32& min, const u32& max) const {
 		const cache::info& numof0 = query16(0).numof;
 		const cache::info& numof1 = query16(1).numof;
 		const cache::info& numof2 = query16(2).numof;
@@ -645,8 +643,7 @@ public:
 			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 		}
 	}
-	template<typename numa>
-	inline void numof80(numa num, const u32& min, const u32& max) const {
+	inline void numof80(u32 num[], const u32& min, const u32& max) const {
 		const cache::info& numof0 = query20(0).numof;
 		const cache::info& numof1 = query20(1).numof;
 		const cache::info& numof2 = query20(2).numof;
@@ -670,16 +667,13 @@ public:
 		return num;
 	}
 
-	template<typename numa>
-	inline void count(numa num, const u32& min, const u32& max) const { return count64(num, min, max); }
-	template<typename numa>
-	inline void count64(numa num, const u32& min, const u32& max) const {
+	inline void count(u32 num[], const u32& min, const u32& max) const { return count64(num, min, max); }
+	inline void count64(u32 num[], const u32& min, const u32& max) const {
 		std::fill(num + min, num + max, 0);
 		for (u32 i = 0; i < 16; i++)
 			num[at4(i)]++;
 	}
-	template<typename numa>
-	inline void count80(numa num, const u32& min, const u32& max) const {
+	inline void count80(u32 num[], const u32& min, const u32& max) const {
 		std::fill(num + min, num + max, 0);
 		for (u32 i = 0; i < 16; i++)
 			num[at5(i)]++;
@@ -693,10 +687,8 @@ public:
 		return (query20(0).mask[t] << 0) | (query20(1).mask[t] << 4) | (query20(2).mask[t] << 8) | (query20(3).mask[t] << 12);
 	}
 
-	template<typename numa>
-	inline void mask(numa msk, const u32& min, const u32& max) const { return mask64(msk, min, max); }
-	template<typename numa>
-	inline void mask64(numa msk, const u32& min, const u32& max) const {
+	inline void mask(u32 msk[], const u32& min, const u32& max) const { return mask64(msk, min, max); }
+	inline void mask64(u32 msk[], const u32& min, const u32& max) const {
 		const cache::info& mask0 = query16(0).mask;
 		const cache::info& mask1 = query16(1).mask;
 		const cache::info& mask2 = query16(2).mask;
@@ -705,8 +697,7 @@ public:
 			msk[i] = (mask0[i] << 0) | (mask1[i] << 4) | (mask2[i] << 8) | (mask3[i] << 12);
 		}
 	}
-	template<typename numa>
-	inline void mask80(numa msk, const u32& min, const u32& max) const {
+	inline void mask80(u32 msk[], const u32& min, const u32& max) const {
 		const cache::info& mask0 = query20(0).mask;
 		const cache::info& mask1 = query20(1).mask;
 		const cache::info& mask2 = query20(2).mask;
