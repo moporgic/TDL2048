@@ -915,7 +915,7 @@ public:
 			if (b.inf & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext >> 16);
 			out << buf;
 		} else {
-			char buf[32];
+			char buf[64];
 			u32 w = (b.inf & style::exact) ? 6 : 4;
 			std::snprintf(buf, sizeof(buf), "+%.*s+", (w * 4), "------------------------");
 			out << buf << std::endl;
