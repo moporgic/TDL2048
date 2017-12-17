@@ -258,10 +258,6 @@ public:
 		return at4(i) | ((ext >> (i + 12)) & 0x10);
 	}
 
-	inline u32 exact(const u32& i) const { return exact4(i); }
-	inline u32 exact4(const u32& i) const { return (1 << at4(i)) & 0xfffffffe; }
-	inline u32 exact5(const u32& i) const { return (1 << at5(i)) & 0xfffffffe; }
-
 	inline void set(const u32& i, const u32& t) { set4(i, t); }
 	inline void set4(const u32& i, const u32& t) {
 		raw = (raw & ~(0x0fULL << (i << 2))) | (u64(t & 0x0f) << (i << 2));
@@ -862,12 +858,12 @@ public:
 		bool is(u32 item) const { return b.inf & item; }
 
 		u32 at(bool extend, bool exact) const {
-			if (extend) return exact ? b.exact5(i) : b.at5(i);
-			else        return exact ? b.exact4(i) : b.at4(i);
+			u32 v = (b.*(extend ? &at5 : &at4))(i);
+			return exact ? (1 << v) & -2u : v;
 		}
 		void set(u32 k, bool extend, bool exact) const {
-			if (extend) b.set5(i, exact ? math::lg(k) : k);
-			else        b.set4(i, exact ? math::lg(k) : k);
+			u32 v = exact ? math::lg(k) : k;
+			(b.*(extend ? &set5 : &set4))(i, v);
 		}
 	};
 	inline tile operator [](const u32& i) const { return tile(*this, i); }
