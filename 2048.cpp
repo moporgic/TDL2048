@@ -1467,9 +1467,6 @@ struct state {
 	inline void operator <<(const board& b) { assign(b); estimate(); }
 	inline void operator >>(board& b) const { b = move; }
 
-	inline numeric operator +=(const numeric& v) { return update(v); }
-	inline numeric operator +=(const state& s) { return update(s.esti); }
-
 	declare_comparators(state, esti);
 
 	inline static numeric& alpha() {
@@ -1888,14 +1885,14 @@ statistic train(utils::options opts = {}) {
 			best >> b;
 			b.next();
 			while (best << b) {
-				last += best.esti();
+				last.update(best.esti());
 				score += best.score();
 				opers += 1;
 				best >> last;
 				best >> b;
 				b.next();
 			}
-			last += 0;
+			last.update(0);
 
 			stats.update(score, b.hash(), opers);
 		}
