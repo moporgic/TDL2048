@@ -1847,6 +1847,7 @@ statistic train(utils::options opts = {}) {
 	case to_hash("backward"):
 	case to_hash("backward-best"):
 		for (stats.init(opts["train"]); stats; stats++) {
+
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1870,6 +1871,7 @@ statistic train(utils::options opts = {}) {
 	case to_hash("forward"):
 	case to_hash("forward-best"):
 		for (stats.init(opts["train"]); stats; stats++) {
+
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1907,6 +1909,7 @@ statistic test(utils::options opts = {}) {
 	default:
 	case to_hash("best"):
 		for (stats.init(opts["test"]); stats; stats++) {
+
 			u32 score;
 			u32 opers;
 
