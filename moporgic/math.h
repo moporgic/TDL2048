@@ -106,6 +106,13 @@ unsigned int ones8(register unsigned int x) noexcept {
 	return (x & 0x000f);
 }
 
+static inline constexpr
+unsigned int ones4(register unsigned int x) noexcept {
+	x = ((x & 0b1010) >> 1) + (x & 0b0101);
+	return (((x & 0b1100) >> 2) + (x & 0b0011)) & 0b0111;
+}
+
+
 /**
  * Leading Zero Count
  * Some machines have had single instructions that count the number of leading zero bits in an integer;
@@ -190,6 +197,14 @@ unsigned int msb8(register unsigned int x) noexcept {
 	return (x & ~(x >> 1));
 }
 
+static inline constexpr
+unsigned int msb4(register unsigned int x) noexcept {
+	x |= (x >> 1);
+	x |= (x >> 2);
+	return (x & ~(x >> 1));
+}
+
+
 /**
  * Log2 of an Integer
  * Given a binary integer value x, the floor of the base 2 log of that number efficiently
@@ -265,6 +280,18 @@ unsigned int lg8(register unsigned int x) noexcept {
 	return (ones8(x >> 1));
 #endif
 }
+
+static inline constexpr
+unsigned int lg4(register unsigned int x) noexcept {
+	x |= (x >> 1);
+	x |= (x >> 2);
+#ifdef	LOG0UNDEFINED
+	return (ones4(x) - 1);
+#else
+	return (ones4(x >> 1));
+#endif
+}
+
 
 /**
  * Log2 of an Integer
@@ -383,11 +410,11 @@ numeric deviation(iter first, iter last) noexcept {
  * the full declaration of half is inside type.h
  * here is the 16-bit floating point operation
  */
-constexpr half::half(const f32& num) noexcept : hf(to_half(num)) {}
+constexpr half::half(f32 num) noexcept : hf(to_half(num)) {}
 constexpr half::operator f32() const noexcept { return to_float(hf); }
-constexpr half half::operator +(const half& f) const noexcept { return half::as(half_add(hf, f.hf)); }
-constexpr half half::operator -(const half& f) const noexcept { return half::as(half_sub(hf, f.hf)); }
-constexpr half half::operator *(const half& f) const noexcept { return half::as(half_mul(hf, f.hf)); }
-constexpr half half::operator /(const half& f) const noexcept { return half::as(half_div(hf, f.hf)); }
+constexpr half half::operator +(half f) const noexcept { return half::as(half_add(hf, f.hf)); }
+constexpr half half::operator -(half f) const noexcept { return half::as(half_sub(hf, f.hf)); }
+constexpr half half::operator *(half f) const noexcept { return half::as(half_mul(hf, f.hf)); }
+constexpr half half::operator /(half f) const noexcept { return half::as(half_div(hf, f.hf)); }
 
 } /* moporgic */

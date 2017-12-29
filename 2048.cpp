@@ -198,6 +198,7 @@ public:
 			read_cast<u64>(in, length);
 			raw_init(length);
 			switch (code) {
+			case 2: read_cast<f16>(in, value, value + length); break;
 			case 4: read_cast<f32>(in, value, value + length); break;
 			case 8: read_cast<f64>(in, value, value + length); break;
 			}
@@ -1470,7 +1471,7 @@ void list_mapping() {
 		std::string feats;
 		for (feature f : feature::feats()) {
 			if (weight(f) == w) {
-				snprintf(buf, sizeof(buf), " %08llx", indexer(f).sign());
+				snprintf(buf, sizeof(buf), " %08" PRIx64, indexer(f).sign());
 				feats += buf;
 			}
 		}
@@ -1480,10 +1481,10 @@ void list_mapping() {
 			u32 usageG = usageM >> 10;
 			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
 			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-			snprintf(buf, sizeof(buf), "weight(%08llx)[%llu] = %d%c x3", w.sign(), w.size(), usage, scale);
+			snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c x3", w.sign(), w.size(), usage, scale);
 			std::cout << buf << " :" << feats << std::endl;
 		} else {
-			snprintf(buf, sizeof(buf), "%08llx", w.sign());
+			snprintf(buf, sizeof(buf), "%08" PRIx64, w.sign());
 			weight::erase(w.sign());
 			std::cerr << "unused weight (" << buf << ") at list_mapping, erased" << std::endl;
 		}
@@ -1521,14 +1522,16 @@ struct state {
 	state(action oper) : oper(oper), score(-1), esti(0) {}
 	state(const state& s) = default;
 
-	inline void assign(const board& b) {
-		move = b;
-		score = (move.*oper)();
-	}
+	inline operator bool() const { return score >= 0; }
+	inline operator board() const { return move; }
 
 	inline numeric value() const { return esti - score; }
 	inline numeric reward() const { return score; }
 
+	inline void assign(const board& b) {
+		move = b;
+		score = (move.*oper)();
+	}
 	inline numeric estimate(
 			const clip<feature>& range = feature::feats()) {
 		if (score >= 0) {
@@ -1545,30 +1548,10 @@ struct state {
 		return esti;
 	}
 
-	inline void operator <<(const board& b) {
-		assign(b);
-		estimate();
-	}
-	inline numeric operator +=(const numeric& v) {
-		return update(v);
-	}
-	inline numeric operator +=(const state& s) {
-		return update(s.esti);
-	}
-
+	inline void operator <<(const board& b) { assign(b); estimate(); }
 	inline void operator >>(board& b) const { b = move; }
-	inline bool operator >(const state& s) const { return esti > s.esti; }
-	inline operator bool() const { return score >= 0; }
-	inline operator board() const { return move; }
 
-	void operator >>(std::ostream& out) const {
-		move >> out;
-		moporgic::write(out, score);
-	}
-	void operator <<(std::istream& in) {
-		move << in;
-		moporgic::read(in, score);
-	}
+	declare_comparators(state, esti);
 
 	inline static numeric& alpha() {
 		static numeric a = numeric(0.01);
@@ -1597,33 +1580,21 @@ struct select {
 		move[1].estimate(range);
 		move[2].estimate(range);
 		move[3].estimate(range);
-		return update();
-	}
-	inline select& update() {
-		return update_ordered();
-	}
-	inline select& update_ordered() {
 		best = move;
 		if (move[1] > *best) best = move + 1;
 		if (move[2] > *best) best = move + 2;
 		if (move[3] > *best) best = move + 3;
 		return *this;
 	}
-	inline select& update_random() {
-		const u32 i = std::rand() % 4;
-		best = move + i;
-		if (move[(i + 1) % 4] > *best) best = move + ((i + 1) % 4);
-		if (move[(i + 2) % 4] > *best) best = move + ((i + 2) % 4);
-		if (move[(i + 3) % 4] > *best) best = move + ((i + 3) % 4);
-		return *this;
-	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
 	inline void operator >>(board& b) const { *best >> b; }
+
 	inline operator bool() const { return score() != -1; }
 	inline i32 score() const { return best->score; }
 	inline numeric esti() const { return best->esti; }
+	inline u32 opcode() const { return best - move; }
 
 	inline state* begin() { return move; }
 	inline state* end() { return move + 4; }
@@ -1714,10 +1685,10 @@ struct statistic {
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		summaf = "summary %llums %.2fops";
 		u32 dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
-		indexf = "%0" + std::to_string(dec) + "llu/%0" + std::to_string(dec) + "llu %llums %.2fops";
-		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%llu max=%u tile=%u win=%.2f%%";
-		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%llums %.2fops";
+		indexf = "%0" + std::to_string(dec) + PRIu64 "/%0" + std::to_string(dec) + PRIu64 " %" PRIu64 "ms %.2fops";
+		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
+		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
+		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%" PRIu64 "ms %.2fops";
 	}
 
 	u64 operator++(int) { return (++loop) - 1; }
@@ -1731,9 +1702,9 @@ struct statistic {
 		local.opers += opers;
 		if (hash >= winv) local.win += 1;
 		local.max = std::max(local.max, score);
-		every.count[std::log2(hash)] += 1;
-		every.score[std::log2(hash)] += score;
-		every.opers[std::log2(hash)] += opers;
+		every.count[math::log2(hash)] += 1;
+		every.score[math::log2(hash)] += score;
+		every.opers[math::log2(hash)] += opers;
 
 		if ((loop % unit) != 0) return;
 
@@ -1949,22 +1920,20 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 statistic train(utils::options opts = {}) {
-	board b;
-	state last;
-	select best;
-	statistic stats;
 	std::vector<state> path;
 	path.reserve(65536);
-	u32 score;
-	u32 opers;
+	statistic stats;
+	select best;
+	state last;
+	board b;
 
 	switch (to_hash(opts["train"]["mode"])) {
 	case to_hash("backward"):
 	case to_hash("backward-best"):
 		for (stats.init(opts["train"]); stats; stats++) {
 
-			score = 0;
-			opers = 0;
+			u32 score = 0;
+			u32 opers = 0;
 
 			for (b.init(); best << b; b.next()) {
 				score += best.score();
@@ -1987,8 +1956,8 @@ statistic train(utils::options opts = {}) {
 	case to_hash("forward-best"):
 		for (stats.init(opts["train"]); stats; stats++) {
 
-			score = 0;
-			opers = 0;
+			u32 score = 0;
+			u32 opers = 0;
 
 			b.init();
 			best << b;
@@ -1998,14 +1967,14 @@ statistic train(utils::options opts = {}) {
 			best >> b;
 			b.next();
 			while (best << b) {
-				last += best.esti();
+				last.update(best.esti());
 				score += best.score();
 				opers += 1;
 				best >> last;
 				best >> b;
 				b.next();
 			}
-			last += 0;
+			last.update(0);
 
 			stats.update(score, b.hash(), opers);
 		}
@@ -2016,19 +1985,17 @@ statistic train(utils::options opts = {}) {
 }
 
 statistic test(utils::options opts = {}) {
-	board b;
-	select best;
 	statistic stats;
-	u32 score;
-	u32 opers;
+	select best;
+	board b;
 
 	switch (to_hash(opts["test"]["mode"])) {
 	default:
 	case to_hash("best"):
 		for (stats.init(opts["test"]); stats; stats++) {
 
-			score = 0;
-			opers = 0;
+			u32 score;
+			u32 opers;
 
 			for (b.init(); best << b; b.next()) {
 				score += best.score();

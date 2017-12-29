@@ -46,6 +46,8 @@
 #include <utility>
 #include <iomanip>
 #include <random>
+#include <type_traits>
+#include <regex>
 
 #ifdef INC_MOPORGIOUS_LIB
 #include "type.h"
