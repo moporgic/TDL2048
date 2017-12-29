@@ -1618,9 +1618,9 @@ struct statistic {
 		local.opers += opers;
 		if (hash >= winv) local.win += 1;
 		local.max = std::max(local.max, score);
-		every.count[std::log2(hash)] += 1;
-		every.score[std::log2(hash)] += score;
-		every.opers[std::log2(hash)] += opers;
+		every.count[math::log2(hash)] += 1;
+		every.score[math::log2(hash)] += score;
+		every.opers[math::log2(hash)] += opers;
 
 		if ((loop % unit) != 0) return;
 
