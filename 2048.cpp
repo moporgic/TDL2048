@@ -1836,22 +1836,19 @@ inline utils::options parse(int argc, const char* argv[]) {
 }
 
 statistic train(utils::options opts = {}) {
-	board b;
-	state last;
-	select best;
-	statistic stats;
 	std::vector<state> path;
 	path.reserve(65536);
-	u32 score;
-	u32 opers;
+	statistic stats;
+	select best;
+	state last;
+	board b;
 
 	switch (to_hash(opts["train"]["mode"])) {
 	case to_hash("backward"):
 	case to_hash("backward-best"):
 		for (stats.init(opts["train"]); stats; stats++) {
-
-			score = 0;
-			opers = 0;
+			u32 score = 0;
+			u32 opers = 0;
 
 			for (b.init(); best << b; b.next()) {
 				score += best.score();
@@ -1873,9 +1870,8 @@ statistic train(utils::options opts = {}) {
 	case to_hash("forward"):
 	case to_hash("forward-best"):
 		for (stats.init(opts["train"]); stats; stats++) {
-
-			score = 0;
-			opers = 0;
+			u32 score = 0;
+			u32 opers = 0;
 
 			b.init();
 			best << b;
@@ -1903,19 +1899,16 @@ statistic train(utils::options opts = {}) {
 }
 
 statistic test(utils::options opts = {}) {
-	board b;
-	select best;
 	statistic stats;
-	u32 score;
-	u32 opers;
+	select best;
+	board b;
 
 	switch (to_hash(opts["test"]["mode"])) {
 	default:
 	case to_hash("best"):
 		for (stats.init(opts["test"]); stats; stats++) {
-
-			score = 0;
-			opers = 0;
+			u32 score;
+			u32 opers;
 
 			for (b.init(); best << b; b.next()) {
 				score += best.score();
