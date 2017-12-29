@@ -115,6 +115,7 @@ public:
 			read_cast<u64>(in, length);
 			raw = alloc(length);
 			switch (code) {
+			case 2: read_cast<f16>(in, raw, raw + length); break;
 			case 4: read_cast<f32>(in, raw, raw + length); break;
 			case 8: read_cast<f64>(in, raw, raw + length); break;
 			}
