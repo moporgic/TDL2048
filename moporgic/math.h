@@ -410,11 +410,11 @@ numeric deviation(iter first, iter last) noexcept {
  * the full declaration of half is inside type.h
  * here is the 16-bit floating point operation
  */
-constexpr half::half(const f32& num) noexcept : hf(to_half(num)) {}
+constexpr half::half(f32 num) noexcept : hf(to_half(num)) {}
 constexpr half::operator f32() const noexcept { return to_float(hf); }
-constexpr half half::operator +(const half& f) const noexcept { return half::as(half_add(hf, f.hf)); }
-constexpr half half::operator -(const half& f) const noexcept { return half::as(half_sub(hf, f.hf)); }
-constexpr half half::operator *(const half& f) const noexcept { return half::as(half_mul(hf, f.hf)); }
-constexpr half half::operator /(const half& f) const noexcept { return half::as(half_div(hf, f.hf)); }
+constexpr half half::operator +(half f) const noexcept { return half::as(half_add(hf, f.hf)); }
+constexpr half half::operator -(half f) const noexcept { return half::as(half_sub(hf, f.hf)); }
+constexpr half half::operator *(half f) const noexcept { return half::as(half_mul(hf, f.hf)); }
+constexpr half half::operator /(half f) const noexcept { return half::as(half_div(hf, f.hf)); }
 
 } /* moporgic */
