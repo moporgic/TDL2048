@@ -858,12 +858,12 @@ public:
 		bool is(u32 item) const { return b.inf & item; }
 
 		u32 at(bool extend, bool exact) const {
-			u32 v = (b.*(extend ? &at5 : &at4))(i);
+			u32 v = extend ? b.at5(i) : b.at4(i);
 			return exact ? (1 << v) & -2u : v;
 		}
 		void set(u32 k, bool extend, bool exact) const {
 			u32 v = exact ? math::lg(k) : k;
-			(b.*(extend ? &set5 : &set4))(i, v);
+			if (extend) b.set5(i, v); else b.set4(i, v);
 		}
 	};
 	inline tile operator [](const u32& i) const { return tile(*this, i); }
