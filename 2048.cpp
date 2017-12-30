@@ -1910,8 +1910,8 @@ statistic test(utils::options opts = {}) {
 	case to_hash("best"):
 		for (stats.init(opts["test"]); stats; stats++) {
 
-			u32 score;
-			u32 opers;
+			u32 score = 0;
+			u32 opers = 0;
 
 			for (b.init(); best << b; b.next()) {
 				score += best.score();
