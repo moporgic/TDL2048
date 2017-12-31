@@ -40,6 +40,7 @@ public:
 	inline ~weight() {}
 
 	typedef u64 sign_t;
+	typedef moporgic::numeric numeric;
 
 	inline sign_t sign() const { return id; }
 	inline size_t size() const { return length; }
@@ -258,8 +259,8 @@ public:
 	typedef u64 sign_t;
 
 	inline sign_t sign() const { return (value.sign() << 32) | index.sign(); }
-	inline numeric& operator [](const board& b) { return value[index(b)]; }
-	inline numeric& operator [](const u64& idx) { return value[idx]; }
+	inline weight::numeric& operator [](const board& b) { return value[index(b)]; }
+	inline weight::numeric& operator [](const u64& idx) { return value[idx]; }
 	inline u64 operator ()(const board& b) const { return index(b); }
 
 	inline operator indexer() const { return index; }
@@ -1393,7 +1394,7 @@ void list_mapping() {
 			}
 		}
 		if (feats.size()) {
-			u32 usageK = (sizeof(numeric) * w.size()) >> 10;
+			u32 usageK = (sizeof(weight::numeric) * w.size()) >> 10;
 			u32 usageM = usageK >> 10;
 			u32 usageG = usageM >> 10;
 			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
