@@ -39,10 +39,9 @@ public:
 	inline weight(const weight& w) = default;
 	inline ~weight() {}
 
-	typedef u64 sign_t;
 	typedef moporgic::numeric numeric;
 
-	inline sign_t sign() const { return id; }
+	inline u64 sign() const { return id; }
 	inline size_t size() const { return length; }
 	inline size_t stride() const { return 1ull; }
 	inline numeric& operator [](const u64& i) { return raw[i]; }
@@ -175,19 +174,19 @@ public:
 
 	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
 
-	static inline weight& make(const sign_t& sign, const size_t& size) {
+	static inline weight& make(const u64& sign, const size_t& size) {
 		list<weight>::as(wghts()).push_back(weight(sign, size));
 		return wghts().back();
 	}
-	static inline weight* find(const sign_t& sign, const clip<weight>& range = wghts()) {
+	static inline weight* find(const u64& sign, const clip<weight>& range = wghts()) {
 		return std::find_if(range.begin(), range.end(), [=](const weight& w) { return w.sign() == sign; });
 	}
-	static inline weight& at(const sign_t& sign, const clip<weight>& range = wghts()) {
+	static inline weight& at(const u64& sign, const clip<weight>& range = wghts()) {
 		auto it = find(sign, range);
 		if (it != range.end()) return (*it);
 		throw std::out_of_range("weight::at");
 	}
-	static inline weight erase(const sign_t& sign, const bool& del = true) {
+	static inline weight erase(const u64& sign, const bool& del = true) {
 		weight w = at(sign);
 		if (del) free(w.data());
 		list<weight>::as(wghts()).erase(find(sign));
@@ -195,7 +194,7 @@ public:
 	}
 
 private:
-	inline weight(const sign_t& sign, const size_t& size) : id(sign), length(size), raw(alloc(size)) {}
+	inline weight(const u64& sign, const size_t& size) : id(sign), length(size), raw(alloc(size)) {}
 
 	static inline numeric* alloc(const size_t& size) {
 		return new numeric[size]();
@@ -204,7 +203,7 @@ private:
 		delete[] v;
 	}
 
-	sign_t id;
+	u64 id;
 	size_t length;
 	numeric* raw;
 };
@@ -215,38 +214,37 @@ public:
 	inline indexer(const indexer& i) = default;
 	inline ~indexer() {}
 
-	typedef u64 sign_t;
 	typedef std::function<u64(const board&)> mapper;
 
-	inline sign_t sign() const { return id; }
+	inline u64 sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return map(b); }
 	declare_comparators(indexer, sign());
 
 	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
-	static inline indexer& make(const sign_t& sign, mapper map) {
+	static inline indexer& make(const u64& sign, mapper map) {
 		list<indexer>::as(idxrs()).push_back(indexer(sign, map));
 		return idxrs().back();
 	}
-	static inline indexer* find(const sign_t& sign, const clip<indexer>& range = idxrs()) {
+	static inline indexer* find(const u64& sign, const clip<indexer>& range = idxrs()) {
 		return std::find_if(range.begin(), range.end(), [=](const indexer& i) { return i.sign() == sign; });
 	}
-	static inline indexer& at(const sign_t& sign, const clip<indexer>& range = idxrs()) {
+	static inline indexer& at(const u64& sign, const clip<indexer>& range = idxrs()) {
 		const auto it = find(sign, range);
 		if (it != range.end()) return (*it);
 		throw std::out_of_range("indexer::at");
 	}
-	static inline indexer erase(const sign_t& sign) {
+	static inline indexer erase(const u64& sign) {
 		indexer i = at(sign);
 		list<indexer>::as(idxrs()).erase(find(sign));
 		return i;
 	}
 
 private:
-	inline indexer(const sign_t& sign, mapper map) : id(sign), map(map) {}
+	inline indexer(const u64& sign, mapper map) : id(sign), map(map) {}
 
-	sign_t id;
+	u64 id;
 	mapper map;
 };
 
@@ -256,9 +254,7 @@ public:
 	inline feature(const feature& t) = default;
 	inline ~feature() {}
 
-	typedef u64 sign_t;
-
-	inline sign_t sign() const { return (value.sign() << 32) | index.sign(); }
+	inline u64 sign() const { return (value.sign() << 32) | index.sign(); }
 	inline weight::numeric& operator [](const board& b) { return value[index(b)]; }
 	inline weight::numeric& operator [](const u64& idx) { return value[idx]; }
 	inline u64 operator ()(const board& b) const { return index(b); }
@@ -346,20 +342,20 @@ public:
 
 	static inline clip<feature>& feats() { static clip<feature> f; return f; }
 
-	static inline feature& make(const sign_t& wgt, const sign_t& idx) {
+	static inline feature& make(const u64& wgt, const u64& idx) {
 		list<feature>::as(feats()).push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
-	static inline feature* find(const sign_t& wght, const sign_t& idxr, const clip<feature>& range = feats()) {
+	static inline feature* find(const u64& wght, const u64& idxr, const clip<feature>& range = feats()) {
 		return std::find_if(range.begin(), range.end(),
 			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
 	}
-	static inline feature& at(const sign_t& wgt, const sign_t& idx, const clip<feature>& range = feats()) {
+	static inline feature& at(const u64& wgt, const u64& idx, const clip<feature>& range = feats()) {
 		const auto it = find(wgt, idx, range);
 		if (it != range.end()) return (*it);
 		throw std::out_of_range("feature::at");
 	}
-	static inline feature erase(const sign_t& wgt, const sign_t& idx) {
+	static inline feature erase(const u64& wgt, const u64& idx) {
 		feature f = at(wgt, idx);
 		list<feature>::as(feats()).erase(find(wgt, idx));
 		return f;
@@ -746,7 +742,7 @@ u64 indexmax(const board& b) { // 16-bit
 
 u32 make_indexers(std::string res = "") {
 	u32 succ = 0;
-	auto make = [&](indexer::sign_t sign, indexer::mapper func) {
+	auto make = [&](u64 sign, indexer::mapper func) {
 		if (indexer::find(sign) != indexer::idxrs().end()) return;
 		indexer::make(sign, func); succ++;
 	};
@@ -1225,8 +1221,8 @@ u32 make_weights(std::string res = "") {
 
 		std::string signs;
 		if (!(info >> signs)) continue;
-		weight::sign_t prev = std::stoull(signs.substr(0), nullptr, 16);
-		weight::sign_t sign = std::stoull(signs.substr(signs.find('=') + 1), nullptr, 16);
+		u64 prev = std::stoull(signs.substr(0), nullptr, 16);
+		u64 sign = std::stoull(signs.substr(signs.find('=') + 1), nullptr, 16);
 		if (prev != sign && weight::find(prev) != weight::wghts().end()) {
 			std::cerr << "move weight to a new sign (" << signs << ")..." << std::endl;
 			signs = signs.substr(signs.find('=') + 1);
@@ -1323,7 +1319,7 @@ u32 make_features(std::string res = "") {
 		std::string wghts, idxrs;
 		if (!(info >> wghts && info >> idxrs)) continue;
 
-		weight::sign_t wght = std::stoull(wghts, nullptr, 16);
+		u64 wght = std::stoull(wghts, nullptr, 16);
 		if (weight::find(wght) == weight::wghts().end()) {
 			std::cerr << "unknown weight (" << wghts << ") at make_features, ";
 			std::cerr << "assume as pattern descriptor..." << std::endl;
@@ -1365,7 +1361,7 @@ u32 make_features(std::string res = "") {
 				return x.at(v);
 			});
 
-			indexer::sign_t idxr = (utils::hashpatt(xpatt) & op_bitand) | op_bitor;
+			u64 idxr = (utils::hashpatt(xpatt) & op_bitand) | op_bitor;
 			if (indexer::find(idxr) == indexer::idxrs().end()) {
 				idxrs = utils::hashpatt(idxr, idxv.size());
 				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
