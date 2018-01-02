@@ -119,6 +119,9 @@ struct u8c {
 	constexpr operator u8*() const noexcept { return cast<u8*>(&v); }
 	constexpr operator i8*() const noexcept { return cast<i8*>(&v); }
 	constexpr operator byte*() const noexcept { return cast<byte*>(&v); }
+	constexpr operator const u8*() const noexcept { return cast<const u8*>(&v); }
+	constexpr operator const i8*() const noexcept { return cast<const i8*>(&v); }
+	constexpr operator const byte*() const noexcept { return cast<const byte*>(&v); }
 };
 
 namespace moporgic {
@@ -140,24 +143,22 @@ union r16 {
 	u16 v_u16;
 	u8c v_u8c[2];
 	u8 v_u8[2];
+	constexpr r16(const r16& v) noexcept : v_u16(v) {}
 	constexpr r16(u16 v = 0) noexcept : v_u16(v) {}
 	constexpr r16(i16 v) noexcept : v_u16(v) {}
 	constexpr r16(u32 v) noexcept : v_u16(v) {}
 	constexpr r16(i32 v) noexcept : v_u16(v) {}
 	constexpr r16(u64 v) noexcept : v_u16(v) {}
 	constexpr r16(i64 v) noexcept : v_u16(v) {}
-	constexpr r16(const r16& v) noexcept : v_u16(v) {}
 	constexpr r16(u8 v) noexcept  : v_u16(v) {}
 	constexpr r16(i8 v) noexcept  : v_u16(v) {}
-	constexpr r16(const u8* b) noexcept  : r16(const_cast<u8*>(b)) {}
-	constexpr r16(const i8* b) noexcept  : r16(const_cast<i8*>(b)) {};
-	constexpr r16(const byte* b) noexcept  : r16(cast<i8*>(b)) {};
 	constexpr r16(u8* b) noexcept  : v_u16(*cast<u16*>(b)) {}
 	constexpr r16(i8* b) noexcept  : v_u16(*cast<u16*>(b)) {}
 	constexpr r16(byte* b) noexcept  : v_u16(*cast<u16*>(b)) {}
+	constexpr r16(const u8* b) noexcept  : r16(const_cast<u8*>(b)) {}
+	constexpr r16(const i8* b) noexcept  : r16(const_cast<i8*>(b)) {};
+	constexpr r16(const byte* b) noexcept  : r16(cast<i8*>(b)) {};
 	constexpr u8c& operator[](const int& i) noexcept { return v_u8c[i]; }
-	constexpr operator u8*() const noexcept { return cast<u8*>(v_u8); }
-	constexpr operator i8*() const noexcept { return cast<i8*>(v_u8); }
 	constexpr operator u64() const noexcept { return v_u16; }
 	constexpr operator i64() const noexcept { return v_u16; }
 	constexpr operator f64() const noexcept { return v_u16; }
@@ -169,7 +170,12 @@ union r16 {
 	constexpr operator u8() const noexcept { return v_u8[0]; }
 	constexpr operator i8() const noexcept { return v_u8[0]; }
 	constexpr operator bool() const noexcept { return static_cast<bool>(v_u16); }
+	constexpr operator u8*() const noexcept { return cast<u8*>(v_u8); }
+	constexpr operator i8*() const noexcept { return cast<i8*>(v_u8); }
 	constexpr operator byte*() const noexcept { return cast<byte*>(v_u8); }
+	constexpr operator const u8*() const noexcept { return cast<const u8*>(v_u8); }
+	constexpr operator const i8*() const noexcept { return cast<const i8*>(v_u8); }
+	constexpr operator const byte*() const noexcept { return cast<const byte*>(v_u8); }
 	constexpr r16 le() const noexcept { return moporgic::endian::to_le(v_u16); }
 	constexpr r16 be() const noexcept { return moporgic::endian::to_be(v_u16); }
 };
@@ -180,6 +186,7 @@ union r32 {
 	r16 v_r16[2];
 	u8c v_u8c[4];
 	u8 v_u8[4];
+	constexpr r32(const r32& v) noexcept : v_u32(v) {}
 	constexpr r32(u32 v = 0) noexcept : v_u32(v) {}
 	constexpr r32(i32 v) noexcept : v_u32(v) {}
 	constexpr r32(u16 v) noexcept : v_u32(v) {}
@@ -188,18 +195,15 @@ union r32 {
 	constexpr r32(i64 v) noexcept : v_u32(v) {}
 	constexpr r32(f32 v) noexcept : v_f32(v) {}
 	constexpr r32(f64 v) noexcept : v_f32(v) {}
-	constexpr r32(const r32& v) noexcept : v_u32(v) {}
 	constexpr r32(u8 v) noexcept  : v_u32(v) {}
 	constexpr r32(i8 v) noexcept  : v_u32(v) {}
-	constexpr r32(const u8* b) noexcept  : r32(const_cast<u8*>(b)) {}
-	constexpr r32(const i8* b) noexcept  : r32(const_cast<i8*>(b)) {}
-	constexpr r32(const byte* b) noexcept  : r32(cast<i8*>(b)) {};
 	constexpr r32(u8* b) noexcept  : v_u32(*cast<u32*>(b)) {}
 	constexpr r32(i8* b) noexcept  : v_u32(*cast<u32*>(b)) {}
 	constexpr r32(byte* b) noexcept  : v_u32(*cast<u32*>(b)) {}
+	constexpr r32(const u8* b) noexcept  : r32(const_cast<u8*>(b)) {}
+	constexpr r32(const i8* b) noexcept  : r32(const_cast<i8*>(b)) {}
+	constexpr r32(const byte* b) noexcept  : r32(cast<i8*>(b)) {}
 	constexpr u8c& operator[](const int& i) noexcept { return v_u8c[i]; }
-	constexpr operator u8*() const noexcept { return cast<u8*>(v_u8); }
-	constexpr operator i8*() const noexcept { return cast<i8*>(v_u8); }
 	constexpr operator u64() const noexcept { return v_u32; }
 	constexpr operator i64() const noexcept { return v_u32; }
 	constexpr operator f64() const noexcept { return v_f32; }
@@ -211,7 +215,12 @@ union r32 {
 	constexpr operator u8() const noexcept { return v_u8[0]; }
 	constexpr operator i8() const noexcept { return v_u8[0]; }
 	constexpr operator bool() const noexcept { return static_cast<bool>(v_u32); }
+	constexpr operator u8*() const noexcept { return cast<u8*>(v_u8); }
+	constexpr operator i8*() const noexcept { return cast<i8*>(v_u8); }
 	constexpr operator byte*() const noexcept { return cast<byte*>(v_u8); }
+	constexpr operator const u8*() const noexcept { return cast<const u8*>(v_u8); }
+	constexpr operator const i8*() const noexcept { return cast<const i8*>(v_u8); }
+	constexpr operator const byte*() const noexcept { return cast<const byte*>(v_u8); }
 	constexpr r32 le() const noexcept { return moporgic::endian::to_le(v_u32); }
 	constexpr r32 be() const noexcept { return moporgic::endian::to_be(v_u32); }
 };
@@ -223,6 +232,7 @@ union r64 {
 	r32 v_r32[2];
 	u8c v_u8c[8];
 	u8 v_u8[8];
+	constexpr r64(const r64& v) noexcept : v_u64(v) {}
 	constexpr r64(u64 v) noexcept : v_u64(v) {}
 	constexpr r64(i64 v) noexcept : v_u64(v) {}
 	constexpr r64(u32 v) noexcept : v_u64(v) {}
@@ -231,18 +241,15 @@ union r64 {
 	constexpr r64(i16 v) noexcept : v_u64(v) {}
 	constexpr r64(f32 v) noexcept : v_f64(v) {}
 	constexpr r64(f64 v) noexcept : v_f64(v) {}
-	constexpr r64(const r64& v) noexcept : v_u64(v) {}
 	constexpr r64(u8 v) noexcept  : v_u64(v) {}
 	constexpr r64(i8 v) noexcept  : v_u64(v) {}
-	constexpr r64(const u8* b) noexcept  : r64(const_cast<u8*>(b)) {}
-	constexpr r64(const i8* b) noexcept  : r64(const_cast<i8*>(b)) {}
-	constexpr r64(const byte* b) noexcept  : r64(cast<i8*>(b)) {};
 	constexpr r64(u8* b) noexcept  : v_u64(*cast<u64*>(b)) {}
 	constexpr r64(i8* b) noexcept  : v_u64(*cast<u64*>(b)) {}
 	constexpr r64(byte* b) noexcept  : v_u64(*cast<u64*>(b)) {}
+	constexpr r64(const u8* b) noexcept  : r64(const_cast<u8*>(b)) {}
+	constexpr r64(const i8* b) noexcept  : r64(const_cast<i8*>(b)) {}
+	constexpr r64(const byte* b) noexcept  : r64(cast<i8*>(b)) {}
 	constexpr u8c& operator[](const int& i) noexcept { return v_u8c[i]; }
-	constexpr operator u8*() const noexcept { return cast<u8*>(v_u8); }
-	constexpr operator i8*() const noexcept { return cast<i8*>(v_u8); }
 	constexpr operator u64() const noexcept { return v_u64; }
 	constexpr operator i64() const noexcept { return v_u64; }
 	constexpr operator f64() const noexcept { return v_f64; }
@@ -254,7 +261,12 @@ union r64 {
 	constexpr operator u8() const noexcept { return v_u8[0]; }
 	constexpr operator i8() const noexcept { return v_u8[0]; }
 	constexpr operator bool() const noexcept { return static_cast<bool>(v_u64); }
+	constexpr operator u8*() const noexcept { return cast<u8*>(v_u8); }
+	constexpr operator i8*() const noexcept { return cast<i8*>(v_u8); }
 	constexpr operator byte*() const noexcept { return cast<byte*>(v_u8); }
+	constexpr operator const u8*() const noexcept { return cast<const u8*>(v_u8); }
+	constexpr operator const i8*() const noexcept { return cast<const i8*>(v_u8); }
+	constexpr operator const byte*() const noexcept { return cast<const byte*>(v_u8); }
 	constexpr r64 le() const noexcept { return moporgic::endian::to_le(v_u64); }
 	constexpr r64 be() const noexcept { return moporgic::endian::to_le(v_u64); }
 };
@@ -298,6 +310,9 @@ public:
 	constexpr half(const half& num) noexcept : hf(num.hf) {}
 public:
 	constexpr operator f32() const noexcept; /* { return to_float(hf); } */
+	template<typename numeric, typename = enable_if_arithmetic<numeric>>
+	constexpr operator numeric() const noexcept { return operator f32(); }
+	constexpr operator bool() const noexcept { return hf; }
 	constexpr half operator +(half f) const noexcept; /* { return half::as(half_add(hf, f.hf)); } */
 	constexpr half operator -(half f) const noexcept; /* { return half::as(half_sub(hf, f.hf)); } */
 	constexpr half operator *(half f) const noexcept; /* { return half::as(half_mul(hf, f.hf)); } */
@@ -315,6 +330,7 @@ public:
 	constexpr half  operator --(int) noexcept { half v(*this); operator -=(1); return v; }
 	constexpr half& operator ++() noexcept { operator =(operator f32() + 1); return *this; }
 	constexpr half& operator --() noexcept { operator =(operator f32() - 1); return *this; }
+public:
 	constexpr half& operator  =(const half& f) noexcept { hf = f.hf; return *this; }
 	constexpr half& operator +=(half f) noexcept { return operator =(operator +(f)); }
 	constexpr half& operator -=(half f) noexcept { return operator =(operator -(f)); }
@@ -333,20 +349,26 @@ public:
 public:
 	constexpr bool operator ==(half f) const noexcept { return hf == f.hf; }
 	constexpr bool operator !=(half f) const noexcept { return hf != f.hf; }
+	constexpr bool operator <=(half f) const noexcept { return operator <=(f32(f)); }
+	constexpr bool operator >=(half f) const noexcept { return operator >=(f32(f)); }
+	constexpr bool operator < (half f) const noexcept { return operator < (f32(f)); }
+	constexpr bool operator > (half f) const noexcept { return operator > (f32(f)); }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
-	constexpr bool operator ==(numeric f) const noexcept { return operator f32() == f; }
+	constexpr bool operator ==(numeric f) const noexcept { return operator numeric() == f; }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
-	constexpr bool operator !=(numeric f) const noexcept { return operator f32() != f; }
+	constexpr bool operator !=(numeric f) const noexcept { return operator numeric() != f; }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
-	constexpr bool operator <=(numeric f) const noexcept { return operator f32() <= f; }
+	constexpr bool operator <=(numeric f) const noexcept { return operator numeric() <= f; }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
-	constexpr bool operator >=(numeric f) const noexcept { return operator f32() >= f; }
+	constexpr bool operator >=(numeric f) const noexcept { return operator numeric() >= f; }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
-	constexpr bool operator < (numeric f) const noexcept { return operator f32() <  f; }
+	constexpr bool operator < (numeric f) const noexcept { return operator numeric() <  f; }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
-	constexpr bool operator > (numeric f) const noexcept { return operator f32() >  f; }
+	constexpr bool operator > (numeric f) const noexcept { return operator numeric() >  f; }
 public:
 	static constexpr half& as(const u16& raw) noexcept { return raw_cast<half>(raw); }
+	friend std::ostream& operator <<(std::ostream& os, const half& hf) { return os << f32(hf); }
+	friend std::istream& operator >>(std::istream& is, half& hf) { f32 k; is >> k; hf = k; return is; }
 private:
 	u16 hf;
 };
