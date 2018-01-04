@@ -2516,10 +2516,62 @@ statistic train(utils::options opts = {}) {
 	path.reserve(65536);
 	statistic stats;
 	search xbest;
+	select best;
 	state last;
 	board b;
 
 	switch (to_hash(opts["train"]["mode"])) {
+	case to_hash("backward"):
+	case to_hash("backward-best"):
+		for (stats.init(opts["train"]); stats; stats++) {
+
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				path.back().estimate();
+				v = path.back().update(v);
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("forward"):
+	case to_hash("forward-best"):
+		for (stats.init(opts["train"]); stats; stats++) {
+
+			u32 score = 0;
+			u32 opers = 0;
+
+			b.init();
+			best << b;
+			score += best.score();
+			opers += 1;
+			best >> last;
+			best >> b;
+			b.next();
+			while (best << b) {
+				last.update(best.esti());
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> b;
+				b.next();
+			}
+			last.update(0);
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
 	case to_hash("backward-xbest"):
 		for (stats.init(opts["train"]); stats; stats++) {
 
@@ -2599,6 +2651,7 @@ statistic test(utils::options opts = {}) {
 			stats.update(score, b.hash(), opers);
 		}
 		break;
+
 	default:
 	case to_hash("xbest"):
 		for (stats.init(opts["test"]); stats; stats++) {
