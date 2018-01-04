@@ -18,34 +18,31 @@ namespace moporgic {
 
 class board {
 public:
-	struct list {
+	class list {
+	public:
+		constexpr list(u64 t, u32 i) : raw(t), idx(i) {}
+		constexpr list(const list& l) = default;
+		constexpr list() : raw(0), idx(0) {}
+		constexpr u32 operator[] (u32 i) const noexcept { return (raw >> (i << 2)) & 0x0f; }
+		constexpr u32 at(u32 i) const noexcept { return operator[](i); }
+		constexpr u32 front() const noexcept { return operator[](0); }
+		constexpr u32 back() const noexcept { return operator[](size() - 1); }
+		constexpr size_t size() const noexcept { return idx; }
+		constexpr bool empty() const noexcept { return size() == 0; }
+		constexpr list begin() const noexcept { return list(raw, 0); }
+		constexpr list end() const noexcept { return list(raw, idx); }
+	public:
+		constexpr u32 operator *() const noexcept { return operator[](idx); }
+		constexpr bool operator==(list i) const noexcept { return (raw == i.raw) & (idx == i.idx); }
+		constexpr bool operator!=(list i) const noexcept { return (raw != i.raw) | (idx != i.idx); }
+		constexpr bool operator< (list i) const noexcept { return ((raw == i.raw) & (idx < i.idx)) | (raw < i.raw); }
+		constexpr list& operator++() noexcept { ++idx; return *this; }
+		constexpr list& operator--() noexcept { --idx; return *this; }
+		constexpr list operator++(int) noexcept { return list(raw, ++idx - 1); }
+		constexpr list operator--(int) noexcept { return list(raw, --idx + 1); }
+	public:
 		u64 raw;
-		u32 num;
-		list(const u64& t, const u32& s) : raw(t), num(s) {}
-		list(const list& t) = default;
-		list() : raw(0), num(0) {}
-		~list() = default;
-		inline u32 operator[] (const u32& i) const { return (raw >> (i << 2)) & 0x0f; }
-		inline u32 at(const u32& i) const {
-			if (i >= num) throw std::out_of_range("board::list");
-			return operator[](i);
-		}
-		struct iter {
-			u64 raw;
-			i32 idx;
-			iter(const u64& raw, const i32& idx) : raw(raw), idx(idx) {}
-			inline u32 operator *() const { return (raw >> (idx << 2)) & 0x0f; }
-			inline bool operator==(const iter& i) const { return idx == i.idx; }
-			inline bool operator!=(const iter& i) const { return idx != i.idx; }
-			inline iter& operator++() { ++idx; return *this; }
-			inline iter& operator--() { --idx; return *this; }
-			inline iter  operator++(int) { return iter(raw, ++idx - 1); }
-			inline iter  operator--(int) { return iter(raw, --idx + 1); }
-		};
-		inline iter begin() const { return iter(raw, 0); }
-		inline iter end() const { return iter(raw, num); }
-		inline size_t size() const { return num; }
-		inline bool empty() const { return num == 0; }
+		u32 idx;
 	};
 	class cache {
 	friend class board;
@@ -187,7 +184,7 @@ public:
 			list layout;
 			for (int i = 0; i < 16; i++) {
 				if ((r >> i) & 1) // map bit-location to index
-					layout.raw |= (u64(i) << ((layout.num++) << 2));
+					layout.raw |= (u64(i) << ((layout.idx++) << 2));
 			}
 
 			u32 merge = left.merge | right.merge;
@@ -214,7 +211,7 @@ public:
 	};
 	static const cache lookup[1 << 20];
 
-public:
+private:
 	u64 raw;
 	u32 ext;
 	u32 inf;
@@ -225,18 +222,12 @@ public:
 	inline board(const u64& raw, const u16& ext) : board(raw, u32(ext) << 16) {}
 	inline board(const board& b) = default;
 	inline ~board() = default;
+	inline board& operator =(const u64& raw) { this->raw = raw; return *this; }
+	inline board& operator =(const board& b) = default;
+
 	inline operator u64() const { return raw; }
 	inline operator bool() const { return raw | ext; }
-	inline board& operator  =(const u64& raw) { this->raw = raw; return *this; }
-	inline board& operator  =(const board& b) { raw = b.raw, ext = b.ext; return *this; }
-	inline bool   operator ==(const board& b) const { return raw == b.raw && ext == b.ext; }
-	inline bool   operator !=(const board& b) const { return raw != b.raw || ext != b.ext; }
-	inline bool   operator  <(const board& b) const { return ext == b.ext ? raw < b.raw : ext < b.ext; }
-	inline bool   operator  >(const board& b) const { return ext == b.ext ? raw > b.raw : ext > b.ext; }
-	inline bool   operator ==(const u64& raw) const { return this->raw == raw && this->ext == 0; }
-	inline bool   operator !=(const u64& raw) const { return this->raw != raw || this->ext != 0; }
-	inline bool   operator  <(const u64& raw) const { return this->raw  < raw && this->ext == 0; }
-	inline bool   operator  >(const u64& raw) const { return this->raw  > raw || this->ext != 0; }
+	declare_comparators_with(const board&, raw_cast<u128>(*this), raw_cast<u128>(v))
 
 	inline const cache& query(const u32& r) const { return query16(r); }
 	inline const cache& query16(const u32& r) const { return board::lookup[fetch16(r)]; }
@@ -266,10 +257,6 @@ public:
 	inline u32 at5(const u32& i) const {
 		return at4(i) | ((ext >> (i + 12)) & 0x10);
 	}
-
-	inline u32 exact(const u32& i) const { return exact4(i); }
-	inline u32 exact4(const u32& i) const { return (1 << at4(i)) & 0xfffffffe; }
-	inline u32 exact5(const u32& i) const { return (1 << at5(i)) & 0xfffffffe; }
 
 	inline void set(const u32& i, const u32& t) { set4(i, t); }
 	inline void set4(const u32& i, const u32& t) {
@@ -364,27 +351,27 @@ public:
 	inline void next() { return next64(); }
 	inline void next64() {
 		list empty = spaces64();
-		u32 p = empty[std::rand() % empty.num];
+		u32 p = empty[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
 	inline void next80() {
 		list empty = spaces80();
-		u32 p = empty[std::rand() % empty.num];
+		u32 p = empty[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
 
 	inline bool popup() { return popup64(); }
 	inline bool popup64() {
 		list empty = spaces64();
-		if (empty.num == 0) return false;
-		u32 p = empty[std::rand() % empty.num];
+		if (empty.size() == 0) return false;
+		u32 p = empty[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
 	inline bool popup80() {
 		list empty = spaces80();
-		if (empty.num == 0) return false;
-		u32 p = empty[std::rand() % empty.num];
+		if (empty.size() == 0) return false;
+		u32 p = empty[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
@@ -543,60 +530,35 @@ public:
 		return score | moved;
 	}
 
-	class optype {
+	class action {
 	public:
-		typedef i32 oper;
-		typedef i32 (board::*action)();
-		static constexpr oper up = 0;
-		static constexpr oper right = 1;
-		static constexpr oper down = 2;
-		static constexpr oper left = 3;
-		static constexpr oper null = 4;
-		oper op;
-		inline optype(const oper& op = null) : op(op) {}
-		inline optype(const optype& opt) = default;
-		inline operator oper() const { return op; }
-		inline bool operator ==(const optype& opt) const { return op == opt.op; }
-		inline bool operator !=(const optype& opt) const { return op != opt.op; }
-		inline bool operator < (const optype& opt) const { return op <  opt.op; }
-		inline const char* name() const {
-			const char* res[] = { "up", "right", "down", "left", "null" };
-			return res[op];
-		}
-		inline action function() const {
-			action res[] = { &board::up, &board::right, &board::down, &board::left, nullptr };
-			return res[op];
-		}
-		inline friend std::ostream& operator <<(std::ostream& out, const optype& o) {
-			return out << o.name();
-		}
-		static inline std::array<optype, 4> operations() { return { up, right, down, left }; }
-		static inline std::array<optype, 4> actions() { return operations(); }
+		action() = delete;
+		enum opcode : u32 { up, right, down, left };
 	};
 
-	inline i32 operate(const optype::oper& op) { return operate64(op); }
-	inline i32 operate64(const optype::oper& op) {
+	inline i32 operate(const u32& op) { return operate64(op); }
+	inline i32 operate64(const u32& op) {
 		switch (op) {
-		case optype::up:    return up64();
-		case optype::right: return right64();
-		case optype::down:  return down64();
-		case optype::left:  return left64();
+		case action::up:    return up64();
+		case action::right: return right64();
+		case action::down:  return down64();
+		case action::left:  return left64();
 		default:            return -1;
 		}
 	}
-	inline i32 operate80(const optype::oper& op) {
+	inline i32 operate80(const u32& op) {
 		switch (op) {
-		case optype::up:    return up80();
-		case optype::right: return right80();
-		case optype::down:  return down80();
-		case optype::left:  return left80();
+		case action::up:    return up80();
+		case action::right: return right80();
+		case action::down:  return down80();
+		case action::left:  return left80();
 		default:            return -1;
 		}
 	}
 
-	inline i32 move(const optype::oper& op)   { return operate(op); }
-	inline i32 move64(const optype::oper& op) { return operate64(op); }
-	inline i32 move80(const optype::oper& op) { return operate80(op); }
+	inline i32 move(const u32& op)   { return operate(op); }
+	inline i32 move64(const u32& op) { return operate64(op); }
+	inline i32 move80(const u32& op) { return operate80(op); }
 
 	inline u32 shift(const u32& k = 0, const u32& u = 0) { return shift64(k, u); }
 	inline u32 shift64(const u32& k = 0, const u32& u = 0) {
@@ -667,10 +629,8 @@ public:
 		return query20(0).numof[t] + query20(1).numof[t] + query20(2).numof[t] + query20(3).numof[t];
 	}
 
-	template<typename numa>
-	inline void numof(numa num, const u32& min, const u32& max) const { return numof64(num, min, max); }
-	template<typename numa>
-	inline void numof64(numa num, const u32& min, const u32& max) const {
+	inline void numof(u32 num[], const u32& min, const u32& max) const { return numof64(num, min, max); }
+	inline void numof64(u32 num[], const u32& min, const u32& max) const {
 		const cache::info& numof0 = query16(0).numof;
 		const cache::info& numof1 = query16(1).numof;
 		const cache::info& numof2 = query16(2).numof;
@@ -679,8 +639,7 @@ public:
 			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 		}
 	}
-	template<typename numa>
-	inline void numof80(numa num, const u32& min, const u32& max) const {
+	inline void numof80(u32 num[], const u32& min, const u32& max) const {
 		const cache::info& numof0 = query20(0).numof;
 		const cache::info& numof1 = query20(1).numof;
 		const cache::info& numof2 = query20(2).numof;
@@ -704,16 +663,13 @@ public:
 		return num;
 	}
 
-	template<typename numa>
-	inline void count(numa num, const u32& min, const u32& max) const { return count64(num, min, max); }
-	template<typename numa>
-	inline void count64(numa num, const u32& min, const u32& max) const {
+	inline void count(u32 num[], const u32& min, const u32& max) const { return count64(num, min, max); }
+	inline void count64(u32 num[], const u32& min, const u32& max) const {
 		std::fill(num + min, num + max, 0);
 		for (u32 i = 0; i < 16; i++)
 			num[at4(i)]++;
 	}
-	template<typename numa>
-	inline void count80(numa num, const u32& min, const u32& max) const {
+	inline void count80(u32 num[], const u32& min, const u32& max) const {
 		std::fill(num + min, num + max, 0);
 		for (u32 i = 0; i < 16; i++)
 			num[at5(i)]++;
@@ -727,10 +683,8 @@ public:
 		return (query20(0).mask[t] << 0) | (query20(1).mask[t] << 4) | (query20(2).mask[t] << 8) | (query20(3).mask[t] << 12);
 	}
 
-	template<typename numa>
-	inline void mask(numa msk, const u32& min, const u32& max) const { return mask64(msk, min, max); }
-	template<typename numa>
-	inline void mask64(numa msk, const u32& min, const u32& max) const {
+	inline void mask(u32 msk[], const u32& min, const u32& max) const { return mask64(msk, min, max); }
+	inline void mask64(u32 msk[], const u32& min, const u32& max) const {
 		const cache::info& mask0 = query16(0).mask;
 		const cache::info& mask1 = query16(1).mask;
 		const cache::info& mask2 = query16(2).mask;
@@ -739,8 +693,7 @@ public:
 			msk[i] = (mask0[i] << 0) | (mask1[i] << 4) | (mask2[i] << 8) | (mask3[i] << 12);
 		}
 	}
-	template<typename numa>
-	inline void mask80(numa msk, const u32& min, const u32& max) const {
+	inline void mask80(u32 msk[], const u32& min, const u32& max) const {
 		const cache::info& mask0 = query20(0).mask;
 		const cache::info& mask1 = query20(1).mask;
 		const cache::info& mask2 = query20(2).mask;
@@ -790,9 +743,9 @@ public:
 		return mono;
 	}
 
-	inline u64 mono(const bool& left = true) const   { return left ? monoleft() : monoright(); }
-	inline u64 mono64(const bool& left = true) const { return left ? monoleft64() : monoright64(); }
-	inline u64 mono80(const bool& left = true) const { return left ? monoleft80() : monoright80(); }
+	inline u64 monotonic(const bool& left = true) const   { return left ? monoleft() : monoright(); }
+	inline u64 monotonic64(const bool& left = true) const { return left ? monoleft64() : monoright64(); }
+	inline u64 monotonic80(const bool& left = true) const { return left ? monoleft80() : monoright80(); }
 
 	inline u32 operations() const { return operations64(); }
 	inline u32 operations64() const {
@@ -811,29 +764,37 @@ public:
 	inline list actions() const { return actions64(); }
 	inline list actions64() const {
 		u32 o = operations64();
-		using moporgic::math::ones32;
-		using moporgic::math::msb32;
-		using moporgic::math::log2;
-		u32 x = ones32(o);
-		u32 a = msb32(o);
-		u32 b = msb32(o & ~a);
-		u32 c = msb32(o & ~a & ~b);
-		u32 d = msb32(o & ~a & ~b & ~c);
-		u32 k = (log2(a) << 4*(x-1)) | (log2(b) << 4*(x-2)) | (log2(c) << 4*(x-3)) | (log2(d) << 4*(x-4));
-		return list(k, x);
+		u32 k = 0, x = 0;
+		u32 u = o & 1;
+		k |= (u ? 0 : 0) << x;
+		x += (u << 2);
+		u32 r = o & 2;
+		k |= (r ? 1 : 0) << x;
+		x += (r << 1);
+		u32 d = o & 4;
+		k |= (d ? 2 : 0) << x;
+		x += (d >> 0);
+		u32 l = o & 8;
+		k |= (l ? 3 : 0) << x;
+		x += (l >> 1);
+		return { k, x >> 2 };
 	}
 	inline list actions80() const {
 		u32 o = operations80();
-		using moporgic::math::ones32;
-		using moporgic::math::msb32;
-		using moporgic::math::log2;
-		u32 x = ones32(o);
-		u32 a = msb32(o);
-		u32 b = msb32(o & ~a);
-		u32 c = msb32(o & ~a & ~b);
-		u32 d = msb32(o & ~a & ~b & ~c);
-		u32 k = (log2(a) << 4*(x-1)) | (log2(b) << 4*(x-2)) | (log2(c) << 4*(x-3)) | (log2(d) << 4*(x-4));
-		return list(k, x);
+		u32 k = 0, x = 0;
+		u32 u = o & 1;
+		k |= (u ? 0 : 0) << x;
+		x += (u << 2);
+		u32 r = o & 2;
+		k |= (r ? 1 : 0) << x;
+		x += (r << 1);
+		u32 d = o & 4;
+		k |= (d ? 2 : 0) << x;
+		x += (d >> 0);
+		u32 l = o & 8;
+		k |= (l ? 3 : 0) << x;
+		x += (l >> 1);
+		return { k, x >> 2 };
 	}
 
 	inline bool operable() const { return operable64(); }
@@ -876,10 +837,10 @@ public:
 		inline board& whole() const { return b; }
 		inline u32 where() const { return i; }
 
-		declare_comparators_with(u32, operator u32(), v);
-
 		inline operator u32() const { return at(is(style::extend), is(style::exact)); }
 		inline tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
+		declare_comparators_with(u32, operator u32(), v);
+
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
 			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return t.is(style::binary) ? moporgic::write_cast<byte>(out, v) : (out << v);
@@ -890,29 +851,22 @@ public:
 				t.set(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return in;
 		}
-		inline tile& operator ++() { set(at(is(style::extend), false) + 1, is(style::extend), false); return *this; }
-		inline tile& operator --() { set(at(is(style::extend), false) - 1, is(style::extend), false); return *this; }
-		inline u32 operator ++(int) { u32 v(*this); ++(*this); return v; }
-		inline u32 operator --(int) { u32 v(*this); --(*this); return v; }
 	private:
 		board& b;
 		u32 i;
 
-		bool is(u32 item) const { return style::flag(b) & item; }
+		bool is(u32 item) const { return b.inf & item; }
 
 		u32 at(bool extend, bool exact) const {
-			if (extend) return exact ? b.exact5(i) : b.at5(i);
-			else        return exact ? b.exact4(i) : b.at4(i);
+			u32 v = extend ? b.at5(i) : b.at4(i);
+			return exact ? (1 << v) & -2u : v;
 		}
 		void set(u32 k, bool extend, bool exact) const {
-			if (extend) b.set5(i, exact ? math::lg(k) : k);
-			else        b.set4(i, exact ? math::lg(k) : k);
+			u32 v = exact ? math::lg(k) : k;
+			if (extend) b.set5(i, v); else b.set4(i, v);
 		}
 	};
 	inline tile operator [](const u32& i) const { return tile(*this, i); }
-
-	inline void operator >>(std::ostream& out) const { out << (*this); }
-	inline void operator <<(std::istream& in) { in >> (*this); }
 
 	class style {
 	public:
@@ -939,27 +893,26 @@ public:
 			raw64  = binary,
 			raw80  = binary | extend,
 		};
-
-		static item flag(const board& b) { return static_cast<item>(b.inf & full); }
-		static board& set(board& b, u32 f) { b.inf = (f & full) | (b.inf & ~full); return b; }
 	};
-	inline board& format(u32 flags = style::index) { return style::set(*this, flags); }
+	inline board& format(u32 i = style::index) { info((i & style::full) | (inf & ~style::full)); return *this; }
+
+	inline u32 info(u32 i) { return std::exchange(inf, i); }
+	inline u32 info() const { return inf; }
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
-		auto flag = style::flag(b);
-		if (flag & style::binary) {
+		if (b.inf & style::binary) {
 			moporgic::write<u64>(out, b.raw);
-			if (flag & style::extend) moporgic::write_cast<u16>(out, b.ext >> 16);
-			if (flag & style::alter)  moporgic::write_cast<u16>(out, b.ext & 0xffff);
-			if (flag & style::exact)  moporgic::write<u32>(out, b.inf);
-		} else if (flag & style::alter) {
+			if (b.inf & style::extend) moporgic::write_cast<u16>(out, b.ext >> 16);
+			if (b.inf & style::alter)  moporgic::write_cast<u16>(out, b.ext & 0xffff);
+			if (b.inf & style::exact)  moporgic::write<u32>(out, b.inf);
+		} else if (b.inf & style::alter) {
 			char buf[32];
-			std::snprintf(buf, sizeof(buf), "[%016llx]", b.raw);
-			if (flag & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext >> 16);
+			std::snprintf(buf, sizeof(buf), "[%016" PRIx64 "]", b.raw);
+			if (b.inf & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext >> 16);
 			out << buf;
 		} else {
-			char buf[32];
-			u32 w = (flag & style::exact) ? 6 : 4;
+			char buf[64];
+			u32 w = (b.inf & style::exact) ? 6 : 4;
 			std::snprintf(buf, sizeof(buf), "+%.*s+", (w * 4), "------------------------");
 			out << buf << std::endl;
 			for (u32 i = 0; i < 16; i += 4) {
@@ -974,16 +927,15 @@ public:
 	}
 
 	friend std::istream& operator >>(std::istream& in, board& b) {
-		auto flag = style::flag(b);
-		if (flag & style::binary) {
+		if (b.inf & style::binary) {
 			moporgic::read<u64>(in, b.raw);
-			if (flag & style::extend) moporgic::read_cast<u16>(in, raw_cast<u16, 1>(b.ext));
-			if (flag & style::alter)  moporgic::read_cast<u16>(in, raw_cast<u16, 0>(b.ext));
-			if (flag & style::exact)  moporgic::read<u32>(in, b.inf);
-		} else if (flag & style::alter) {
+			if (b.inf & style::extend) moporgic::read_cast<u16>(in, raw_cast<u16, 1>(b.ext));
+			if (b.inf & style::alter)  moporgic::read_cast<u16>(in, raw_cast<u16, 0>(b.ext));
+			if (b.inf & style::exact)  moporgic::read<u32>(in, b.inf);
+		} else if (b.inf & style::alter) {
 			bool nobox(in >> std::hex >> b.raw);
 			if (!nobox) (in.clear(), in.ignore(1)) >> std::hex >> b.raw;
-			if (flag & style::extend) in.ignore(1) >> std::hex >> raw_cast<u16, 1>(b.ext);
+			if (b.inf & style::extend) in.ignore(1) >> std::hex >> raw_cast<u16, 1>(b.ext);
 			if (!nobox) in.ignore(1);
 		} else {
 			for (u32 k, i = 0; i < 16; i++) {
