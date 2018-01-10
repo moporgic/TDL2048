@@ -347,6 +347,15 @@ public:
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
 	constexpr half& operator /=(numeric f) noexcept { return operator =(operator /(f)); }
 public:
+	template<typename numeric, typename = enable_if_arithmetic<numeric>>
+	constexpr friend numeric& operator +=(numeric& n, half f) { return n += numeric(f); }
+	template<typename numeric, typename = enable_if_arithmetic<numeric>>
+	constexpr friend numeric& operator -=(numeric& n, half f) { return n -= numeric(f); }
+	template<typename numeric, typename = enable_if_arithmetic<numeric>>
+	constexpr friend numeric& operator *=(numeric& n, half f) { return n *= numeric(f); }
+	template<typename numeric, typename = enable_if_arithmetic<numeric>>
+	constexpr friend numeric& operator /=(numeric& n, half f) { return n /= numeric(f); }
+public:
 	constexpr bool operator ==(half f) const noexcept { return hf == f.hf; }
 	constexpr bool operator !=(half f) const noexcept { return hf != f.hf; }
 	constexpr bool operator <=(half f) const noexcept { return operator <=(f32(f)); }
