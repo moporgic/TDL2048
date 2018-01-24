@@ -1,2 +1,13 @@
 TODO
 id mapping of weight, feature, and indexer
+
+	template<typename num, typename = enable_if_arithmetic<num>>
+	inline board(const std::initializer_list<num>& l) : board(0) {}
+
+board iterator
+
+option cast to numeric?
+
+parse() direct save without parser
+
+version
