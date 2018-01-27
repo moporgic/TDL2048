@@ -852,8 +852,14 @@ public:
 			return in;
 		}
 	public:
+		typedef std::ptrdiff_t difference_type;
+		typedef u32 value_type;
+		typedef tile& reference;
+		typedef tile pointer;
+		typedef std::forward_iterator_tag iterator_category;
 		tile& operator *() { return *this; }
 		const tile& operator *() const { return *this; }
+		tile  operator->() const { return *this; }
 		bool  operator==(const tile& t) const { return ((b == t.b) & (i == t.i)); }
 		bool  operator!=(const tile& t) const { return ((b != t.b) | (i != t.i)); }
 		bool  operator< (const tile& t) const { return ((b == t.b) & (i < t.i)) | (b < t.b); }
