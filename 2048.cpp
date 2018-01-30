@@ -385,6 +385,7 @@ public:
 		std::string label() const { return token.substr(0, token.find('=')); }
 		std::string value() const { return token.substr(token.find('=') + 1); }
 		operator std::string() const { return value(); }
+		operator numeric() const { return std::stod(value()); }
 		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
 		opinion& operator =(const opinion& opt) { token  = opt.token; return (*this); }
 		opinion& operator =(const numeric& val) { return operator =(ntos(val)); }
@@ -404,6 +405,7 @@ public:
 		option(const vector& opt = {}) : vector(opt) {}
 		std::string value() const { return vtos(*this); }
 		operator std::string() const { return value(); }
+		operator numeric() const { return std::stod(value()); }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
 		option& operator  =(const numeric& val) { return operator =(ntos(val)); }
 		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
