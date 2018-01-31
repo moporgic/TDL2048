@@ -840,7 +840,7 @@ public:
 		inline operator u32() const { return at(is(style::extend), is(style::exact)); }
 		inline tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
 		declare_comparators_with(u32, operator u32(), v);
-
+	public:
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
 			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return t.is(style::binary) ? moporgic::write_cast<byte>(out, v) : (out << v);
@@ -851,6 +851,22 @@ public:
 				t.set(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return in;
 		}
+	public:
+		typedef std::ptrdiff_t difference_type;
+		typedef u32 value_type;
+		typedef tile& reference;
+		typedef tile pointer;
+		typedef std::forward_iterator_tag iterator_category;
+		tile& operator *() { return *this; }
+		const tile& operator *() const { return *this; }
+		tile  operator->() const { return *this; }
+		bool  operator==(const tile& t) const { return ((b == t.b) & (i == t.i)); }
+		bool  operator!=(const tile& t) const { return ((b != t.b) | (i != t.i)); }
+		bool  operator< (const tile& t) const { return ((b == t.b) & (i < t.i)) | (b < t.b); }
+		tile& operator++() { ++i; return *this; }
+		tile& operator--() { --i; return *this; }
+		tile  operator++(int) { return tile(b, ++i - 1); }
+		tile  operator--(int) { return tile(b, --i + 1); }
 	private:
 		board& b;
 		u32 i;
@@ -867,6 +883,8 @@ public:
 		}
 	};
 	inline tile operator [](const u32& i) const { return tile(*this, i); }
+	inline tile begin() const { return operator [](0); }
+	inline tile end() const { return operator [](16); }
 
 	class style {
 	public:

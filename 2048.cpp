@@ -216,11 +216,11 @@ public:
 	inline indexer(const indexer& i) = default;
 	inline ~indexer() {}
 
-	typedef std::function<u64(const board&)> mapper;
+	typedef u64(*mapper)(const board&);
 
 	inline u64 sign() const { return id; }
 	inline mapper index() const { return map; }
-	inline u64 operator ()(const board& b) const { return map(b); }
+	inline u64 operator ()(const board& b) const { return (*map)(b); }
 	declare_comparators(indexer, sign());
 
 	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
@@ -387,6 +387,7 @@ public:
 		std::string label() const { return token.substr(0, token.find('=')); }
 		std::string value() const { return token.substr(token.find('=') + 1); }
 		operator std::string() const { return value(); }
+		operator numeric() const { return std::stod(value()); }
 		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
 		opinion& operator =(const opinion& opt) { token  = opt.token; return (*this); }
 		opinion& operator =(const numeric& val) { return operator =(ntos(val)); }
@@ -406,6 +407,7 @@ public:
 		option(const vector& opt = {}) : vector(opt) {}
 		std::string value() const { return vtos(*this); }
 		operator std::string() const { return value(); }
+		operator numeric() const { return std::stod(value()); }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
 		option& operator  =(const numeric& val) { return operator =(ntos(val)); }
 		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
@@ -741,6 +743,26 @@ u64 indexmax(const board& b) { // 16-bit
 	k.isomorphic(isomorphic);
 	return k.mask(k.max());
 }
+
+std::vector<std::function<u64(const board&)>> indexhdr_pool;
+template<u32 id>
+u64 indexhdr(const board& b) {
+	return indexhdr_pool[id](b);
+}
+
+std::list<u64(*)(const board&)> indexlnk_pool;
+template<u32 id, u32 lim>
+struct make_generic_indexer_handlers {
+	make_generic_indexer_handlers() {
+		indexlnk_pool.push_back(utils::indexhdr<id>);
+		make_generic_indexer_handlers<id + 1, lim>();
+	}
+};
+template<u32 id>
+struct make_generic_indexer_handlers<id, id> {
+	make_generic_indexer_handlers() {
+	}
+};
 
 u32 make_indexers(std::string res = "") {
 	u32 succ = 0;
@@ -1166,6 +1188,8 @@ u32 make_indexers(std::string res = "") {
 	make(0xfc000050, utils::indexmax<5>);
 	make(0xfc000060, utils::indexmax<6>);
 	make(0xfc000070, utils::indexmax<7>);
+
+	make_generic_indexer_handlers<0, 128>();
 	return succ;
 }
 
@@ -1368,8 +1392,15 @@ u32 make_features(std::string res = "") {
 				idxrs = utils::hashpatt(idxr, idxv.size());
 				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
 				std::cerr << "assume as pattern descriptor..." << std::endl;
-				std::vector<int>* npatt = new std::vector<int>(xpatt); // will NOT be deleted
-				indexer::make(idxr, std::bind(utils::indexnta, std::placeholders::_1, std::cref(*npatt)));
+				auto& handler = utils::indexhdr_pool;
+				auto& adapter = utils::indexlnk_pool;
+				if (adapter.size()) {
+					handler.push_back(std::bind(utils::indexnta, std::placeholders::_1, xpatt));
+					indexer::make(idxr, adapter.front());
+					adapter.pop_front();
+				} else {
+					std::cerr << "run out of generic index handler" << std::endl;
+				}
 			}
 
 			if (feature::find(wght, idxr) == feature::feats().end()) {
