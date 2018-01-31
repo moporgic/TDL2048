@@ -1479,7 +1479,8 @@ void list_mapping() {
 			u32 usageG = usageM >> 10;
 			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
 			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-			snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c x3", w.sign(), w.size(), usage, scale);
+			int n = snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c", w.sign(), w.size(), usage, scale);
+			if (w.stride() > 1) snprintf(buf + n, sizeof(buf) - n, " x%zu", w.stride());
 			std::cout << buf << " :" << feats << std::endl;
 		} else {
 			snprintf(buf, sizeof(buf), "%08" PRIx64, w.sign());
