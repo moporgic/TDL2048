@@ -1865,6 +1865,12 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--comment"):
 			opts["comment"] = find_opts(i);
 			break;
+		case to_hash("-?"):
+		case to_hash("--help"):
+			std::cout << "TDL2048+ by Hung Guei" << std::endl;
+			std::cout << "Build Alpha (" __DATE__ ")" << std::endl;
+			std::exit(0);
+			break;
 		default:
 			std::cerr << "unknown: " << argv[i];
 			for (auto& v : find_opts(i)) std::cerr << " " << v;
