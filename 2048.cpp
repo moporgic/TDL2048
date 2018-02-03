@@ -1758,14 +1758,18 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
+			opts["temporary"] = opts["train"];
 			opts["train"] = find_opt(i, "1000");
 			opts["train"] += find_opts(i);
+			opts["train"] += opts["temporary"];
 			break;
 		case to_hash("-T"):
 		case to_hash("-e"):
 		case to_hash("--test"):
+			opts["temporary"] = opts["test"];
 			opts["test"] = find_opt(i, "1000");
 			opts["test"] += find_opts(i);
+			opts["test"] += opts["temporary"];
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
