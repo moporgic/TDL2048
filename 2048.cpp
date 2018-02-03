@@ -750,19 +750,32 @@ u64 indexhdr(const board& b) {
 	return indexhdr_pool[id](b);
 }
 
-std::list<u64(*)(const board&)> indexlnk_pool;
+std::list<u64(*)(const board&)> indexhdr_wrap;
 template<u32 id, u32 lim>
-struct make_generic_indexer_handlers {
-	make_generic_indexer_handlers() {
-		indexlnk_pool.push_back(utils::indexhdr<id>);
-		make_generic_indexer_handlers<id + 1, lim>();
+struct make_mapper_wrappers {
+	make_mapper_wrappers() {
+		indexhdr_wrap.push_back(utils::indexhdr<id>);
+		make_mapper_wrappers<id + 1, lim>();
 	}
 };
 template<u32 id>
-struct make_generic_indexer_handlers<id, id> {
-	make_generic_indexer_handlers() {
+struct make_mapper_wrappers<id, id> {
+	make_mapper_wrappers() {
 	}
 };
+
+indexer::mapper wrap_mapper(std::function<u64(const board&)> idxr) {
+	auto& handler = utils::indexhdr_pool;
+	auto& wrapper = utils::indexhdr_wrap;
+	if (wrapper.size()) {
+		handler.push_back(idxr);
+		auto map = wrapper.front();
+		wrapper.pop_front();
+		return map;
+	} else {
+		return nullptr;
+	}
+}
 
 u32 make_indexers(std::string res = "") {
 	u32 succ = 0;
@@ -770,7 +783,6 @@ u32 make_indexers(std::string res = "") {
 		if (indexer::find(sign) != indexer::idxrs().end()) return;
 		indexer::make(sign, func); succ++;
 	};
-
 	make(0x00012367, utils::index6t<0x0,0x1,0x2,0x3,0x6,0x7>);
 	make(0x0037bfae, utils::index6t<0x3,0x7,0xb,0xf,0xa,0xe>);
 	make(0x00fedc98, utils::index6t<0xf,0xe,0xd,0xc,0x9,0x8>);
@@ -1188,8 +1200,7 @@ u32 make_indexers(std::string res = "") {
 	make(0xfc000050, utils::indexmax<5>);
 	make(0xfc000060, utils::indexmax<6>);
 	make(0xfc000070, utils::indexmax<7>);
-
-	make_generic_indexer_handlers<0, 128>();
+	make_mapper_wrappers<0, 128>();
 	return succ;
 }
 
@@ -1392,14 +1403,11 @@ u32 make_features(std::string res = "") {
 				idxrs = utils::hashpatt(idxr, idxv.size());
 				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
 				std::cerr << "assume as pattern descriptor..." << std::endl;
-				auto& handler = utils::indexhdr_pool;
-				auto& adapter = utils::indexlnk_pool;
-				if (adapter.size()) {
-					handler.push_back(std::bind(utils::indexnta, std::placeholders::_1, xpatt));
-					indexer::make(idxr, adapter.front());
-					adapter.pop_front();
+				auto wrapper = utils::wrap_mapper(std::bind(utils::indexnta, std::placeholders::_1, xpatt));
+				if (wrapper) {
+					indexer::make(idxr, wrapper);
 				} else {
-					std::cerr << "run out of generic index handler" << std::endl;
+					std::cerr << "run out of generic indexer wrapper" << std::endl;
 				}
 			}
 
