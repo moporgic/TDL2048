@@ -1512,6 +1512,13 @@ struct state {
 	inline static numeric& alpha(const numeric& a) {
 		return (state::alpha() = a);
 	}
+	inline static std::pair<u32, u32>& lambda() {
+		static std::pair<u32, u32> l = { 0, 1 };
+		return l;
+	}
+	inline static std::pair<u32, u32>& lambda(const u32& l, const u32& m) {
+		return (state::lambda() = { l, m });
+	}
 };
 struct select {
 	state move[4];
@@ -1756,6 +1763,14 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--alpha"):
 			opts["alpha"] = find_opt(i, std::to_string(state::alpha()));
 			break;
+		case to_hash("-l"):
+		case to_hash("--lambda"):
+			opts["lambda"] = find_opt(i, "0.5");
+			break;
+		case to_hash("-n"):
+		case to_hash("--step"):
+			opts["step"] = find_opt(i, "5");
+			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
 			opts["temporary"] = opts["train"];
@@ -1941,6 +1956,57 @@ statistic train(utils::options opts = {}) {
 			stats.update(score, b.hash(), opers);
 		}
 		break;
+
+	case to_hash("forward-lambda"):
+	case to_hash("forward-best-lambda"):
+		for (stats.init(opts["train"]); stats; stats++) {
+
+			u32 score = 0;
+			u32 opers = 0;
+
+			u32 l = state::lambda().first;
+			u32 m = state::lambda().second;
+
+			b.init();
+			for (u32 n = 0; n < m && best << b; n++) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			while (best << b) {
+				numeric z = best.esti();
+				for (u32 k = 1; k < m; k++) {
+					numeric r = path[opers - k].reward();
+					numeric v = path[opers - k].value();
+					z = r + (l * z + (1 - l) * v);
+				}
+				path[opers - m].update(z);
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			u32 o = std::min(m, opers);
+			for (u32 n = 0; n < o; n++) {
+				numeric z = 0;
+				for (u32 k = 1; k <= n; k++) {
+					z = 0 + (l * z + (1 - l) * 0);
+				}
+				for (u32 k = n + 1; k < o; k++) {
+					numeric r = path[opers + n - k].reward();
+					numeric v = path[opers + n - k].value();
+					z = r + (l * z + (1 - l) * v);
+				}
+				path[opers + n - o].update(z);
+			}
+			path.clear();
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
 	}
 
 	return stats;
@@ -1979,6 +2045,8 @@ int main(int argc, const char* argv[]) {
 	if (!opts("test")) opts["test"] = opts("train") ? 0 : 10;
 	if (!opts("alpha")) opts["alpha"] = 0.0025;
 	if (!opts("seed")) opts["seed"] = rdtsc();
+	if (!opts("lambda")) opts["lambda"] = 0;
+	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
 
 	std::cout << "TDL2048+ LOG" << std::endl;
 	std::cout << "develop" << " build C++" << __cplusplus;
@@ -1988,10 +2056,13 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << moporgic::millisec() << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
+	std::cout << "lambda = " << opts["lambda"] << std::endl;
+	std::cout << "step = " << opts["step"] << std::endl;
 	std::cout << std::endl;
 
 	std::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
+	state::lambda(opts["lambda"], opts["step"]);
 
 	utils::make_indexers();
 
