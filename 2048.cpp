@@ -2021,9 +2021,6 @@ statistic train(utils::options opts = {}) {
 			u32 o = std::min(m, opers);
 			for (u32 n = 0; n < o; n++) {
 				numeric z = 0;
-				for (u32 k = 1; k <= n; k++) {
-					z = 0 + (l * z + (1 - l) * 0);
-				}
 				for (u32 k = n + 1; k < o; k++) {
 					numeric r = path[opers + n - k].reward();
 					numeric v = path[opers + n - k].value();
