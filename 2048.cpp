@@ -1928,6 +1928,35 @@ statistic train(utils::options opts = {}) {
 		}
 		break;
 
+	case to_hash("backward-lambda"):
+	case to_hash("backward-best-lambda"):
+		for (stats.init(opts["train"]); stats; stats++) {
+
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			u32 l = state::lambda().first;
+
+			numeric z = 0;
+			numeric r = path.back().reward();
+			numeric v = path.back().update(0) - r;
+			for (path.pop_back(); path.size(); path.pop_back()) {
+				z = r + (l * z + (1 - l) * v);
+				r = path.back().reward();
+				v = path.back().update(z) - r;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
 	default:
 	case to_hash("forward"):
 	case to_hash("forward-best"):
