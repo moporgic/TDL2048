@@ -2075,7 +2075,7 @@ int main(int argc, const char* argv[]) {
 	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
 
 	std::cout << "TDL2048+ LOG" << std::endl;
-	std::cout << "develop" << " build C++" << __cplusplus;
+	std::cout << "develop-lambda" << " build C++" << __cplusplus;
 	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
