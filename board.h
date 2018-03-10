@@ -533,7 +533,12 @@ public:
 	class action {
 	public:
 		action() = delete;
-		enum opcode : u32 { up, right, down, left };
+		enum opcode : u32 {
+			up    = 0x00u,
+			right = 0x01u,
+			down  = 0x02u,
+			left  = 0x03u,
+		};
 	};
 
 	inline i32 operate(const u32& op) { return operate64(op); }
@@ -889,7 +894,7 @@ public:
 	class style {
 	public:
 		style() = delete;
-		enum item : u32 {
+		enum fmtcode : u32 {
 			index  = 0x00000000u,
 			exact  = 0x10000000u,
 			alter  = 0x20000000u,
