@@ -1833,19 +1833,20 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-tt"):
 		case to_hash("-tm"):
+		case to_hash("--train-type"):
 		case to_hash("--train-mode"):
 			opts["train"]["mode"] = find_opt(i, "bias");
 			break;
 		case to_hash("-Tt"):
 		case to_hash("-et"):
 		case to_hash("-em"):
+		case to_hash("--test-type"):
 		case to_hash("--test-mode"):
 			opts["test"]["mode"] = find_opt(i, "bias");
 			break;
 		case to_hash("-tc"):
 		case to_hash("-tu"):
 		case to_hash("--train-check"):
-		case to_hash("--train-check-interval"):
 		case to_hash("--train-unit"):
 			opts["train"]["unit"] = find_opt(i, "1000");
 			break;
@@ -1853,7 +1854,6 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-ec"):
 		case to_hash("-eu"):
 		case to_hash("--test-check"):
-		case to_hash("--test-check-interval"):
 		case to_hash("--test-unit"):
 			opts["test"]["unit"] = find_opt(i, "1000");
 			break;
@@ -1864,6 +1864,10 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-c"):
 		case to_hash("--comment"):
 			opts["comment"] = find_opts(i);
+			break;
+		case to_hash("-|"):
+		case to_hash("--|"):
+			opts = {};
 			break;
 		case to_hash("-?"):
 		case to_hash("--help"):
