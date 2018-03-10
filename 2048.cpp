@@ -2635,7 +2635,7 @@ statistic test(utils::options opts = {}) {
 	select best;
 	board b;
 
-	switch (to_hash(opts["test-mode"])) {
+	switch (to_hash(opts["test"]["mode"])) {
 	case to_hash("best"):
 		for (stats.init(opts["test"]); stats; stats++) {
 
