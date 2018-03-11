@@ -1876,7 +1876,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--thread"):
 		case to_hash("-p"):
 		case to_hash("--parallel"):
-			opts["thread"] = find_opt(i, std::to_string(std::thread::hardware_concurrency()).c_str());
+			opts["thread"] = find_opt(i, std::to_string(std::thread::hardware_concurrency()));
 			break;
 		default:
 			std::cerr << "unknown: " << argv[i];
@@ -1986,6 +1986,7 @@ int main(int argc, const char* argv[]) {
 	if (!opts("test")) opts["test"] = opts("train") ? 0 : 10;
 	if (!opts("alpha")) opts["alpha"] = 0.0025;
 	if (!opts("seed")) opts["seed"] = rdtsc();
+	if (!opts("thread")) opts["thread"] = 1;
 
 	std::cout << "TDL2048+ LOG" << std::endl;
 	std::cout << "develop-parallel" << " build C++" << __cplusplus;
@@ -1995,7 +1996,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << moporgic::millisec() << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
-	std::cout << "agent = " << opts.find("thread", "1") << "x" << std::endl;
+	std::cout << "agent = " << opts["thread"] << "x" << std::endl;
 	std::cout << std::endl;
 
 	std::srand(moporgic::to_hash(opts["seed"]));
@@ -2014,7 +2015,7 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["train"])) {
 		std::cout << std::endl << "start training..." << std::endl;
 		std::list<std::future<statistic>> agents;
-		u32 thdid = std::stol(opts["train"]["thread"] = opts.find("thread", "1"));
+		u32 thdid = std::stol(opts["train"]["thread"] = opts["thread"]);
 		while (std::stol(opts["train"]["thread-id"] = (--thdid)))
 			agents.push_back(std::async(std::launch::async, train, opts));
 		statistic stat = std::accumulate(agents.begin(), agents.end(), train(opts),
@@ -2028,7 +2029,7 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["test"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		std::list<std::future<statistic>> agents;
-		u32 thdid = std::stol(opts["test"]["thread"] = opts.find("thread", "1"));
+		u32 thdid = std::stol(opts["test"]["thread"] = opts["thread"]);
 		while (std::stol(opts["test"]["thread-id"] = (--thdid)))
 			agents.push_back(std::async(std::launch::async, test, opts));
 		statistic stat = std::accumulate(agents.begin(), agents.end(), test(opts),
