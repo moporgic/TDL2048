@@ -1454,7 +1454,7 @@ inline numeric estimate(const board& state,
 	return esti;
 }
 
-inline numeric update(const board& state, const numeric& updv,
+inline numeric optimize(const board& state, const numeric& updv,
 		const clip<feature>& range = feature::feats()) {
 	register numeric esti = 0;
 	for (register feature& feat : range)
@@ -1494,9 +1494,9 @@ struct state {
 		}
 		return esti;
 	}
-	inline numeric update(const numeric& accu, const numeric& alpha = state::alpha(),
+	inline numeric optimize(const numeric& accu, const numeric& alpha = state::alpha(),
 			const clip<feature>& range = feature::feats()) {
-		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), range);
+		esti = state::reward() + utils::optimize(move, alpha * (accu - state::value()), range);
 		return esti;
 	}
 
@@ -1910,7 +1910,7 @@ statistic train(utils::options opts = {}) {
 
 			for (numeric v = 0; path.size(); path.pop_back()) {
 				path.back().estimate();
-				v = path.back().update(v);
+				v = path.back().optimize(v);
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -1933,14 +1933,14 @@ statistic train(utils::options opts = {}) {
 			best >> b;
 			b.next();
 			while (best << b) {
-				last.update(best.esti());
+				last.optimize(best.esti());
 				score += best.score();
 				opers += 1;
 				best >> last;
 				best >> b;
 				b.next();
 			}
-			last.update(0);
+			last.optimize(0);
 
 			stats.update(score, b.hash(), opers);
 		}
