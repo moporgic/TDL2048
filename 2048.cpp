@@ -1401,11 +1401,13 @@ u32 make_features(std::string res = "") {
 				idxrs = utils::hashpatt(idxr, idxv.size());
 				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
 				std::cerr << "assume as pattern descriptor..." << std::endl;
-				auto wrapper = utils::wrap_mapper(std::bind(utils::indexnta, std::placeholders::_1, xpatt));
+				std::function<u64(const board&)> adapter = std::bind(utils::indexnta, std::placeholders::_1, xpatt);
+				indexer::mapper wrapper = utils::wrap_mapper(adapter);
 				if (wrapper) {
 					indexer::make(idxr, wrapper);
 				} else {
 					std::cerr << "run out of generic indexer wrapper" << std::endl;
+					std::exit(10);
 				}
 			}
 
