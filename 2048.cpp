@@ -494,6 +494,42 @@ u64 index6t(const board& b) {
 	index += b.at(p5) << 20;
 	return index;
 }
+template<>
+u64 index6t<0x0,0x1,0x2,0x3,0x4,0x5>(const board& b) {
+	return (u32(u64(b)) & 0xffffff);
+}
+template<>
+u64 index6t<0x4,0x5,0x6,0x7,0x8,0x9>(const board& b) {
+	return (u32(u64(b) >> 16) & 0xffffff);
+}
+template<>
+u64 index6t<0x0,0x1,0x2,0x4,0x5,0x6>(const board& b) {
+	return (u32(u64(b)) & 0x000fff) | ((u32(u64(b)) >> 4) & 0xfff000);
+}
+template<>
+u64 index6t<0x4,0x5,0x6,0x8,0x9,0xa>(const board& b) {
+	return (u32(u64(b) >> 16) & 0x000fff) | (u32(u64(b) >> 20) & 0xfff000);
+}
+template<>
+u64 index6t<0x2,0x3,0x4,0x5,0x6,0x9>(const board& b) {
+	return (u32(u64(b) >> 8) & 0x0fffff) | (u32(u64(b) >> 16) & 0xf00000);
+}
+template<>
+u64 index6t<0x0,0x1,0x2,0x5,0x9,0xa>(const board& b) {
+	return (u32(u64(b)) & 0x000fff) | (u32(u64(b) >> 8) & 0x00f000) | (u32(u64(b) >> 20) & 0xff0000);
+}
+template<>
+u64 index6t<0x3,0x4,0x5,0x6,0x7,0x8>(const board& b) {
+	return (u32(u64(b) >> 12) & 0xffffff);
+}
+template<>
+u64 index6t<0x1,0x3,0x4,0x5,0x6,0x7>(const board& b) {
+	return (u32(u64(b) >> 4) & 0x00000f) | (u32(u64(b) >> 8) & 0xfffff0);
+}
+template<>
+u64 index6t<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) {
+	return (u32(u64(b)) & 0x0000ff) | (u32(u64(b) >> 8) & 0x000f00) | (u32(u64(b) >> 20) & 0xfff000);
+}
 template<int p0, int p1, int p2, int p3>
 u64 index4t(const board& b) {
 	register u64 index = 0;
