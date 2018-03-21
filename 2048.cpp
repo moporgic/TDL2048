@@ -1482,7 +1482,8 @@ void list_mapping() {
 	}
 }
 
-
+typedef numeric(*estimator)(const board&, clip<feature>);
+typedef numeric(*optimizer)(const board&, numeric, numeric, clip<feature>);
 
 inline numeric estimate(const board& state,
 		clip<feature> range = feature::feats()) {
@@ -1492,8 +1493,9 @@ inline numeric estimate(const board& state,
 	return esti;
 }
 
-inline numeric optimize(const board& state, numeric updv,
+inline numeric optimize(const board& state, numeric error, numeric alpha,
 		clip<feature> range = feature::feats()) {
+	register numeric updv = alpha * error;
 	register numeric esti = 0;
 	for (register feature& feat : range)
 		esti += (feat[state] += updv);
@@ -1534,7 +1536,7 @@ struct state {
 	}
 	inline numeric optimize(numeric accu, numeric alpha = state::alpha(),
 			clip<feature> range = feature::feats()) {
-		esti = state::reward() + utils::optimize(move, alpha * (accu - state::value()), range);
+		esti = state::reward() + utils::optimize(move, accu - state::value(), alpha, range);
 		return esti;
 	}
 
