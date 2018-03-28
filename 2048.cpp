@@ -1954,11 +1954,11 @@ statistic train(utils::options opts = {}) {
 
 			numeric z = 0;
 			numeric r = path.back().reward();
-			numeric v = path.back().update(0) - r;
+			numeric v = path.back().optimize(0) - r;
 			for (path.pop_back(); path.size(); path.pop_back()) {
 				z = r + (l * z + (1 - l) * v);
 				r = path.back().reward();
-				v = path.back().update(z) - r;
+				v = path.back().optimize(z) - r;
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -2019,7 +2019,7 @@ statistic train(utils::options opts = {}) {
 					numeric v = path[opers - k].value();
 					z = r + (l * z + (1 - l) * v);
 				}
-				path[opers - m].update(z);
+				path[opers - m].optimize(z);
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -2034,7 +2034,7 @@ statistic train(utils::options opts = {}) {
 					numeric v = path[opers + n - k].value();
 					z = r + (l * z + (1 - l) * v);
 				}
-				path[opers + n - o].update(z);
+				path[opers + n - o].optimize(z);
 			}
 			path.clear();
 
