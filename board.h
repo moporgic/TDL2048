@@ -87,7 +87,7 @@ public:
 			move(const move& op) = default;
 			~move() = default;
 
-			static move make(const u32& r, const bool& reverse) {
+			static move make(u32 r, bool reverse) {
 				u32 row[] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
 							((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
 				if (reverse) std::reverse(row, row + 4);
@@ -162,7 +162,7 @@ public:
 		cache(const cache& c) = default;
 		~cache() = default;
 
-		static cache make(const u32& r) {
+		static cache make(u32 r) {
 			u32 raw = r & 0x0ffff;
 			u32 ext = r & 0xf0000;
 
@@ -217,52 +217,52 @@ private:
 	u32 inf;
 
 public:
-	inline board(const u64& raw = 0) : raw(raw), ext(0), inf(0) {}
-	inline board(const u64& raw, const u32& ext) : raw(raw), ext(ext), inf(0) {}
-	inline board(const u64& raw, const u16& ext) : board(raw, u32(ext) << 16) {}
+	inline board(u64 raw = 0) : raw(raw), ext(0), inf(0) {}
+	inline board(u64 raw, u32 ext) : raw(raw), ext(ext), inf(0) {}
+	inline board(u64 raw, u16 ext) : board(raw, u32(ext) << 16) {}
 	inline board(const board& b) = default;
 	inline ~board() = default;
-	inline board& operator =(const u64& raw) { this->raw = raw; return *this; }
+	inline board& operator =(u64 raw) { this->raw = raw; return *this; }
 	inline board& operator =(const board& b) = default;
 
 	inline operator u64() const { return raw; }
 	inline operator bool() const { return raw | ext; }
 	declare_comparators_with(const board&, raw_cast<u128>(*this), raw_cast<u128>(v))
 
-	inline const cache& query(const u32& r) const { return query16(r); }
-	inline const cache& query16(const u32& r) const { return board::lookup[fetch16(r)]; }
-	inline const cache& query20(const u32& r) const { return board::lookup[fetch20(r)]; }
+	inline const cache& query(u32 r) const { return query16(r); }
+	inline const cache& query16(u32 r) const { return board::lookup[fetch16(r)]; }
+	inline const cache& query20(u32 r) const { return board::lookup[fetch20(r)]; }
 
-	inline u32 fetch(const u32& i) const { return fetch16(i); }
-	inline u32 fetch16(const u32& i) const {
+	inline u32 fetch(u32 i) const { return fetch16(i); }
+	inline u32 fetch16(u32 i) const {
 		return ((raw >> (i << 4)) & 0xffff);
 	}
-	inline u32 fetch20(const u32& i) const {
+	inline u32 fetch20(u32 i) const {
 		return fetch16(i) | ((ext >> (i << 2)) & 0xf0000);
 	}
 
-	inline void place(const u32& i, const u32& r) { place16(i, r); }
-	inline void place16(const u32& i, const u32& r) {
+	inline void place(u32 i, u32 r) { place16(i, r); }
+	inline void place16(u32 i, u32 r) {
 		raw = (raw & ~(0xffffULL << (i << 4))) | (u64(r & 0xffff) << (i << 4));
 	}
-	inline void place20(const u32& i, const u32& r) {
+	inline void place20(u32 i, u32 r) {
 		place16(i, r & 0xffff);
 		ext = (ext & ~(0xf0000 << (i << 2))) | ((r & 0xf0000) << (i << 2));
 	}
 
-	inline u32 at(const u32& i) const { return at4(i); }
-	inline u32 at4(const u32& i) const {
+	inline u32 at(u32 i) const { return at4(i); }
+	inline u32 at4(u32 i) const {
 		return (raw >> (i << 2)) & 0x0f;
 	}
-	inline u32 at5(const u32& i) const {
+	inline u32 at5(u32 i) const {
 		return at4(i) | ((ext >> (i + 12)) & 0x10);
 	}
 
-	inline void set(const u32& i, const u32& t) { set4(i, t); }
-	inline void set4(const u32& i, const u32& t) {
+	inline void set(u32 i, u32 t) { set4(i, t); }
+	inline void set4(u32 i, u32 t) {
 		raw = (raw & ~(0x0fULL << (i << 2))) | (u64(t & 0x0f) << (i << 2));
 	}
-	inline void set5(const u32& i, const u32& t) {
+	inline void set5(u32 i, u32 t) {
 		set4(i, t);
 		ext = (ext & ~(1U << (i + 16))) | ((t & 0x10) << (i + 12));
 	}
@@ -389,10 +389,10 @@ public:
 	inline void rotleft64() { transpose64(); flip64(); }
 	inline void rotleft80() { transpose80(); flip80(); }
 
-	inline void rotate(const int& r = 1) {
+	inline void rotate(int r = 1) {
 		rotate64(r);
 	}
-	inline void rotate64(const int& r = 1) {
+	inline void rotate64(int r = 1) {
 		switch (((r % 4) + 4) % 4) {
 		default:
 		case 0: break;
@@ -401,7 +401,7 @@ public:
 		case 3: rotleft64(); break;
 		}
 	}
-	inline void rotate80(const int& r = 1) {
+	inline void rotate80(int r = 1) {
 		switch (((r % 4) + 4) % 4) {
 		default:
 		case 0: break;
@@ -411,14 +411,14 @@ public:
 		}
 	}
 
-	inline void isomorphic(const int& i = 0) {
+	inline void isomorphic(int i = 0) {
 		return isomorphic64(i);
 	}
-	inline void isomorphic64(const int& i = 0) {
+	inline void isomorphic64(int i = 0) {
 		if ((i % 8) / 4) mirror64();
 		rotate64(i);
 	}
-	inline void isomorphic80(const int& i = 0) {
+	inline void isomorphic80(int i = 0) {
 		if ((i % 8) / 4) mirror80();
 		rotate80(i);
 	}
@@ -533,11 +533,16 @@ public:
 	class action {
 	public:
 		action() = delete;
-		enum opcode : u32 { up, right, down, left };
+		enum opcode : u32 {
+			up    = 0x00u,
+			right = 0x01u,
+			down  = 0x02u,
+			left  = 0x03u,
+		};
 	};
 
-	inline i32 operate(const u32& op) { return operate64(op); }
-	inline i32 operate64(const u32& op) {
+	inline i32 operate(u32 op) { return operate64(op); }
+	inline i32 operate64(u32 op) {
 		switch (op) {
 		case action::up:    return up64();
 		case action::right: return right64();
@@ -546,7 +551,7 @@ public:
 		default:            return -1;
 		}
 	}
-	inline i32 operate80(const u32& op) {
+	inline i32 operate80(u32 op) {
 		switch (op) {
 		case action::up:    return up80();
 		case action::right: return right80();
@@ -556,12 +561,12 @@ public:
 		}
 	}
 
-	inline i32 move(const u32& op)   { return operate(op); }
-	inline i32 move64(const u32& op) { return operate64(op); }
-	inline i32 move80(const u32& op) { return operate80(op); }
+	inline i32 move(u32 op)   { return operate(op); }
+	inline i32 move64(u32 op) { return operate64(op); }
+	inline i32 move80(u32 op) { return operate80(op); }
 
-	inline u32 shift(const u32& k = 0, const u32& u = 0) { return shift64(k, u); }
-	inline u32 shift64(const u32& k = 0, const u32& u = 0) {
+	inline u32 shift(u32 k = 0, u32 u = 0) { return shift64(k, u); }
+	inline u32 shift64(u32 k = 0, u32 u = 0) {
 		u32 hash = hash64();
 		u32 tile = math::msb16(hash);
 		u32 mask = (((k ? (1 << k) : tile) << 1) - 1) & ~((2 << u) - 1);
@@ -574,7 +579,7 @@ public:
 		}
 		return h;
 	}
-	inline u32 shift80(const u32& k = 0, const u32& u = 0) {
+	inline u32 shift80(u32 k = 0, u32 u = 0) {
 		u32 hash = hash80();
 		u32 tile = math::msb16(hash);
 		u32 mask = (((k ? (1 << k) : tile) << 1) - 1) & ~((2 << u) - 1);
@@ -621,16 +626,16 @@ public:
 		return list(num, 16);
 	}
 
-	inline u32 numof(const u32& t) const { return numof64(t); }
-	inline u32 numof64(const u32& t) const {
+	inline u32 numof(u32 t) const { return numof64(t); }
+	inline u32 numof64(u32 t) const {
 		return query16(0).numof[t] + query16(1).numof[t] + query16(2).numof[t] + query16(3).numof[t];
 	}
-	inline u32 numof80(const u32& t) const {
+	inline u32 numof80(u32 t) const {
 		return query20(0).numof[t] + query20(1).numof[t] + query20(2).numof[t] + query20(3).numof[t];
 	}
 
-	inline void numof(u32 num[], const u32& min, const u32& max) const { return numof64(num, min, max); }
-	inline void numof64(u32 num[], const u32& min, const u32& max) const {
+	inline void numof(u32 num[], u32 min, u32 max) const { return numof64(num, min, max); }
+	inline void numof64(u32 num[], u32 min, u32 max) const {
 		const cache::info& numof0 = query16(0).numof;
 		const cache::info& numof1 = query16(1).numof;
 		const cache::info& numof2 = query16(2).numof;
@@ -639,7 +644,7 @@ public:
 			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 		}
 	}
-	inline void numof80(u32 num[], const u32& min, const u32& max) const {
+	inline void numof80(u32 num[], u32 min, u32 max) const {
 		const cache::info& numof0 = query20(0).numof;
 		const cache::info& numof1 = query20(1).numof;
 		const cache::info& numof2 = query20(2).numof;
@@ -649,42 +654,42 @@ public:
 		}
 	}
 
-	inline u32 count(const u32& t) const { return count64(t); }
-	inline u32 count64(const u32& t) const {
+	inline u32 count(u32 t) const { return count64(t); }
+	inline u32 count64(u32 t) const {
 		register u32 num = 0;
 		for (u32 i = 0; i < 16; i++)
 			if (at4(i) == t) num++;
 		return num;
 	}
-	inline u32 count80(const u32& t) const {
+	inline u32 count80(u32 t) const {
 		register u32 num = 0;
 		for (u32 i = 0; i < 16; i++)
 			if (at5(i) == t) num++;
 		return num;
 	}
 
-	inline void count(u32 num[], const u32& min, const u32& max) const { return count64(num, min, max); }
-	inline void count64(u32 num[], const u32& min, const u32& max) const {
+	inline void count(u32 num[], u32 min, u32 max) const { return count64(num, min, max); }
+	inline void count64(u32 num[], u32 min, u32 max) const {
 		std::fill(num + min, num + max, 0);
 		for (u32 i = 0; i < 16; i++)
 			num[at4(i)]++;
 	}
-	inline void count80(u32 num[], const u32& min, const u32& max) const {
+	inline void count80(u32 num[], u32 min, u32 max) const {
 		std::fill(num + min, num + max, 0);
 		for (u32 i = 0; i < 16; i++)
 			num[at5(i)]++;
 	}
 
-	inline u32 mask(const u32& t) const { return mask64(t); }
-	inline u32 mask64(const u32& t) const {
+	inline u32 mask(u32 t) const { return mask64(t); }
+	inline u32 mask64(u32 t) const {
 		return (query16(0).mask[t] << 0) | (query16(1).mask[t] << 4) | (query16(2).mask[t] << 8) | (query16(3).mask[t] << 12);
 	}
-	inline u32 mask80(const u32& t) const {
+	inline u32 mask80(u32 t) const {
 		return (query20(0).mask[t] << 0) | (query20(1).mask[t] << 4) | (query20(2).mask[t] << 8) | (query20(3).mask[t] << 12);
 	}
 
-	inline void mask(u32 msk[], const u32& min, const u32& max) const { return mask64(msk, min, max); }
-	inline void mask64(u32 msk[], const u32& min, const u32& max) const {
+	inline void mask(u32 msk[], u32 min, u32 max) const { return mask64(msk, min, max); }
+	inline void mask64(u32 msk[], u32 min, u32 max) const {
 		const cache::info& mask0 = query16(0).mask;
 		const cache::info& mask1 = query16(1).mask;
 		const cache::info& mask2 = query16(2).mask;
@@ -693,7 +698,7 @@ public:
 			msk[i] = (mask0[i] << 0) | (mask1[i] << 4) | (mask2[i] << 8) | (mask3[i] << 12);
 		}
 	}
-	inline void mask80(u32 msk[], const u32& min, const u32& max) const {
+	inline void mask80(u32 msk[], u32 min, u32 max) const {
 		const cache::info& mask0 = query20(0).mask;
 		const cache::info& mask1 = query20(1).mask;
 		const cache::info& mask2 = query20(2).mask;
@@ -703,9 +708,9 @@ public:
 		}
 	}
 
-	inline list find(const u32& t) const { return find64(t); }
-	inline list find64(const u32& t) const { return board::lookup[mask64(t)].layout; }
-	inline list find80(const u32& t) const { return board::lookup[mask80(t)].layout; }
+	inline list find(u32 t) const { return find64(t); }
+	inline list find64(u32 t) const { return board::lookup[mask64(t)].layout; }
+	inline list find80(u32 t) const { return board::lookup[mask80(t)].layout; }
 
 	inline u64 monoleft() const { return monoleft64(); }
 	inline u64 monoleft64() const {
@@ -743,9 +748,9 @@ public:
 		return mono;
 	}
 
-	inline u64 monotonic(const bool& left = true) const   { return left ? monoleft() : monoright(); }
-	inline u64 monotonic64(const bool& left = true) const { return left ? monoleft64() : monoright64(); }
-	inline u64 monotonic80(const bool& left = true) const { return left ? monoleft80() : monoright80(); }
+	inline u64 monotonic(bool left = true) const   { return left ? monoleft() : monoright(); }
+	inline u64 monotonic64(bool left = true) const { return left ? monoleft64() : monoright64(); }
+	inline u64 monotonic80(bool left = true) const { return left ? monoleft80() : monoright80(); }
 
 	inline u32 operations() const { return operations64(); }
 	inline u32 operations64() const {
@@ -840,7 +845,7 @@ public:
 		inline operator u32() const { return at(is(style::extend), is(style::exact)); }
 		inline tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
 		declare_comparators_with(u32, operator u32(), v);
-
+	public:
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
 			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return t.is(style::binary) ? moporgic::write_cast<byte>(out, v) : (out << v);
@@ -851,6 +856,22 @@ public:
 				t.set(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return in;
 		}
+	public:
+		typedef std::ptrdiff_t difference_type;
+		typedef u32 value_type;
+		typedef tile& reference;
+		typedef tile pointer;
+		typedef std::forward_iterator_tag iterator_category;
+		tile& operator *() { return *this; }
+		const tile& operator *() const { return *this; }
+		tile  operator->() const { return *this; }
+		bool  operator==(const tile& t) const { return ((b == t.b) & (i == t.i)); }
+		bool  operator!=(const tile& t) const { return ((b != t.b) | (i != t.i)); }
+		bool  operator< (const tile& t) const { return ((b == t.b) & (i < t.i)) | (b < t.b); }
+		tile& operator++() { ++i; return *this; }
+		tile& operator--() { --i; return *this; }
+		tile  operator++(int) { return tile(b, ++i - 1); }
+		tile  operator--(int) { return tile(b, --i + 1); }
 	private:
 		board& b;
 		u32 i;
@@ -866,12 +887,14 @@ public:
 			if (extend) b.set5(i, v); else b.set4(i, v);
 		}
 	};
-	inline tile operator [](const u32& i) const { return tile(*this, i); }
+	inline tile operator [](u32 i) const { return tile(*this, i); }
+	inline tile begin() const { return operator [](0); }
+	inline tile end() const { return operator [](16); }
 
 	class style {
 	public:
 		style() = delete;
-		enum item : u32 {
+		enum fmtcode : u32 {
 			index  = 0x00000000u,
 			exact  = 0x10000000u,
 			alter  = 0x20000000u,
