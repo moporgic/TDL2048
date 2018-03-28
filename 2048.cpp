@@ -44,8 +44,8 @@ public:
 	inline u64 sign() const { return id; }
 	inline size_t size() const { return length; }
 	inline size_t stride() const { return 1ull; }
-	inline numeric& operator [](const u64& i) { return raw[i]; }
-	inline numeric* data(const u64& i = 0) { return raw + i; }
+	inline numeric& operator [](u64 i) { return raw[i]; }
+	inline numeric* data(u64 i = 0) { return raw + i; }
 	inline clip<numeric> value() const { return { raw, raw + length }; }
 	declare_comparators(weight, sign());
 
@@ -174,19 +174,19 @@ public:
 
 	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
 
-	static inline weight& make(const u64& sign, const size_t& size) {
+	static inline weight& make(u64 sign, size_t size) {
 		list<weight>::as(wghts()).push_back(weight(sign, size));
 		return wghts().back();
 	}
-	static inline weight* find(const u64& sign, const clip<weight>& range = wghts()) {
+	static inline weight* find(u64 sign, clip<weight> range = wghts()) {
 		return std::find_if(range.begin(), range.end(), [=](const weight& w) { return w.sign() == sign; });
 	}
-	static inline weight& at(const u64& sign, const clip<weight>& range = wghts()) {
+	static inline weight& at(u64 sign, clip<weight> range = wghts()) {
 		auto it = find(sign, range);
 		if (it != range.end()) return (*it);
 		throw std::out_of_range("weight::at");
 	}
-	static inline weight erase(const u64& sign, const bool& del = true) {
+	static inline weight erase(u64 sign, bool del = true) {
 		weight w = at(sign);
 		if (del) free(w.data());
 		list<weight>::as(wghts()).erase(find(sign));
@@ -194,9 +194,9 @@ public:
 	}
 
 private:
-	inline weight(const u64& sign, const size_t& size) : id(sign), length(size), raw(alloc(size)) {}
+	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
 
-	static inline numeric* alloc(const size_t& size) {
+	static inline numeric* alloc(size_t size) {
 		return new numeric[size]();
 	}
 	static inline void free(numeric* v) {
@@ -223,26 +223,26 @@ public:
 
 	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
-	static inline indexer& make(const u64& sign, mapper map) {
+	static inline indexer& make(u64 sign, mapper map) {
 		list<indexer>::as(idxrs()).push_back(indexer(sign, map));
 		return idxrs().back();
 	}
-	static inline indexer* find(const u64& sign, const clip<indexer>& range = idxrs()) {
+	static inline indexer* find(u64 sign, clip<indexer> range = idxrs()) {
 		return std::find_if(range.begin(), range.end(), [=](const indexer& i) { return i.sign() == sign; });
 	}
-	static inline indexer& at(const u64& sign, const clip<indexer>& range = idxrs()) {
+	static inline indexer& at(u64 sign, clip<indexer> range = idxrs()) {
 		const auto it = find(sign, range);
 		if (it != range.end()) return (*it);
 		throw std::out_of_range("indexer::at");
 	}
-	static inline indexer erase(const u64& sign) {
+	static inline indexer erase(u64 sign) {
 		indexer i = at(sign);
 		list<indexer>::as(idxrs()).erase(find(sign));
 		return i;
 	}
 
 private:
-	inline indexer(const u64& sign, mapper map) : id(sign), map(map) {}
+	inline indexer(u64 sign, mapper map) : id(sign), map(map) {}
 
 	u64 id;
 	mapper map;
@@ -256,7 +256,7 @@ public:
 
 	inline u64 sign() const { return (value.sign() << 32) | index.sign(); }
 	inline weight::numeric& operator [](const board& b) { return value[index(b)]; }
-	inline weight::numeric& operator [](const u64& idx) { return value[idx]; }
+	inline weight::numeric& operator [](u64 idx) { return value[idx]; }
 	inline u64 operator ()(const board& b) const { return index(b); }
 
 	inline operator indexer() const { return index; }
@@ -342,20 +342,20 @@ public:
 
 	static inline clip<feature>& feats() { static clip<feature> f; return f; }
 
-	static inline feature& make(const u64& wgt, const u64& idx) {
+	static inline feature& make(u64 wgt, u64 idx) {
 		list<feature>::as(feats()).push_back(feature(weight::at(wgt), indexer::at(idx)));
 		return feats().back();
 	}
-	static inline feature* find(const u64& wght, const u64& idxr, const clip<feature>& range = feats()) {
+	static inline feature* find(u64 wght, u64 idxr, clip<feature> range = feats()) {
 		return std::find_if(range.begin(), range.end(),
 			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
 	}
-	static inline feature& at(const u64& wgt, const u64& idx, const clip<feature>& range = feats()) {
+	static inline feature& at(u64 wgt, u64 idx, clip<feature> range = feats()) {
 		const auto it = find(wgt, idx, range);
 		if (it != range.end()) return (*it);
 		throw std::out_of_range("feature::at");
 	}
-	static inline feature erase(const u64& wgt, const u64& idx) {
+	static inline feature erase(u64 wgt, u64 idx) {
 		feature f = at(wgt, idx);
 		list<feature>::as(feats()).erase(find(wgt, idx));
 		return f;
@@ -477,7 +477,7 @@ inline std::vector<int> hashpatt(const std::string& hashs) {
 		(*it) = hash & 0x0f;
 	return patt;
 }
-inline std::string hashpatt(const u32& hash, const size_t& n = 0) {
+inline std::string hashpatt(u32 hash, size_t n = 0) {
 	std::stringstream ss; ss << std::hex << hash;
 	std::string patt = ss.str();
 	return std::string(std::max(n, patt.size()) - patt.size(), '0') + patt;
@@ -703,7 +703,7 @@ u64 indexnuma(const board& b, const std::vector<int>& n) {
 	auto num = b.numof();
 	register u64 index = 0;
 	register u32 offset = 0;
-	for (const int& code : n) {
+	for (int code : n) {
 		using moporgic::math::msb32;
 		using moporgic::math::log2;
 		// code: 0x00SSTTTT
@@ -1401,11 +1401,13 @@ u32 make_features(std::string res = "") {
 				idxrs = utils::hashpatt(idxr, idxv.size());
 				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
 				std::cerr << "assume as pattern descriptor..." << std::endl;
-				auto wrapper = utils::wrap_mapper(std::bind(utils::indexnta, std::placeholders::_1, xpatt));
+				std::function<u64(const board&)> adapter = std::bind(utils::indexnta, std::placeholders::_1, xpatt);
+				indexer::mapper wrapper = utils::wrap_mapper(adapter);
 				if (wrapper) {
 					indexer::make(idxr, wrapper);
 				} else {
 					std::cerr << "run out of generic indexer wrapper" << std::endl;
+					std::exit(10);
 				}
 			}
 
@@ -1444,18 +1446,20 @@ void list_mapping() {
 	}
 }
 
-
+typedef numeric(*estimator)(const board&, clip<feature>);
+typedef numeric(*optimizer)(const board&, numeric, numeric, clip<feature>);
 
 inline numeric estimate(const board& state,
-		const clip<feature>& range = feature::feats()) {
+		clip<feature> range = feature::feats()) {
 	register numeric esti = 0;
 	for (register feature& feat : range)
 		esti += feat[state];
 	return esti;
 }
 
-inline numeric update(const board& state, const numeric& updv,
-		const clip<feature>& range = feature::feats()) {
+inline numeric optimize(const board& state, numeric error, numeric alpha,
+		clip<feature> range = feature::feats()) {
+	register numeric updv = alpha * error;
 	register numeric esti = 0;
 	for (register feature& feat : range)
 		esti += (feat[state] += updv);
@@ -1486,7 +1490,7 @@ struct state {
 		score = (move.*oper)();
 	}
 	inline numeric estimate(
-			const clip<feature>& range = feature::feats()) {
+			clip<feature> range = feature::feats()) {
 		if (score >= 0) {
 			esti = state::reward() + utils::estimate(move, range);
 		} else {
@@ -1494,9 +1498,9 @@ struct state {
 		}
 		return esti;
 	}
-	inline numeric update(const numeric& accu, const numeric& alpha = state::alpha(),
-			const clip<feature>& range = feature::feats()) {
-		esti = state::reward() + utils::update(move, alpha * (accu - state::value()), range);
+	inline numeric optimize(numeric accu, numeric alpha = state::alpha(),
+			clip<feature> range = feature::feats()) {
+		esti = state::reward() + utils::optimize(move, accu - state::value(), alpha, range);
 		return esti;
 	}
 
@@ -1509,7 +1513,7 @@ struct state {
 		static numeric a = numeric(0.0025);
 		return a;
 	}
-	inline static numeric& alpha(const numeric& a) {
+	inline static numeric& alpha(numeric a) {
 		return (state::alpha() = a);
 	}
 	inline static std::pair<u32, u32>& lambda() {
@@ -1530,7 +1534,7 @@ struct select {
 		move[2] = state(down);
 		move[3] = state(left);
 	}
-	inline select& operator ()(const board& b, const clip<feature>& range = feature::feats()) {
+	inline select& operator ()(const board& b, clip<feature> range = feature::feats()) {
 		move[0].assign(b);
 		move[1].assign(b);
 		move[2].assign(b);
@@ -1655,7 +1659,7 @@ struct statistic {
 	operator bool() const { return loop <= limit; }
 	bool checked() const { return (loop % unit) == 0; }
 
-	void update(const u32& score, const u32& hash, const u32& opers) {
+	void update(u32 score, u32 hash, u32 opers) {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
@@ -1848,19 +1852,20 @@ inline utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-tt"):
 		case to_hash("-tm"):
+		case to_hash("--train-type"):
 		case to_hash("--train-mode"):
 			opts["train"]["mode"] = find_opt(i, "bias");
 			break;
 		case to_hash("-Tt"):
 		case to_hash("-et"):
 		case to_hash("-em"):
+		case to_hash("--test-type"):
 		case to_hash("--test-mode"):
 			opts["test"]["mode"] = find_opt(i, "bias");
 			break;
 		case to_hash("-tc"):
 		case to_hash("-tu"):
 		case to_hash("--train-check"):
-		case to_hash("--train-check-interval"):
 		case to_hash("--train-unit"):
 			opts["train"]["unit"] = find_opt(i, "1000");
 			break;
@@ -1868,7 +1873,6 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-ec"):
 		case to_hash("-eu"):
 		case to_hash("--test-check"):
-		case to_hash("--test-check-interval"):
 		case to_hash("--test-unit"):
 			opts["test"]["unit"] = find_opt(i, "1000");
 			break;
@@ -1879,6 +1883,10 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-c"):
 		case to_hash("--comment"):
 			opts["comment"] = find_opts(i);
+			break;
+		case to_hash("-|"):
+		case to_hash("--|"):
+			opts = {};
 			break;
 		case to_hash("-?"):
 		case to_hash("--help"):
@@ -1921,7 +1929,7 @@ statistic train(utils::options opts = {}) {
 
 			for (numeric v = 0; path.size(); path.pop_back()) {
 				path.back().estimate();
-				v = path.back().update(v);
+				v = path.back().optimize(v);
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -1973,14 +1981,14 @@ statistic train(utils::options opts = {}) {
 			best >> b;
 			b.next();
 			while (best << b) {
-				last.update(best.esti());
+				last.optimize(best.esti());
 				score += best.score();
 				opers += 1;
 				best >> last;
 				best >> b;
 				b.next();
 			}
-			last.update(0);
+			last.optimize(0);
 
 			stats.update(score, b.hash(), opers);
 		}
