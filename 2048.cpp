@@ -1613,7 +1613,7 @@ struct statistic {
 
 		auto npos = std::string::npos;
 		auto it = std::find_if(opt.begin(), opt.end(), [=](std::string v) { return v.find('=') == npos; });
-		std::string res = (it != opt.end()) ? *it : "1000";
+		std::string res = (it != opt.end()) ? *it : (opt.empty() ? "1000" : "0");
 		try {
 			loop = std::stol(res);
 			if (res.find('x') != npos) unit = std::stol(res.substr(res.find('x') + 1));
