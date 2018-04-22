@@ -588,13 +588,13 @@ public:
 
 	inline u64 min_isomorphic(board t) const {
 		u64 x = u64(t);
-		t.transpose(); x = std::min(x, u64(t));
 		t.mirror();    x = std::min(x, u64(t));
 		t.transpose(); x = std::min(x, u64(t));
 		t.mirror();    x = std::min(x, u64(t));
 		t.transpose(); x = std::min(x, u64(t));
 		t.mirror();    x = std::min(x, u64(t));
 		t.transpose(); x = std::min(x, u64(t));
+		t.mirror();    x = std::min(x, u64(t));
 		return x;
 	}
 
