@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cinttypes>
+#include <type_traits>
 
 typedef int64_t  ll;
 typedef uint64_t ull;
@@ -57,6 +58,11 @@ dst& reference_cast(src& ref) noexcept { return *(pointer_cast<dst>(&ref)); }
 
 template<typename dst, int off = 0, typename src> static inline constexpr
 dst& raw_cast(src& ref, int sh = 0) noexcept { return *(pointer_cast<dst>(&ref) + off + sh); }
+
+#include <iostream>
+#include <iterator>
+#include <algorithm>
+#include <utility>
 
 struct byte {
 	unsigned char v;
@@ -297,7 +303,13 @@ declare_enable_if(unsigned);
 
 declare_enable_if_with(convertible, iterator_convertible, typename std::iterator_traits<test>::iterator_category, std::input_iterator_tag);
 
+#define declare_trait(trait, detail...)\
+template<> struct std::is_##trait<detail> : public std::true_type {};
+
 } /* namespace moporgic */
+
+namespace moporgic { class half; }
+declare_trait(floating_point, moporgic::half);
 
 namespace moporgic {
 /**
@@ -318,13 +330,13 @@ public:
 	constexpr half operator *(half f) const noexcept; /* { return half::as(half_mul(hf, f.hf)); } */
 	constexpr half operator /(half f) const noexcept; /* { return half::as(half_div(hf, f.hf)); } */
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
-	constexpr f32  operator +(numeric f) const noexcept { return operator f32() + f; }
+	constexpr half operator +(numeric f) const noexcept { return operator f32() + f; }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
-	constexpr f32  operator -(numeric f) const noexcept { return operator f32() - f; }
+	constexpr half operator -(numeric f) const noexcept { return operator f32() - f; }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
-	constexpr f32  operator *(numeric f) const noexcept { return operator f32() * f; }
+	constexpr half operator *(numeric f) const noexcept { return operator f32() * f; }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
-	constexpr f32  operator /(numeric f) const noexcept { return operator f32() / f; }
+	constexpr half operator /(numeric f) const noexcept { return operator f32() / f; }
 public:
 	constexpr half  operator ++(int) noexcept { half v(*this); operator +=(1); return v; }
 	constexpr half  operator --(int) noexcept { half v(*this); operator -=(1); return v; }
@@ -346,7 +358,6 @@ public:
 	constexpr half& operator *=(numeric f) noexcept { return operator =(operator *(f)); }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
 	constexpr half& operator /=(numeric f) noexcept { return operator =(operator /(f)); }
-public:
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
 	constexpr friend numeric& operator +=(numeric& n, half f) { return n += numeric(f); }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
@@ -374,6 +385,19 @@ public:
 	constexpr bool operator < (numeric f) const noexcept { return operator numeric() <  f; }
 	template<typename numeric, typename = enable_if_arithmetic<numeric>>
 	constexpr bool operator > (numeric f) const noexcept { return operator numeric() >  f; }
+	template<typename numeric, typename = enable_if_arithmetic<numeric>>
+	constexpr friend bool operator ==(numeric n, half f) { return n == numeric(f); }
+	template<typename numeric, typename = enable_if_arithmetic<numeric>>
+	constexpr friend bool operator !=(numeric n, half f) { return n != numeric(f); }
+	template<typename numeric, typename = enable_if_arithmetic<numeric>>
+	constexpr friend bool operator <=(numeric n, half f) { return n <= numeric(f); }
+	template<typename numeric, typename = enable_if_arithmetic<numeric>>
+	constexpr friend bool operator >=(numeric n, half f) { return n >= numeric(f); }
+	template<typename numeric, typename = enable_if_arithmetic<numeric>>
+	constexpr friend bool operator < (numeric n, half f) { return n <  numeric(f); }
+	template<typename numeric, typename = enable_if_arithmetic<numeric>>
+	constexpr friend bool operator > (numeric n, half f) { return n >  numeric(f); }
+
 public:
 	static constexpr half& as(const u16& raw) noexcept { return raw_cast<half>(raw); }
 	friend std::ostream& operator <<(std::ostream& os, const half& hf) { return os << f32(hf); }
@@ -405,6 +429,8 @@ public:
 	constexpr type* data() const noexcept { return first; }
 	constexpr type* begin() const noexcept { return first; }
 	constexpr type* end() const noexcept { return last; }
+	constexpr type* begin(type* it) noexcept { return std::exchange(first, it); }
+	constexpr type* end(type* it) noexcept { return std::exchange(last, it); }
 	constexpr const type* cbegin() const noexcept { return begin(); }
 	constexpr const type* cend() const noexcept { return end(); }
 	constexpr type& front() const noexcept { return *(begin()); }
@@ -494,9 +520,122 @@ public:
 	const list<type>& as(const clip<type>& c) noexcept { return raw_cast<list<type>>(c); }
 protected:
 	void set(type* first, type* last) {
+		for (type* it = clip<type>::begin(); it != clip<type>::end(); it++) it->~type();
 		alloc().deallocate(clip<type>::begin(), clip<type>::size());
 		clip<type>::operator=(clip<type>(first, last));
 	}
+};
+
+class hexadeca {
+public:
+	constexpr hexadeca(uint64_t hex = 0) noexcept : hex(hex) {}
+	constexpr operator uint64_t&() noexcept { return hex; }
+	constexpr operator uint64_t() const noexcept { return hex; }
+	class list;
+	class cell {
+	friend class hexadeca;
+	friend class list;
+	public:
+		constexpr cell() noexcept = delete;
+		constexpr cell(const cell& c) noexcept = default;
+		constexpr operator uint32_t() const noexcept { return (ref >> (idx << 2)) & 0x0f; }
+		constexpr cell& operator =(uint32_t val) noexcept { ref = (ref & ~(0x0full << (idx << 2))) | ((val & 0x0full) << (idx << 2)); return *this; }
+		constexpr cell& operator =(const cell& c) noexcept { return operator =(uint32_t(c)); }
+	private:
+		constexpr cell(uint64_t& ref, uint32_t idx) noexcept : ref(ref), idx(idx) {}
+		uint64_t& ref;
+		uint32_t idx;
+	};
+	constexpr cell operator [](uint32_t idx) const noexcept { return cell(const_cast<uint64_t&>(hex), idx); }
+private:
+	uint64_t hex;
+};
+
+class hexadeca::list : public hexadeca {
+friend class hexadeca;
+public:
+	constexpr list(uint64_t hex = 0, uint32_t len = 0) noexcept : hexadeca(hex), len(len) {}
+	constexpr list(const hexadeca& hexa) noexcept : hexadeca(hexa), len(16) {}
+	constexpr list(const list& hexa) = default;
+	constexpr cell at(uint32_t i) const noexcept { return hexadeca::operator [](i); }
+	constexpr size_t size() const { return len; }
+	constexpr size_t capacity() const noexcept { return 16ull; }
+	constexpr size_t max_size() const noexcept { return 16ull; }
+	constexpr bool empty() const noexcept { return size() == 0; }
+	constexpr void clear() { hexadeca::operator =(0); len = 0; }
+	constexpr cell front() const noexcept { return hexadeca::operator [](0); }
+	constexpr cell back() const noexcept { return hexadeca::operator [](len - 1); }
+	constexpr void push_front(uint32_t v) { hexadeca::operator =((uint64_t(*this) << 4) | (v & 0x0f)); len++; }
+	constexpr void push_back(uint32_t v) { hexadeca::operator [](len++) = v; }
+	constexpr void pop_front() { hexadeca::operator =(uint64_t(*this) >> 4); len--; }
+	constexpr void pop_back() { len--; }
+	moporgic::list<cell> make() const {
+		cell* buf = (cell*) malloc(sizeof(cell) * len);
+		uint64_t& ref = const_cast<hexadeca::list&>(*this);
+		for (uint32_t idx = 0; idx < len; idx++) new (buf + idx) cell(ref, idx);
+		clip<cell> res(buf, buf + len);
+		return std::move(moporgic::list<cell>::as(res));
+	}
+private:
+	uint32_t len;
+};
+
+typedef hexadeca hex;
+typedef hexadeca::list hexa;
+
+template<typename type,
+	template<typename...> class list = moporgic::list,
+	template<typename...> class alloc = std::allocator,
+	bool bchk = false>
+class segment {
+public:
+	constexpr
+	segment() noexcept {}
+	segment(const segment& seg) = delete;
+	segment(segment&& seg) noexcept : free(std::move(seg.free)) {}
+
+	type* allocate(size_t num) {
+		for (auto it = free.begin(); it != free.end(); it++) {
+			if (it->size() >= num) {
+				type* buf = it->begin(it->begin() + num);
+				if (it->empty()) free.erase(it);
+				return buf;
+			}
+		}
+		return nullptr;
+	}
+
+	void deallocate(type* buf, size_t num) {
+		clip<type> tok(buf, buf + num);
+		auto it = std::lower_bound(free.begin(), free.end(), tok);
+		auto pt = std::prev(it);
+
+		if (bchk && it != free.begin()) {
+			tok.begin(std::max(tok.begin(), pt->end()));
+			tok.end(std::max(tok.end(), pt->end()));
+		}
+		if (bchk && it != free.end()) {
+			tok.end(std::min(tok.end(), it->begin()));
+		}
+
+		if (it != free.begin() && pt->end() == tok.begin()) {
+			if (it != free.end() && tok.end() == it->begin()) {
+				it->begin(pt->begin());
+				it = free.erase(pt);
+			} else {
+				pt->end(tok.end());
+			}
+		} else {
+			if (it != free.end() && tok.end() == it->begin()) {
+				it->begin(tok.begin());
+			} else {
+				it = free.insert(it, tok);
+			}
+		}
+	}
+
+private:
+	list<clip<type>, alloc<clip<type>>> free;
 };
 
 } /* namespace moporgic */
