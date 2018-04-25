@@ -195,11 +195,11 @@ public:
 	inline board(u64 raw, u16 ext) : board(raw, u32(ext) << 16) {}
 	inline board(const board& b) = default;
 	inline ~board() = default;
-	inline board& operator =(u64 raw) { this->raw = raw; return *this; }
+	inline board& operator =(u64 raw) { this->raw = raw; this->ext = 0; return *this; }
 	inline board& operator =(const board& b) = default;
 
+	inline operator u64&() { return raw; }
 	inline operator u64() const { return raw; }
-	inline operator bool() const { return raw | ext; }
 	declare_comparators_with(const board&, raw_cast<u128>(*this), raw_cast<u128>(v))
 
 	inline const cache& query(u32 r) const { return query16(r); }
