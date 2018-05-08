@@ -458,8 +458,7 @@ protected:
 template<typename type, typename alloc = std::allocator<type>>
 class list : public clip<type> {
 public:
-	constexpr
-	list() noexcept : clip<type>() {}
+	constexpr list() noexcept : clip<type>() {}
 	list(const clip<type>& c) : list(c.begin(), c.end()) {}
 	list(const list<type>& l) : list(l.begin(), l.end()) {}
 	list(list<type>&& l) noexcept : list() { clip<type>::swap(l); }
@@ -514,10 +513,8 @@ public:
 	list<type>& operator=(const list<type>& l) { assign(l.cbegin(), l.cend()); return *this; }
 	list<type>& operator=(list<type>&& l) { clip<type>::swap(l); return *this; }
 public:
-	static constexpr
-	list<type>& as(clip<type>& c) noexcept { return raw_cast<list<type>>(c); }
-	static constexpr
-	const list<type>& as(const clip<type>& c) noexcept { return raw_cast<list<type>>(c); }
+	static constexpr list<type>& as(clip<type>& c) noexcept { return raw_cast<list<type>>(c); }
+	static constexpr const list<type>& as(const clip<type>& c) noexcept { return raw_cast<list<type>>(c); }
 protected:
 	void set(type* first, type* last) {
 		for (type* it = clip<type>::begin(); it != clip<type>::end(); it++) it->~type();
@@ -528,60 +525,80 @@ protected:
 
 class hexadeca {
 public:
-	constexpr hexadeca(uint64_t hex = 0) noexcept : hex(hex) {}
-	constexpr operator uint64_t&() noexcept { return hex; }
-	constexpr operator uint64_t() const noexcept { return hex; }
-	class list;
+	constexpr hexadeca(u64 hex = 0) noexcept : hex(hex) {}
+	constexpr operator u64&() noexcept { return hex; }
+	constexpr operator u64() const noexcept { return hex; }
+	constexpr static hexadeca& as(u64& hex) noexcept { return raw_cast<hexadeca>(hex); }
+public:
+	class dual;
 	class cell {
-	friend class hexadeca;
-	friend class list;
+		friend class hexadeca;
+		friend class hexadeca::dual;
 	public:
 		constexpr cell() noexcept = delete;
 		constexpr cell(const cell& c) noexcept = default;
-		constexpr operator uint32_t() const noexcept { return (ref >> (idx << 2)) & 0x0f; }
-		constexpr cell& operator =(uint32_t val) noexcept { ref = (ref & ~(0x0full << (idx << 2))) | ((val & 0x0full) << (idx << 2)); return *this; }
-		constexpr cell& operator =(const cell& c) noexcept { return operator =(uint32_t(c)); }
-	private:
-		constexpr cell(uint64_t& ref, uint32_t idx) noexcept : ref(ref), idx(idx) {}
-		uint64_t& ref;
-		uint32_t idx;
+		constexpr operator u32() const noexcept { return (ref >> (idx << 2)) & 0x0f; }
+		constexpr cell& operator =(u32 val) noexcept { ref = (ref & ~(0x0full << (idx << 2))) | ((val & 0x0full) << (idx << 2)); return *this; }
+		constexpr cell& operator =(const cell& c) noexcept { return operator =(u32(c)); }
+		constexpr cell& operator +=(u32 val) noexcept { return operator =(operator u32() + val); }
+		constexpr cell& operator -=(u32 val) noexcept { return operator =(operator u32() - val); }
+		constexpr cell& operator ++() noexcept { return operator +=(1); }
+		constexpr cell& operator --() noexcept { return operator -=(1); }
+		constexpr u32 operator ++(int) noexcept { u32 v = operator u32(); operator ++(); return v; }
+		constexpr u32 operator --(int) noexcept { u32 v = operator u32(); operator --(); return v; }
+	protected:
+		constexpr cell(u64& ref, u32 idx) noexcept : ref(ref), idx(idx) {}
+		u64& ref;
+		u32 idx;
 	};
-	constexpr cell operator [](uint32_t idx) const noexcept { return cell(const_cast<uint64_t&>(hex), idx); }
-private:
-	uint64_t hex;
+public:
+	constexpr cell operator [](u32 idx) const noexcept { return cell(const_cast<u64&>(hex), idx); }
+	constexpr cell at(u32 idx) const noexcept { return operator [](idx); }
+	constexpr size_t size() const noexcept { return at(15); }
+	constexpr void resize(u32 len) noexcept { hex &= (len ? -1ull >> ((16 - len) << 2) : 0); at(15) = len; }
+	constexpr size_t capacity() const noexcept { return 15; }
+	constexpr size_t max_size() const noexcept { return 16; }
+	constexpr bool empty() const noexcept { return size() == 0; }
+	constexpr void clear() { hex = 0; }
+	constexpr cell front() const noexcept { return at(0); }
+	constexpr cell back() const noexcept { return at(size() - 1); }
+	constexpr void push_front(u32 v) noexcept { u32 n = size(); hex <<= 4; at(0) = v; resize(n + 1); }
+	constexpr void push_back(u32 v) noexcept { at(size()) = v; resize(size() + 1); }
+	constexpr void pop_front() noexcept { u32 n = size(); hex >>= 4; resize(n - 1); }
+	constexpr void pop_back() noexcept { resize(size() - 1); }
+protected:
+	u64 hex;
 };
 
-class hexadeca::list : public hexadeca {
+class hexadeca::dual : public hexadeca {
 friend class hexadeca;
 public:
-	constexpr list(uint64_t hex = 0, uint32_t len = 0) noexcept : hexadeca(hex), len(len) {}
-	constexpr list(const hexadeca& hexa) noexcept : hexadeca(hexa), len(16) {}
-	constexpr list(const list& hexa) = default;
-	constexpr cell at(uint32_t i) const noexcept { return hexadeca::operator [](i); }
-	constexpr size_t size() const { return len; }
-	constexpr size_t capacity() const noexcept { return 16ull; }
-	constexpr size_t max_size() const noexcept { return 16ull; }
-	constexpr bool empty() const noexcept { return size() == 0; }
-	constexpr void clear() { hexadeca::operator =(0); len = 0; }
-	constexpr cell front() const noexcept { return hexadeca::operator [](0); }
-	constexpr cell back() const noexcept { return hexadeca::operator [](len - 1); }
-	constexpr void push_front(uint32_t v) { hexadeca::operator =((uint64_t(*this) << 4) | (v & 0x0f)); len++; }
-	constexpr void push_back(uint32_t v) { hexadeca::operator [](len++) = v; }
-	constexpr void pop_front() { hexadeca::operator =(uint64_t(*this) >> 4); len--; }
-	constexpr void pop_back() { len--; }
-	moporgic::list<cell> make() const {
-		cell* buf = (cell*) malloc(sizeof(cell) * len);
-		uint64_t& ref = const_cast<hexadeca::list&>(*this);
-		for (uint32_t idx = 0; idx < len; idx++) new (buf + idx) cell(ref, idx);
-		clip<cell> res(buf, buf + len);
-		return std::move(moporgic::list<cell>::as(res));
+	constexpr dual(u64 hex = 0, u64 ext = 0) noexcept : hexadeca(hex), ext(ext) {}
+public:
+	constexpr cell operator [](u32 idx) const noexcept { return cell(cast<u64*>(this)[idx >> 4], idx); }
+	constexpr cell at(u32 idx) const noexcept { return operator [](idx); }
+	constexpr size_t size() const noexcept { return raw_cast<u8, 7>(ext); }
+	constexpr void resize(u32 len) noexcept {
+		if (len > 16) ext &= (-1ull >> ((16 - (len - 16)) << 2));
+		else ext = 0, hex &= (len ? -1ull >> ((16 - len) << 2) : 0);
+		raw_cast<u8, 7>(ext) = len;
 	}
-private:
-	uint32_t len;
+	constexpr size_t capacity() const noexcept { return 30; }
+	constexpr size_t max_size() const noexcept { return 32; }
+	constexpr bool empty() const noexcept { return size() == 0; }
+	constexpr void clear() { hex = ext = 0; }
+	constexpr cell front() const noexcept { return at(0); }
+	constexpr cell back() const noexcept { return at(size() - 1); }
+	constexpr void push_front(u32 v) noexcept { u32 n = size(); ext <<= 4; at(16) = at(15); hex <<= 4; at(0) = v; resize(n + 1); }
+	constexpr void push_back(u32 v) noexcept { at(size()) = v; resize(size() + 1); }
+	constexpr void pop_front() noexcept { u32 n = size(); hex >>= 4; at(15) = at(16); ext >>= 4; resize(n - 1); }
+	constexpr void pop_back() noexcept { resize(size() - 1); }
+protected:
+	u64 ext;
 };
 
 typedef hexadeca hex;
-typedef hexadeca::list hexa;
+typedef hexadeca::dual hexa;
 
 template<typename type,
 	template<typename...> class list = moporgic::list,
@@ -589,8 +606,7 @@ template<typename type,
 	bool bchk = false>
 class segment {
 public:
-	constexpr
-	segment() noexcept {}
+	constexpr segment() noexcept {}
 	segment(const segment& seg) = delete;
 	segment(segment&& seg) noexcept : free(std::move(seg.free)) {}
 

@@ -25,6 +25,56 @@
 #define noexcept
 #endif
 
+#define VA_ARG_1(V, ...) V
+#define VA_ARG_2(V, ...) VA_ARG_1(__VA_ARGS__)
+#define VA_ARG_3(V, ...) VA_ARG_2(__VA_ARGS__)
+#define VA_ARG_4(V, ...) VA_ARG_3(__VA_ARGS__)
+#define VA_ARG_5(V, ...) VA_ARG_4(__VA_ARGS__)
+#define VA_ARG_6(V, ...) VA_ARG_5(__VA_ARGS__)
+#define VA_ARG_7(V, ...) VA_ARG_6(__VA_ARGS__)
+#define VA_ARG_8(V, ...) VA_ARG_7(__VA_ARGS__)
+#define VA_ARG_9(V, ...) VA_ARG_8(__VA_ARGS__)
+#define VA_PASS(...) __VA_ARGS__
+
+
+#define declare_alias_spec(alias, name, head, tail, ...)\
+template <typename... types> VA_PASS(head inline) \
+auto alias(types&&... args) VA_PASS(tail -> decltype(name(std::forward<types>(args)...)))\
+{ return name(std::forward<types>(args)...); }
+#define declare_alias(alias, name, ...)\
+declare_alias_spec(alias, name, __VA_ARGS__,)
+
+
+#define declare_comparators_rel(type, ...)\
+VA_PASS(__VA_ARGS__ bool operator) !=(type v) const { return !(*this == v); }\
+VA_PASS(__VA_ARGS__ bool operator) > (type v) const { return  (v < *this); }\
+VA_PASS(__VA_ARGS__ bool operator) <=(type v) const { return !(v < *this); }\
+VA_PASS(__VA_ARGS__ bool operator) >=(type v) const { return !(*this < v); }
+
+#define declare_comparators_with(type, lhs, rhs, ...)\
+VA_PASS(__VA_ARGS__ bool operator) ==(type v) const { return lhs == rhs; }\
+VA_PASS(__VA_ARGS__ bool operator) < (type v) const { return lhs <  rhs; }\
+declare_comparators_rel(type, __VA_ARGS__)
+
+#define declare_comparators(type, cmp, ...)\
+declare_comparators_with(type, cmp, v.cmp, __VA_ARGS__)
+
+
+#define declare_extern_comparators_rel(ltype, rtype, ...)\
+VA_PASS(__VA_ARGS__ inline bool operator) !=(ltype lv, rtype rv) { return !(lv == rv); }\
+VA_PASS(__VA_ARGS__ inline bool operator) > (ltype lv, rtype rv) { return  (rv < lv); }\
+VA_PASS(__VA_ARGS__ inline bool operator) <=(ltype lv, rtype rv) { return !(rv < lv); }\
+VA_PASS(__VA_ARGS__ inline bool operator) >=(ltype lv, rtype rv) { return !(lv < rv); }
+
+#define declare_extern_comparators_with(ltype, rtype, lhs, rhs, ...)\
+VA_PASS(__VA_ARGS__ inline bool operator) ==(ltype lv, rtype rv) { return lhs == rhs; }\
+VA_PASS(__VA_ARGS__ inline bool operator) < (ltype lv, rtype rv) { return lhs <  rhs; }\
+declare_extern_comparators_rel(ltype, rtype, __VA_ARGS__)
+
+#define declare_extern_comparators(ltype, rtype, cmp, ...)\
+declare_extern_comparators_with(ltype, rtype, lv.cmp, rv.cmp, __VA_ARGS__)
+
+
 namespace moporgic {
 
 static inline uint64_t millisec() {
@@ -149,25 +199,6 @@ unsigned long long rdtsc() {
     return -1;
 #endif
 }
-
-#define declare_alias(alias, name, ...)\
-template <typename... types>\
-inline auto alias(types&&... args) __VA_ARGS__ -> decltype(name(std::forward<types>(args)...))\
-{ return name(std::forward<types>(args)...); }
-
-#define declare_comparators_rel(type)\
-bool operator !=(type v) const { return !(*this == v); }\
-bool operator > (type v) const { return v < *this; }\
-bool operator <=(type v) const { return !(v < *this); }\
-bool operator >=(type v) const { return !(*this < v); }
-
-#define declare_comparators_with(type, lhs, rhs)\
-bool operator ==(type v) const { return lhs == rhs; }\
-bool operator < (type v) const { return lhs < rhs; }\
-declare_comparators_rel(type)
-
-#define declare_comparators(type, cmp)\
-declare_comparators_with(type, cmp, v.cmp)
 
 } /* moporgic */
 
