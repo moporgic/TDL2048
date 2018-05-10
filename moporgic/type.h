@@ -542,6 +542,11 @@ public:
 		constexpr cell& operator =(const cell& c) noexcept { return operator =(u32(c)); }
 		constexpr cell& operator +=(u32 val) noexcept { return operator =(operator u32() + val); }
 		constexpr cell& operator -=(u32 val) noexcept { return operator =(operator u32() - val); }
+		constexpr cell& operator *=(u32 val) noexcept { return operator =(operator u32() * val); }
+		constexpr cell& operator /=(u32 val) noexcept { return operator =(operator u32() / val); }
+		constexpr cell& operator &=(u32 val) noexcept { return operator =(operator u32() & val); }
+		constexpr cell& operator |=(u32 val) noexcept { return operator =(operator u32() | val); }
+		constexpr cell& operator ^=(u32 val) noexcept { return operator =(operator u32() ^ val); }
 		constexpr cell& operator ++() noexcept { return operator +=(1); }
 		constexpr cell& operator --() noexcept { return operator -=(1); }
 		constexpr u32 operator ++(int) noexcept { u32 v = operator u32(); operator ++(); return v; }

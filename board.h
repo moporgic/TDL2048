@@ -119,16 +119,14 @@ public:
 			move& operator =(const move& op) = default;
 		};
 
-		typedef std::array<u16, 32> info;
 		u32 raw; // base row (16-bit raw)
 		u32 ext; // base row (4-bit extra)
 		u32 species; // species of this row
 		u32 merge; // number of merged tiles
 		move left; // left operation
 		move right; // right operation
-		info numof; // number of each tile-type
-		info mask; // mask of each tile-type
-		hex num; // number of 0~f tile-type
+		hexa numof; // number of each tile-type
+		hexa mask; // mask of each tile-type
 		hexa layout; // layout of board-type
 		i32 moved; // moved or not
 		u32 legal; // legal actions
@@ -144,15 +142,13 @@ public:
 			move right = move::make(r, true);
 
 			u32 species = 0;
-			info numof = {};
-			info mask = {};
-			hex num;
+			hexa numof = {};
+			hexa mask = {};
 			for (int i = 0; i < 4; i++) {
 				u32 tile = ((r >> (i << 2)) & 0x0f) | ((r >> (12 + i)) & 0x10);
 				species |= (1 << tile);
-				numof[tile]++;
+				numof[tile] += 1;
 				mask[tile] |= (1 << i);
-				num[tile] = num[tile] + 1;
 			}
 
 			hexa layout;
@@ -167,15 +163,15 @@ public:
 			if (left.moved == 0)  legal |= (0x08 | 0x01);
 			if (right.moved == 0) legal |= (0x02 | 0x04);
 
-			return cache(raw, ext, species, merge, left, right, numof, mask, num, layout, moved, legal);
+			return cache(raw, ext, species, merge, left, right, numof, mask, layout, moved, legal);
 		}
 
 	private:
 		cache(u32 raw, u32 ext, u32 species, u32 merge, move left, move right,
-			  info numof, info mask, hex num, hexa layout, i32 moved, u32 legal)
+			  hexa numof, hexa mask, hexa layout, i32 moved, u32 legal)
 		: raw(raw), ext(ext), species(species), merge(merge), left(left), right(right),
-		  numof(numof), mask(mask), num(num), layout(layout), moved(moved), legal(legal) {}
-		cache() : cache(0, 0, 0, 0, {}, {}, {}, {}, {}, {}, -1, 0) {
+		  numof(numof), mask(mask), layout(layout), moved(moved), legal(legal) {}
+		cache() : cache(0, 0, 0, 0, {}, {}, {}, {}, {}, -1, 0) {
 			static u32 seq = 0;
 			operator =(make(seq++));
 		}
@@ -324,12 +320,12 @@ public:
 	inline void next() { return next64(); }
 	inline void next64() {
 		hexa empty = spaces64();
-		u32 p = empty[std::rand() % empty.size()];
+		u32 p = hex::as(empty)[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
 	inline void next80() {
 		hexa empty = spaces80();
-		u32 p = empty[std::rand() % empty.size()];
+		u32 p = hex::as(empty)[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
 
@@ -337,14 +333,14 @@ public:
 	inline bool popup64() {
 		hexa empty = spaces64();
 		if (empty.size() == 0) return false;
-		u32 p = empty[std::rand() % empty.size()];
+		u32 p = hex::as(empty)[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
 	inline bool popup80() {
 		hexa empty = spaces80();
 		if (empty.size() == 0) return false;
-		u32 p = empty[std::rand() % empty.size()];
+		u32 p = hex::as(empty)[std::rand() % empty.size()];
 		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
@@ -623,7 +619,7 @@ public:
 	inline u32 max80() const { return math::log2(scale80()); }
 
 	inline hex numof() const {
-		return query(0).num + query(1).num + query(2).num + query(3).num;
+		return query(0).numof + query(1).numof + query(2).numof + query(3).numof;
 	}
 
 	inline u32 numof(u32 t) const { return numof64(t); }
@@ -636,19 +632,19 @@ public:
 
 	inline void numof(u32 num[], u32 min, u32 max) const { return numof64(num, min, max); }
 	inline void numof64(u32 num[], u32 min, u32 max) const {
-		const cache::info& numof0 = query16(0).numof;
-		const cache::info& numof1 = query16(1).numof;
-		const cache::info& numof2 = query16(2).numof;
-		const cache::info& numof3 = query16(3).numof;
+		hexa numof0 = query16(0).numof;
+		hexa numof1 = query16(1).numof;
+		hexa numof2 = query16(2).numof;
+		hexa numof3 = query16(3).numof;
 		for (u32 i = min; i < max; i++) {
 			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 		}
 	}
 	inline void numof80(u32 num[], u32 min, u32 max) const {
-		const cache::info& numof0 = query20(0).numof;
-		const cache::info& numof1 = query20(1).numof;
-		const cache::info& numof2 = query20(2).numof;
-		const cache::info& numof3 = query20(3).numof;
+		hexa numof0 = query20(0).numof;
+		hexa numof1 = query20(1).numof;
+		hexa numof2 = query20(2).numof;
+		hexa numof3 = query20(3).numof;
 		for (u32 i = min; i < max; i++) {
 			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 		}
@@ -690,19 +686,19 @@ public:
 
 	inline void mask(u32 msk[], u32 min, u32 max) const { return mask64(msk, min, max); }
 	inline void mask64(u32 msk[], u32 min, u32 max) const {
-		const cache::info& mask0 = query16(0).mask;
-		const cache::info& mask1 = query16(1).mask;
-		const cache::info& mask2 = query16(2).mask;
-		const cache::info& mask3 = query16(3).mask;
+		hexa mask0 = query16(0).mask;
+		hexa mask1 = query16(1).mask;
+		hexa mask2 = query16(2).mask;
+		hexa mask3 = query16(3).mask;
 		for (u32 i = min; i < max; i++) {
 			msk[i] = (mask0[i] << 0) | (mask1[i] << 4) | (mask2[i] << 8) | (mask3[i] << 12);
 		}
 	}
 	inline void mask80(u32 msk[], u32 min, u32 max) const {
-		const cache::info& mask0 = query20(0).mask;
-		const cache::info& mask1 = query20(1).mask;
-		const cache::info& mask2 = query20(2).mask;
-		const cache::info& mask3 = query20(3).mask;
+		hexa mask0 = query20(0).mask;
+		hexa mask1 = query20(1).mask;
+		hexa mask2 = query20(2).mask;
+		hexa mask3 = query20(3).mask;
 		for (u32 i = min; i < max; i++) {
 			msk[i] = (mask0[i] << 0) | (mask1[i] << 4) | (mask2[i] << 8) | (mask3[i] << 12);
 		}
@@ -766,8 +762,8 @@ public:
 		return (hori & 0x0a) | (vert & 0x05);
 	}
 
-	inline hexa actions() const { return actions64(); }
-	inline hexa actions64() const {
+	inline hex actions() const { return actions64(); }
+	inline hex actions64() const {
 		u32 o = operations64();
 		u32 k = 0, x = 0;
 		u32 u = o & 1;
@@ -782,9 +778,10 @@ public:
 		u32 l = o & 8;
 		k |= (l ? 3 : 0) << x;
 		x += (l >> 1);
-		return { k, x >> 2 };
+		hex a(k); a.resize(x >> 2);
+		return a;
 	}
-	inline hexa actions80() const {
+	inline hex actions80() const {
 		u32 o = operations80();
 		u32 k = 0, x = 0;
 		u32 u = o & 1;
@@ -799,7 +796,8 @@ public:
 		u32 l = o & 8;
 		k |= (l ? 3 : 0) << x;
 		x += (l >> 1);
-		return { k, x >> 2 };
+		hex a(k); a.resize(x >> 2);
+		return a;
 	}
 
 	inline bool operable() const { return operable64(); }
