@@ -279,11 +279,10 @@ public:
 		x |= (x >> 2);
 		x |= (x >> 1);
 		x = ~x & 0x1111111111111111ULL;
-		x += x >> 32;
-		x += x >> 16;
-		x += x >> 8;
-		x += x >> 4;
-		return x & 0xf;
+		register u32 e = x + (x >> 32);
+		e += e >> 16;
+		e += e >> 8;
+		return (e & 0x0f) + ((e >> 4) & 0x0f);
 	}
 	inline u32 empty80() const {
 		register u64 x = raw;
@@ -296,11 +295,10 @@ public:
 		k = ((k & 0x000c000c000c000cULL) << 6) | (k & 0x0003000300030003ULL);
 		k = ((k & 0x0202020202020202ULL) << 3) | (k & 0x0101010101010101ULL);
 		x &= ~k & 0x1111111111111111ULL;
-		x += x >> 32;
-		x += x >> 16;
-		x += x >> 8;
-		x += x >> 4;
-		return x & 0xf;
+		register u32 e = x + (x >> 32);
+		e += e >> 16;
+		e += e >> 8;
+		return (e & 0x0f) + ((e >> 4) & 0x0f);
 	}
 
 	inline hexa spaces() const { return spaces64(); }
