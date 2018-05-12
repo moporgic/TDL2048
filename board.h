@@ -830,17 +830,13 @@ public:
 
 	class tile {
 	friend class board;
-	private:
-		inline tile(const board& b, u32 i) : b(const_cast<board&>(b)), i(i) {}
 	public:
 		inline tile(const tile& t) = default;
 		inline tile() = delete;
 		inline board& whole() const { return b; }
 		inline u32 where() const { return i; }
-
 		inline operator u32() const { return at(is(style::extend), is(style::exact)); }
 		inline tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
-		declare_comparators_with(u32, operator u32(), v);
 	public:
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
 			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
@@ -852,28 +848,11 @@ public:
 				t.set(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return in;
 		}
-	public:
-		typedef std::ptrdiff_t difference_type;
-		typedef u32 value_type;
-		typedef tile& reference;
-		typedef tile pointer;
-		typedef std::forward_iterator_tag iterator_category;
-		tile& operator *() { return *this; }
-		const tile& operator *() const { return *this; }
-		tile  operator->() const { return *this; }
-		bool  operator==(const tile& t) const { return ((b == t.b) & (i == t.i)); }
-		bool  operator!=(const tile& t) const { return ((b != t.b) | (i != t.i)); }
-		bool  operator< (const tile& t) const { return ((b == t.b) & (i < t.i)) | (b < t.b); }
-		tile& operator++() { ++i; return *this; }
-		tile& operator--() { --i; return *this; }
-		tile  operator++(int) { return tile(b, ++i - 1); }
-		tile  operator--(int) { return tile(b, --i + 1); }
-	private:
+	protected:
+		inline tile(const board& b, u32 i) : b(const_cast<board&>(b)), i(i) {}
 		board& b;
 		u32 i;
-
 		bool is(u32 item) const { return b.inf & item; }
-
 		u32 at(bool extend, bool exact) const {
 			u32 v = extend ? b.at5(i) : b.at4(i);
 			return exact ? (1 << v) & -2u : v;
@@ -883,9 +862,37 @@ public:
 			if (extend) b.set5(i, v); else b.set4(i, v);
 		}
 	};
+	class iter : tile {
+	friend class board;
+	public:
+		typedef u32 value_type;
+		typedef i32 difference_type;
+		typedef tile& reference;
+		typedef iter pointer;
+		typedef std::forward_iterator_tag iterator_category;
+		inline iter(const iter& t) = default;
+		inline iter() = delete;
+		tile& operator *() { return *this; }
+		const tile& operator *() const { return *this; }
+		tile  operator ->() const { return *this; }
+		bool  operator ==(const iter& t) const { return ((b == t.b) & (i == t.i)); }
+		bool  operator !=(const iter& t) const { return ((b != t.b) | (i != t.i)); }
+		bool  operator < (const iter& t) const { return ((b == t.b) & (i < t.i)) | (b < t.b); }
+		i32   operator - (const iter& t) const { return i32(i) - i32(t.i); }
+		iter  operator + (u32 n) const { return iter(b, i + n); }
+		iter  operator - (u32 n) const { return iter(b, i - n); }
+		iter& operator +=(u32 n) { i += n; return *this; }
+		iter& operator -=(u32 n) { i -= n; return *this; }
+		iter& operator ++() { i += 1; return *this; }
+		iter& operator --() { i -= 1; return *this; }
+		iter  operator ++(int) { return iter(b, ++i - 1); }
+		iter  operator --(int) { return iter(b, --i + 1); }
+	protected:
+		inline iter(const board& b, u32 i) : tile(b, i) {};
+	};
 	inline tile operator [](u32 i) const { return tile(*this, i); }
-	inline tile begin() const { return operator [](0); }
-	inline tile end() const { return operator [](16); }
+	inline iter begin() const { return iter(*this, 0); }
+	inline iter end() const { return iter(*this, 16); }
 
 	class style {
 	public:
