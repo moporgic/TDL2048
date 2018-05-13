@@ -383,14 +383,12 @@ std::istream& read_cast(std::istream& in, const type* begin, const type* end, co
 
 namespace moporgic {
 
-static void __util_init__(void) __attribute__((constructor));
-static void __util_exit__(void) __attribute__((destructor));
-
-void __util_init__() {
+__attribute__((constructor))
+static void __util_init__(void) {
 	moporgic::random::init();
 }
-void __util_exit__() {
 
-}
+__attribute__((destructor))
+static void __util_exit__(void) {}
 
 } /* moporgic */
