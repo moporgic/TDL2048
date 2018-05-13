@@ -1998,7 +1998,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << std::endl;
 
-	std::srand(moporgic::to_hash(opts["seed"]));
+	moporgic::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
 
 	utils::make_indexers();

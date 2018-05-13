@@ -306,10 +306,11 @@ public:
 	inline hexa spaces80() const { return find80(0); }
 
 	inline void init() {
-		u32 k = std::rand();
+		u32 u = moporgic::rand();
+		u32 k = (u & 0xffff);
 		u32 i = (k) % 16;
 		u32 j = (i + 1 + (k >> 4) % 15) % 16;
-		u32 r = std::rand() % 100;
+		u32 r = (u >> 16) % 100;
 		raw =  (r >=  1 ? 1ULL : 2ULL) << (i << 2);
 		raw |= (r >= 19 ? 1ULL : 2ULL) << (j << 2);
 		ext = 0;
@@ -318,28 +319,32 @@ public:
 	inline void next() { return next64(); }
 	inline void next64() {
 		hexa empty = spaces64();
-		u32 p = hex::as(empty)[std::rand() % empty.size()];
-		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
+		u32 u = moporgic::rand();
+		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
+		raw |= (u % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
 	inline void next80() {
 		hexa empty = spaces80();
-		u32 p = hex::as(empty)[std::rand() % empty.size()];
-		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
+		u32 u = moporgic::rand();
+		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
+		raw |= (u % 10 ? 1ULL : 2ULL) << (p << 2);
 	}
 
 	inline bool popup() { return popup64(); }
 	inline bool popup64() {
 		hexa empty = spaces64();
 		if (empty.size() == 0) return false;
-		u32 p = hex::as(empty)[std::rand() % empty.size()];
-		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
+		u32 u = moporgic::rand();
+		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
+		raw |= (u % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
 	inline bool popup80() {
 		hexa empty = spaces80();
 		if (empty.size() == 0) return false;
-		u32 p = hex::as(empty)[std::rand() % empty.size()];
-		raw |= (std::rand() % 10 ? 1ULL : 2ULL) << (p << 2);
+		u32 u = moporgic::rand();
+		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
+		raw |= (u % 10 ? 1ULL : 2ULL) << (p << 2);
 		return true;
 	}
 
