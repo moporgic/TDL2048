@@ -1978,9 +1978,9 @@ numeric search_max(const board& before, const i32& depth,
 
 numeric search_expt(const board& after, const i32& depth,
 		const clip<feature>& range) {
-	if (depth <= 0) return utils::estimate(after, range);
 	auto& t = transposition::find(after);
 	if (t >= depth) return t;
+	if (depth <= 0) return t.save(utils::estimate(after, range), 0);
 	const auto spaces = after.spaces();
 	numeric expt = 0;
 	board before = after;
