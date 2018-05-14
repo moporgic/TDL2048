@@ -500,50 +500,6 @@ private:
 	u64 seedb;
 };
 
-class segment : public std::allocator<byte> {
-public:
-	typedef moporgic::clip<byte>  piece;
-	typedef moporgic::list<piece> plist;
-
-	segment() { free.emplace_back(cast<byte*>(-1ull), cast<byte*>(-1ull)); }
-	segment(const segment& seg) = delete;
-	segment(segment&& seg) : free(std::move(seg.free)) {}
-
-	byte* allocate(size_t space) {
-		for (auto it = free.begin(); it != free.end(); it++) {
-			if (it->size() >= space) {
-				byte* alloc = it->begin();
-				*it = { it->begin() + space, it->end() };
-				if (it->size() == 0) free.erase(it);
-				return alloc;
-			}
-		}
-		return nullptr;
-	}
-
-	byte* deallocate(byte* alloc, size_t space) {
-		piece tok(alloc, alloc + space);
-		auto it = std::lower_bound(free.begin(), free.end(), tok);
-		auto pt = std::prev(it);
-		if (it != free.begin() && pt->end() == tok.begin()) { // -=
-			*pt = { pt->begin(), pt->end() + tok.size() };
-			if (pt->end() == it->begin() && it->size()) { // -=-
-				*pt = { pt->begin(), pt->end() + it->size() };
-				tok = { tok.begin(), tok.end() + it->size() };
-				free.erase(it);
-			}
-		} else if (tok.end() == it->begin() && it->size()) { // =-
-			*it = { it->begin() - tok.size(), it->end() };
-		} else if (tok.size()) { // = -
-			free.insert(it, tok);
-		}
-		return tok.end();
-	}
-
-private:
-	plist free;
-};
-
 class transposition {
 public:
 	class position {
@@ -783,8 +739,8 @@ private:
 	inline position* mpool_alloc(size_t num) {
 		return cast<position*>(mpool.allocate(sizeof(position) * num));
 	}
-	inline position* mpool_free(position* pos, size_t now) {
-		return cast<position*>(mpool.deallocate(cast<byte*>(pos), sizeof(position) * now));
+	inline void mpool_free(position* pos, size_t now) {
+		mpool.deallocate(cast<byte*>(pos), sizeof(position) * now);
 	}
 	inline position* mpool_realloc(position* pos, size_t now) {
 		auto alloc = mpool_alloc(now + now);
@@ -854,7 +810,7 @@ private:
 private:
 	zhasher zhash;
 	position* cache;
-	segment mpool;
+	segment<byte> mpool;
 	size_t zsize;
 	size_t limit;
 	size_t zmask;
