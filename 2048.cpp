@@ -424,7 +424,7 @@ public:
 	}
 
 public:
-	inline u64 operator ()(const board& b, const bool& after = true) const {
+	inline u64 operator ()(const board& b, bool after = true) const {
 		register u64 hash = after ? seeda : seedb;
 		hash ^= zhash[0][b.fetch(0)];
 		hash ^= zhash[1][b.fetch(1)];
@@ -432,7 +432,7 @@ public:
 		hash ^= zhash[3][b.fetch(3)];
 		return hash;
 	}
-	inline u64 operator ()(const board::tile& t, const bool& after = true) const {
+	inline u64 operator ()(const board::tile& t, bool after = true) const {
 		return (after ? seeda : seedb) ^ ztile[t.where()][u32(t)];
 	}
 
@@ -510,20 +510,20 @@ public:
 		i16 depth;
 		u16 info;
 		position(const position& e) = default;
-		position(const u64& sign = 0) : sign(sign), esti(0), depth(-1), info(0) {}
+		position(u64 sign = 0) : sign(sign), esti(0), depth(-1), info(0) {}
 
 		operator numeric() const { return esti; }
 		operator bool()    const { return sign; }
-		bool operator ==(const u64& s) const { return sign == s; }
-		bool operator >=(const i32& d) const { return depth >= d; }
+		bool operator ==(u64 s) const { return sign == s; }
+		bool operator >=(i32 d) const { return depth >= d; }
 		declare_comparators(position, info);
 
-		position& save(const f32& e, const i32& d) {
+		position& save(f32 e, i32 d) {
 			esti = e;
 			depth = d;
 			return *this;
 		}
-		position& operator()(const u64& s) {
+		position& operator()(u64 s) {
 			if (sign != s) {
 				sign = s;
 				esti = 0;
@@ -729,7 +729,7 @@ public:
 	static inline position& remove(const board& b) { return find(b)(0); }
 
 private:
-	transposition(const size_t& len, const size_t& lim) : zsize(len), limit(lim), zmask(len - 1) {
+	transposition(size_t len, size_t lim) : zsize(len), limit(lim), zmask(len - 1) {
 		cache = zsize ? alloc(zsize) : nullptr;
 		mpool.deallocate(cast<byte*>(limit ? alloc(limit) : nullptr), sizeof(position) * limit);
 	}
@@ -1914,7 +1914,7 @@ inline numeric optimize(const board& state, numeric error, numeric alpha,
 	return esti;
 }
 
-void make_transposition(const std::string& res = "") {
+void make_transposition(std::string res = "") {
 	std::string in(res);
 	if (in.empty() && transposition::instance().size() == 0) in = "default";
 	if (in == "default") in = "2G+2G";
@@ -1949,7 +1949,7 @@ void make_transposition(const std::string& res = "") {
 		transposition::make(len, lim);
 	}
 }
-bool load_transposition(const std::string& path) {
+bool load_transposition(std::string path) {
 	std::ifstream in;
 	char buf[1 << 20];
 	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
@@ -1959,7 +1959,7 @@ bool load_transposition(const std::string& path) {
 	in.close();
 	return true;
 }
-bool save_transposition(const std::string& path) {
+bool save_transposition(std::string path) {
 	std::ofstream out;
 	char buf[1 << 20];
 	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
@@ -1971,12 +1971,12 @@ bool save_transposition(const std::string& path) {
 	return true;
 }
 
-numeric search_expt(const board& after, const i32& depth,
+numeric search_expt(const board& after, i32 depth,
 		const clip<feature>& range = feature::feats());
-numeric search_max(const board& before, const i32& depth,
+numeric search_max(const board& before, i32 depth,
 		const clip<feature>& range = feature::feats());
 
-numeric search_expt(const board& after, const i32& depth,
+numeric search_expt(const board& after, i32 depth,
 		const clip<feature>& range) {
 	auto& t = transposition::find(after);
 	if (t >= depth) return t;
@@ -1996,7 +1996,7 @@ numeric search_expt(const board& after, const i32& depth,
 	return t.save(esti, depth);
 }
 
-numeric search_max(const board& before, const i32& depth,
+numeric search_max(const board& before, i32 depth,
 		const clip<feature>& range) {
 	numeric expt = 0;
 	board after = before;
@@ -2057,7 +2057,7 @@ struct state {
 		esti = state::reward() + utils::optimize(move, accu - state::value(), alpha, range);
 		return esti;
 	}
-	inline numeric search(const i32& depth,
+	inline numeric search(i32 depth,
 			const clip<feature>& range = feature::feats()) {
 		if (score >= 0) {
 			esti = state::reward() + utils::search_expt(move, depth, range);
