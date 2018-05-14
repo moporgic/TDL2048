@@ -12,6 +12,7 @@
 #include <string>
 #include <cstdio>
 #include <iostream>
+#include <random>
 #include <utility>
 
 #ifndef DEBUG
@@ -24,6 +25,56 @@
 #define constexpr
 #define noexcept
 #endif
+
+#define VA_ARG_1(V, ...) V
+#define VA_ARG_2(V, ...) VA_ARG_1(__VA_ARGS__)
+#define VA_ARG_3(V, ...) VA_ARG_2(__VA_ARGS__)
+#define VA_ARG_4(V, ...) VA_ARG_3(__VA_ARGS__)
+#define VA_ARG_5(V, ...) VA_ARG_4(__VA_ARGS__)
+#define VA_ARG_6(V, ...) VA_ARG_5(__VA_ARGS__)
+#define VA_ARG_7(V, ...) VA_ARG_6(__VA_ARGS__)
+#define VA_ARG_8(V, ...) VA_ARG_7(__VA_ARGS__)
+#define VA_ARG_9(V, ...) VA_ARG_8(__VA_ARGS__)
+#define VA_PASS(...) __VA_ARGS__
+
+
+#define declare_alias_spec(alias, name, head, tail, ...)\
+template <typename... types> VA_PASS(head inline) \
+auto alias(types&&... args) VA_PASS(tail -> decltype(name(std::forward<types>(args)...)))\
+{ return name(std::forward<types>(args)...); }
+#define declare_alias(alias, name, ...)\
+declare_alias_spec(alias, name, __VA_ARGS__,)
+
+
+#define declare_comparators_rel(type, ...)\
+VA_PASS(__VA_ARGS__ bool operator) !=(type v) const { return !(*this == v); }\
+VA_PASS(__VA_ARGS__ bool operator) > (type v) const { return  (v < *this); }\
+VA_PASS(__VA_ARGS__ bool operator) <=(type v) const { return !(v < *this); }\
+VA_PASS(__VA_ARGS__ bool operator) >=(type v) const { return !(*this < v); }
+
+#define declare_comparators_with(type, lhs, rhs, ...)\
+VA_PASS(__VA_ARGS__ bool operator) ==(type v) const { return lhs == rhs; }\
+VA_PASS(__VA_ARGS__ bool operator) < (type v) const { return lhs <  rhs; }\
+declare_comparators_rel(type, __VA_ARGS__)
+
+#define declare_comparators(type, cmp, ...)\
+declare_comparators_with(type, cmp, v.cmp, __VA_ARGS__)
+
+
+#define declare_extern_comparators_rel(ltype, rtype, ...)\
+VA_PASS(__VA_ARGS__ inline bool operator) !=(ltype lv, rtype rv) { return !(lv == rv); }\
+VA_PASS(__VA_ARGS__ inline bool operator) > (ltype lv, rtype rv) { return  (rv < lv); }\
+VA_PASS(__VA_ARGS__ inline bool operator) <=(ltype lv, rtype rv) { return !(rv < lv); }\
+VA_PASS(__VA_ARGS__ inline bool operator) >=(ltype lv, rtype rv) { return !(lv < rv); }
+
+#define declare_extern_comparators_with(ltype, rtype, lhs, rhs, ...)\
+VA_PASS(__VA_ARGS__ inline bool operator) ==(ltype lv, rtype rv) { return lhs == rhs; }\
+VA_PASS(__VA_ARGS__ inline bool operator) < (ltype lv, rtype rv) { return lhs <  rhs; }\
+declare_extern_comparators_rel(ltype, rtype, __VA_ARGS__)
+
+#define declare_extern_comparators(ltype, rtype, cmp, ...)\
+declare_extern_comparators_with(ltype, rtype, lv.cmp, rv.cmp, __VA_ARGS__)
+
 
 namespace moporgic {
 
@@ -53,84 +104,49 @@ uint32_t to_hash(const std::string& str) noexcept {
 	return to_hash(str.c_str());
 }
 
-static inline
-uint32_t rand16() {
-#if RAND_MAX == 0x7fff
-    return (rand() << 1) | (rand() & 1);
-#else
-    return rand() & 0xffff;
-#endif
-}
+class random {
+public:
+	template<typename engine_t = std::mt19937>
+	inline operator uint16_t() const { return (*engine<engine_t>())(); }
+	template<typename engine_t = std::mt19937>
+	inline operator uint32_t() const { return (*engine<engine_t>())(); }
+	template<typename engine_t = std::mt19937_64>
+	inline operator uint64_t() const { return (*engine<engine_t>())(); }
+	template<typename engine_t = std::mt19937>
+	inline operator float() const { return std::uniform_real_distribution<float>(0.0f, 1.0f)(*engine<engine_t>()); }
+	template<typename engine_t = std::mt19937_64>
+	inline operator double() const { return std::uniform_real_distribution<double>(0.0, 1.0)(*engine<engine_t>()); }
 
-static inline
-uint32_t rand32() {
-#if   RAND_MAX == 0x7fffffff
-	return (rand() << 1) | (rand() & 1);
-#elif RAND_MAX == 0x7fff
-    return (rand() << 17) | (rand() << 2) | (rand() & 3);
-#else
-    return (rand16() << 16) | rand16();
-#endif
-}
+	template<typename engine_t = std::mt19937>
+	static inline void init() {
+		engine<engine_t>(new engine_t(moporgic::to_hash("moporgic")));
+	}
+	template<typename engine_t = std::mt19937, typename seed_t = decltype(engine_t::default_seed)>
+	static inline void seed(seed_t seed = engine_t::default_seed) {
+		if (engine<engine_t>()) engine<engine_t>()->seed(seed);
+		else                    engine<engine_t>(new engine_t(seed));
+	}
+	template<typename engine_t = std::mt19937>
+	static inline auto next() { return (*engine<engine_t>())(); }
+protected:
+	template<typename engine_t>
+	inline static engine_t* engine(engine_t* e = nullptr) {
+		static engine_t* p = nullptr;
+		if (e) delete std::exchange(p, e);
+		return p;
+	}
+};
 
-static inline
-uint32_t rand31() {
-#if   RAND_MAX == 0x7fffffff
-	return rand();
-#elif RAND_MAX == 0x7fff
-	return (rand() << 16) | (rand() << 1) | (rand() & 1);
-#else
-	return rand32() & 0x7fffffff;
-#endif
-}
+static inline void srand(uint32_t seed) { random::seed(seed); }
+static inline uint32_t rand()   { return uint32_t(random()); }
 
-static inline
-uint64_t rand64() {
-#if   RAND_MAX == 0x7fffffff
-	return (static_cast<uint64_t>(rand()) << 33) | (static_cast<uint64_t>(rand()) << 2) | (static_cast<uint64_t>(rand()) & 3);
-#elif RAND_MAX == 0x7fff
-    return (static_cast<uint64_t>(rand()) << 49) | (static_cast<uint64_t>(rand()) << 34)
-    	 | (static_cast<uint64_t>(rand()) << 19) | (static_cast<uint64_t>(rand()) << 4) | (static_cast<uint64_t>(rand()) & 15);
-#else
-    return (rand32() << 32) | rand32();
-#endif
-}
-
-static inline
-uint64_t rand63() {
-	return rand64() & 0x7fffffffffffffffull;
-}
-
-static inline
-uint32_t rand24() {
-#if   RAND_MAX == 0x7fffffff
-	return rand() & 0x00ffffff;
-#elif RAND_MAX == 0x7fff
-    return (rand() << 9) | (rand() >> 6);
-#else
-    return (rand32()) & 0x00ffffff;
-#endif
-}
-
-#if RAND_MAX == 0x7fff
-#define RANDX_MAX 0x3fffffff
-#else
-#define RANDX_MAX RAND_MAX
-#endif
-
-static inline
-uint32_t randx() {
-#if RAND_MAX == 0x7fff
-    return (rand() << 15) | (rand());
-#else
-	return rand();
-#endif
-}
-
-static inline
-float random() {
-	return static_cast<float>(randx()) / static_cast<float>(RANDX_MAX);
-}
+static inline uint32_t rand16() { return uint32_t(random()) & 0xffffu; }
+static inline uint32_t rand32() { return uint32_t(random()); }
+static inline uint32_t rand31() { return uint32_t(random()) & 0x7fffffffu; }
+static inline uint64_t rand64() { return uint64_t(random()); }
+static inline uint64_t rand63() { return uint64_t(random()) & 0x7fffffffffffffffull; }
+static inline uint32_t rand24() { return uint32_t(random()) & 0x00ffffffu; }
+static inline uint32_t randx()  { return rand32(); }
 
 static inline
 unsigned long long rdtsc() {
@@ -149,25 +165,6 @@ unsigned long long rdtsc() {
     return -1;
 #endif
 }
-
-#define declare_alias(alias, name, ...)\
-template <typename... types>\
-inline auto alias(types&&... args) __VA_ARGS__ -> decltype(name(std::forward<types>(args)...))\
-{ return name(std::forward<types>(args)...); }
-
-#define declare_comparators_rel(type)\
-bool operator !=(type v) const { return !(*this == v); }\
-bool operator > (type v) const { return v < *this; }\
-bool operator <=(type v) const { return !(v < *this); }\
-bool operator >=(type v) const { return !(*this < v); }
-
-#define declare_comparators_with(type, lhs, rhs)\
-bool operator ==(type v) const { return lhs == rhs; }\
-bool operator < (type v) const { return lhs < rhs; }\
-declare_comparators_rel(type)
-
-#define declare_comparators(type, cmp)\
-declare_comparators_with(type, cmp, v.cmp)
 
 } /* moporgic */
 
@@ -381,5 +378,17 @@ std::istream& read_cast(std::istream& in, const type* begin, const type* end, co
 		read(in, buf, len);
 	return in;
 }
+
+} /* moporgic */
+
+namespace moporgic {
+
+__attribute__((constructor))
+static void __util_init__(void) {
+	moporgic::random::init();
+}
+
+__attribute__((destructor))
+static void __util_exit__(void) {}
 
 } /* moporgic */

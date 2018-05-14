@@ -1154,40 +1154,40 @@ u64 indexnum4(const board& b) { // 24-bit
 	index |= (num[0] + num[1] + num[2] + num[3]) << 0; // 0+2+4+8, 4-bit
 	index |= (num[4] + num[5] + num[6]) << 4; // 16+32+64, 4-bit
 	index |= (num[7] + num[8]) << 8; // 128+256, 4-bit
-	index |= std::min(num[9] + num[10], 7u) << 12; // 512+1024, 3-bit
-	index |= std::min(num[11], 3u) << 15; // 2048~16384, 2-bit ea.
-	index |= std::min(num[12], 3u) << 17;
-	index |= std::min(num[13], 3u) << 19;
-	index |= std::min(num[14], 3u) << 21;
-	index |= std::min(num[15], 1u) << 23; // 32768, 1-bit
+	index |= std::min(u32(num[9] + num[10]), 7u) << 12; // 512+1024, 3-bit
+	index |= std::min(u32(num[11]), 3u) << 15; // 2048~16384, 2-bit ea.
+	index |= std::min(u32(num[12]), 3u) << 17;
+	index |= std::min(u32(num[13]), 3u) << 19;
+	index |= std::min(u32(num[14]), 3u) << 21;
+	index |= std::min(u32(num[15]), 1u) << 23; // 32768, 1-bit
 	return index;
 }
 
 u64 indexnum5lt(const board& b) { // 24-bit
 	auto num = b.numof();
 	register u64 index = 0;
-	index |= std::min(num[8],  7u) <<  0; // 256, 3-bit
-	index |= std::min(num[9],  7u) <<  3; // 512, 3-bit
-	index |= std::min(num[10], 7u) <<  6; // 1024, 3-bit
-	index |= std::min(num[11], 7u) <<  9; // 2048, 3-bit
-	index |= std::min(num[12], 7u) << 12; // 4096, 3-bit
-	index |= std::min(num[13], 7u) << 15; // 8192, 3-bit
-	index |= std::min(num[14], 7u) << 18; // 16384, 3-bit
-	index |= std::min(num[15], 7u) << 21; // 32768, 3-bit
+	index |= std::min(u32(num[8]),  7u) <<  0; // 256, 3-bit
+	index |= std::min(u32(num[9]),  7u) <<  3; // 512, 3-bit
+	index |= std::min(u32(num[10]), 7u) <<  6; // 1024, 3-bit
+	index |= std::min(u32(num[11]), 7u) <<  9; // 2048, 3-bit
+	index |= std::min(u32(num[12]), 7u) << 12; // 4096, 3-bit
+	index |= std::min(u32(num[13]), 7u) << 15; // 8192, 3-bit
+	index |= std::min(u32(num[14]), 7u) << 18; // 16384, 3-bit
+	index |= std::min(u32(num[15]), 7u) << 21; // 32768, 3-bit
 	return index;
 }
 
 u64 indexnum5st(const board& b) { // 24-bit
 	auto num = b.numof();
 	register u64 index = 0;
-	index |= std::min(num[0], 7u) <<  0; // 0, 3-bit
-	index |= std::min(num[1], 7u) <<  3; // 2, 3-bit
-	index |= std::min(num[2], 7u) <<  6; // 4, 3-bit
-	index |= std::min(num[3], 7u) <<  9; // 8, 3-bit
-	index |= std::min(num[4], 7u) << 12; // 16, 3-bit
-	index |= std::min(num[5], 7u) << 15; // 32, 3-bit
-	index |= std::min(num[6], 7u) << 18; // 64, 3-bit
-	index |= std::min(num[7], 7u) << 21; // 128, 3-bit
+	index |= std::min(u32(num[0]), 7u) <<  0; // 0, 3-bit
+	index |= std::min(u32(num[1]), 7u) <<  3; // 2, 3-bit
+	index |= std::min(u32(num[2]), 7u) <<  6; // 4, 3-bit
+	index |= std::min(u32(num[3]), 7u) <<  9; // 8, 3-bit
+	index |= std::min(u32(num[4]), 7u) << 12; // 16, 3-bit
+	index |= std::min(u32(num[5]), 7u) << 15; // 32, 3-bit
+	index |= std::min(u32(num[6]), 7u) << 18; // 64, 3-bit
+	index |= std::min(u32(num[7]), 7u) << 21; // 128, 3-bit
 	return index;
 }
 
@@ -1217,7 +1217,7 @@ template<int p0, int p1, int p2, int p3, int p4, int p5, int p6, int p7>
 u64 indexmono(const board& b) { // 24-bit
 	u32 h0 = (b.at(p0)) | (b.at(p1) << 4) | (b.at(p2) << 8) | (b.at(p3) << 12);
 	u32 h1 = (b.at(p4)) | (b.at(p5) << 4) | (b.at(p6) << 8) | (b.at(p7) << 12);
-	return (board::lookup[h0].left.mono) | (board::lookup[h1].left.mono << 12);
+	return (board::cache::load(h0).left.mono) | (board::cache::load(h1).left.mono << 12);
 }
 
 template<u32 tile, int isomorphic>
@@ -2264,7 +2264,7 @@ struct statistic {
 
 		auto npos = std::string::npos;
 		auto it = std::find_if(opt.begin(), opt.end(), [=](std::string v) { return v.find('=') == npos; });
-		std::string res = (it != opt.end()) ? *it : "1000";
+		std::string res = (it != opt.end()) ? *it : (opt.empty() ? "1000" : "0");
 		try {
 			loop = std::stol(res);
 			if (res.find('x') != npos) unit = std::stol(res.substr(res.find('x') + 1));
@@ -2749,7 +2749,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "depth = " << opts["depth"] << std::endl;
 	std::cout << std::endl;
 
-	std::srand(moporgic::to_hash(opts["seed"]));
+	moporgic::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
 	search::parse(opts["depth"]);
 
