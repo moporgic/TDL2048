@@ -1759,6 +1759,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
 			opts["alpha"] = find_opt(i, std::to_string(state::alpha()));
+			opts["alpha"] += find_opts(i);
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
@@ -1984,8 +1985,8 @@ statistic test(utils::options opts = {}) {
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (!opts("train")) opts["train"] = opts("test") ? 0 : 1000;
-	if (!opts("test")) opts["test"] = opts("train") ? 0 : 10;
-	if (!opts("alpha")) opts["alpha"] = 0.0025;
+	if (!opts("test")) opts["test"] = opts("train") ? 0 : 1000;
+	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = rdtsc();
 
 	std::cout << "TDL2048+ LOG" << std::endl;
@@ -1998,18 +1999,16 @@ int main(int argc, const char* argv[]) {
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << std::endl;
 
-	moporgic::srand(moporgic::to_hash(opts["seed"]));
-	state::alpha(std::stod(opts["alpha"]));
-
 	utils::make_indexers();
-
 	utils::load_weights(opts["weight-input"]);
 	utils::make_weights(opts["weight-value"]);
-
 	utils::load_features(opts["feature-input"]);
 	utils::make_features(opts["feature-value"]);
-
 	utils::list_mapping();
+
+	moporgic::srand(moporgic::to_hash(opts["seed"]));
+	state::alpha(std::stod(opts["alpha"]));
+	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
 
 	if (statistic(opts["train"])) {
 		std::cout << std::endl << "start training..." << std::endl;
