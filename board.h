@@ -223,13 +223,19 @@ public:
 
 	inline void transpose() { transpose64(); }
 	inline void transpose64() {
-		raw = (raw & 0xf0f00f0ff0f00f0fULL) | ((raw & 0x0000f0f00000f0f0ULL) << 12) | ((raw & 0x0f0f00000f0f0000ULL) >> 12);
-		raw = (raw & 0xff00ff0000ff00ffULL) | ((raw & 0x00000000ff00ff00ULL) << 24) | ((raw & 0x00ff00ff00000000ULL) >> 24);
+		register u64 buf;
+		buf = (raw ^ (raw >> 12)) & 0x0000f0f00000f0f0ull;
+		raw ^= buf ^ (buf << 12);
+		buf = (raw ^ (raw >> 24)) & 0x00000000ff00ff00ull;
+		raw ^= buf ^ (buf << 24);
 	}
 	inline void transpose80() {
 		transpose64();
-		ext = (ext & 0xa5a50000) | ((ext & 0x0a0a0000) << 3) | ((ext & 0x50500000) >> 3);
-		ext = (ext & 0xcc330000) | ((ext & 0x00cc0000) << 6) | ((ext & 0x33000000) >> 6);
+		register u32 buf;
+		buf = (ext ^ (ext >> 3)) & 0x0a0a0000;
+		ext ^= buf ^ (buf << 3);
+		buf = (ext ^ (ext >> 6)) & 0x00cc0000;
+		ext ^= buf ^ (buf << 6);
 	}
 
 	inline u32 empty() const { return empty64(); }
