@@ -45,9 +45,14 @@ typedef uintptr_t uptr;
 namespace moporgic {
 class byte;
 class half;
+class hexadeca;
+class bihexadeca;
+typedef hexadeca hex;
+typedef bihexadeca hexa;
 }
 typedef moporgic::byte byte;
 typedef moporgic::half f16;
+
 
 #if !defined(__cplusplus) || __cplusplus < 201103L
 #define constexpr
@@ -102,8 +107,13 @@ template<> struct std::trait<detail> : public std::true_type {};
 
 } /* namespace moporgic */
 
+declare_trait(is_integral, moporgic::hexadeca);
+declare_trait(is_unsigned, moporgic::hexadeca);
+declare_trait(is_array, moporgic::hexadeca);
 declare_trait(is_integral, moporgic::byte);
+declare_trait(is_unsigned, moporgic::byte);
 declare_trait(is_floating_point, moporgic::half);
+declare_trait(is_signed, moporgic::half);
 
 namespace moporgic {
 
@@ -361,13 +371,12 @@ public:
 	constexpr operator u64() const noexcept { return hex; }
 	constexpr static hexadeca& as(u64& hex) noexcept { return raw_cast<hexadeca>(hex); }
 public:
-	class dual;
 	class cell {
 		friend class hexadeca;
-		friend class hexadeca::dual;
 	public:
 		constexpr cell() noexcept = delete;
 		constexpr cell(const cell& c) noexcept = default;
+		constexpr cell(u64& ref, u32 idx) noexcept : ref(ref), idx(idx) {}
 		constexpr operator u32() const noexcept { return (ref >> (idx << 2)) & 0x0f; }
 		constexpr cell& operator =(u32 val) noexcept { ref = (ref & ~(0x0full << (idx << 2))) | ((val & 0x0full) << (idx << 2)); return *this; }
 		constexpr cell& operator =(const cell& c) noexcept { return operator =(u32(c)); }
@@ -382,8 +391,7 @@ public:
 		constexpr cell& operator --() noexcept { return operator -=(1); }
 		constexpr u32 operator ++(int) noexcept { u32 v = operator u32(); operator ++(); return v; }
 		constexpr u32 operator --(int) noexcept { u32 v = operator u32(); operator --(); return v; }
-	protected:
-		constexpr cell(u64& ref, u32 idx) noexcept : ref(ref), idx(idx) {}
+	private:
 		u64& ref;
 		u32 idx;
 	};
@@ -406,10 +414,9 @@ protected:
 	u64 hex;
 };
 
-class hexadeca::dual : public hexadeca {
-friend class hexadeca;
+class bihexadeca : public hexadeca {
 public:
-	constexpr dual(u64 hex = 0, u64 ext = 0) noexcept : hexadeca(hex), ext(ext) {}
+	constexpr bihexadeca(u64 hex = 0, u64 ext = 0) noexcept : hexadeca(hex), ext(ext) {}
 	constexpr hexadeca& exten() noexcept { return raw_cast<hexadeca>(ext); }
 	constexpr hexadeca exten() const noexcept { return raw_cast<hexadeca>(ext); }
 public:
@@ -435,9 +442,6 @@ protected:
 	u64 ext;
 };
 
-typedef hexadeca hex;
-typedef hexadeca::dual hexa;
-
 template<typename type,
 	template<typename...> class list = moporgic::list,
 	template<typename...> class alloc = std::allocator,
@@ -446,13 +450,13 @@ class segment {
 public:
 	constexpr segment() noexcept {}
 	segment(const segment& seg) = delete;
-	segment(segment&& seg) noexcept : free(std::move(seg.free)) {}
+	segment(segment&& seg) noexcept : space(std::move(seg.space)) {}
 
 	type* allocate(size_t num) {
-		for (auto it = free.begin(); it != free.end(); it++) {
+		for (auto it = idle().begin(); it != idle().end(); it++) {
 			if (it->size() >= num) {
 				type* buf = it->begin(it->begin() + num);
-				if (it->empty()) free.erase(it);
+				if (it->empty()) idle().erase(it);
 				return buf;
 			}
 		}
@@ -461,35 +465,36 @@ public:
 
 	void deallocate(type* buf, size_t num) {
 		clip<type> tok(buf, buf + num);
-		auto it = std::lower_bound(free.begin(), free.end(), tok);
+		auto it = std::lower_bound(idle().begin(), idle().end(), tok);
 		auto pt = std::prev(it);
 
-		if (bchk && it != free.begin()) {
+		if (bchk && it != idle().begin()) {
 			tok.begin(std::max(tok.begin(), pt->end()));
 			tok.end(std::max(tok.end(), pt->end()));
 		}
-		if (bchk && it != free.end()) {
+		if (bchk && it != idle().end()) {
 			tok.end(std::min(tok.end(), it->begin()));
 		}
 
-		if (it != free.begin() && pt->end() == tok.begin()) {
-			if (it != free.end() && tok.end() == it->begin()) {
+		if (it != idle().begin() && pt->end() == tok.begin()) {
+			if (it != idle().end() && tok.end() == it->begin()) {
 				it->begin(pt->begin());
-				it = free.erase(pt);
+				it = idle().erase(pt);
 			} else {
 				pt->end(tok.end());
 			}
 		} else {
-			if (it != free.end() && tok.end() == it->begin()) {
+			if (it != idle().end() && tok.end() == it->begin()) {
 				it->begin(tok.begin());
 			} else {
-				it = free.insert(it, tok);
+				it = idle().insert(it, tok);
 			}
 		}
 	}
 
 private:
-	list<clip<type>, alloc<clip<type>>> free;
+	list<clip<type>, alloc<clip<type>>> space;
+	constexpr inline auto& idle() noexcept { return space; }
 };
 
 } /* namespace moporgic */
