@@ -413,57 +413,55 @@ public:
 
 	inline u64 min_isomorphic(board t) const {
 		u64 x = u64(t);
-		t.mirror();    x = std::min(x, u64(t));
-		t.transpose(); x = std::min(x, u64(t));
-		t.mirror();    x = std::min(x, u64(t));
-		t.transpose(); x = std::min(x, u64(t));
-		t.mirror();    x = std::min(x, u64(t));
-		t.transpose(); x = std::min(x, u64(t));
-		t.mirror();    x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
 		return x;
 	}
 
 	inline position& operator[] (const board& b) {
-		auto x = min_isomorphic(b);
-		auto hash = math::fmix64(x) & zmask;
+		u64 x = min_isomorphic(b);
+		u64 hash = math::fmix64(x) & zmask;
 
-		auto& data = cache[hash];
+		position& data = cache[hash];
 		if (!data) return data(x);
 		if (!std::isnan(data.esti)) {
 			if (data == x || !data.info) return data(x);
-			auto list = mpool.allocate(2);
+			position* list = mpool.allocate(2);
 			if (!list) return data(x);
 			list[0] = data;
 			data(cast<uintptr_t>(list)).save(0.0 / 0.0, 1);
 			return list[1](x);
 		}
 
-		auto& list = raw_cast<position*>(data.sign);
-		auto& last = raw_cast<u16>(data.depth);
-		auto  size = last + 1u;
+		position*& list = raw_cast<position*>(data.sign);
+		u16& lim = raw_cast<u16>(data.depth);
+		u32 size = lim + 1;
 
-		for (auto i = 0u; i < last; i++) {
+		for (u32 i = 0; i < lim; i++) {
 			if (list[i] < list[i + 1]) std::swap(list[i], list[i + 1]);
 			if (list[i] == x) return list[i](x);
 		}
-		if (list[last] == x) return list[last](x);
-		if (size != (1u << math::ones16(last))) return list[++last](x);
+		if (list[lim] == x) return list[lim](x);
+		if (size != (1u << math::ones16(lim))) return list[++lim](x);
 
-		auto mini = list[last].info;
-		auto hits = 0u;
-		for (auto i = 0u; i < size; i++) {
+		u32 hits = 0, min = list[lim].info;
+		for (u32 i = 0; i < size; i++) {
 			hits += list[i].info;
-			list[i].info -= mini;
+			list[i].info -= min;
 		}
-		if (mini <= hits / (size * 2)) return list[last](x);
-		if (size == 65536u)            return list[last](x);
+		u32 thres = hits / (size * 2);
+		if (min <= thres || size == 65536) return list[lim](x);
 
-		auto temp = mpool.allocate(size + size);
-		if (!temp) return list[last](x);
+		position* temp = mpool.allocate(size + size);
+		if (!temp) return list[lim](x);
 		std::copy(list, list + size, temp);
 		mpool.deallocate(list, size);
-		list = temp;
-		return list[++last](x);
+		return (list = temp)[++lim](x);
 	}
 
     friend std::ostream& operator <<(std::ostream& out, const transposition& tp) {
@@ -550,29 +548,6 @@ public:
 		return in;
 	}
 
-	void summary() {
-		std::cout << std::endl << "summary" << std::endl;
-		if (zsize > 1) {
-			std::vector<u64> stat(65537);
-			for (size_t i = 0; i < zsize; i++) {
-				auto& h = cache[i];
-				if (std::isnan(h.esti)) {
-					stat[u16(h.depth) + 1]++;
-				} else {
-					stat[h.sign ? 1 : 0]++;
-				}
-			}
-			while (stat.back() == 0) stat.pop_back();
-
-			std::cout << "block" "\t" "count" << std::endl;
-			for (size_t i = 0; i < stat.size(); i++) {
-				std::cout << i << "\t" << stat[i] << std::endl;
-			}
-		} else {
-			std::cout << "no transposition" << std::endl;
-		}
-	}
-
 	static void save(std::ostream& out) {
 		u32 code = 0;
 		write_cast<byte>(out, code);
@@ -596,6 +571,29 @@ public:
 		case 0:
 			in >> instance();
 			break;
+		}
+	}
+
+	void summary() {
+		std::cout << std::endl << "summary" << std::endl;
+		if (zsize > 1) {
+			std::vector<u64> stat(65537);
+			for (size_t i = 0; i < zsize; i++) {
+				auto& h = cache[i];
+				if (std::isnan(h.esti)) {
+					stat[u16(h.depth) + 1]++;
+				} else {
+					stat[h.sign ? 1 : 0]++;
+				}
+			}
+			while (stat.back() == 0) stat.pop_back();
+
+			std::cout << "block" "\t" "count" << std::endl;
+			for (size_t i = 0; i < stat.size(); i++) {
+				std::cout << i << "\t" << stat[i] << std::endl;
+			}
+		} else {
+			std::cout << "no transposition" << std::endl;
 		}
 	}
 
