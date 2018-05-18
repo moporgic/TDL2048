@@ -369,137 +369,6 @@ private:
 	weight value;
 };
 
-class zhasher {
-private:
-	typedef u64(*zhash_t)[1<<20];
-	typedef u64(*ztile_t)[32];
-	zhasher(bool alloc, u64 id = 0, u64 sa = 0, u64 sb = 0) :
-		id(id),
-		zhash(alloc ? new u64[4][1 << 20]() : nullptr),
-		ztile(alloc ? new u64[16][32]() : nullptr),
-		seeda(sa),
-		seedb(sb) {}
-public:
-	zhasher(u64 seed = moporgic::millisec(), u64 seeda = 0ull, u64 seedb = -1ull) :
-		zhasher(true, seed ^ seeda ^ seedb, seeda, seedb) {
-		std::default_random_engine engine(seed);
-		std::uniform_int_distribution<u64> dist;
-		for (u32 idx = 0; idx < 16; idx++) {
-			for (u32 tile = 0; tile < 32; tile++) {
-				ztile[idx][tile] = dist(engine);
-			}
-		}
-		for (u32 row = 0; row < 4; row++) {
-			auto rhash = zhash[row];
-			auto rtile = ztile + (row * 4);
-			for (u32 value = 0; value < (1 << 20); value++) {
-				board tile; tile.place20(0, value);
-				auto t0 = rtile[0][tile.at5(0)];
-				auto t1 = rtile[1][tile.at5(1)];
-				auto t2 = rtile[2][tile.at5(2)];
-				auto t3 = rtile[3][tile.at5(3)];
-				rhash[value] = t0 ^ t1 ^ t2 ^ t3;
-			}
-		}
-	}
-	zhasher(const zhasher& z) : zhasher(true) { operator=(z); }
-	zhasher(zhasher&& z) : zhasher(false) { operator=(std::move(z)); }
-	~zhasher() { delete[] zhash; delete[] ztile; }
-
-	zhasher& operator =(const zhasher& z) {
-		id = z.id;
-		std::copy(cast<u64*>(z.zhash), cast<u64*>(z.zhash) + sizeof(u64[4][1 << 20]), cast<u64*>(zhash));
-		std::copy(cast<u64*>(z.ztile), cast<u64*>(z.ztile) + sizeof(u64[16][32]),     cast<u64*>(ztile));
-		seeda = z.seeda;
-		seedb = z.seedb;
-		return *this;
-	}
-	zhasher& operator =(zhasher&& z) {
-		id = z.id;
-		zhash = std::exchange(z.zhash, nullptr);
-		ztile = std::exchange(z.ztile, nullptr);
-		seeda = z.seeda;
-		seedb = z.seedb;
-		return *this;
-	}
-
-public:
-	inline u64 operator ()(const board& b, bool after = true) const {
-		register u64 hash = after ? seeda : seedb;
-		hash ^= zhash[0][b.fetch(0)];
-		hash ^= zhash[1][b.fetch(1)];
-		hash ^= zhash[2][b.fetch(2)];
-		hash ^= zhash[3][b.fetch(3)];
-		return hash;
-	}
-	inline u64 operator ()(const board::tile& t, bool after = true) const {
-		return (after ? seeda : seedb) ^ ztile[t.where()][u32(t)];
-	}
-
-public:
-	inline u64 sign() const { return id; }
-
-    friend std::ostream& operator <<(std::ostream& out, const zhasher& z) {
-    	auto& seeda = z.seeda;
-    	auto& seedb = z.seedb;
-    	auto& zhash = z.zhash;
-    	auto& ztile = z.ztile;
-    	auto& id = z.id;
-		u32 code = 1;
-		moporgic::write_cast<byte>(out, code);
-		switch (code) {
-		case 1:
-			moporgic::write(out, id);
-			moporgic::write(out, seeda);
-			moporgic::write(out, seedb);
-			moporgic::write(out, *zhash, sizeof(u64[4][1 << 20]));
-			moporgic::write(out, *ztile, sizeof(u64[16][32]));
-			break;
-		default:
-			std::cerr << "unknown serial at zhasher::>>" << std::endl;
-			break;
-		}
-		return out;
-	}
-	friend std::istream& operator >>(std::istream& in, zhasher& z) {
-    	auto& seeda = z.seeda;
-    	auto& seedb = z.seedb;
-    	auto& zhash = z.zhash;
-    	auto& ztile = z.ztile;
-    	auto& id = z.id;
-		u32 code;
-		read_cast<byte>(in, code);
-		switch (code) {
-		case 0:
-			moporgic::read(in, seeda);
-			moporgic::read(in, seedb);
-			moporgic::read(in, *zhash, sizeof(u64[4][1 << 20]));
-			for (u32 i = 0; i < 16; i++) // build ztile
-				for (u32 t = 0; t < 32; t++)
-					ztile[i][t] = rand64();
-			moporgic::read(in, id);
-			break;
-		case 1:
-			moporgic::read(in, id);
-			moporgic::read(in, seeda);
-			moporgic::read(in, seedb);
-			moporgic::read(in, *zhash, sizeof(u64[4][1 << 20]));
-			moporgic::read(in, *ztile, sizeof(u64[16][32]));
-			break;
-		default:
-			std::cerr << "unknown serial at zhasher::<<" << std::endl;
-			break;
-		}
-		return in;
-	}
-private:
-	u64 id;
-	zhash_t zhash;
-	ztile_t ztile;
-	u64 seeda;
-	u64 seedb;
-};
-
 class transposition {
 public:
 	class position {
@@ -509,21 +378,21 @@ public:
 		f32 esti;
 		i16 depth;
 		u16 info;
-		position(const position& e) = default;
-		position(u64 sign = 0) : sign(sign), esti(0), depth(-1), info(0) {}
+		constexpr position(const position& e) = default;
+		constexpr position(u64 sign = 0) : sign(sign), esti(0), depth(-1), info(0) {}
 
-		operator numeric() const { return esti; }
-		operator bool()    const { return sign; }
-		bool operator ==(u64 s) const { return sign == s; }
-		bool operator >=(i32 d) const { return depth >= d; }
-		declare_comparators(position, info);
+		constexpr operator numeric() const { return esti; }
+		constexpr operator bool()    const { return sign; }
+		constexpr bool operator ==(u64 s) const { return sign == s; }
+		constexpr bool operator >=(i32 d) const { return depth >= d; }
+		declare_comparators(position, info, constexpr);
 
-		position& save(f32 e, i32 d) {
+		constexpr position& save(f32 e, i32 d) {
 			esti = e;
 			depth = d;
 			return *this;
 		}
-		position& operator()(u64 s) {
+		constexpr position& operator()(u64 s) {
 			if (sign != s) {
 				sign = s;
 				esti = 0;
@@ -536,11 +405,11 @@ public:
 		}
 	};
 
-	transposition() : zhash(), cache(nullptr), mpool(), zsize(0), limit(0), zmask(-1) {}
+	constexpr transposition() : cache(&initial), zsize(1), limit(0), zmask(0) {}
 	transposition(const transposition& tp) = default;
 	~transposition() {}
-	inline size_t length() const { return zsize; }
-	inline size_t size() const { return zsize + limit; }
+	inline constexpr size_t length() const { return zsize; }
+	inline constexpr size_t size() const { return zsize + limit; }
 
 	inline u64 min_isomorphic(board t) const {
 		u64 x = u64(t);
@@ -556,13 +425,13 @@ public:
 
 	inline position& operator[] (const board& b) {
 		auto x = min_isomorphic(b);
-		auto hash = zhash(x) & zmask;
+		auto hash = math::fmix64(x) & zmask;
 
 		auto& data = cache[hash];
 		if (!data) return data(x);
 		if (!std::isnan(data.esti)) {
 			if (data == x || !data.info) return data(x);
-			auto list = mpool_alloc(2);
+			auto list = mpool.allocate(2);
 			if (!list) return data(x);
 			list[0] = data;
 			data(cast<uintptr_t>(list)).save(0.0 / 0.0, 1);
@@ -589,26 +458,26 @@ public:
 		if (mini <= hits / (size * 2)) return list[last](x);
 		if (size == 65536u)            return list[last](x);
 
-		auto temp = mpool_realloc(list, size);
+		auto temp = mpool.allocate(size + size);
 		if (!temp) return list[last](x);
+		std::copy(list, list + size, temp);
+		mpool.deallocate(list, size);
 		list = temp;
 		return list[++last](x);
 	}
 
     friend std::ostream& operator <<(std::ostream& out, const transposition& tp) {
-    	auto& zhash = tp.zhash;
     	auto& cache = tp.cache;
     	auto& zsize = tp.zsize;
     	auto& limit = tp.limit;
-		u32 code = 1;
+		u32 code = 2;
 		write_cast<byte>(out, code);
 		switch (code) {
 		default:
 			std::cerr << "unknown serial at transposition::>>" << std::endl;
-			std::cerr << "use default serial (1) instead" << std::endl;
+			std::cerr << "use default serial (" << code << ") instead" << std::endl;
 			// no break;
-		case 1:
-			out << zhash;
+		case 2:
 			write_cast<u64>(out, zsize);
 			write_cast<u64>(out, limit);
 			for (u64 i = 0; i < zsize; i++) {
@@ -636,7 +505,6 @@ public:
 		return out;
 	}
 	friend std::istream& operator >>(std::istream& in, transposition& tp) {
-    	auto& zhash = tp.zhash;
     	auto& cache = tp.cache;
     	auto& mpool = tp.mpool;
     	auto& zsize = tp.zsize;
@@ -645,13 +513,12 @@ public:
 		u32 code = 0;
 		read_cast<byte>(in, code);
 		switch (code) {
-		case 1:
-			in >> zhash;
+		case 2:
 			read_cast<u64>(in, zsize);
 			read_cast<u64>(in, limit);
 			zmask = zsize - 1;
 			cache = alloc(zsize + limit);
-			mpool.deallocate(cast<byte*>(cache + zsize), sizeof(position) * limit);
+			mpool.deallocate(cache + zsize, limit);
 			for (u64 i = 0; i < zsize; i++) {
 				auto& data = cache[i];
 				read_cast<u64>(in, data.sign);
@@ -662,7 +529,7 @@ public:
 				if (!std::isnan(data.esti)) continue;
 
 				auto size = u16(data.depth) + 1u;
-				auto list = tp.mpool_alloc((2 << math::lg(size - 1)));
+				auto list = tp.mpool.allocate((2 << math::lg(size - 1)));
 				data.sign = cast<uintptr_t>(list);
 				for (auto it = list; it != list + size; it++) {
 					read_cast<u64>(in, it->sign);
@@ -685,14 +552,25 @@ public:
 
 	void summary() {
 		std::cout << std::endl << "summary" << std::endl;
-		if (zsize <= 1) {
+		if (zsize > 1) {
+			std::vector<u64> stat(65537);
+			for (size_t i = 0; i < zsize; i++) {
+				auto& h = cache[i];
+				if (std::isnan(h.esti)) {
+					stat[u16(h.depth) + 1]++;
+				} else {
+					stat[h.sign ? 1 : 0]++;
+				}
+			}
+			while (stat.back() == 0) stat.pop_back();
+
+			std::cout << "block" "\t" "count" << std::endl;
+			for (size_t i = 0; i < stat.size(); i++) {
+				std::cout << i << "\t" << stat[i] << std::endl;
+			}
+		} else {
 			std::cout << "no transposition" << std::endl;
-			return;
 		}
-		std::vector<u64> stat = count();
-		std::cout << "used" "\t" "count" << std::endl;
-		for (u32 i = 0; i < stat.size(); i++)
-			std::cout << i << "\t" << stat[i] << std::endl;
 	}
 
 	static void save(std::ostream& out) {
@@ -724,31 +602,13 @@ public:
 	static transposition& make(size_t len, size_t lim = 0) {
 		return instance().shape(std::max(len, size_t(1)), lim);
 	}
-	static inline transposition& instance() { static transposition tp(1, 0); return tp; }
+	static inline transposition& instance() { static transposition tp; return tp; }
 	static inline position& find(const board& b) { return instance()[b]; }
 	static inline position& remove(const board& b) { return find(b)(0); }
 
 private:
-	transposition(size_t len, size_t lim) : zsize(len), limit(lim), zmask(len - 1) {
-		cache = zsize ? alloc(zsize) : nullptr;
-		mpool.deallocate(cast<byte*>(limit ? alloc(limit) : nullptr), sizeof(position) * limit);
-	}
 	static inline position* alloc(size_t len) { return new position[len](); }
 	static inline void free(position* alloc) { delete[] alloc; }
-
-	inline position* mpool_alloc(size_t num) {
-		return cast<position*>(mpool.allocate(sizeof(position) * num));
-	}
-	inline void mpool_free(position* pos, size_t now) {
-		mpool.deallocate(cast<byte*>(pos), sizeof(position) * now);
-	}
-	inline position* mpool_realloc(position* pos, size_t now) {
-		auto alloc = mpool_alloc(now + now);
-		if (!alloc) return nullptr;
-		std::copy(pos, pos + now, alloc);
-		mpool_free(pos, now);
-		return alloc;
-	}
 
 	transposition& shape(size_t len, size_t lim = 0) {
 		if (math::ones64(len) != 1) {
@@ -757,30 +617,29 @@ private:
 			std::cerr << "fit to " << len << std::endl;
 		}
 
+		std::list<size_t> blocks;
 		if (cache && zsize > 1) {
 			if (zsize > len) std::cerr << "unsupported operation: shrink z-size" << std::endl;
 			if (zsize < len) std::cerr << "unsupported operation: enlarge z-size" << std::endl;
 			if (limit > lim) std::cerr << "unsupported operation: shrink m-pool" << std::endl;
 			if (limit < lim) {
-				mpool_offer(lim - limit);
+				blocks.push_back(lim - limit);
 				limit = lim;
 			}
 		} else {
 			zsize = len;
 			limit = lim;
 			zmask = len - 1;
-			if (cache) free(cache);
+			if (cache != &initial) free(cache);
 			cache = alloc(zsize);
-			mpool_offer(limit);
+			blocks.push_back(limit);
 		}
-		return *this;
-	}
 
-	void mpool_offer(size_t total) {
-		for (std::list<size_t> blocks = { total }; blocks.size(); blocks.pop_front()) {
+		while (blocks.size()) {
 			auto block = blocks.front();
+			blocks.pop_front();
 			try {
-				mpool.deallocate(cast<byte*>(alloc(block)), sizeof(position) * block);
+				mpool.deallocate(alloc(block), block);
 			} catch (std::bad_alloc&) {
 				if (sizeof(position) * block >= (64ull << 20) /* 64 MB */ ) {
 					blocks.push_back(block >> 1); // try allocate smaller block size
@@ -790,27 +649,13 @@ private:
 				}
 			}
 		}
-	}
-
-	std::vector<u64> count() const {
-		std::vector<u64> stat(65537);
-		for (u64 i = 0; i < zsize; i++) {
-			auto& h = cache[i];
-			if (std::isnan(h.esti)) {
-				stat[u16(h.depth) + 1]++;
-			} else {
-				stat[h.sign ? 1 : 0]++;
-			}
-		}
-		while (stat.back() == 0)
-			stat.pop_back();
-		return stat;
+		return *this;
 	}
 
 private:
-	zhasher zhash;
 	position* cache;
-	segment<byte> mpool;
+	position initial;
+	segment<position> mpool;
 	size_t zsize;
 	size_t limit;
 	size_t zmask;
