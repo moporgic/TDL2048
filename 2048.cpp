@@ -2366,6 +2366,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
 			opts["alpha"] = find_opt(i, std::to_string(state::alpha()));
+			opts["alpha"] += find_opts(i);
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
@@ -2689,8 +2690,8 @@ statistic test(utils::options opts = {}) {
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (!opts("train")) opts["train"] = opts("test") ? 0 : 1000;
-	if (!opts("test")) opts["test"] = opts("train") ? 0 : 10;
-	if (!opts("alpha")) opts["alpha"] = 0.0025;
+	if (!opts("test")) opts["test"] = opts("train") ? 0 : 1000;
+	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = rdtsc();
 	if (!opts("depth")) opts["depth"] = "7 7 7 7 5 5 5 5 3 3 3 3 1 1 1 1";
 
@@ -2705,19 +2706,17 @@ int main(int argc, const char* argv[]) {
 	std::cout << "depth = " << opts["depth"] << std::endl;
 	std::cout << std::endl;
 
-	moporgic::srand(moporgic::to_hash(opts["seed"]));
-	state::alpha(std::stod(opts["alpha"]));
-	search::parse(opts["depth"]);
-
 	utils::make_indexers();
-
 	utils::load_weights(opts["weight-input"]);
 	utils::make_weights(opts["weight-value"]);
-
 	utils::load_features(opts["feature-input"]);
 	utils::make_features(opts["feature-value"]);
-
 	utils::list_mapping();
+
+	moporgic::srand(moporgic::to_hash(opts["seed"]));
+	state::alpha(std::stod(opts["alpha"]));
+	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
+	search::parse(opts["depth"]);
 
 	if (statistic(opts["train"])) {
 		std::cout << std::endl << "start training..." << std::endl;
@@ -2734,10 +2733,8 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["test"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		statistic stat = test(opts);
-		if (opts["info"] != "none") {
-			stat.summary(opts["test"]);
-			transposition::instance().summary();
-		}
+		if (opts["info"] != "none") stat.summary(opts["test"]);
+		if (opts["info"] != "none") transposition::instance().summary();
 	}
 
 	utils::save_transposition(opts["cache-output"]);

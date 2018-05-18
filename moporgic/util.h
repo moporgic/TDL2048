@@ -385,7 +385,8 @@ namespace moporgic {
 
 __attribute__((constructor))
 static void __util_init__(void) {
-	moporgic::random::init();
+	moporgic::random::init<std::mt19937>();
+	moporgic::random::init<std::mt19937_64>();
 }
 
 __attribute__((destructor))

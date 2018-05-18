@@ -171,7 +171,7 @@ public:
 
 	inline void place(u32 i, u32 r) { place16(i, r); }
 	inline void place16(u32 i, u32 r) {
-		raw = (raw & ~(0xffffULL << (i << 4))) | (u64(r & 0xffff) << (i << 4));
+		raw = (raw & ~(0xffffull << (i << 4))) | (u64(r & 0xffff) << (i << 4));
 	}
 	inline void place20(u32 i, u32 r) {
 		place16(i, r & 0xffff);
@@ -188,7 +188,7 @@ public:
 
 	inline void set(u32 i, u32 t) { set4(i, t); }
 	inline void set4(u32 i, u32 t) {
-		raw = (raw & ~(0x0fULL << (i << 2))) | (u64(t & 0x0f) << (i << 2));
+		raw = (raw & ~(0x0full << (i << 2))) | (u64(t & 0x0f) << (i << 2));
 	}
 	inline void set5(u32 i, u32 t) {
 		set4(i, t);
@@ -197,8 +197,8 @@ public:
 
 	inline void mirror() { mirror64(); }
 	inline void mirror64() {
-		raw = ((raw & 0x000f000f000f000fULL) << 12) | ((raw & 0x00f000f000f000f0ULL) << 4)
-			| ((raw & 0x0f000f000f000f00ULL) >> 4) | ((raw & 0xf000f000f000f000ULL) >> 12);
+		raw = ((raw & 0x000f000f000f000full) << 12) | ((raw & 0x00f000f000f000f0ull) << 4)
+			| ((raw & 0x0f000f000f000f00ull) >> 4) | ((raw & 0xf000f000f000f000ull) >> 12);
 	}
 	inline void mirror80() {
 		mirror64();
@@ -208,8 +208,8 @@ public:
 
 	inline void flip() { flip64(); }
 	inline void flip64() {
-		raw = ((raw & 0x000000000000ffffULL) << 48) | ((raw & 0x00000000ffff0000ULL) << 16)
-			| ((raw & 0x0000ffff00000000ULL) >> 16) | ((raw & 0xffff000000000000ULL) >> 48);
+		raw = ((raw & 0x000000000000ffffull) << 48) | ((raw & 0x00000000ffff0000ull) << 16)
+			| ((raw & 0x0000ffff00000000ull) >> 16) | ((raw & 0xffff000000000000ull) >> 48);
 	}
 	inline void flip80() {
 		flip64();
@@ -223,13 +223,19 @@ public:
 
 	inline void transpose() { transpose64(); }
 	inline void transpose64() {
-		raw = (raw & 0xf0f00f0ff0f00f0fULL) | ((raw & 0x0000f0f00000f0f0ULL) << 12) | ((raw & 0x0f0f00000f0f0000ULL) >> 12);
-		raw = (raw & 0xff00ff0000ff00ffULL) | ((raw & 0x00000000ff00ff00ULL) << 24) | ((raw & 0x00ff00ff00000000ULL) >> 24);
+		register u64 buf;
+		buf = (raw ^ (raw >> 12)) & 0x0000f0f00000f0f0ull;
+		raw ^= buf ^ (buf << 12);
+		buf = (raw ^ (raw >> 24)) & 0x00000000ff00ff00ull;
+		raw ^= buf ^ (buf << 24);
 	}
 	inline void transpose80() {
 		transpose64();
-		ext = (ext & 0xa5a50000) | ((ext & 0x0a0a0000) << 3) | ((ext & 0x50500000) >> 3);
-		ext = (ext & 0xcc330000) | ((ext & 0x00cc0000) << 6) | ((ext & 0x33000000) >> 6);
+		register u32 buf;
+		buf = (ext ^ (ext >> 3)) & 0x0a0a0000;
+		ext ^= buf ^ (buf << 3);
+		buf = (ext ^ (ext >> 6)) & 0x00cc0000;
+		ext ^= buf ^ (buf << 6);
 	}
 
 	inline u32 empty() const { return empty64(); }
@@ -237,7 +243,7 @@ public:
 		register u64 x = raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
-		x = ~x & 0x1111111111111111ULL;
+		x = ~x & 0x1111111111111111ull;
 		register u32 e = x + (x >> 32);
 		e += e >> 16;
 		e += e >> 8;
@@ -247,13 +253,13 @@ public:
 		register u64 x = raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
-		x = ~x & 0x1111111111111111ULL;
+		x = ~x & 0x1111111111111111ull;
 		register u64 k = ext >> 16;
-		k = ((k & 0xff00ULL) << 24) | (k & 0x00ffULL);
-		k = ((k & 0xf0000000f0ULL) << 12) | (k & 0x0f0000000fULL);
-		k = ((k & 0x000c000c000c000cULL) << 6) | (k & 0x0003000300030003ULL);
-		k = ((k & 0x0202020202020202ULL) << 3) | (k & 0x0101010101010101ULL);
-		x &= ~k & 0x1111111111111111ULL;
+		k = ((k & 0xff00ull) << 24) | (k & 0x00ffull);
+		k = ((k & 0xf0000000f0ull) << 12) | (k & 0x0f0000000full);
+		k = ((k & 0x000c000c000c000cull) << 6) | (k & 0x0003000300030003ull);
+		k = ((k & 0x0202020202020202ull) << 3) | (k & 0x0101010101010101ull);
+		x &= ~k & 0x1111111111111111ull;
 		register u32 e = x + (x >> 32);
 		e += e >> 16;
 		e += e >> 8;
@@ -270,8 +276,8 @@ public:
 		u32 i = (k) % 16;
 		u32 j = (i + 1 + (k >> 4) % 15) % 16;
 		u32 r = (u >> 16) % 100;
-		raw =  (r >=  1 ? 1ULL : 2ULL) << (i << 2);
-		raw |= (r >= 19 ? 1ULL : 2ULL) << (j << 2);
+		raw =  (r >=  1 ? 1ull : 2ull) << (i << 2);
+		raw |= (r >= 19 ? 1ull : 2ull) << (j << 2);
 		ext = 0;
 	}
 
@@ -280,13 +286,13 @@ public:
 		hexa empty = spaces64();
 		u32 u = moporgic::rand();
 		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ULL : 2ULL) << (p << 2);
+		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
 	}
 	inline void next80() {
 		hexa empty = spaces80();
 		u32 u = moporgic::rand();
 		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ULL : 2ULL) << (p << 2);
+		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
 	}
 
 	inline bool popup() { return popup64(); }
@@ -295,7 +301,7 @@ public:
 		if (empty.size() == 0) return false;
 		u32 u = moporgic::rand();
 		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ULL : 2ULL) << (p << 2);
+		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
 		return true;
 	}
 	inline bool popup80() {
@@ -303,7 +309,7 @@ public:
 		if (empty.size() == 0) return false;
 		u32 u = moporgic::rand();
 		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ULL : 2ULL) << (p << 2);
+		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
 		return true;
 	}
 
