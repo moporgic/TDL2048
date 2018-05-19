@@ -23,17 +23,16 @@ private:
 	u32 inf;
 
 public:
-	inline board(u64 raw = 0) : raw(raw), ext(0), inf(0) {}
-	inline board(u64 raw, u32 ext) : raw(raw), ext(ext), inf(0) {}
-	inline board(u64 raw, u16 ext) : board(raw, u32(ext) << 16) {}
-	inline board(const board& b) = default;
-	inline ~board() = default;
-	inline board& operator =(u64 raw) { this->raw = raw; this->ext = 0; return *this; }
-	inline board& operator =(const board& b) = default;
+	inline constexpr board(u64 raw = 0) : raw(raw), ext(0), inf(0) {}
+	inline constexpr board(u64 raw, u32 ext) : raw(raw), ext(ext), inf(0) {}
+	inline constexpr board(u64 raw, u16 ext) : board(raw, u32(ext) << 16) {}
+	inline constexpr board(const board& b) = default;
+	inline constexpr board& operator =(u64 raw) { this->raw = raw; this->ext = 0; return *this; }
+	inline constexpr board& operator =(const board& b) = default;
 
-	inline operator u64&() { return raw; }
-	inline operator u64() const { return raw; }
-	declare_comparators_with(const board&, raw_cast<u128>(*this), raw_cast<u128>(v))
+	inline constexpr operator u64&() { return raw; }
+	inline constexpr operator u64() const { return raw; }
+	declare_comparators_with(const board&, raw_cast<u128>(*this), raw_cast<u128>(v), constexpr)
 
 public:
 	class cache {
