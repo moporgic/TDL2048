@@ -2242,6 +2242,66 @@ statistic train(utils::options opts = {}) {
 			stats.update(score, b.hash(), opers);
 		}
 		break;
+
+	case to_hash("forward-4x6patt"):
+	case to_hash("forward-best-4x6patt"):
+		for (stats.init(opts["train"]); stats; stats++) {
+
+			clip<feature> feats = feature::feats();
+			numeric alpha = state::alpha();
+			u32 score = 0;
+			u32 opers = 0;
+
+			b.init();
+			best(b, feats, utils::estimate_4x6patt);
+			score += best.score();
+			opers += 1;
+			best >> last;
+			best >> b;
+			b.next();
+			while (best(b, feats, utils::estimate_4x6patt)) {
+				last.optimize(best.esti(), alpha, feats, utils::optimize_4x6patt);
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> b;
+				b.next();
+			}
+			last.optimize(0, alpha, feats, utils::optimize_4x6patt);
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("forward-8x6patt"):
+	case to_hash("forward-best-8x6patt"):
+		for (stats.init(opts["train"]); stats; stats++) {
+
+			clip<feature> feats = feature::feats();
+			numeric alpha = state::alpha();
+			u32 score = 0;
+			u32 opers = 0;
+
+			b.init();
+			best(b, feats, utils::estimate_8x6patt);
+			score += best.score();
+			opers += 1;
+			best >> last;
+			best >> b;
+			b.next();
+			while (best(b, feats, utils::estimate_8x6patt)) {
+				last.optimize(best.esti(), alpha, feats, utils::optimize_8x6patt);
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> b;
+				b.next();
+			}
+			last.optimize(0, alpha, feats, utils::optimize_8x6patt);
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
 	}
 
 	return stats;
@@ -2261,6 +2321,40 @@ statistic test(utils::options opts = {}) {
 			u32 opers = 0;
 
 			for (b.init(); best << b; b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> b;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("best-4x6patt"):
+		for (stats.init(opts["test"]); stats; stats++) {
+
+			clip<feature> feats = feature::feats();
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, utils::estimate_4x6patt); b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> b;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("best-8x6patt"):
+		for (stats.init(opts["test"]); stats; stats++) {
+
+			clip<feature> feats = feature::feats();
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, utils::estimate_8x6patt); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> b;
@@ -2297,6 +2391,12 @@ int main(int argc, const char* argv[]) {
 	utils::load_features(opts["feature-input"]);
 	utils::make_features(opts["feature-value"]);
 	utils::list_mapping();
+
+	std::string type = opts["feature-value"];
+	if (type == "4x6patt" || type == "8x6patt") {
+		if (!opts("train", "mode")) opts["train"]["mode"] = "forward-" + type;
+		if (!opts("test", "mode")) opts["test"]["mode"] = "best-" + type;
+	}
 
 	moporgic::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
