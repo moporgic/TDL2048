@@ -2214,6 +2214,31 @@ statistic train(utils::options opts = {}) {
 		}
 		break;
 
+	case to_hash("backward-4x6patt"):
+	case to_hash("backward-best-4x6patt"):
+		for (stats.init(opts["train"]); stats; stats++) {
+
+			clip<feature> feats = feature::feats();
+			numeric alpha = state::alpha();
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, utils::estimate_4x6patt); b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				path.back().estimate(feats, utils::estimate_4x6patt);
+				v = path.back().optimize(v, alpha, feats, utils::optimize_4x6patt);
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
 	default:
 	case to_hash("forward"):
 	case to_hash("forward-best"):
