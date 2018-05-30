@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <iostream>
 #include <cstdio>
-#include <array>
 
 namespace moporgic {
 
@@ -160,85 +159,85 @@ public:
 	inline const cache& query16(u32 r) const { return cache::load(fetch16(r)); }
 	inline const cache& query20(u32 r) const { return cache::load(fetch20(r)); }
 
-	inline u32 fetch(u32 i) const { return fetch16(i); }
-	inline u32 fetch16(u32 i) const {
+	inline constexpr u32 fetch(u32 i) const { return fetch16(i); }
+	inline constexpr u32 fetch16(u32 i) const {
 		return ((raw >> (i << 4)) & 0xffff);
 	}
-	inline u32 fetch20(u32 i) const {
+	inline constexpr u32 fetch20(u32 i) const {
 		return fetch16(i) | ((ext >> (i << 2)) & 0xf0000);
 	}
 
-	inline void place(u32 i, u32 r) { place16(i, r); }
-	inline void place16(u32 i, u32 r) {
+	inline constexpr void place(u32 i, u32 r) { place16(i, r); }
+	inline constexpr void place16(u32 i, u32 r) {
 		raw = (raw & ~(0xffffull << (i << 4))) | (u64(r & 0xffff) << (i << 4));
 	}
-	inline void place20(u32 i, u32 r) {
+	inline constexpr void place20(u32 i, u32 r) {
 		place16(i, r & 0xffff);
 		ext = (ext & ~(0xf0000 << (i << 2))) | ((r & 0xf0000) << (i << 2));
 	}
 
-	inline u32 at(u32 i) const { return at4(i); }
-	inline u32 at4(u32 i) const {
+	inline constexpr u32 at(u32 i) const { return at4(i); }
+	inline constexpr u32 at4(u32 i) const {
 		return (raw >> (i << 2)) & 0x0f;
 	}
-	inline u32 at5(u32 i) const {
+	inline constexpr u32 at5(u32 i) const {
 		return at4(i) | ((ext >> (i + 12)) & 0x10);
 	}
 
-	inline void set(u32 i, u32 t) { set4(i, t); }
-	inline void set4(u32 i, u32 t) {
+	inline constexpr void set(u32 i, u32 t) { set4(i, t); }
+	inline constexpr void set4(u32 i, u32 t) {
 		raw = (raw & ~(0x0full << (i << 2))) | (u64(t & 0x0f) << (i << 2));
 	}
-	inline void set5(u32 i, u32 t) {
+	inline constexpr void set5(u32 i, u32 t) {
 		set4(i, t);
 		ext = (ext & ~(1U << (i + 16))) | ((t & 0x10) << (i + 12));
 	}
 
-	inline void mirror() { mirror64(); }
-	inline void mirror64() {
+	inline constexpr void mirror() { mirror64(); }
+	inline constexpr void mirror64() {
 		raw = ((raw & 0x000f000f000f000full) << 12) | ((raw & 0x00f000f000f000f0ull) << 4)
 			| ((raw & 0x0f000f000f000f00ull) >> 4) | ((raw & 0xf000f000f000f000ull) >> 12);
 	}
-	inline void mirror80() {
+	inline constexpr void mirror80() {
 		mirror64();
 		ext = ((ext & 0x11110000) << 3) | ((ext & 0x22220000) << 1)
 			| ((ext & 0x44440000) >> 1) | ((ext & 0x88880000) >> 3);
 	}
 
-	inline void flip() { flip64(); }
-	inline void flip64() {
+	inline constexpr void flip() { flip64(); }
+	inline constexpr void flip64() {
 		raw = ((raw & 0x000000000000ffffull) << 48) | ((raw & 0x00000000ffff0000ull) << 16)
 			| ((raw & 0x0000ffff00000000ull) >> 16) | ((raw & 0xffff000000000000ull) >> 48);
 	}
-	inline void flip80() {
+	inline constexpr void flip80() {
 		flip64();
 		ext = ((ext & 0x000f0000) << 12) | ((ext & 0x00f00000) << 4)
 			| ((ext & 0x0f000000) >> 4) | ((ext & 0xf0000000) >> 12);
 	}
 
-	inline void reverse() { reverse64(); }
-	inline void reverse64() { mirror64(); flip64(); }
-	inline void reverse80() { mirror80(); flip80(); }
+	inline constexpr void reverse() { reverse64(); }
+	inline constexpr void reverse64() { mirror64(); flip64(); }
+	inline constexpr void reverse80() { mirror80(); flip80(); }
 
-	inline void transpose() { transpose64(); }
-	inline void transpose64() {
-		register u64 buf;
+	inline constexpr void transpose() { transpose64(); }
+	inline constexpr void transpose64() {
+		register u64 buf = 0;
 		buf = (raw ^ (raw >> 12)) & 0x0000f0f00000f0f0ull;
 		raw ^= buf ^ (buf << 12);
 		buf = (raw ^ (raw >> 24)) & 0x00000000ff00ff00ull;
 		raw ^= buf ^ (buf << 24);
 	}
-	inline void transpose80() {
+	inline constexpr void transpose80() {
 		transpose64();
-		register u32 buf;
+		register u32 buf = 0;
 		buf = (ext ^ (ext >> 3)) & 0x0a0a0000;
 		ext ^= buf ^ (buf << 3);
 		buf = (ext ^ (ext >> 6)) & 0x00cc0000;
 		ext ^= buf ^ (buf << 6);
 	}
 
-	inline u32 empty() const { return empty64(); }
-	inline u32 empty64() const {
+	inline constexpr u32 empty() const { return empty64(); }
+	inline constexpr u32 empty64() const {
 		register u64 x = raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
@@ -248,7 +247,7 @@ public:
 		e += e >> 8;
 		return (e & 0x0f) + ((e >> 4) & 0x0f);
 	}
-	inline u32 empty80() const {
+	inline constexpr u32 empty80() const {
 		register u64 x = raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
@@ -312,7 +311,7 @@ public:
 		return true;
 	}
 
-	inline void clear() {
+	inline constexpr void clear() {
 		raw = 0;
 		ext = 0;
 	}
@@ -529,8 +528,8 @@ public:
 	inline i32 move64(u32 op) { return operate64(op); }
 	inline i32 move80(u32 op) { return operate80(op); }
 
-	inline u32 shift(u32 k = 0, u32 u = 0) { return shift64(k, u); }
-	inline u32 shift64(u32 k = 0, u32 u = 0) {
+	inline constexpr u32 shift(u32 k = 0, u32 u = 0) { return shift64(k, u); }
+	inline constexpr u32 shift64(u32 k = 0, u32 u = 0) {
 		u32 hash = hash64();
 		u32 tile = math::msb16(hash);
 		u32 mask = (((k ? (1 << k) : tile) << 1) - 1) & ~((2 << u) - 1);
@@ -543,7 +542,7 @@ public:
 		}
 		return h;
 	}
-	inline u32 shift80(u32 k = 0, u32 u = 0) {
+	inline constexpr u32 shift80(u32 k = 0, u32 u = 0) {
 		u32 hash = hash80();
 		u32 tile = math::msb16(hash);
 		u32 mask = (((k ? (1 << k) : tile) << 1) - 1) & ~((2 << u) - 1);
@@ -569,13 +568,13 @@ public:
 	inline u32 scale64() const { return species64(); }
 	inline u32 scale80() const { return species80(); }
 
-	inline u32 hash() const { return hash64(); }
-	inline u32 hash64() const {
+	inline constexpr u32 hash() const { return hash64(); }
+	inline constexpr u32 hash64() const {
 		register u32 h = 0;
 		for (u32 i = 0; i < 16; i++) h |= (1 << at4(i));
 		return h;
 	}
-	inline u32 hash80() const {
+	inline constexpr u32 hash80() const {
 		register u32 h = 0;
 		for (u32 i = 0; i < 16; i++) h |= (1 << at5(i));
 		return h;
@@ -617,30 +616,26 @@ public:
 		}
 	}
 
-	inline u32 count(u32 t) const { return count64(t); }
-	inline u32 count64(u32 t) const {
+	inline constexpr u32 count(u32 t) const { return count64(t); }
+	inline constexpr u32 count64(u32 t) const {
 		register u32 num = 0;
 		for (u32 i = 0; i < 16; i++)
 			if (at4(i) == t) num++;
 		return num;
 	}
-	inline u32 count80(u32 t) const {
+	inline constexpr u32 count80(u32 t) const {
 		register u32 num = 0;
 		for (u32 i = 0; i < 16; i++)
 			if (at5(i) == t) num++;
 		return num;
 	}
 
-	inline void count(u32 num[], u32 min, u32 max) const { return count64(num, min, max); }
-	inline void count64(u32 num[], u32 min, u32 max) const {
-		std::fill(num + min, num + max, 0);
-		for (u32 i = 0; i < 16; i++)
-			num[at4(i)]++;
+	inline constexpr void count(u32 num[], u32 min, u32 max) const { return count64(num, min, max); }
+	inline constexpr void count64(u32 num[], u32 min, u32 max) const {
+		for (u32 i = 0; i < 16; i++) num[at4(i)]++;
 	}
-	inline void count80(u32 num[], u32 min, u32 max) const {
-		std::fill(num + min, num + max, 0);
-		for (u32 i = 0; i < 16; i++)
-			num[at5(i)]++;
+	inline constexpr void count80(u32 num[], u32 min, u32 max) const {
+		for (u32 i = 0; i < 16; i++) num[at5(i)]++;
 	}
 
 	inline u32 mask(u32 t) const { return mask64(t); }
@@ -800,12 +795,12 @@ public:
 	class tile {
 	friend class board;
 	public:
-		inline tile(const tile& t) = default;
-		inline tile() = delete;
-		inline board& whole() const { return b; }
-		inline u32 where() const { return i; }
-		inline operator u32() const { return at(is(style::extend), is(style::exact)); }
-		inline tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
+		inline constexpr tile(const tile& t) = default;
+		inline constexpr tile() = delete;
+		inline constexpr board& whole() const { return b; }
+		inline constexpr u32 where() const { return i; }
+		inline constexpr operator u32() const { return at(is(style::extend), is(style::exact)); }
+		inline constexpr tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
 	public:
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
 			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
@@ -818,15 +813,15 @@ public:
 			return in;
 		}
 	protected:
-		inline tile(const board& b, u32 i) : b(const_cast<board&>(b)), i(i) {}
+		inline constexpr tile(const board& b, u32 i) : b(const_cast<board&>(b)), i(i) {}
 		board& b;
 		u32 i;
-		bool is(u32 item) const { return b.inf & item; }
-		u32 at(bool extend, bool exact) const {
+		inline constexpr bool is(u32 item) const { return b.inf & item; }
+		inline constexpr u32 at(bool extend, bool exact) const {
 			u32 v = extend ? b.at5(i) : b.at4(i);
 			return exact ? (1 << v) & -2u : v;
 		}
-		void set(u32 k, bool extend, bool exact) const {
+		inline constexpr void set(u32 k, bool extend, bool exact) const {
 			u32 v = exact ? math::lg(k) : k;
 			if (extend) b.set5(i, v); else b.set4(i, v);
 		}
@@ -839,29 +834,29 @@ public:
 		typedef tile& reference;
 		typedef iter pointer;
 		typedef std::forward_iterator_tag iterator_category;
-		inline iter(const iter& t) = default;
-		inline iter() = delete;
-		tile& operator *() { return *this; }
-		const tile& operator *() const { return *this; }
-		tile  operator ->() const { return *this; }
-		bool  operator ==(const iter& t) const { return ((b == t.b) & (i == t.i)); }
-		bool  operator !=(const iter& t) const { return ((b != t.b) | (i != t.i)); }
-		bool  operator < (const iter& t) const { return ((b == t.b) & (i < t.i)) | (b < t.b); }
-		i32   operator - (const iter& t) const { return i32(i) - i32(t.i); }
-		iter  operator + (u32 n) const { return iter(b, i + n); }
-		iter  operator - (u32 n) const { return iter(b, i - n); }
-		iter& operator +=(u32 n) { i += n; return *this; }
-		iter& operator -=(u32 n) { i -= n; return *this; }
-		iter& operator ++() { i += 1; return *this; }
-		iter& operator --() { i -= 1; return *this; }
-		iter  operator ++(int) { return iter(b, ++i - 1); }
-		iter  operator --(int) { return iter(b, --i + 1); }
+		inline constexpr iter(const iter& t) = default;
+		inline constexpr iter() = delete;
+		inline constexpr tile& operator *() { return *this; }
+		inline constexpr const tile& operator *() const { return *this; }
+		inline constexpr tile  operator ->() const { return *this; }
+		inline constexpr bool  operator ==(const iter& t) const { return ((b == t.b) & (i == t.i)); }
+		inline constexpr bool  operator !=(const iter& t) const { return ((b != t.b) | (i != t.i)); }
+		inline constexpr bool  operator < (const iter& t) const { return ((b == t.b) & (i < t.i)) | (b < t.b); }
+		inline constexpr i32   operator - (const iter& t) const { return i32(i) - i32(t.i); }
+		inline constexpr iter  operator + (u32 n) const { return iter(b, i + n); }
+		inline constexpr iter  operator - (u32 n) const { return iter(b, i - n); }
+		inline constexpr iter& operator +=(u32 n) { i += n; return *this; }
+		inline constexpr iter& operator -=(u32 n) { i -= n; return *this; }
+		inline constexpr iter& operator ++() { i += 1; return *this; }
+		inline constexpr iter& operator --() { i -= 1; return *this; }
+		inline constexpr iter  operator ++(int) { return iter(b, ++i - 1); }
+		inline constexpr iter  operator --(int) { return iter(b, --i + 1); }
 	protected:
-		inline iter(const board& b, u32 i) : tile(b, i) {};
+		inline constexpr iter(const board& b, u32 i) : tile(b, i) {};
 	};
-	inline tile operator [](u32 i) const { return tile(*this, i); }
-	inline iter begin() const { return iter(*this, 0); }
-	inline iter end() const { return iter(*this, 16); }
+	inline constexpr tile operator [](u32 i) const { return tile(*this, i); }
+	inline constexpr iter begin() const { return iter(*this, 0); }
+	inline constexpr iter end() const { return iter(*this, 16); }
 
 	class style {
 	public:
@@ -889,10 +884,10 @@ public:
 			raw80  = binary | extend,
 		};
 	};
-	inline board& format(u32 i = style::index) { info((i & style::full) | (inf & ~style::full)); return *this; }
+	inline constexpr board& format(u32 i = style::index) { info((i & style::full) | (inf & ~style::full)); return *this; }
 
-	inline u32 info(u32 i) { return std::exchange(inf, i); }
-	inline u32 info() const { return inf; }
+	inline constexpr u32 info(u32 i) { u32 val = inf; inf = i; return val; }
+	inline constexpr u32 info() const { return inf; }
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
 		if (b.inf & style::binary) {
