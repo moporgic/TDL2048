@@ -50,9 +50,6 @@ public:
 	declare_comparators(weight, sign());
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
-		auto& id = w.id;
-		auto& length = w.length;
-		auto& raw = w.raw;
 		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -61,11 +58,11 @@ public:
 			std::cerr << "use default (4) instead..." << std::endl;
 			// no break
 		case 4:
-			write_cast<u32>(out, id);
+			write_cast<u32>(out, w.sign());
 			write_cast<u32>(out, 0);
-			write_cast<u16>(out, sizeof(numeric));
-			write_cast<u64>(out, length);
-			write_cast<numeric>(out, raw, raw + length);
+			write_cast<u16>(out, sizeof(weight::numeric));
+			write_cast<u64>(out, w.size());
+			write_cast<numeric>(out, w.value().begin(), w.value().end());
 			write_cast<u16>(out, 0);
 			break;
 		}
