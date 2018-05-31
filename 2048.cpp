@@ -40,12 +40,12 @@ public:
 	inline ~weight() {}
 
 	typedef moporgic::numeric numeric;
+	typedef weight::numeric segment;
 
 	inline u64 sign() const { return id; }
 	inline size_t size() const { return length; }
-	inline size_t stride() const { return 1ull; }
 	inline numeric& operator [](u64 i) { return raw[i]; }
-	inline numeric* data(u64 i = 0) { return raw + i; }
+	inline segment* data(u64 i = 0) { return raw + i; }
 	inline clip<numeric> value() const { return { raw, raw + length }; }
 	declare_comparators(weight, sign());
 
@@ -196,16 +196,12 @@ public:
 private:
 	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
 
-	static inline numeric* alloc(size_t size) {
-		return new numeric[size]();
-	}
-	static inline void free(numeric* v) {
-		delete[] v;
-	}
+	static inline segment* alloc(size_t size) { return new segment[size](); }
+	static inline void free(segment* v) { delete[] v; }
 
 	u64 id;
 	size_t length;
-	numeric* raw;
+	segment* raw;
 };
 
 class indexer {
@@ -1263,7 +1259,7 @@ u32 make_weights(std::string res = "") {
 			signs = signs.substr(signs.find('=') + 1);
 			weight wsrc = weight::at(prev);
 			weight wdst = weight::make(sign, wsrc.size());
-			std::copy_n(wsrc.data(), wsrc.size() * wsrc.stride(), wdst.data());
+			std::copy_n(wsrc.data(), wsrc.size(), wdst.data());
 			weight::erase(prev);
 		}
 
