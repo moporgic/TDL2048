@@ -40,34 +40,21 @@ public:
 	inline ~weight() {}
 
 	typedef moporgic::numeric numeric;
-	template<size_t i>
-	class block_t : public std::array<numeric, 3> {
-	public:
-		inline constexpr operator f32() const { return operator [](i); }
-		inline constexpr operator f64() const { return operator [](i); }
-		inline constexpr operator numeric&()  { return operator [](i); }
-		inline constexpr operator const numeric&() const { return operator [](i); }
-		inline constexpr numeric& operator =(const f16& f) { operator [](i) = f; return operator [](i); }
-		inline constexpr numeric& operator =(const f32& f) { operator [](i) = f; return operator [](i); }
-		inline constexpr numeric& operator =(const f64& f) { operator [](i) = f; return operator [](i); }
-		inline constexpr numeric& operator =(const block_t<i>& blk) { return operator =(blk[i]); }
-		declare_comparators_with(f32, f32(operator [](i)), v, constexpr);
-		declare_comparators_with(f64, f64(operator [](i)), v, constexpr);
-		declare_comparators(block_t<i>, operator [](i), constexpr);
-	};
-	struct block {
+	struct segment {
 		numeric value;
 		numeric accum;
 		numeric updvu;
+		inline constexpr segment() : value(0), accum(0), updvu(0) {}
+		inline constexpr segment(const segment& s) = default;
 		inline constexpr operator numeric&() { return value; }
 		inline constexpr operator numeric() const { return value; }
 	};
 
 	inline u64 sign() const { return id; }
 	inline size_t size() const { return length; }
-	inline block& operator [](u64 i) { return raw_cast<block>(raw[i]); }
-	inline block& operator ()(u64 i, numeric alpha, numeric error) {
-		block&   block = operator [](i);
+	inline numeric& operator [](u64 i) { return raw[i]; }
+	inline numeric& operator ()(u64 i, numeric alpha, numeric error) {
+		segment& block = raw[i];
 		numeric& value = block.value;
 		numeric& accum = block.accum;
 		numeric& updvu = block.updvu;
@@ -75,33 +62,43 @@ public:
 		value += updvu ? (std::abs(accum) / updvu) * aupdv : aupdv;
 		accum += error;
 		updvu += std::abs(error);
-		return block;
+		return value;
 	}
+	inline segment* data(u64 i = 0) { return raw + i; }
 
-	inline clip<block_t<0>> value() const { return { cast<block_t<0>*>(raw), cast<block_t<0>*>(raw) + length }; }
-	inline clip<block_t<1>> accum() const { return { cast<block_t<1>*>(raw), cast<block_t<1>*>(raw) + length }; }
-	inline clip<block_t<2>> updvu() const { return { cast<block_t<2>*>(raw), cast<block_t<2>*>(raw) + length }; }
-
-	inline block* data(u64 i = 0) { return pointer_cast<block>(raw + i); }
+	template<size_t i>
+	struct block : std::array<numeric, 3> {
+		inline constexpr operator f32() const { return operator [](i); }
+		inline constexpr operator f64() const { return operator [](i); }
+		inline constexpr operator numeric&()  { return operator [](i); }
+		inline constexpr operator const numeric&() const { return operator [](i); }
+		inline constexpr numeric& operator =(const f16& f) { operator [](i) = f; return operator [](i); }
+		inline constexpr numeric& operator =(const f32& f) { operator [](i) = f; return operator [](i); }
+		inline constexpr numeric& operator =(const f64& f) { operator [](i) = f; return operator [](i); }
+		inline constexpr numeric& operator =(const block<i>& blk) { return operator =(blk[i]); }
+		declare_comparators_with(f32, f32(operator [](i)), v, constexpr);
+		declare_comparators_with(f64, f64(operator [](i)), v, constexpr);
+		declare_comparators(block<i>, operator [](i), constexpr);
+	};
+	inline clip<block<0>> value() const { return { cast<block<0>*>(raw), cast<block<0>*>(raw) + length }; }
+	inline clip<block<1>> accum() const { return { cast<block<1>*>(raw), cast<block<1>*>(raw) + length }; }
+	inline clip<block<2>> updvu() const { return { cast<block<2>*>(raw), cast<block<2>*>(raw) + length }; }
 	declare_comparators(weight, sign());
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
-		auto& id = w.id;
-		auto& length = w.length;
-		auto& raw = w.raw;
 		u32 code = 128;
 		write_cast<u8>(out, code);
 		switch (code) {
 		case 128:
-			write_cast<u32>(out, id);
+			write_cast<u32>(out, w.sign());
 			write_cast<u32>(out, 0);
-			write_cast<u16>(out, sizeof(numeric));
-			write_cast<u64>(out, length);
-			write_cast<numeric>(out, cast<block_t<0>*>(raw), cast<block_t<0>*>(raw) + length);
-			write_cast<u16>(out, sizeof(numeric));
-			write_cast<u64>(out, length + length);
-			write_cast<numeric>(out, cast<block_t<1>*>(raw), cast<block_t<1>*>(raw) + length); // accum
-			write_cast<numeric>(out, cast<block_t<2>*>(raw), cast<block_t<2>*>(raw) + length); // updvu
+			write_cast<u16>(out, sizeof(weight::numeric));
+			write_cast<u64>(out, w.size());
+			write_cast<numeric>(out, w.value().begin(), w.value().end());
+			write_cast<u16>(out, sizeof(weight::numeric));
+			write_cast<u64>(out, w.size() + w.size());
+			write_cast<numeric>(out, w.accum().begin(), w.accum().end());
+			write_cast<numeric>(out, w.updvu().begin(), w.updvu().end());
 			write_cast<u16>(out, 0);
 			break;
 		default:
@@ -109,11 +106,11 @@ public:
 			std::cerr << "use default (4) instead..." << std::endl;
 			// no break
 		case 4:
-			write_cast<u32>(out, id);
+			write_cast<u32>(out, w.sign());
 			write_cast<u32>(out, 0);
-			write_cast<u16>(out, sizeof(numeric));
-			write_cast<u64>(out, length);
-			write_cast<numeric>(out, cast<block_t<0>*>(raw), cast<block_t<0>*>(raw) + length);
+			write_cast<u16>(out, sizeof(weight::numeric));
+			write_cast<u64>(out, w.size());
+			write_cast<numeric>(out, w.value().begin(), w.value().end());
 			write_cast<u16>(out, 0);
 			break;
 		}
@@ -122,15 +119,7 @@ public:
 	friend std::istream& operator >>(std::istream& in, weight& w) {
     	auto& id = w.id;
     	auto& length = w.length;
-    	block_t<0>* value = nullptr;
-    	block_t<1>* accum = nullptr;
-    	block_t<2>* updvu = nullptr;
-    	auto raw_init = [&](size_t len) {
-    		w.raw = weight::alloc(len);
-    		value = cast<block_t<0>*>(w.raw);
-    		accum = cast<block_t<1>*>(w.raw);
-    		updvu = cast<block_t<2>*>(w.raw);
-    	};
+    	auto& raw = w.raw;
 		u32 code;
 		read_cast<u8>(in, code);
 		switch (code) {
@@ -143,27 +132,27 @@ public:
 				read_cast<u16>(in, code);
 			else
 				code = code == 1 ? 8 : 4;
-			raw_init(length);
+			raw = weight::alloc(length);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + length); break;
-			case 8: read_cast<f64>(in, value, value + length); break;
+			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
+			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
 			break;
 		case 127:
 			read_cast<u32>(in, id);
 			read_cast<u64>(in, length);
-			raw_init(length);
+			raw = weight::alloc(length);
 			read_cast<u16>(in, code);
 			switch (code) {
 			case 4:
-				read_cast<f32>(in, value, value + length);
-				read_cast<f32>(in, accum, accum + length);
-				read_cast<f32>(in, updvu, updvu + length);
+				read_cast<f32>(in, w.value().begin(), w.value().end());
+				read_cast<f32>(in, w.accum().begin(), w.accum().end());
+				read_cast<f32>(in, w.updvu().begin(), w.updvu().end());
 				break;
 			case 8:
-				read_cast<f64>(in, value, value + length);
-				read_cast<f64>(in, accum, accum + length);
-				read_cast<f64>(in, updvu, updvu + length);
+				read_cast<f64>(in, w.value().begin(), w.value().end());
+				read_cast<f64>(in, w.accum().begin(), w.accum().end());
+				read_cast<f64>(in, w.updvu().begin(), w.updvu().end());
 				break;
 			}
 			break;
@@ -172,21 +161,21 @@ public:
 			read_cast<u32>(in, code);
 			read_cast<u16>(in, code);
 			read_cast<u64>(in, length);
-			raw_init(length);
+			raw = weight::alloc(length);
 			switch (code) {
-			case 4: read_cast<f32>(in, value, value + length); break;
-			case 8: read_cast<f64>(in, value, value + length); break;
+			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
+			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
 			read_cast<u16>(in, code);
 			in.ignore(8); // == length + length
 			switch (code) {
 			case 4:
-				read_cast<f32>(in, accum, accum + length);
-				read_cast<f32>(in, updvu, updvu + length);
+				read_cast<f32>(in, w.accum().begin(), w.accum().end());
+				read_cast<f32>(in, w.updvu().begin(), w.updvu().end());
 				break;
 			case 8:
-				read_cast<f64>(in, accum, accum + length);
-				read_cast<f64>(in, updvu, updvu + length);
+				read_cast<f64>(in, w.accum().begin(), w.accum().end());
+				read_cast<f64>(in, w.updvu().begin(), w.updvu().end());
 				break;
 			}
 			while (read_cast<u16>(in, code) && code) {
@@ -203,11 +192,11 @@ public:
 			read_cast<u32>(in, code);
 			read_cast<u16>(in, code);
 			read_cast<u64>(in, length);
-			raw_init(length);
+			raw = weight::alloc(length);
 			switch (code) {
-			case 2: read_cast<f16>(in, value, value + length); break;
-			case 4: read_cast<f32>(in, value, value + length); break;
-			case 8: read_cast<f64>(in, value, value + length); break;
+			case 2: read_cast<f16>(in, w.value().begin(), w.value().end()); break;
+			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
+			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
 			while (read_cast<u16>(in, code) && code) {
 				u64 skip; read_cast<u64>(in, skip);
@@ -286,12 +275,12 @@ public:
 private:
 	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
 
-	static inline block* alloc(size_t size) { return new block[size](); }
-	static inline void free(block* v) { delete[] v; }
+	static inline segment* alloc(size_t size) { return new segment[size](); }
+	static inline void free(segment* v) { delete[] v; }
 
 	u64 id;
 	size_t length;
-	block* raw;
+	segment* raw;
 };
 
 class indexer {
@@ -1523,7 +1512,7 @@ void list_mapping() {
 			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
 			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
 			int n = snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c", w.sign(), w.size(), usage, scale);
-			u32 stride = sizeof(weight::block) / sizeof(weight::numeric);
+			u32 stride = sizeof(weight::segment) / sizeof(weight::numeric);
 			if (stride > 1) snprintf(buf + n, sizeof(buf) - n, " x%u", stride);
 			std::cout << buf << " :" << feats << std::endl;
 		} else {
