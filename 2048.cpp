@@ -1507,12 +1507,11 @@ struct select {
 	state move[4];
 	state *best;
 	inline select() : best(move) {}
-	template<board::action::opcode type = board::action::x64>
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats()) {
-		move[0].assign(b, 0 | type);
-		move[1].assign(b, 1 | type);
-		move[2].assign(b, 2 | type);
-		move[3].assign(b, 3 | type);
+		move[0].assign(b, 0);
+		move[1].assign(b, 1);
+		move[2].assign(b, 2);
+		move[3].assign(b, 3);
 		move[0].estimate(range);
 		move[1].estimate(range);
 		move[2].estimate(range);
