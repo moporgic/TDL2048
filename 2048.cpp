@@ -1463,24 +1463,22 @@ inline numeric optimize(const board& state, numeric error, numeric alpha,
 
 
 struct state {
-	typedef i32 (board::*action)();
 	board move;
-	action oper;
 	i32 score;
 	numeric esti;
-	state() : state(nullptr) {}
-	state(action oper) : oper(oper), score(-1), esti(0) {}
-	state(const state& s) = default;
+	inline state() : score(-1), esti(0) {}
+	inline state(const state& s) = default;
 
 	inline operator bool() const { return score >= 0; }
 	inline operator board() const { return move; }
+	declare_comparators(state, esti);
 
 	inline numeric value() const { return esti - score; }
 	inline numeric reward() const { return score; }
 
-	inline void assign(const board& b) {
+	inline void assign(const board& b, u32 op = -1) {
 		move = b;
-		score = (move.*oper)();
+		score = move.operate(op);
 	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats()) {
@@ -1497,11 +1495,6 @@ struct state {
 		return esti;
 	}
 
-	inline void operator <<(const board& b) { assign(b); estimate(); }
-	inline void operator >>(board& b) const { b = move; }
-
-	declare_comparators(state, esti);
-
 	inline static numeric& alpha() {
 		static numeric a = numeric(0.0025);
 		return a;
@@ -1513,18 +1506,13 @@ struct state {
 struct select {
 	state move[4];
 	state *best;
-	select(state::action up = &board::up, state::action right = &board::right,
-		   state::action down = &board::down, state::action left = &board::left) : best(move) {
-		move[0] = state(up);
-		move[1] = state(right);
-		move[2] = state(down);
-		move[3] = state(left);
-	}
+	inline select() : best(move) {}
+	template<board::action::opcode type = board::action::x64>
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats()) {
-		move[0].assign(b);
-		move[1].assign(b);
-		move[2].assign(b);
-		move[3].assign(b);
+		move[0].assign(b, 0 | type);
+		move[1].assign(b, 1 | type);
+		move[2].assign(b, 2 | type);
+		move[3].assign(b, 3 | type);
 		move[0].estimate(range);
 		move[1].estimate(range);
 		move[2].estimate(range);
@@ -1538,7 +1526,7 @@ struct select {
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
-	inline void operator >>(board& b) const { *best >> b; }
+	inline void operator >>(board& b) const { b = best->move; }
 
 	inline operator bool() const { return score() != -1; }
 	inline i32 score() const { return best->score; }
