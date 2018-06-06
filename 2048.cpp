@@ -1495,20 +1495,12 @@ struct state {
 		return esti;
 	}
 
-	inline static numeric& alpha() {
-		static numeric a = numeric(0.0025);
-		return a;
-	}
-	inline static numeric& alpha(numeric a) {
-		return (state::alpha() = a);
-	}
-	inline static std::pair<u32, u32>& lambda() {
-		static std::pair<u32, u32> l = { 0, 1 };
-		return l;
-	}
-	inline static std::pair<u32, u32>& lambda(const u32& l, const u32& m) {
-		return (state::lambda() = { l, m });
-	}
+	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
+	inline static numeric& alpha(numeric a) { return (state::alpha() = a); }
+	inline static u32& lambda() { static u32 l = 0; return l; }
+	inline static u32& lambda(u32 l) { return (state::lambda() = l); }
+	inline static u32& step() { static u32 n = 1; return n; }
+	inline static u32& step(u32 n) { return (state::step() = n); }
 };
 struct select {
 	state move[4];
@@ -1931,7 +1923,7 @@ statistic train(utils::options opts = {}) {
 				best >> b;
 			}
 
-			u32 l = state::lambda().first;
+			u32 l = state::lambda();
 
 			numeric z = 0;
 			numeric r = path.back().reward();
@@ -1982,8 +1974,8 @@ statistic train(utils::options opts = {}) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			u32 l = state::lambda().first;
-			u32 n = state::lambda().second;
+			u32 l = state::lambda();
+			u32 n = state::step();
 
 			b.init();
 			for (u32 i = 0; i < n && best << b; i++) {
@@ -2085,7 +2077,8 @@ int main(int argc, const char* argv[]) {
 	moporgic::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
 	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
-	state::lambda(opts["lambda"], opts["step"]);
+	state::lambda(opts["lambda"]);
+	state::step(opts["step"]);
 
 	if (statistic(opts["train"])) {
 		std::cout << std::endl << "start training..." << std::endl;
