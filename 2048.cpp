@@ -83,7 +83,7 @@ public:
 	inline clip<block<0>> value() const { return { cast<block<0>*>(raw), cast<block<0>*>(raw) + length }; }
 	inline clip<block<1>> accum() const { return { cast<block<1>*>(raw), cast<block<1>*>(raw) + length }; }
 	inline clip<block<2>> updvu() const { return { cast<block<2>*>(raw), cast<block<2>*>(raw) + length }; }
-	declare_comparators(weight, sign());
+	declare_comparators(weight, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
 		u32 code = 128;
@@ -294,7 +294,7 @@ public:
 	inline u64 sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return (*map)(b); }
-	declare_comparators(indexer, sign());
+	declare_comparators(indexer, sign(), inline);
 
 	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
@@ -336,7 +336,7 @@ public:
 
 	inline operator indexer() const { return index; }
 	inline operator weight() const { return value; }
-	declare_comparators(feature, sign());
+	declare_comparators(feature, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
 		auto& index = f.index;
@@ -1546,24 +1546,22 @@ inline numeric optimize(const board& state, numeric error, numeric alpha,
 
 
 struct state {
-	typedef i32 (board::*action)();
 	board move;
-	action oper;
 	i32 score;
 	numeric esti;
-	state() : state(nullptr) {}
-	state(action oper) : oper(oper), score(-1), esti(0) {}
-	state(const state& s) = default;
+	inline state() : score(-1), esti(0) {}
+	inline state(const state& s) = default;
 
 	inline operator bool() const { return score >= 0; }
 	inline operator board() const { return move; }
+	declare_comparators(state, esti, inline);
 
 	inline numeric value() const { return esti - score; }
 	inline numeric reward() const { return score; }
 
-	inline void assign(const board& b) {
+	inline void assign(const board& b, u32 op = -1) {
 		move = b;
-		score = (move.*oper)();
+		score = move.operate(op);
 	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats()) {
@@ -1580,11 +1578,6 @@ struct state {
 		return esti;
 	}
 
-	inline void operator <<(const board& b) { assign(b); estimate(); }
-	inline void operator >>(board& b) const { b = move; }
-
-	declare_comparators(state, esti);
-
 	inline static numeric& alpha() {
 		static numeric a = numeric(0.01);
 		return a;
@@ -1596,18 +1589,12 @@ struct state {
 struct select {
 	state move[4];
 	state *best;
-	select(state::action up = &board::up, state::action right = &board::right,
-		   state::action down = &board::down, state::action left = &board::left) : best(move) {
-		move[0] = state(up);
-		move[1] = state(right);
-		move[2] = state(down);
-		move[3] = state(left);
-	}
+	inline select() : best(move) {}
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats()) {
-		move[0].assign(b);
-		move[1].assign(b);
-		move[2].assign(b);
-		move[3].assign(b);
+		move[0].assign(b, 0);
+		move[1].assign(b, 1);
+		move[2].assign(b, 2);
+		move[3].assign(b, 3);
 		move[0].estimate(range);
 		move[1].estimate(range);
 		move[2].estimate(range);
@@ -1621,7 +1608,7 @@ struct select {
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
-	inline void operator >>(board& b) const { *best >> b; }
+	inline void operator >>(board& b) const { b = best->move; }
 
 	inline operator bool() const { return score() != -1; }
 	inline i32 score() const { return best->score; }
@@ -1820,7 +1807,7 @@ struct statistic {
 	}
 };
 
-inline utils::options parse(int argc, const char* argv[]) {
+utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
 	auto find_opt = [&](int& i, const std::string& v) -> std::string {
 		return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
