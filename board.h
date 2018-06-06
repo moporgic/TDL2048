@@ -31,7 +31,7 @@ public:
 
 	inline constexpr operator u64&() { return raw; }
 	inline constexpr operator u64() const { return raw; }
-	declare_comparators_with(const board&, raw_cast<u128>(*this), raw_cast<u128>(v), constexpr)
+	declare_comparators_with(const board&, raw_cast<u128>(*this), raw_cast<u128>(v), inline constexpr)
 
 public:
 	class cache {
