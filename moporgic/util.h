@@ -137,9 +137,11 @@ protected:
 	}
 };
 
-static inline void srand(uint32_t seed) { random::seed(seed); }
+static inline void srand(uint32_t seed = std::mt19937::default_seed, uint32_t seed64 = std::mt19937_64::default_seed) {
+	random::seed<std::mt19937>(seed);
+	random::seed<std::mt19937_64>(seed64);
+}
 static inline uint32_t rand()   { return uint32_t(random()); }
-
 static inline uint32_t rand16() { return uint32_t(random()) & 0xffffu; }
 static inline uint32_t rand32() { return uint32_t(random()); }
 static inline uint32_t rand31() { return uint32_t(random()) & 0x7fffffffu; }
