@@ -76,9 +76,9 @@ public:
 		inline constexpr numeric& operator =(const f32& f) { operator [](i) = f; return operator [](i); }
 		inline constexpr numeric& operator =(const f64& f) { operator [](i) = f; return operator [](i); }
 		inline constexpr numeric& operator =(const block<i>& blk) { return operator =(blk[i]); }
-		declare_comparators_with(f32, f32(operator [](i)), v, constexpr);
-		declare_comparators_with(f64, f64(operator [](i)), v, constexpr);
-		declare_comparators(block<i>, operator [](i), constexpr);
+		declare_comparators_with(f32, f32(operator [](i)), v, inline constexpr);
+		declare_comparators_with(f64, f64(operator [](i)), v, inline constexpr);
+		declare_comparators(block<i>, operator [](i), inline constexpr);
 	};
 	inline clip<block<0>> value() const { return { cast<block<0>*>(raw), cast<block<0>*>(raw) + length }; }
 	inline clip<block<1>> accum() const { return { cast<block<1>*>(raw), cast<block<1>*>(raw) + length }; }
