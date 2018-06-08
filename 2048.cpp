@@ -48,22 +48,18 @@ public:
 		inline constexpr segment(const segment& s) = default;
 		inline constexpr operator numeric&() { return value; }
 		inline constexpr operator numeric() const { return value; }
+
+		inline numeric& operator +=(numeric aupdv) {
+			value += updvu ? (std::abs(accum) / updvu) * aupdv : aupdv;
+			accum += aupdv;
+			updvu += std::abs(aupdv);
+			return value;
+		}
 	};
 
 	inline u64 sign() const { return id; }
 	inline size_t size() const { return length; }
-	inline numeric& operator [](u64 i) { return raw[i]; }
-	inline numeric& operator ()(u64 i, numeric alpha, numeric error) {
-		segment& block = raw[i];
-		numeric& value = block.value;
-		numeric& accum = block.accum;
-		numeric& updvu = block.updvu;
-		numeric  aupdv = alpha * error;
-		value += updvu ? (std::abs(accum) / updvu) * aupdv : aupdv;
-		accum += error;
-		updvu += std::abs(error);
-		return value;
-	}
+	inline segment& operator [](u64 i) { return raw[i]; }
 	inline segment* data(u64 i = 0) { return raw + i; }
 
 	template<size_t i>
@@ -330,8 +326,8 @@ public:
 	inline ~feature() {}
 
 	inline u64 sign() const { return (value.sign() << 32) | index.sign(); }
-	inline weight::numeric& operator [](const board& b) { return value[index(b)]; }
-	inline weight::numeric& operator [](u64 idx) { return value[idx]; }
+	inline weight::segment& operator [](const board& b) { return value[index(b)]; }
+	inline weight::segment& operator [](u64 idx) { return value[idx]; }
 	inline u64 operator ()(const board& b) const { return index(b); }
 
 	inline operator indexer() const { return index; }
@@ -1536,9 +1532,10 @@ inline numeric estimate(const board& state,
 
 inline numeric optimize(const board& state, numeric error, numeric alpha,
 		clip<feature> range = feature::feats()) {
+	register numeric updv = alpha * error;
 	register numeric esti = 0;
 	for (register feature& feat : range)
-		esti += weight(feat)(feat(state), alpha, error);
+		esti += (feat[state] += updv);
 	return esti;
 }
 
