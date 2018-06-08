@@ -404,6 +404,35 @@ numeric deviation(iter first, iter last) noexcept {
 	return deviation<numeric>(first, last, mean<numeric>(first, last));
 }
 
+// reference: https://github.com/aappleby/smhasher/wiki/MurmurHash3
+//            https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
+
+/**
+ * Finalization mix - force all bits of a hash block to avalanche
+ */
+static inline constexpr
+uint32_t fmix32 (register uint32_t h) {
+	h ^= h >> 16;
+	h *= 0x85ebca6b;
+	h ^= h >> 13;
+	h *= 0xc2b2ae35;
+	h ^= h >> 16;
+	return h;
+}
+
+/**
+ * Finalization mix - force all bits of a hash block to avalanche
+ */
+static inline constexpr
+uint64_t fmix64 (register uint64_t h) {
+	h ^= h >> 33;
+	h *= 0xff51afd7ed558ccdull;
+	h ^= h >> 33;
+	h *= 0xc4ceb9fe1a85ec53ull;
+	h ^= h >> 33;
+	return h;
+}
+
 } /* math */
 
 /**

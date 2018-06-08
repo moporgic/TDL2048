@@ -80,19 +80,16 @@ public:
 	inline ~weight() {}
 
 	typedef moporgic::numeric numeric;
+	typedef weight::numeric segment;
 
 	inline u64 sign() const { return id; }
 	inline size_t size() const { return length; }
-	inline size_t stride() const { return 1ull; }
 	inline numeric& operator [](u64 i) { return raw[i]; }
-	inline numeric* data(u64 i = 0) { return raw + i; }
+	inline segment* data(u64 i = 0) { return raw + i; }
 	inline clip<numeric> value() const { return { raw, raw + length }; }
-	declare_comparators(weight, sign());
+	declare_comparators(weight, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
-		auto& id = w.id;
-		auto& length = w.length;
-		auto& raw = w.raw;
 		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -101,11 +98,11 @@ public:
 			std::cerr << "use default (4) instead..." << std::endl;
 			// no break
 		case 4:
-			write_cast<u32>(out, id);
+			write_cast<u32>(out, w.sign());
 			write_cast<u32>(out, 0);
-			write_cast<u16>(out, sizeof(numeric));
-			write_cast<u64>(out, length);
-			write_cast<numeric>(out, raw, raw + length);
+			write_cast<u16>(out, sizeof(weight::numeric));
+			write_cast<u64>(out, w.size());
+			write_cast<numeric>(out, w.value().begin(), w.value().end());
 			write_cast<u16>(out, 0);
 			break;
 		}
@@ -236,16 +233,12 @@ public:
 private:
 	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
 
-	static inline numeric* alloc(size_t size) {
-		return shm::alloc<numeric>(size);
-	}
-	static inline void free(numeric* v) {
-		shm::free(v);
-	}
+	static inline numeric* alloc(size_t size) { return shm::alloc<numeric>(size); }
+	static inline void free(numeric* v) { shm::free(v); }
 
 	u64 id;
 	size_t length;
-	numeric* raw;
+	segment* raw;
 };
 
 class indexer {
@@ -259,7 +252,7 @@ public:
 	inline u64 sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return (*map)(b); }
-	declare_comparators(indexer, sign());
+	declare_comparators(indexer, sign(), inline);
 
 	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
@@ -301,7 +294,7 @@ public:
 
 	inline operator indexer() const { return index; }
 	inline operator weight() const { return value; }
-	declare_comparators(feature, sign());
+	declare_comparators(feature, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
 		auto& index = f.index;
@@ -702,40 +695,40 @@ u64 indexnum4(const board& b) { // 24-bit
 	index |= (num[0] + num[1] + num[2] + num[3]) << 0; // 0+2+4+8, 4-bit
 	index |= (num[4] + num[5] + num[6]) << 4; // 16+32+64, 4-bit
 	index |= (num[7] + num[8]) << 8; // 128+256, 4-bit
-	index |= std::min(num[9] + num[10], 7u) << 12; // 512+1024, 3-bit
-	index |= std::min(num[11], 3u) << 15; // 2048~16384, 2-bit ea.
-	index |= std::min(num[12], 3u) << 17;
-	index |= std::min(num[13], 3u) << 19;
-	index |= std::min(num[14], 3u) << 21;
-	index |= std::min(num[15], 1u) << 23; // 32768, 1-bit
+	index |= std::min(u32(num[9] + num[10]), 7u) << 12; // 512+1024, 3-bit
+	index |= std::min(u32(num[11]), 3u) << 15; // 2048~16384, 2-bit ea.
+	index |= std::min(u32(num[12]), 3u) << 17;
+	index |= std::min(u32(num[13]), 3u) << 19;
+	index |= std::min(u32(num[14]), 3u) << 21;
+	index |= std::min(u32(num[15]), 1u) << 23; // 32768, 1-bit
 	return index;
 }
 
 u64 indexnum5lt(const board& b) { // 24-bit
 	auto num = b.numof();
 	register u64 index = 0;
-	index |= std::min(num[8],  7u) <<  0; // 256, 3-bit
-	index |= std::min(num[9],  7u) <<  3; // 512, 3-bit
-	index |= std::min(num[10], 7u) <<  6; // 1024, 3-bit
-	index |= std::min(num[11], 7u) <<  9; // 2048, 3-bit
-	index |= std::min(num[12], 7u) << 12; // 4096, 3-bit
-	index |= std::min(num[13], 7u) << 15; // 8192, 3-bit
-	index |= std::min(num[14], 7u) << 18; // 16384, 3-bit
-	index |= std::min(num[15], 7u) << 21; // 32768, 3-bit
+	index |= std::min(u32(num[8]),  7u) <<  0; // 256, 3-bit
+	index |= std::min(u32(num[9]),  7u) <<  3; // 512, 3-bit
+	index |= std::min(u32(num[10]), 7u) <<  6; // 1024, 3-bit
+	index |= std::min(u32(num[11]), 7u) <<  9; // 2048, 3-bit
+	index |= std::min(u32(num[12]), 7u) << 12; // 4096, 3-bit
+	index |= std::min(u32(num[13]), 7u) << 15; // 8192, 3-bit
+	index |= std::min(u32(num[14]), 7u) << 18; // 16384, 3-bit
+	index |= std::min(u32(num[15]), 7u) << 21; // 32768, 3-bit
 	return index;
 }
 
 u64 indexnum5st(const board& b) { // 24-bit
 	auto num = b.numof();
 	register u64 index = 0;
-	index |= std::min(num[0], 7u) <<  0; // 0, 3-bit
-	index |= std::min(num[1], 7u) <<  3; // 2, 3-bit
-	index |= std::min(num[2], 7u) <<  6; // 4, 3-bit
-	index |= std::min(num[3], 7u) <<  9; // 8, 3-bit
-	index |= std::min(num[4], 7u) << 12; // 16, 3-bit
-	index |= std::min(num[5], 7u) << 15; // 32, 3-bit
-	index |= std::min(num[6], 7u) << 18; // 64, 3-bit
-	index |= std::min(num[7], 7u) << 21; // 128, 3-bit
+	index |= std::min(u32(num[0]), 7u) <<  0; // 0, 3-bit
+	index |= std::min(u32(num[1]), 7u) <<  3; // 2, 3-bit
+	index |= std::min(u32(num[2]), 7u) <<  6; // 4, 3-bit
+	index |= std::min(u32(num[3]), 7u) <<  9; // 8, 3-bit
+	index |= std::min(u32(num[4]), 7u) << 12; // 16, 3-bit
+	index |= std::min(u32(num[5]), 7u) << 15; // 32, 3-bit
+	index |= std::min(u32(num[6]), 7u) << 18; // 64, 3-bit
+	index |= std::min(u32(num[7]), 7u) << 21; // 128, 3-bit
 	return index;
 }
 
@@ -765,7 +758,7 @@ template<int p0, int p1, int p2, int p3, int p4, int p5, int p6, int p7>
 u64 indexmono(const board& b) { // 24-bit
 	u32 h0 = (b.at(p0)) | (b.at(p1) << 4) | (b.at(p2) << 8) | (b.at(p3) << 12);
 	u32 h1 = (b.at(p4)) | (b.at(p5) << 4) | (b.at(p6) << 8) | (b.at(p7) << 12);
-	return (board::lookup[h0].left.mono) | (board::lookup[h1].left.mono << 12);
+	return (board::cache::load(h0).left.mono) | (board::cache::load(h1).left.mono << 12);
 }
 
 template<u32 tile, int isomorphic>
@@ -1303,7 +1296,7 @@ u32 make_weights(std::string res = "") {
 			signs = signs.substr(signs.find('=') + 1);
 			weight wsrc = weight::at(prev);
 			weight wdst = weight::make(sign, wsrc.size());
-			std::copy_n(wsrc.data(), wsrc.size() * wsrc.stride(), wdst.data());
+			std::copy_n(wsrc.data(), wsrc.size(), wdst.data());
 			weight::erase(prev);
 		}
 
@@ -1510,24 +1503,22 @@ inline numeric optimize(const board& state, numeric error, numeric alpha,
 
 
 struct state {
-	typedef i32 (board::*action)();
 	board move;
-	action oper;
 	i32 score;
 	numeric esti;
-	state() : state(nullptr) {}
-	state(action oper) : oper(oper), score(-1), esti(0) {}
-	state(const state& s) = default;
+	inline state() : score(-1), esti(0) {}
+	inline state(const state& s) = default;
 
 	inline operator bool() const { return score >= 0; }
 	inline operator board() const { return move; }
+	declare_comparators(state, esti, inline);
 
 	inline numeric value() const { return esti - score; }
 	inline numeric reward() const { return score; }
 
-	inline void assign(const board& b) {
+	inline void assign(const board& b, u32 op = -1) {
 		move = b;
-		score = (move.*oper)();
+		score = move.operate(op);
 	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats()) {
@@ -1544,11 +1535,6 @@ struct state {
 		return esti;
 	}
 
-	inline void operator <<(const board& b) { assign(b); estimate(); }
-	inline void operator >>(board& b) const { b = move; }
-
-	declare_comparators(state, esti);
-
 	inline static numeric& alpha() {
 		static numeric a = numeric(0.0025);
 		return a;
@@ -1560,18 +1546,12 @@ struct state {
 struct select {
 	state move[4];
 	state *best;
-	select(state::action up = &board::up, state::action right = &board::right,
-		   state::action down = &board::down, state::action left = &board::left) : best(move) {
-		move[0] = state(up);
-		move[1] = state(right);
-		move[2] = state(down);
-		move[3] = state(left);
-	}
+	inline select() : best(move) {}
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats()) {
-		move[0].assign(b);
-		move[1].assign(b);
-		move[2].assign(b);
-		move[3].assign(b);
+		move[0].assign(b, 0);
+		move[1].assign(b, 1);
+		move[2].assign(b, 2);
+		move[3].assign(b, 3);
 		move[0].estimate(range);
 		move[1].estimate(range);
 		move[2].estimate(range);
@@ -1585,7 +1565,7 @@ struct select {
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
-	inline void operator >>(board& b) const { *best >> b; }
+	inline void operator >>(board& b) const { b = best->move; }
 
 	inline operator bool() const { return score() != -1; }
 	inline i32 score() const { return best->score; }
@@ -1653,7 +1633,7 @@ struct statistic {
 
 		auto npos = std::string::npos;
 		auto it = std::find_if(opt.begin(), opt.end(), [=](std::string v) { return v.find('=') == npos; });
-		std::string res = (it != opt.end()) ? *it : "1000";
+		std::string res = (it != opt.end()) ? *it : (opt.empty() ? "1000" : "0");
 		try {
 			loop = std::stol(res);
 			if (res.find('x') != npos) unit = std::stol(res.substr(res.find('x') + 1));
@@ -1793,7 +1773,7 @@ struct statistic {
 	}
 };
 
-inline utils::options parse(int argc, const char* argv[]) {
+utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
 	auto find_opt = [&](int& i, const std::string& v) -> std::string {
 		return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
@@ -1808,6 +1788,7 @@ inline utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
 			opts["alpha"] = find_opt(i, std::to_string(state::alpha()));
+			opts["alpha"] += find_opts(i);
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
@@ -2045,8 +2026,8 @@ statistic test(utils::options opts = {}) {
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (!opts("train")) opts["train"] = opts("test") ? 0 : 1000;
-	if (!opts("test")) opts["test"] = opts("train") ? 0 : 10;
-	if (!opts("alpha")) opts["alpha"] = 0.0025;
+	if (!opts("test")) opts["test"] = opts("train") ? 0 : 1000;
+	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = rdtsc();
 	if (!opts("thread")) opts["thread"] = 1;
 	shm::hook = opts["shared-memory"].find("hook", argv[0]);
@@ -2063,18 +2044,16 @@ int main(int argc, const char* argv[]) {
 	std::cout << "shm = " << shm::hook << std::endl;
 	std::cout << std::endl;
 
-	std::srand(moporgic::to_hash(opts["seed"]));
-	state::alpha(std::stod(opts["alpha"]));
-
 	utils::make_indexers();
-
 	utils::load_weights(opts["weight-input"]);
 	utils::make_weights(opts["weight-value"]);
-
 	utils::load_features(opts["feature-input"]);
 	utils::make_features(opts["feature-value"]);
-
 	utils::list_mapping();
+
+	moporgic::srand(moporgic::to_hash(opts["seed"]));
+	state::alpha(std::stod(opts["alpha"]));
+	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
 
 	if (statistic(opts["train"])) {
 		std::cout << std::endl << "start training..." << std::endl;

@@ -1,7 +1,48 @@
-/bin/
-/Release/
-/Debug/
+# Folders and settings
+/bin
+/Release
+/Debug
+/Default
+/__pycache__
+/.settings
+/.project
+/.cproject
+/.pydevproject
+/.issues
 
-[Tt]humbs.db
+# Executables
+*.exe
+*.out
+*.app
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Prerequisites
+*.d
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# System caches
 *.DS_Store
-/.settings/
+[Tt]humbs.db
