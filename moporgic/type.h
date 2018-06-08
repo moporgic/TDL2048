@@ -364,7 +364,7 @@ protected:
 	}
 };
 
-class hexadeca {
+class hexadeca { // iter?
 public:
 	constexpr hexadeca(u64 hex = 0) noexcept : hex(hex) {}
 	constexpr operator u64&() noexcept { return hex; }
@@ -391,9 +391,36 @@ public:
 		constexpr cell& operator --() noexcept { return operator -=(1); }
 		constexpr u32 operator ++(int) noexcept { u32 v = operator u32(); operator ++(); return v; }
 		constexpr u32 operator --(int) noexcept { u32 v = operator u32(); operator --(); return v; }
-	private:
+	protected:
 		u64& ref;
 		u32 idx;
+	};
+	class iter : cell {
+		friend class hexadeca;
+	public:
+		typedef u32 value_type;
+		typedef i32 difference_type;
+		typedef cell& reference;
+		typedef iter pointer;
+		typedef std::forward_iterator_tag iterator_category;
+		constexpr iter() noexcept = delete;
+		constexpr iter(const cell& c) noexcept : cell(c) {};
+		constexpr iter(u64& ref, u32 idx) noexcept : cell(ref, idx) {};
+		constexpr cell& operator *() noexcept { return *this; }
+		constexpr const cell& operator *() const noexcept { return *this; }
+		constexpr cell  operator ->() const noexcept { return *this; }
+		constexpr bool  operator ==(const iter& t) const noexcept { return ((ref == t.ref) & (idx == t.idx)); }
+		constexpr bool  operator !=(const iter& t) const noexcept { return ((ref != t.ref) | (idx != t.idx)); }
+		constexpr bool  operator < (const iter& t) const noexcept { return ((ref == t.ref) & (idx < t.idx)) | (ref < t.ref); }
+		constexpr i32   operator - (const iter& t) const noexcept { return i32(idx) - i32(t.idx); }
+		constexpr iter  operator + (u32 n) const noexcept { return iter(ref, idx + n); }
+		constexpr iter  operator - (u32 n) const noexcept { return iter(ref, idx - n); }
+		constexpr iter& operator +=(u32 n) noexcept { idx += n; return *this; }
+		constexpr iter& operator -=(u32 n) noexcept { idx -= n; return *this; }
+		constexpr iter& operator ++() noexcept { idx += 1; return *this; }
+		constexpr iter& operator --() noexcept { idx -= 1; return *this; }
+		constexpr iter  operator ++(int) noexcept { return iter(ref, ++idx - 1); }
+		constexpr iter  operator --(int) noexcept { return iter(ref, --idx + 1); }
 	};
 public:
 	constexpr cell operator [](u32 idx) const noexcept { return cell(const_cast<u64&>(hex), idx); }
@@ -404,6 +431,8 @@ public:
 	constexpr size_t max_size() const noexcept { return 16; }
 	constexpr bool empty() const noexcept { return size() == 0; }
 	constexpr void clear() { hex = 0; }
+	constexpr iter begin() const noexcept { return iter(operator [](0)); }
+	constexpr iter end() const noexcept { return iter(operator [](size())); }
 	constexpr cell front() const noexcept { return at(0); }
 	constexpr cell back() const noexcept { return at(size() - 1); }
 	constexpr void push_front(u32 v) noexcept { u32 n = size(); hex <<= 4; at(0) = v; resize(n + 1); }
@@ -420,7 +449,33 @@ public:
 	constexpr hexadeca& exten() noexcept { return raw_cast<hexadeca>(ext); }
 	constexpr hexadeca exten() const noexcept { return raw_cast<hexadeca>(ext); }
 public:
-	constexpr cell operator [](u32 idx) const noexcept { return cell(cast<u64*>(this)[idx >> 4], idx); }
+	class iter : cell {
+		friend class hexadeca;
+	public:
+		typedef u32 value_type;
+		typedef i32 difference_type;
+		typedef iter pointer;
+		typedef std::forward_iterator_tag iterator_category;
+		constexpr iter() noexcept = delete;
+		constexpr iter(const cell& c) noexcept : cell(c) {};
+		constexpr iter(u64& ref, u32 idx) noexcept : cell(ref, idx) {};
+		constexpr cell  operator *() noexcept { return cell(cast<u64*>(&ref)[idx >> 4], idx & 0x0f); }
+		constexpr cell  operator ->() const noexcept { return cell(cast<u64*>(&ref)[idx >> 4], idx & 0x0f); }
+		constexpr bool  operator ==(const iter& t) const noexcept { return ((ref == t.ref) & (idx == t.idx)); }
+		constexpr bool  operator !=(const iter& t) const noexcept { return ((ref != t.ref) | (idx != t.idx)); }
+		constexpr bool  operator < (const iter& t) const noexcept { return ((ref == t.ref) & (idx < t.idx)) | (ref < t.ref); }
+		constexpr i32   operator - (const iter& t) const noexcept { return i32(idx) - i32(t.idx); }
+		constexpr iter  operator + (u32 n) const noexcept { return iter(ref, idx + n); }
+		constexpr iter  operator - (u32 n) const noexcept { return iter(ref, idx - n); }
+		constexpr iter& operator +=(u32 n) noexcept { idx += n; return *this; }
+		constexpr iter& operator -=(u32 n) noexcept { idx -= n; return *this; }
+		constexpr iter& operator ++() noexcept { idx += 1; return *this; }
+		constexpr iter& operator --() noexcept { idx -= 1; return *this; }
+		constexpr iter  operator ++(int) noexcept { return iter(ref, ++idx - 1); }
+		constexpr iter  operator --(int) noexcept { return iter(ref, --idx + 1); }
+	};
+public:
+	constexpr cell operator [](u32 idx) const noexcept { return cell(cast<u64*>(this)[idx >> 4], idx & 0x0f); }
 	constexpr cell at(u32 idx) const noexcept { return operator [](idx); }
 	constexpr size_t size() const noexcept { return raw_cast<u8, 7>(ext); }
 	constexpr void resize(u32 len) noexcept {
@@ -432,6 +487,8 @@ public:
 	constexpr size_t max_size() const noexcept { return 32; }
 	constexpr bool empty() const noexcept { return size() == 0; }
 	constexpr void clear() { hex = ext = 0; }
+	constexpr iter begin() const noexcept { return iter(const_cast<u64&>(hex), 0); }
+	constexpr iter end() const noexcept { return iter(const_cast<u64&>(hex), size()); }
 	constexpr cell front() const noexcept { return at(0); }
 	constexpr cell back() const noexcept { return at(size() - 1); }
 	constexpr void push_front(u32 v) noexcept { u32 n = size(); ext <<= 4; at(16) = at(15); hex <<= 4; at(0) = v; resize(n + 1); }
