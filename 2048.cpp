@@ -229,6 +229,10 @@ public:
 		list<weight>::as(wghts()).erase(find(sign));
 		return w;
 	}
+	static inline void release() {
+		for (weight w : wghts()) shm::free(w.data());
+		list<weight>::as(wghts()).clear();
+	}
 
 private:
 	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
@@ -2032,6 +2036,10 @@ int main(int argc, const char* argv[]) {
 	if (!opts("thread")) opts["thread"] = 1;
 	shm::hook = opts["shared-memory"].find("hook", argv[0]);
 
+	signal(SIGINT, [] (int i) { std::exit(0); });
+	std::set_terminate(weight::release);
+	std::atexit(weight::release);
+
 	std::cout << "TDL2048+ LOG" << std::endl;
 	std::cout << "develop-parallel" << " build C++" << __cplusplus;
 	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
@@ -2084,7 +2092,6 @@ int main(int argc, const char* argv[]) {
 		shm::free(stats);
 	}
 
-	for (weight w : weight::wghts()) shm::free(w.data());
 	std::cout << std::endl;
 	return 0;
 }
