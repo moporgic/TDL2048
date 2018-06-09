@@ -1616,7 +1616,7 @@ struct statistic {
 		every = {};
 		total = {};
 		local = {};
-		for (u32 i = 0; i <= thdid; i++) std::rand();
+		for (u32 i = 0; i <= thdid; i++) moporgic::rand();
 		local.time = moporgic::millisec();
 
 		return limit;
