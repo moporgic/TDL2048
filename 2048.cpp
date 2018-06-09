@@ -458,14 +458,14 @@ private:
 	}
 };
 
-inline u32 hashpatt(const std::vector<int>& patt) {
+inline u32 hashpatt(const std::vector<u32>& patt) {
 	u32 hash = 0;
 	for (auto tile : patt) hash = (hash << 4) | tile;
 	return hash;
 }
-inline std::vector<int> hashpatt(const std::string& hashs) {
+inline std::vector<u32> hashpatt(const std::string& hashs) {
 	u32 hash; std::stringstream(hashs) >> std::hex >> hash;
-	std::vector<int> patt(hashs.size());
+	std::vector<u32> patt(hashs.size());
 	for (auto it = patt.rbegin(); it != patt.rend(); it++, hash >>= 4)
 		(*it) = hash & 0x0f;
 	return patt;
@@ -476,7 +476,7 @@ inline std::string hashpatt(u32 hash, size_t n = 0) {
 	return std::string(std::max(n, patt.size()) - patt.size(), '0') + patt;
 }
 
-template<int p0, int p1, int p2, int p3, int p4, int p5>
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5>
 u64 index6t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -487,7 +487,7 @@ u64 index6t(const board& b) {
 	index += b.at(p5) << 20;
 	return index;
 }
-template<int p0, int p1, int p2, int p3>
+template<u32 p0, u32 p1, u32 p2, u32 p3>
 u64 index4t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -496,7 +496,7 @@ u64 index4t(const board& b) {
 	index += b.at(p3) << 12;
 	return index;
 }
-template<int p0, int p1, int p2, int p3, int p4, int p5, int p6, int p7>
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7>
 u64 index8t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -509,7 +509,7 @@ u64 index8t(const board& b) {
 	index += b.at(p7) << 28;
 	return index;
 }
-template<int p0, int p1, int p2, int p3, int p4, int p5, int p6>
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6>
 u64 index7t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -521,7 +521,7 @@ u64 index7t(const board& b) {
 	index += b.at(p6) << 24;
 	return index;
 }
-template<int p0, int p1, int p2, int p3, int p4>
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4>
 u64 index5t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -532,7 +532,7 @@ u64 index5t(const board& b) {
 	return index;
 }
 
-u64 indexnta(const board& b, const std::vector<int>& p) {
+u64 indexnta(const board& b, const std::vector<u32>& p) {
 	register u64 index = 0;
 	for (size_t i = 0; i < p.size(); i++)
 		index += b.at(p[i]) << (i << 2);
@@ -553,7 +553,7 @@ u64 indexmerge0(const board& b) { // 16-bit
 	return hori | (vert << 8);
 }
 
-template<int transpose>
+template<u32 transpose>
 u64 indexmerge1(const board& b) { // 8-bit
 	register u32 merge = 0;
 	board k = b; if (transpose) k.transpose();
@@ -605,11 +605,10 @@ u64 indexnum2(const board& b) { // 25-bit
 	index += ((num[13]) & 0x03) << 19;
 	index += ((num[14]) & 0x03) << 21;
 	index += ((num[15]) & 0x03) << 23;
-
 	return index;
 }
 
-template<int transpose, int qu0, int qu1>
+template<u32 transpose, u32 qu0, u32 qu1>
 u64 indexnum2x(const board& b) { // 25-bit
 	board o = b;
 	if (transpose) o.transpose();
@@ -692,11 +691,11 @@ u64 indexnum5st(const board& b) { // 24-bit
 	return index;
 }
 
-u64 indexnuma(const board& b, const std::vector<int>& n) {
+u64 indexnuma(const board& b, const std::vector<u32>& n) {
 	auto num = b.numof();
 	register u64 index = 0;
 	register u32 offset = 0;
-	for (int code : n) {
+	for (u32 code : n) {
 		using moporgic::math::msb32;
 		using moporgic::math::log2;
 		// code: 0x00SSTTTT
@@ -714,21 +713,21 @@ u64 indexnuma(const board& b, const std::vector<int>& n) {
 	return index;
 }
 
-template<int p0, int p1, int p2, int p3, int p4, int p5, int p6, int p7>
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7>
 u64 indexmono(const board& b) { // 24-bit
 	u32 h0 = (b.at(p0)) | (b.at(p1) << 4) | (b.at(p2) << 8) | (b.at(p3) << 12);
 	u32 h1 = (b.at(p4)) | (b.at(p5) << 4) | (b.at(p6) << 8) | (b.at(p7) << 12);
 	return (board::cache::load(h0).left.mono) | (board::cache::load(h1).left.mono << 12);
 }
 
-template<u32 tile, int isomorphic>
+template<u32 tile, u32 isomorphic>
 u64 indexmask(const board& b) { // 16-bit
 	board k = b;
 	k.isomorphic(isomorphic);
 	return k.mask(tile);
 }
 
-template<int isomorphic>
+template<u32 isomorphic>
 u64 indexmax(const board& b) { // 16-bit
 	board k = b;
 	k.isomorphic(isomorphic);
@@ -741,19 +740,14 @@ u64 indexhdr(const board& b) {
 	return indexhdr_pool[id](b);
 }
 
-std::list<u64(*)(const board&)> indexhdr_wrap;
+std::list<indexer::mapper> indexhdr_wrap;
 template<u32 id, u32 lim>
 struct make_mapper_wrappers {
-	make_mapper_wrappers() {
-		indexhdr_wrap.push_back(utils::indexhdr<id>);
-		make_mapper_wrappers<id + 1, lim>();
-	}
+	make_mapper_wrappers() { indexhdr_wrap.push_back(utils::indexhdr<id>); }
+	~make_mapper_wrappers() { make_mapper_wrappers<id + 1, lim>(); }
 };
 template<u32 id>
-struct make_mapper_wrappers<id, id> {
-	make_mapper_wrappers() {
-	}
-};
+struct make_mapper_wrappers<id, id> {};
 
 indexer::mapper wrap_mapper(std::function<u64(const board&)> idxr) {
 	auto& handler = utils::indexhdr_pool;
@@ -1243,8 +1237,7 @@ u32 make_weights(std::string res = "") {
 	std::string token;
 	while (split >> token) {
 		// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit old=new old=new:size
-		while (token.find_first_of(":()[],") != std::string::npos)
-			token[token.find_first_of(":()[],")] = ' ';
+		for (size_t i; (i = token.find_first_of(":()[],")) != std::string::npos; token[i] = ' ');
 		std::stringstream info(token);
 
 		std::string signs;
@@ -1260,8 +1253,8 @@ u32 make_weights(std::string res = "") {
 			weight::erase(prev);
 		}
 
-		std::string sizes;
-		if (!(info >> sizes)) sizes = "?";
+		std::string sizes = "?";
+		info >> sizes;
 		size_t size = 0;
 		switch (sizes.front()) {
 		case 'p':
@@ -1340,8 +1333,7 @@ u32 make_features(std::string res = "") {
 	std::string token;
 	while (split >> token) {
 		// weight:indexer weight(indexer) weight[indexer] weight[and&or|pattern!]
-		while (token.find_first_of(":()[],") != std::string::npos)
-			token[token.find_first_of(":()[],")] = ' ';
+		for (size_t i; (i = token.find_first_of(":()[],")) != std::string::npos; token[i] = ' ');
 		std::stringstream info(token);
 
 		std::string wghts, idxrs;
@@ -1355,7 +1347,7 @@ u32 make_features(std::string res = "") {
 		}
 
 		std::string idxv;
-		int isomorphic = 1;
+		u32 isomorphic = 1;
 		u64 op_bitand = -1ull, op_bitor = 0ull;
 		while (idxv.empty() && std::isxdigit(idxrs[0])) {
 			size_t pos = 0;
@@ -1381,9 +1373,9 @@ u32 make_features(std::string res = "") {
 
 		if (idxv.empty()) continue;
 
-		for (int iso = 0; iso < isomorphic; iso++) {
-			std::vector<int> xpatt = utils::hashpatt(idxv);
-			std::transform(xpatt.begin(), xpatt.end(), xpatt.begin(), [=](int v) {
+		for (u32 iso = 0; iso < isomorphic; iso++) {
+			std::vector<u32> xpatt = utils::hashpatt(idxv);
+			std::transform(xpatt.begin(), xpatt.end(), xpatt.begin(), [=](u32 v) {
 				board x(0xfedcba9876543210ull);
 				x.isomorphic(-iso);
 				return x.at(v);
