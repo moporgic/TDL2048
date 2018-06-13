@@ -1619,16 +1619,16 @@ struct statistic {
 		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%" PRIu64 "ms %.2fops";
 	}
 
-	u64 operator++(int) { return (++loop) - 1; }
-	u64 operator++() { return (++loop); }
-	operator bool() const { return loop <= limit; }
-	bool checked() const { return (loop % unit) == 0; }
+	inline u64 operator++(int) { return (++loop) - 1; }
+	inline u64 operator++() { return (++loop); }
+	inline operator bool() const { return loop <= limit; }
+	inline bool checked() const { return (loop % unit) == 0; }
 
 	void update(u32 score, u32 hash, u32 opers) {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
-		if (hash >= winv) local.win += 1;
+		local.win += (hash >= winv ? 1 : 0);
 		local.max = std::max(local.max, score);
 		every.count[math::log2(hash)] += 1;
 		every.score[math::log2(hash)] += score;
@@ -1636,8 +1636,8 @@ struct statistic {
 
 		if ((loop % unit) != 0) return;
 
-		u64 current_time = moporgic::millisec();
-		local.time = current_time - local.time;
+		u64 tick = moporgic::millisec();
+		local.time = tick - local.time;
 		total.score += local.score;
 		total.win += local.win;
 		total.time += local.time;
@@ -1667,7 +1667,7 @@ struct statistic {
 		std::cout << buf << std::endl;
 
 		local = {};
-		local.time = current_time;
+		local.time = tick;
 	}
 
 	void summary(const utils::options::option& opt = {}) const {
