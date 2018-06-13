@@ -134,6 +134,8 @@ public:
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
+			std::fill(w.accum().begin(), w.accum().end(), numeric(0));
+			std::fill(w.updvu().begin(), w.updvu().end(), numeric(0));
 			break;
 		case 127:
 			read_cast<u32>(in, id);
@@ -160,20 +162,21 @@ public:
 			read_cast<u64>(in, length);
 			raw = weight::alloc(length);
 			switch (code) {
+			case 2: read_cast<f16>(in, w.value().begin(), w.value().end()); break;
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
 			read_cast<u16>(in, code);
 			in.ignore(8); // == length + length
 			switch (code) {
-			case 4:
-				read_cast<f32>(in, w.accum().begin(), w.accum().end());
-				read_cast<f32>(in, w.updvu().begin(), w.updvu().end());
-				break;
-			case 8:
-				read_cast<f64>(in, w.accum().begin(), w.accum().end());
-				read_cast<f64>(in, w.updvu().begin(), w.updvu().end());
-				break;
+			case 2: read_cast<f16>(in, w.accum().begin(), w.accum().end()); break;
+			case 4: read_cast<f32>(in, w.accum().begin(), w.accum().end()); break;
+			case 8: read_cast<f64>(in, w.accum().begin(), w.accum().end()); break;
+			}
+			switch (code) {
+			case 2: read_cast<f16>(in, w.updvu().begin(), w.updvu().end()); break;
+			case 4: read_cast<f32>(in, w.updvu().begin(), w.updvu().end()); break;
+			case 8: read_cast<f64>(in, w.updvu().begin(), w.updvu().end()); break;
 			}
 			while (read_cast<u16>(in, code) && code) {
 				u64 skip; read_cast<u64>(in, skip);
