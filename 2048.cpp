@@ -54,9 +54,6 @@ public:
 		write_cast<u8>(out, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial (" << code << ") at ostream << weight, ";
-			std::cerr << "use default (4) instead..." << std::endl;
-			// no break
 		case 4:
 			write_cast<u32>(out, w.sign());
 			write_cast<u32>(out, 0);
@@ -72,7 +69,7 @@ public:
 		auto& id = w.id;
 		auto& length = w.length;
 		auto& raw = w.raw;
-		u32 code;
+		u32 code = 4;
 		read_cast<u8>(in, code);
 		switch (code) {
 		case 0:
@@ -90,21 +87,7 @@ public:
 			case 8: read_cast<f64>(in, raw, raw + length); break;
 			}
 			break;
-		case 127:
-			read_cast<u32>(in, id);
-			read_cast<u64>(in, length);
-			read_cast<u16>(in, code);
-			raw = alloc(length);
-			switch (code) {
-			case 4: read_cast<f32>(in, raw, raw + length); break;
-			case 8: read_cast<f64>(in, raw, raw + length); break;
-			}
-			in.ignore(code * length * 2);
-			break;
 		default:
-			std::cerr << "unknown serial (" << code << ") at istream >> weight, ";
-			std::cerr << "use default (4) instead..." << std::endl;
-			// no break
 		case 4:
 			read_cast<u32>(in, id);
 			read_cast<u32>(in, code);
@@ -116,56 +99,34 @@ public:
 			case 4: read_cast<f32>(in, raw, raw + length); break;
 			case 8: read_cast<f64>(in, raw, raw + length); break;
 			}
-			while (read_cast<u16>(in, code) && code) {
-				u64 skip; read_cast<u64>(in, skip);
-				in.ignore(code * skip);
-			}
+			while (read_cast<u16>(in, code) && code)
+				in.ignore(code * read<u64>(in));
 			break;
 		}
 		return in;
 	}
 
-	static u32 save(std::ostream& out) {
-		u32 succ = 0;
+	static void save(std::ostream& out) {
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial (" << code << ") at weight::save, ";
-			std::cerr << "use default (0) instead..." << std::endl;
-			// no break
 		case 0:
 			write_cast<u32>(out, wghts().size());
-			for (weight w : wghts())
-				if (out << w) succ++;
+			for (weight w : wghts()) out << w;
 			break;
 		}
-		out.flush();
-		if (!out) {
-			std::cerr << "output failed at weight::save" << std::endl;
-		}
-		return succ;
 	}
-	static u32 load(std::istream& in) {
-		u32 succ = 0;
-		u32 code;
+	static void load(std::istream& in) {
+		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial (" << code << ") at weight::load";
-			break;
 		case 0:
-			for (read_cast<u32>(in, code); code; code--) {
-				list<weight>::as(wghts()).emplace_back();
-				if (in >> wghts().back()) succ++;
-			}
+			for (read_cast<u32>(in, code); code; code--)
+				in >> list<weight>::as(wghts()).emplace_back();
 			break;
 		}
-		if (!in) {
-			std::cerr << "input failed at weight::load" << std::endl;
-			std::exit(-1);
-		}
-		return succ;
 	}
 
 	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
@@ -261,12 +222,10 @@ public:
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
+		default:
 		case 0:
 			write_cast<u32>(out, index.sign());
 			write_cast<u32>(out, value.sign());
-			break;
-		default:
-			std::cerr << "unknown serial (" << code << ") at ostream << feature" << std::endl;
 			break;
 		}
 		return out;
@@ -274,62 +233,41 @@ public:
 	friend std::istream& operator >>(std::istream& in, feature& f) {
 		auto& index = f.index;
 		auto& value = f.value;
-		u32 code;
+		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
+		default:
 		case 0:
 			read_cast<u32>(in, code);
 			index = indexer::at(code);
 			read_cast<u32>(in, code);
 			value = weight::at(code);
 			break;
-		default:
-			std::cerr << "unknown serial (" << code << ") at istream >> feature" << std::endl;
-			break;
 		}
 		return in;
 	}
 
-	static u32 save(std::ostream& out) {
-		u32 succ = 0;
+	static void save(std::ostream& out) {
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
+		default:
 		case 0:
 			write_cast<u32>(out, feats().size());
-			for (feature f : feature::feats())
-				out << f, succ++;
-			break;
-		default:
-			std::cerr << "unknown serial (" << code << ") at feature::save" << std::endl;
+			for (feature f : feats()) out << f;
 			break;
 		}
-		out.flush();
-		if (!out) {
-			std::cerr << "output failed at feature::save" << std::endl;
-		}
-		return succ;
 	}
-	static u32 load(std::istream& in) {
-		u32 succ = 0;
+	static void load(std::istream& in) {
 		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
-		case 0:
-			for (read_cast<u32>(in, code); code; code--) {
-				list<feature>::as(feats()).emplace_back();
-				if (in >> feats().back()) succ++;
-			}
-			break;
 		default:
-			std::cerr << "unknown serial (" << code << ") at feature::load" << std::endl;
+		case 0:
+			for (read_cast<u32>(in, code); code; code--)
+				in >> list<feature>::as(feats()).emplace_back();
 			break;
 		}
-		if (!in) {
-			std::cerr << "input failed at feature::load" << std::endl;
-			std::exit(-1);
-		}
-		return succ;
 	}
 
 	static inline clip<feature>& feats() { static clip<feature> f; return f; }
@@ -1193,11 +1131,11 @@ u32 save_weights(std::string path) {
 	char buf[1 << 20];
 	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
 	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-	if (!out.is_open()) return 0;
-	u32 succ = weight::save(out);
+	if (!out.is_open()) return -1;
+	weight::save(out);
 	out.flush();
 	out.close();
-	return succ;
+	return out.rdstate();
 }
 u32 load_weights(std::string path) {
 	std::ifstream in;
@@ -1205,9 +1143,9 @@ u32 load_weights(std::string path) {
 	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
 	in.open(path, std::ios::in | std::ios::binary);
 	if (!in.is_open()) return 0;
-	u32 succ = weight::load(in);
+	weight::load(in);
 	in.close();
-	return succ;
+	return in.rdstate();
 }
 u32 make_weights(std::string res = "") {
 	std::map<std::string, std::string> alias;
@@ -1286,18 +1224,18 @@ u32 save_features(std::string path) {
 	std::ofstream out;
 	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.is_open()) return 0;
-	u32 succ = feature::save(out);
+	feature::save(out);
 	out.flush();
 	out.close();
-	return succ;
+	return out.rdstate();
 }
 u32 load_features(std::string path) {
 	std::ifstream in;
 	in.open(path, std::ios::in | std::ios::binary);
 	if (!in.is_open()) return 0;
-	u32 succ = feature::load(in);
+	feature::load(in);
 	in.close();
-	return succ;
+	return in.rdstate();
 }
 u32 make_features(std::string res = "") {
 	std::map<std::string, std::string> alias;
