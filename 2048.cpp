@@ -63,18 +63,19 @@ public:
 	inline segment* data(u64 i = 0) { return raw + i; }
 
 	template<size_t i>
-	struct block : std::array<numeric, 3> {
-		inline constexpr operator f32() const { return operator [](i); }
-		inline constexpr operator f64() const { return operator [](i); }
-		inline constexpr operator numeric&()  { return operator [](i); }
-		inline constexpr operator const numeric&() const { return operator [](i); }
-		inline constexpr numeric& operator =(const f16& f) { operator [](i) = f; return operator [](i); }
-		inline constexpr numeric& operator =(const f32& f) { operator [](i) = f; return operator [](i); }
-		inline constexpr numeric& operator =(const f64& f) { operator [](i) = f; return operator [](i); }
-		inline constexpr numeric& operator =(const block<i>& blk) { return operator =(blk[i]); }
-		declare_comparators_with(f32, f32(operator [](i)), v, inline constexpr);
-		declare_comparators_with(f64, f64(operator [](i)), v, inline constexpr);
-		declare_comparators(block<i>, operator [](i), inline constexpr);
+	struct block : std::array<numeric, sizeof(segment) / sizeof(numeric)> {
+		block() = delete;
+		inline operator f16() const { return operator [](i); }
+		inline operator f32() const { return operator [](i); }
+		inline operator f64() const { return operator [](i); }
+		inline numeric& operator =(const f16& f) { return (operator [](i) = f); }
+		inline numeric& operator =(const f32& f) { return (operator [](i) = f); }
+		inline numeric& operator =(const f64& f) { return (operator [](i) = f); }
+		inline numeric& operator =(const block<i>& blk) { return (operator [](i) = blk[i]); }
+		declare_comparators_with(f16, f16(operator [](i)), v, inline);
+		declare_comparators_with(f32, f32(operator [](i)), v, inline);
+		declare_comparators_with(f64, f64(operator [](i)), v, inline);
+		declare_comparators(const block<i>&, operator [](i), inline);
 	};
 	inline clip<block<0>> value() const { return { cast<block<0>*>(raw), cast<block<0>*>(raw) + length }; }
 	inline clip<block<1>> accum() const { return { cast<block<1>*>(raw), cast<block<1>*>(raw) + length }; }
