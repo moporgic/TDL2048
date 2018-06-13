@@ -152,9 +152,8 @@ public:
 		read_cast<u8>(in, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial (" << code << ") at weight::load, ";
-			std::cerr << "use default (0) instead..." << std::endl;
-			// no break
+			std::cerr << "unknown serial (" << code << ") at weight::load";
+			break;
 		case 0:
 			for (read_cast<u32>(in, code); code; code--) {
 				list<weight>::as(wghts()).emplace_back();
