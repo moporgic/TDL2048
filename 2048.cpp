@@ -1532,17 +1532,6 @@ struct statistic {
 	u64 unit;
 	u32 winv;
 
-	class format_t : public std::array<char, 64> {
-	public:
-		inline void operator =(const std::string& s) { std::copy_n(s.begin(), s.size() + 1, begin()); }
-		inline operator const char*() const { return &(operator[](0)); }
-	};
-
-	format_t indexf;
-	format_t localf;
-	format_t totalf;
-	format_t summaf;
-
 	struct record {
 		u64 score;
 		u64 win;
@@ -1606,6 +1595,18 @@ struct statistic {
 
 		return limit;
 	}
+
+	class format_t : public std::array<char, 64> {
+	public:
+		inline void operator =(const std::string& s) { std::copy_n(s.begin(), s.size() + 1, begin()); }
+		inline operator const char*() const { return data(); }
+	};
+
+	format_t indexf;
+	format_t localf;
+	format_t totalf;
+	format_t summaf;
+
 	void format() {
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
