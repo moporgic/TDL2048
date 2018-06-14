@@ -675,33 +675,32 @@ u64 indexmax(const board& b) { // 16-bit
 	return k.mask(k.max());
 }
 
-std::vector<std::function<u64(const board&)>> indexhdr_pool;
-template<u32 id>
-u64 indexhdr(const board& b) {
-	return indexhdr_pool[id](b);
-}
+struct indexhdr { // generic functional adapter
+	typedef indexer::mapper wrapper;
+	typedef std::function<u64(const board&)> handler;
+	typedef moporgic::list<wrapper> wrapper_list;
+	typedef moporgic::list<handler> handler_list;
+	static wrapper_list& wlist() { static wrapper_list w; return w; }
+	static handler_list& hlist() { static handler_list h; return h; }
 
-std::list<indexer::mapper> indexhdr_wrap;
-template<u32 id, u32 lim>
-struct make_mapper_wrappers {
-	make_mapper_wrappers() { indexhdr_wrap.push_back(utils::indexhdr<id>); }
-	~make_mapper_wrappers() { make_mapper_wrappers<id + 1, lim>(); }
+	operator wrapper() const { return wlist().front(); }
+	indexhdr(handler hdr) { hlist().push_back(hdr); }
+	~indexhdr() { wlist().pop_front(); }
+
+	template<u32 idx>
+	static u64 adapt(const board& b) { return hlist()[idx](b); }
+
+	template<u32 idx, u32 lim>
+	static void make() { make_wrappers<idx, lim>(); }
+
+	template<u32 idx, u32 lim>
+	struct make_wrappers {
+		make_wrappers() { wlist().push_back(indexhdr::adapt<idx>); }
+		~make_wrappers() { make_wrappers<idx + 1, lim>(); }
+	};
+	template<u32 idx>
+	struct make_wrappers<idx, idx> {};
 };
-template<u32 id>
-struct make_mapper_wrappers<id, id> {};
-
-indexer::mapper wrap_mapper(std::function<u64(const board&)> idxr) {
-	auto& handler = utils::indexhdr_pool;
-	auto& wrapper = utils::indexhdr_wrap;
-	if (wrapper.size()) {
-		handler.push_back(idxr);
-		auto map = wrapper.front();
-		wrapper.pop_front();
-		return map;
-	} else {
-		return nullptr;
-	}
-}
 
 u32 make_indexers(std::string res = "") {
 	u32 succ = 0;
@@ -1126,7 +1125,8 @@ u32 make_indexers(std::string res = "") {
 	make(0xfc000050, utils::indexmax<5>);
 	make(0xfc000060, utils::indexmax<6>);
 	make(0xfc000070, utils::indexmax<7>);
-	make_mapper_wrappers<0, 128>();
+
+	indexhdr::make<0, 256>();
 	return succ;
 }
 
@@ -1328,13 +1328,7 @@ u32 make_features(std::string res = "") {
 				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
 				std::cerr << "assume as pattern descriptor..." << std::endl;
 				std::function<u64(const board&)> adapter = std::bind(utils::indexnta, std::placeholders::_1, xpatt);
-				indexer::mapper wrapper = utils::wrap_mapper(adapter);
-				if (wrapper) {
-					indexer::make(idxr, wrapper);
-				} else {
-					std::cerr << "run out of generic indexer wrapper" << std::endl;
-					std::exit(10);
-				}
+				indexer::make(idxr, utils::indexhdr(adapter));
 			}
 
 			if (feature::find(wght, idxr) == feature::feats().end()) {
