@@ -304,7 +304,7 @@ class options {
 public:
 	options() {}
 	options(const options& opts) : opts(opts.opts) {}
-	using vector = std::vector<std::string>;
+	typedef std::list<std::string> list;
 
 	class opinion {
 		friend class option;
@@ -312,15 +312,18 @@ public:
 		opinion() = delete;
 		opinion(const opinion& i) = default;
 		opinion(std::string& token) : token(token) {}
-		std::string label() const { return token.substr(0, token.find('=')); }
-		std::string value() const { return token.substr(token.find('=') + 1); }
 		operator std::string() const { return value(); }
 		operator numeric() const { return std::stod(value()); }
+		std::string label() const { return token.substr(0, token.find('=')); }
+		std::string value() const { return token.find('=') != std::string::npos ? token.substr(token.find('=') + 1) : ""; }
+		std::string operator +(const std::string& val) { return value() + val; }
 		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
-		opinion& operator =(const opinion& opt) { token  = opt.token; return (*this); }
-		opinion& operator =(const numeric& val) { return operator =(ntos(val)); }
-		opinion& operator =(const std::string& val) { token = label() + (val.size() ? ("=" + val) : ""); return (*this); }
-		opinion& operator =(const vector& vec) { return operator  =(vtos(vec)); }
+		opinion& operator  =(const opinion& opi) { return operator =(opi.value()); }
+		opinion& operator  =(const numeric& val) { return operator =(ntos(val)); }
+		opinion& operator  =(const std::string& val) { token = label() + (val.size() ? ("=" + val) : ""); return (*this); }
+		opinion& operator +=(const std::string& val) { return operator =(value() + val); }
+		opinion& operator  =(const list& vec) { return operator =(vtos(vec)); }
+		opinion& operator +=(const list& vec) { return operator =(value() + vtos(vec)); }
 		bool operator ==(const std::string& val) const { return value() == val; }
 		bool operator !=(const std::string& val) const { return value() != val; }
 		bool operator ()(const std::string& val) const { return value().find(val) != std::string::npos; }
@@ -329,19 +332,20 @@ public:
 		std::string& token;
 	};
 
-	class option : public vector {
+	class option : public list {
 		friend class options;
 	public:
-		option(const vector& opt = {}) : vector(opt) {}
-		std::string value() const { return vtos(*this); }
+		option(const list& opt = {}) : list(opt) {}
 		operator std::string() const { return value(); }
 		operator numeric() const { return std::stod(value()); }
+		std::string value() const { return vtos(*this); }
+		std::string operator +(const std::string& val) { return value() + val; }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
 		option& operator  =(const numeric& val) { return operator =(ntos(val)); }
 		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
 		option& operator +=(const std::string& val) { push_back(val); return *this; }
-		option& operator  =(const vector& vec) { clear(); return operator +=(vec); }
-		option& operator +=(const vector& vec) { insert(end(), vec.begin(), vec.end()); return *this; }
+		option& operator  =(const list& vec) { clear(); return operator +=(vec); }
+		option& operator +=(const list& vec) { insert(end(), vec.begin(), vec.end()); return *this; }
 		bool operator ==(const std::string& val) const { return value() == val; }
 		bool operator !=(const std::string& val) const { return value() != val; }
 		bool operator ()(const std::string& ext) const {
@@ -379,7 +383,7 @@ public:
 private:
 	std::map<std::string, option> opts;
 
-	static std::string vtos(const vector& vec) {
+	static std::string vtos(const list& vec) {
 		std::string str = std::accumulate(vec.cbegin(), vec.cend(), std::string(),
 		    [](std::string& r, const std::string& v){ return std::move(r) + v + " "; });
 		if (str.size()) str.pop_back();
@@ -1656,143 +1660,165 @@ struct statistic {
 
 utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
-	auto find_opt = [&](int& i, const std::string& v) -> std::string {
-		return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
-	};
-	auto find_opts = [&](int& i) -> std::vector<std::string> {
-		std::vector<std::string> vec;
-		for (std::string v; (v = find_opt(i, "")).size(); ) vec.push_back(v);
-		return vec;
-	};
 	for (int i = 1; i < argc; i++) {
-		switch (to_hash(argv[i])) {
+		std::string label = argv[i];
+		auto next_opt = [&](const std::string& v) -> std::string {
+			return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
+		};
+		auto next_opts = [&]() -> utils::options::list {
+			utils::options::list args;
+			for (std::string v; (v = next_opt("")).size(); ) args.push_back(v);
+			return args;
+		};
+		switch (to_hash(label)) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
-			opts["alpha"] = find_opt(i, std::to_string(state::alpha()));
-			opts["alpha"] += find_opts(i);
+			opts["alpha"] = next_opt(std::to_string(state::alpha()));
+			opts["alpha"] += next_opts();
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
-			opts["temporary"] = opts["train"];
-			opts["train"] = find_opt(i, "1000");
-			opts["train"] += find_opts(i);
-			opts["train"] += opts["temporary"];
+			opts[""] = opts["train"];
+			opts["train"] = next_opt("1000");
+			opts["train"] += next_opts();
+			opts["train"] += opts[""];
 			break;
 		case to_hash("-T"):
 		case to_hash("-e"):
 		case to_hash("--test"):
-			opts["temporary"] = opts["test"];
-			opts["test"] = find_opt(i, "1000");
-			opts["test"] += find_opts(i);
-			opts["test"] += opts["temporary"];
+			opts[""] = opts["test"];
+			opts["test"] = next_opt("1000");
+			opts["test"] += next_opts();
+			opts["test"] += opts[""];
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
-		case to_hash("--srand"):
-			opts["seed"] = find_opt(i, "moporgic");
+			opts["seed"] = next_opt("moporgic");
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
-			opts["temporary"] = find_opts(i);
-			opts["weight-input"] += opts["temporary"];
-			opts["weight-output"] += opts["temporary"];
+			opts["weight"]["input"] = opts["weight"]["output"] = next_opt("2048.w");
 			break;
 		case to_hash("-wi"):
 		case to_hash("--weight-input"):
-			opts["weight-input"] += find_opts(i);
+			opts["weight"]["input"] = next_opt("2048.w");
 			break;
 		case to_hash("-wo"):
 		case to_hash("--weight-output"):
-			opts["weight-output"] += find_opts(i);
+			opts["weight"]["output"] = next_opt("2048.w");
 			break;
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			opts["temporary"] = find_opts(i);
-			opts["feature-input"] += opts["temporary"];
-			opts["feature-output"] += opts["temporary"];
+			opts["feature"]["input"] = opts["feature"]["output"] = next_opt("2048.f");
 			break;
 		case to_hash("-fi"):
 		case to_hash("--feature-input"):
-			opts["feature-input"] += find_opts(i);
+			opts["feature"]["input"] = next_opt("2048.f");
 			break;
 		case to_hash("-fo"):
 		case to_hash("--feature-output"):
-			opts["feature-output"] += find_opts(i);
+			opts["feature"]["output"] = next_opt("2048.f");
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
+			opts["weight"]["value"] = opts[""] = next_opts();
+			if (opts("", "input") || opts("", "output") || opts("", "value"))
+				opts["weight"] = opts[""];
+			break;
 		case to_hash("--weight-value"):
-			opts["weight-value"] += find_opts(i);
+			opts["weight"]["value"] = next_opts();
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
+			opts["feature"]["value"] = opts[""] = next_opts();
+			if (opts("", "input") || opts("", "output") || opts("", "value"))
+				opts["feature"] = opts[""];
+			break;
 		case to_hash("--feature-value"):
-			opts["feature-value"] += find_opts(i);
+			opts["feature"]["value"] = next_opts();
 			break;
 		case to_hash("-wf"):
 		case to_hash("-fw"):
-			opts["temporary"] = find_opts(i);
-			opts["feature-value"] += opts["temporary"];
-			opts["weight-value"] += opts["temporary"];
+			opts["feature"]["value"] = opts["weight"]["value"] = opts[""] = next_opts();
+			if (opts("", "input") || opts("", "output") || opts("", "value"))
+				opts["feature"] = opts["weight"] = opts[""];
+			if (opts("", "input"))
+				opts["feature"]["input"] += ".f",
+				opts["weight"]["input"] += ".w";
+			if (opts("", "output"))
+				opts["feature"]["output"] += ".f",
+				opts["weight"]["output"] += ".w";
+			break;
+		case to_hash("-wfi"):
+		case to_hash("-fwi"):
+			opts[""] = next_opt("2048");
+			opts["feature"]["input"] = opts[""] + ".f";
+			opts["weight"]["input"] = opts[""] + ".w";
+			break;
+		case to_hash("-wfo"):
+		case to_hash("-fwo"):
+			opts[""] = next_opt("2048");
+			opts["feature"]["output"] = opts[""] + ".f";
+			opts["weight"]["output"] = opts[""] + ".w";
+			break;
+		case to_hash("-wfio"):
+		case to_hash("-fwio"):
+			opts[""] = next_opt("2048");
+			opts["feature"]["input"] = opts["feature"]["output"] = opts[""] + ".f";
+			opts["weight"]["input"] = opts["weight"]["output"] = opts[""] + ".w";
 			break;
 		case to_hash("-i"):
 		case to_hash("--info"):
-			opts["info"] = find_opt(i, "full");
-			opts["info"] += find_opts(i);
+			opts["info"] = next_opt("full");
+			opts["info"] += next_opts();
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 		case to_hash("--extra"):
-			opts["options"] += find_opts(i);
+			opts["options"] += next_opts();
 			break;
 		case to_hash("-tt"):
 		case to_hash("-tm"):
 		case to_hash("--train-type"):
 		case to_hash("--train-mode"):
-			opts["train"]["mode"] = find_opt(i, "bias");
+			opts["train"]["mode"] = next_opt("bias");
 			break;
 		case to_hash("-Tt"):
 		case to_hash("-et"):
 		case to_hash("-em"):
 		case to_hash("--test-type"):
 		case to_hash("--test-mode"):
-			opts["test"]["mode"] = find_opt(i, "bias");
+			opts["test"]["mode"] = next_opt("bias");
 			break;
 		case to_hash("-tc"):
 		case to_hash("-tu"):
 		case to_hash("--train-check"):
 		case to_hash("--train-unit"):
-			opts["train"]["unit"] = find_opt(i, "1000");
+			opts["train"]["unit"] = next_opt("1000");
 			break;
 		case to_hash("-Tc"):
 		case to_hash("-ec"):
 		case to_hash("-eu"):
 		case to_hash("--test-check"):
 		case to_hash("--test-unit"):
-			opts["test"]["unit"] = find_opt(i, "1000");
+			opts["test"]["unit"] = next_opt("1000");
 			break;
 		case to_hash("-v"):
 		case to_hash("--win"):
-			opts["train"]["win"] = opts["test"]["win"] = find_opt(i, "2048");
+			opts["train"]["win"] = opts["test"]["win"] = next_opt("2048");
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
-			opts["comment"] = find_opts(i);
+			opts["comment"] = next_opts();
 			break;
 		case to_hash("-|"):
 		case to_hash("--|"):
 			opts = {};
 			break;
-		case to_hash("-?"):
-		case to_hash("--help"):
-			std::cout << "TDL2048+ by Hung Guei" << std::endl;
-			std::cout << "Build Alpha (" __DATE__ ")" << std::endl;
-			std::exit(0);
-			break;
 		default:
-			std::cerr << "unknown: " << argv[i];
-			for (auto& v : find_opts(i)) std::cerr << " " << v;
+			std::cerr << "unknown: " << label;
+			for (auto& v : next_opts()) std::cerr << " " << v;
 			std::cerr << std::endl;
 			break;
 		}
@@ -1899,9 +1925,9 @@ int main(int argc, const char* argv[]) {
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = rdtsc();
 
-	std::cout << "TDL2048+ LOG" << std::endl;
-	std::cout << "develop" << " build C++" << __cplusplus;
-	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
+	std::cout << "TDL2048+ by Hung Guei" << std::endl;
+	std::cout << "develop" << " build GCC " __VERSION__ << " C++" << __cplusplus;
+	std::cout << " (" __DATE__ " " __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 	std::cout << "time = " << moporgic::millisec() << std::endl;
@@ -1910,10 +1936,10 @@ int main(int argc, const char* argv[]) {
 	std::cout << std::endl;
 
 	utils::make_indexers();
-	utils::load_weights(opts["weight-input"]);
-	utils::make_weights(opts["weight-value"]);
-	utils::load_features(opts["feature-input"]);
-	utils::make_features(opts["feature-value"]);
+	utils::load_weights(opts["weight"]["input"]);
+	utils::make_weights(opts["weight"]["value"]);
+	utils::load_features(opts["feature"]["input"]);
+	utils::make_features(opts["feature"]["value"]);
 	utils::list_mapping();
 
 	moporgic::srand(moporgic::to_hash(opts["seed"]));
@@ -1926,8 +1952,8 @@ int main(int argc, const char* argv[]) {
 		if (opts["info"] == "full") stat.summary(opts["train"]);
 	}
 
-	utils::save_weights(opts["weight-output"]);
-	utils::save_features(opts["feature-output"]);
+	utils::save_weights(opts["weight"]["output"]);
+	utils::save_features(opts["feature"]["output"]);
 
 	if (statistic(opts["test"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
