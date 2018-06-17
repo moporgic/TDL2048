@@ -47,7 +47,7 @@ public:
 	inline numeric& operator [](u64 i) { return raw[i]; }
 	inline segment* data(u64 i = 0) { return raw + i; }
 	inline clip<numeric> value() const { return { raw, raw + length }; }
-	declare_comparators(weight, sign(), inline);
+	declare_comparators(const weight&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
 		u32 code = 4;
@@ -172,7 +172,7 @@ public:
 	inline u64 sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return (*map)(b); }
-	declare_comparators(indexer, sign(), inline);
+	declare_comparators(const indexer&, sign(), inline);
 
 	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
@@ -214,7 +214,7 @@ public:
 
 	inline operator indexer() const { return index; }
 	inline operator weight() const { return value; }
-	declare_comparators(feature, sign(), inline);
+	declare_comparators(const feature&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
 		auto& index = f.index;
@@ -1398,7 +1398,7 @@ struct state {
 
 	inline operator bool() const { return score >= 0; }
 	inline operator board() const { return move; }
-	declare_comparators(state, esti, inline);
+	declare_comparators(const state&, esti, inline);
 
 	inline numeric value() const { return esti - score; }
 	inline numeric reward() const { return score; }
