@@ -1422,13 +1422,8 @@ struct state {
 		return esti;
 	}
 
-	inline static numeric& alpha() {
-		static numeric a = numeric(0.0025);
-		return a;
-	}
-	inline static numeric& alpha(numeric a) {
-		return (state::alpha() = a);
-	}
+	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
+	inline static numeric& alpha(numeric a) { return (state::alpha() = a); }
 };
 struct select {
 	state move[4];
