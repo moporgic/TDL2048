@@ -1439,9 +1439,9 @@ struct select {
 		move[2].estimate(range);
 		move[3].estimate(range);
 		best = move;
-		if (move[1] > *best) best = move + 1;
-		if (move[2] > *best) best = move + 2;
-		if (move[3] > *best) best = move + 3;
+		best = move[1] > *best ? move + 1 : best;
+		best = move[2] > *best ? move + 2 : best;
+		best = move[3] > *best ? move + 3 : best;
 		return *this;
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
