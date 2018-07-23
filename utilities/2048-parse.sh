@@ -1,8 +1,8 @@
 #!/bin/bash
 #Program: parser of TDL2048+
 #History: 2018/04/01 moporgic
-PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
 
+#A record consists of 3 lines
 #001/500 1765ms 596549.01ops [8]
 #local:  avg=18580 max=51140 tile=4096 win=28.60%
 #total:  avg=18580 max=51140 tile=4096 win=28.60%

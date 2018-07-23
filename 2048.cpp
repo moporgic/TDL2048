@@ -47,16 +47,13 @@ public:
 	inline numeric& operator [](u64 i) { return raw[i]; }
 	inline segment* data(u64 i = 0) { return raw + i; }
 	inline clip<numeric> value() const { return { raw, raw + length }; }
-	declare_comparators(weight, sign(), inline);
+	declare_comparators(const weight&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
 		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial (" << code << ") at ostream << weight, ";
-			std::cerr << "use default (4) instead..." << std::endl;
-			// no break
 		case 4:
 			write_cast<u32>(out, w.sign());
 			write_cast<u32>(out, 0);
@@ -72,7 +69,7 @@ public:
 		auto& id = w.id;
 		auto& length = w.length;
 		auto& raw = w.raw;
-		u32 code;
+		u32 code = 4;
 		read_cast<u8>(in, code);
 		switch (code) {
 		case 0:
@@ -90,21 +87,7 @@ public:
 			case 8: read_cast<f64>(in, raw, raw + length); break;
 			}
 			break;
-		case 127:
-			read_cast<u32>(in, id);
-			read_cast<u64>(in, length);
-			read_cast<u16>(in, code);
-			raw = alloc(length);
-			switch (code) {
-			case 4: read_cast<f32>(in, raw, raw + length); break;
-			case 8: read_cast<f64>(in, raw, raw + length); break;
-			}
-			in.ignore(code * length * 2);
-			break;
 		default:
-			std::cerr << "unknown serial (" << code << ") at istream >> weight, ";
-			std::cerr << "use default (4) instead..." << std::endl;
-			// no break
 		case 4:
 			read_cast<u32>(in, id);
 			read_cast<u32>(in, code);
@@ -116,57 +99,34 @@ public:
 			case 4: read_cast<f32>(in, raw, raw + length); break;
 			case 8: read_cast<f64>(in, raw, raw + length); break;
 			}
-			while (read_cast<u16>(in, code) && code) {
-				u64 skip; read_cast<u64>(in, skip);
-				in.ignore(code * skip);
-			}
+			while (read_cast<u16>(in, code) && code)
+				in.ignore(code * read<u64>(in));
 			break;
 		}
 		return in;
 	}
 
-	static u32 save(std::ostream& out) {
-		u32 succ = 0;
+	static void save(std::ostream& out) {
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial (" << code << ") at weight::save, ";
-			std::cerr << "use default (0) instead..." << std::endl;
-			// no break
 		case 0:
 			write_cast<u32>(out, wghts().size());
-			for (weight w : wghts())
-				if (out << w) succ++;
+			for (weight w : wghts()) out << w;
 			break;
 		}
-		out.flush();
-		if (!out) {
-			std::cerr << "output failed at weight::save" << std::endl;
-		}
-		return succ;
 	}
-	static u32 load(std::istream& in) {
-		u32 succ = 0;
-		u32 code;
+	static void load(std::istream& in) {
+		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial (" << code << ") at weight::load, ";
-			std::cerr << "use default (0) instead..." << std::endl;
-			// no break
 		case 0:
-			for (read_cast<u32>(in, code); code; code--) {
-				list<weight>::as(wghts()).emplace_back();
-				if (in >> wghts().back()) succ++;
-			}
+			for (read_cast<u32>(in, code); code; code--)
+				in >> list<weight>::as(wghts()).emplace_back();
 			break;
 		}
-		if (!in) {
-			std::cerr << "input failed at weight::load" << std::endl;
-			std::exit(-1);
-		}
-		return succ;
 	}
 
 	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
@@ -212,7 +172,7 @@ public:
 	inline u64 sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return (*map)(b); }
-	declare_comparators(indexer, sign(), inline);
+	declare_comparators(const indexer&, sign(), inline);
 
 	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
@@ -254,7 +214,7 @@ public:
 
 	inline operator indexer() const { return index; }
 	inline operator weight() const { return value; }
-	declare_comparators(feature, sign(), inline);
+	declare_comparators(const feature&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
 		auto& index = f.index;
@@ -262,12 +222,10 @@ public:
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
+		default:
 		case 0:
 			write_cast<u32>(out, index.sign());
 			write_cast<u32>(out, value.sign());
-			break;
-		default:
-			std::cerr << "unknown serial (" << code << ") at ostream << feature" << std::endl;
 			break;
 		}
 		return out;
@@ -275,62 +233,41 @@ public:
 	friend std::istream& operator >>(std::istream& in, feature& f) {
 		auto& index = f.index;
 		auto& value = f.value;
-		u32 code;
+		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
+		default:
 		case 0:
 			read_cast<u32>(in, code);
 			index = indexer::at(code);
 			read_cast<u32>(in, code);
 			value = weight::at(code);
 			break;
-		default:
-			std::cerr << "unknown serial (" << code << ") at istream >> feature" << std::endl;
-			break;
 		}
 		return in;
 	}
 
-	static u32 save(std::ostream& out) {
-		u32 succ = 0;
+	static void save(std::ostream& out) {
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
+		default:
 		case 0:
 			write_cast<u32>(out, feats().size());
-			for (feature f : feature::feats())
-				out << f, succ++;
-			break;
-		default:
-			std::cerr << "unknown serial (" << code << ") at feature::save" << std::endl;
+			for (feature f : feats()) out << f;
 			break;
 		}
-		out.flush();
-		if (!out) {
-			std::cerr << "output failed at feature::save" << std::endl;
-		}
-		return succ;
 	}
-	static u32 load(std::istream& in) {
-		u32 succ = 0;
+	static void load(std::istream& in) {
 		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
-		case 0:
-			for (read_cast<u32>(in, code); code; code--) {
-				list<feature>::as(feats()).emplace_back();
-				if (in >> feats().back()) succ++;
-			}
-			break;
 		default:
-			std::cerr << "unknown serial (" << code << ") at feature::load" << std::endl;
+		case 0:
+			for (read_cast<u32>(in, code); code; code--)
+				in >> list<feature>::as(feats()).emplace_back();
 			break;
 		}
-		if (!in) {
-			std::cerr << "input failed at feature::load" << std::endl;
-			std::exit(-1);
-		}
-		return succ;
 	}
 
 	static inline clip<feature>& feats() { static clip<feature> f; return f; }
@@ -367,7 +304,7 @@ class options {
 public:
 	options() {}
 	options(const options& opts) : opts(opts.opts) {}
-	using vector = std::vector<std::string>;
+	typedef std::list<std::string> list;
 
 	class opinion {
 		friend class option;
@@ -375,15 +312,18 @@ public:
 		opinion() = delete;
 		opinion(const opinion& i) = default;
 		opinion(std::string& token) : token(token) {}
-		std::string label() const { return token.substr(0, token.find('=')); }
-		std::string value() const { return token.substr(token.find('=') + 1); }
 		operator std::string() const { return value(); }
 		operator numeric() const { return std::stod(value()); }
+		std::string label() const { return token.substr(0, token.find('=')); }
+		std::string value() const { return token.find('=') != std::string::npos ? token.substr(token.find('=') + 1) : ""; }
+		std::string operator +(const std::string& val) { return value() + val; }
 		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
-		opinion& operator =(const opinion& opt) { token  = opt.token; return (*this); }
-		opinion& operator =(const numeric& val) { return operator =(ntos(val)); }
-		opinion& operator =(const std::string& val) { token = label() + (val.size() ? ("=" + val) : ""); return (*this); }
-		opinion& operator =(const vector& vec) { return operator  =(vtos(vec)); }
+		opinion& operator  =(const opinion& opi) { return operator =(opi.value()); }
+		opinion& operator  =(const numeric& val) { return operator =(ntos(val)); }
+		opinion& operator  =(const std::string& val) { token = label() + (val.size() ? ("=" + val) : ""); return (*this); }
+		opinion& operator +=(const std::string& val) { return operator =(value() + val); }
+		opinion& operator  =(const list& vec) { return operator =(vtos(vec)); }
+		opinion& operator +=(const list& vec) { return operator =(value() + vtos(vec)); }
 		bool operator ==(const std::string& val) const { return value() == val; }
 		bool operator !=(const std::string& val) const { return value() != val; }
 		bool operator ()(const std::string& val) const { return value().find(val) != std::string::npos; }
@@ -392,19 +332,20 @@ public:
 		std::string& token;
 	};
 
-	class option : public vector {
+	class option : public list {
 		friend class options;
 	public:
-		option(const vector& opt = {}) : vector(opt) {}
-		std::string value() const { return vtos(*this); }
+		option(const list& opt = {}) : list(opt) {}
 		operator std::string() const { return value(); }
 		operator numeric() const { return std::stod(value()); }
+		std::string value() const { return vtos(*this); }
+		std::string operator +(const std::string& val) { return value() + val; }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
 		option& operator  =(const numeric& val) { return operator =(ntos(val)); }
 		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
 		option& operator +=(const std::string& val) { push_back(val); return *this; }
-		option& operator  =(const vector& vec) { clear(); return operator +=(vec); }
-		option& operator +=(const vector& vec) { insert(end(), vec.begin(), vec.end()); return *this; }
+		option& operator  =(const list& vec) { clear(); return operator +=(vec); }
+		option& operator +=(const list& vec) { insert(end(), vec.begin(), vec.end()); return *this; }
 		bool operator ==(const std::string& val) const { return value() == val; }
 		bool operator !=(const std::string& val) const { return value() != val; }
 		bool operator ()(const std::string& ext) const {
@@ -442,7 +383,7 @@ public:
 private:
 	std::map<std::string, option> opts;
 
-	static std::string vtos(const vector& vec) {
+	static std::string vtos(const list& vec) {
 		std::string str = std::accumulate(vec.cbegin(), vec.cend(), std::string(),
 		    [](std::string& r, const std::string& v){ return std::move(r) + v + " "; });
 		if (str.size()) str.pop_back();
@@ -458,14 +399,14 @@ private:
 	}
 };
 
-inline u32 hashpatt(const std::vector<int>& patt) {
+inline u32 hashpatt(const std::vector<u32>& patt) {
 	u32 hash = 0;
 	for (auto tile : patt) hash = (hash << 4) | tile;
 	return hash;
 }
-inline std::vector<int> hashpatt(const std::string& hashs) {
+inline std::vector<u32> hashpatt(const std::string& hashs) {
 	u32 hash; std::stringstream(hashs) >> std::hex >> hash;
-	std::vector<int> patt(hashs.size());
+	std::vector<u32> patt(hashs.size());
 	for (auto it = patt.rbegin(); it != patt.rend(); it++, hash >>= 4)
 		(*it) = hash & 0x0f;
 	return patt;
@@ -476,7 +417,7 @@ inline std::string hashpatt(u32 hash, size_t n = 0) {
 	return std::string(std::max(n, patt.size()) - patt.size(), '0') + patt;
 }
 
-template<int p0, int p1, int p2, int p3, int p4, int p5>
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5>
 u64 index6t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -527,7 +468,7 @@ template<>
 u64 index6t<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) {
 	return (u32(u64(b)) & 0x0000ff) | (u32(u64(b) >> 8) & 0x000f00) | (u32(u64(b) >> 20) & 0xfff000);
 }
-template<int p0, int p1, int p2, int p3>
+template<u32 p0, u32 p1, u32 p2, u32 p3>
 u64 index4t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -536,7 +477,7 @@ u64 index4t(const board& b) {
 	index += b.at(p3) << 12;
 	return index;
 }
-template<int p0, int p1, int p2, int p3, int p4, int p5, int p6, int p7>
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7>
 u64 index8t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -549,7 +490,7 @@ u64 index8t(const board& b) {
 	index += b.at(p7) << 28;
 	return index;
 }
-template<int p0, int p1, int p2, int p3, int p4, int p5, int p6>
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6>
 u64 index7t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -561,7 +502,7 @@ u64 index7t(const board& b) {
 	index += b.at(p6) << 24;
 	return index;
 }
-template<int p0, int p1, int p2, int p3, int p4>
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4>
 u64 index5t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
@@ -572,7 +513,7 @@ u64 index5t(const board& b) {
 	return index;
 }
 
-u64 indexnta(const board& b, const std::vector<int>& p) {
+u64 indexnta(const board& b, const std::vector<u32>& p) {
 	register u64 index = 0;
 	for (size_t i = 0; i < p.size(); i++)
 		index += b.at(p[i]) << (i << 2);
@@ -593,7 +534,7 @@ u64 indexmerge0(const board& b) { // 16-bit
 	return hori | (vert << 8);
 }
 
-template<int transpose>
+template<u32 transpose>
 u64 indexmerge1(const board& b) { // 8-bit
 	register u32 merge = 0;
 	board k = b; if (transpose) k.transpose();
@@ -645,11 +586,10 @@ u64 indexnum2(const board& b) { // 25-bit
 	index += ((num[13]) & 0x03) << 19;
 	index += ((num[14]) & 0x03) << 21;
 	index += ((num[15]) & 0x03) << 23;
-
 	return index;
 }
 
-template<int transpose, int qu0, int qu1>
+template<u32 transpose, u32 qu0, u32 qu1>
 u64 indexnum2x(const board& b) { // 25-bit
 	board o = b;
 	if (transpose) o.transpose();
@@ -732,11 +672,11 @@ u64 indexnum5st(const board& b) { // 24-bit
 	return index;
 }
 
-u64 indexnuma(const board& b, const std::vector<int>& n) {
+u64 indexnuma(const board& b, const std::vector<u32>& n) {
 	auto num = b.numof();
 	register u64 index = 0;
 	register u32 offset = 0;
-	for (int code : n) {
+	for (u32 code : n) {
 		using moporgic::math::msb32;
 		using moporgic::math::log2;
 		// code: 0x00SSTTTT
@@ -754,59 +694,53 @@ u64 indexnuma(const board& b, const std::vector<int>& n) {
 	return index;
 }
 
-template<int p0, int p1, int p2, int p3, int p4, int p5, int p6, int p7>
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7>
 u64 indexmono(const board& b) { // 24-bit
 	u32 h0 = (b.at(p0)) | (b.at(p1) << 4) | (b.at(p2) << 8) | (b.at(p3) << 12);
 	u32 h1 = (b.at(p4)) | (b.at(p5) << 4) | (b.at(p6) << 8) | (b.at(p7) << 12);
 	return (board::cache::load(h0).left.mono) | (board::cache::load(h1).left.mono << 12);
 }
 
-template<u32 tile, int isomorphic>
+template<u32 tile, u32 isomorphic>
 u64 indexmask(const board& b) { // 16-bit
 	board k = b;
 	k.isomorphic(isomorphic);
 	return k.mask(tile);
 }
 
-template<int isomorphic>
+template<u32 isomorphic>
 u64 indexmax(const board& b) { // 16-bit
 	board k = b;
 	k.isomorphic(isomorphic);
 	return k.mask(k.max());
 }
 
-std::vector<std::function<u64(const board&)>> indexhdr_pool;
-template<u32 id>
-u64 indexhdr(const board& b) {
-	return indexhdr_pool[id](b);
-}
+struct indexhdr { // generic functional adapter
+	typedef indexer::mapper wrapper;
+	typedef std::function<u64(const board&)> handler;
+	typedef moporgic::list<wrapper> wrapper_list;
+	typedef moporgic::list<handler> handler_list;
+	static wrapper_list& wlist() { static wrapper_list w; return w; }
+	static handler_list& hlist() { static handler_list h; return h; }
 
-std::list<u64(*)(const board&)> indexhdr_wrap;
-template<u32 id, u32 lim>
-struct make_mapper_wrappers {
-	make_mapper_wrappers() {
-		indexhdr_wrap.push_back(utils::indexhdr<id>);
-		make_mapper_wrappers<id + 1, lim>();
-	}
-};
-template<u32 id>
-struct make_mapper_wrappers<id, id> {
-	make_mapper_wrappers() {
-	}
-};
+	operator wrapper() const { return wlist().front(); }
+	indexhdr(handler hdr) { hlist().push_back(hdr); }
+	~indexhdr() { wlist().pop_front(); }
 
-indexer::mapper wrap_mapper(std::function<u64(const board&)> idxr) {
-	auto& handler = utils::indexhdr_pool;
-	auto& wrapper = utils::indexhdr_wrap;
-	if (wrapper.size()) {
-		handler.push_back(idxr);
-		auto map = wrapper.front();
-		wrapper.pop_front();
-		return map;
-	} else {
-		return nullptr;
-	}
-}
+	template<u32 idx>
+	static u64 adapt(const board& b) { return hlist()[idx](b); }
+
+	template<u32 idx, u32 lim>
+	static void make() { make_wrappers<idx, lim>(); }
+
+	template<u32 idx, u32 lim>
+	struct make_wrappers {
+		make_wrappers() { wlist().push_back(indexhdr::adapt<idx>); }
+		~make_wrappers() { make_wrappers<idx + 1, lim>(); }
+	};
+	template<u32 idx>
+	struct make_wrappers<idx, idx> {};
+};
 
 u32 make_indexers(std::string res = "") {
 	u32 succ = 0;
@@ -1231,7 +1165,8 @@ u32 make_indexers(std::string res = "") {
 	make(0xfc000050, utils::indexmax<5>);
 	make(0xfc000060, utils::indexmax<6>);
 	make(0xfc000070, utils::indexmax<7>);
-	make_mapper_wrappers<0, 128>();
+
+	indexhdr::make<0, 256>();
 	return succ;
 }
 
@@ -1240,11 +1175,11 @@ u32 save_weights(std::string path) {
 	char buf[1 << 20];
 	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
 	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-	if (!out.is_open()) return 0;
-	u32 succ = weight::save(out);
+	if (!out.is_open()) return -1;
+	weight::save(out);
 	out.flush();
 	out.close();
-	return succ;
+	return out.rdstate();
 }
 u32 load_weights(std::string path) {
 	std::ifstream in;
@@ -1252,9 +1187,9 @@ u32 load_weights(std::string path) {
 	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
 	in.open(path, std::ios::in | std::ios::binary);
 	if (!in.is_open()) return 0;
-	u32 succ = weight::load(in);
+	weight::load(in);
 	in.close();
-	return succ;
+	return in.rdstate();
 }
 u32 make_weights(std::string res = "") {
 	std::map<std::string, std::string> alias;
@@ -1283,8 +1218,7 @@ u32 make_weights(std::string res = "") {
 	std::string token;
 	while (split >> token) {
 		// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit old=new old=new:size
-		while (token.find_first_of(":()[],") != std::string::npos)
-			token[token.find_first_of(":()[],")] = ' ';
+		for (size_t i; (i = token.find_first_of(":()[],")) != std::string::npos; token[i] = ' ');
 		std::stringstream info(token);
 
 		std::string signs;
@@ -1300,8 +1234,8 @@ u32 make_weights(std::string res = "") {
 			weight::erase(prev);
 		}
 
-		std::string sizes;
-		if (!(info >> sizes)) sizes = "?";
+		std::string sizes = "?";
+		info >> sizes;
 		size_t size = 0;
 		switch (sizes.front()) {
 		case 'p':
@@ -1334,18 +1268,18 @@ u32 save_features(std::string path) {
 	std::ofstream out;
 	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.is_open()) return 0;
-	u32 succ = feature::save(out);
+	feature::save(out);
 	out.flush();
 	out.close();
-	return succ;
+	return out.rdstate();
 }
 u32 load_features(std::string path) {
 	std::ifstream in;
 	in.open(path, std::ios::in | std::ios::binary);
 	if (!in.is_open()) return 0;
-	u32 succ = feature::load(in);
+	feature::load(in);
 	in.close();
-	return succ;
+	return in.rdstate();
 }
 u32 make_features(std::string res = "") {
 	std::map<std::string, std::string> alias;
@@ -1380,8 +1314,7 @@ u32 make_features(std::string res = "") {
 	std::string token;
 	while (split >> token) {
 		// weight:indexer weight(indexer) weight[indexer] weight[and&or|pattern!]
-		while (token.find_first_of(":()[],") != std::string::npos)
-			token[token.find_first_of(":()[],")] = ' ';
+		for (size_t i; (i = token.find_first_of(":()[],")) != std::string::npos; token[i] = ' ');
 		std::stringstream info(token);
 
 		std::string wghts, idxrs;
@@ -1395,7 +1328,7 @@ u32 make_features(std::string res = "") {
 		}
 
 		std::string idxv;
-		int isomorphic = 1;
+		u32 isomorphic = 1;
 		u64 op_bitand = -1ull, op_bitor = 0ull;
 		while (idxv.empty() && std::isxdigit(idxrs[0])) {
 			size_t pos = 0;
@@ -1421,9 +1354,9 @@ u32 make_features(std::string res = "") {
 
 		if (idxv.empty()) continue;
 
-		for (int iso = 0; iso < isomorphic; iso++) {
-			std::vector<int> xpatt = utils::hashpatt(idxv);
-			std::transform(xpatt.begin(), xpatt.end(), xpatt.begin(), [=](int v) {
+		for (u32 iso = 0; iso < isomorphic; iso++) {
+			std::vector<u32> xpatt = utils::hashpatt(idxv);
+			std::transform(xpatt.begin(), xpatt.end(), xpatt.begin(), [=](u32 v) {
 				board x(0xfedcba9876543210ull);
 				x.isomorphic(-iso);
 				return x.at(v);
@@ -1435,13 +1368,7 @@ u32 make_features(std::string res = "") {
 				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
 				std::cerr << "assume as pattern descriptor..." << std::endl;
 				std::function<u64(const board&)> adapter = std::bind(utils::indexnta, std::placeholders::_1, xpatt);
-				indexer::mapper wrapper = utils::wrap_mapper(adapter);
-				if (wrapper) {
-					indexer::make(idxr, wrapper);
-				} else {
-					std::cerr << "run out of generic indexer wrapper" << std::endl;
-					std::exit(10);
-				}
+				indexer::make(idxr, utils::indexhdr(adapter));
 			}
 
 			if (feature::find(wght, idxr) == feature::feats().end()) {
@@ -1875,7 +1802,7 @@ struct state {
 
 	inline operator bool() const { return score >= 0; }
 	inline operator board() const { return move; }
-	declare_comparators(state, esti, inline);
+	declare_comparators(const state&, esti, inline);
 
 	inline numeric value() const { return esti - score; }
 	inline numeric reward() const { return score; }
@@ -1901,13 +1828,8 @@ struct state {
 		return esti;
 	}
 
-	inline static numeric& alpha() {
-		static numeric a = numeric(0.0025);
-		return a;
-	}
-	inline static numeric& alpha(numeric a) {
-		return (state::alpha() = a);
-	}
+	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
+	inline static numeric& alpha(numeric a) { return (state::alpha() = a); }
 };
 struct select {
 	state move[4];
@@ -1923,9 +1845,9 @@ struct select {
 		move[2].estimate(range, estim);
 		move[3].estimate(range, estim);
 		best = move;
-		if (move[1] > *best) best = move + 1;
-		if (move[2] > *best) best = move + 2;
-		if (move[3] > *best) best = move + 3;
+		best = move[1] > *best ? move + 1 : best;
+		best = move[2] > *best ? move + 2 : best;
+		best = move[3] > *best ? move + 3 : best;
 		return *this;
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
@@ -1946,17 +1868,6 @@ struct statistic {
 	u64 loop;
 	u64 unit;
 	u32 winv;
-
-	class format_t : public std::array<char, 64> {
-	public:
-		inline void operator =(const std::string& s) { std::copy_n(s.begin(), s.size() + 1, begin()); }
-		inline operator const char*() const { return &(operator[](0)); }
-	};
-
-	format_t indexf;
-	format_t localf;
-	format_t totalf;
-	format_t summaf;
 
 	struct record {
 		u64 score;
@@ -2021,6 +1932,18 @@ struct statistic {
 
 		return limit;
 	}
+
+	class format_t : public std::array<char, 64> {
+	public:
+		inline void operator =(const std::string& s) { std::copy_n(s.begin(), s.size() + 1, begin()); }
+		inline operator const char*() const { return data(); }
+	};
+
+	format_t indexf;
+	format_t localf;
+	format_t totalf;
+	format_t summaf;
+
 	void format() {
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
@@ -2033,16 +1956,16 @@ struct statistic {
 		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%" PRIu64 "ms %.2fops";
 	}
 
-	u64 operator++(int) { return (++loop) - 1; }
-	u64 operator++() { return (++loop); }
-	operator bool() const { return loop <= limit; }
-	bool checked() const { return (loop % unit) == 0; }
+	inline u64 operator++(int) { return (++loop) - 1; }
+	inline u64 operator++() { return (++loop); }
+	inline operator bool() const { return loop <= limit; }
+	inline bool checked() const { return (loop % unit) == 0; }
 
 	void update(u32 score, u32 hash, u32 opers) {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
-		if (hash >= winv) local.win += 1;
+		local.win += (hash >= winv ? 1 : 0);
 		local.max = std::max(local.max, score);
 		every.count[math::log2(hash)] += 1;
 		every.score[math::log2(hash)] += score;
@@ -2050,8 +1973,8 @@ struct statistic {
 
 		if ((loop % unit) != 0) return;
 
-		u64 current_time = moporgic::millisec();
-		local.time = current_time - local.time;
+		u64 tick = moporgic::millisec();
+		local.time = tick - local.time;
 		total.score += local.score;
 		total.win += local.win;
 		total.time += local.time;
@@ -2081,7 +2004,7 @@ struct statistic {
 		std::cout << buf << std::endl;
 
 		local = {};
-		local.time = current_time;
+		local.time = tick;
 	}
 
 	void summary(const utils::options::option& opt = {}) const {
@@ -2132,143 +2055,165 @@ struct statistic {
 
 utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
-	auto find_opt = [&](int& i, const std::string& v) -> std::string {
-		return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
-	};
-	auto find_opts = [&](int& i) -> std::vector<std::string> {
-		std::vector<std::string> vec;
-		for (std::string v; (v = find_opt(i, "")).size(); ) vec.push_back(v);
-		return vec;
-	};
 	for (int i = 1; i < argc; i++) {
-		switch (to_hash(argv[i])) {
+		std::string label = argv[i];
+		auto next_opt = [&](const std::string& v) -> std::string {
+			return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
+		};
+		auto next_opts = [&]() -> utils::options::list {
+			utils::options::list args;
+			for (std::string v; (v = next_opt("")).size(); ) args.push_back(v);
+			return args;
+		};
+		switch (to_hash(label)) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
-			opts["alpha"] = find_opt(i, std::to_string(state::alpha()));
-			opts["alpha"] += find_opts(i);
+			opts["alpha"] = next_opt(std::to_string(state::alpha()));
+			opts["alpha"] += next_opts();
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
-			opts["temporary"] = opts["train"];
-			opts["train"] = find_opt(i, "1000");
-			opts["train"] += find_opts(i);
-			opts["train"] += opts["temporary"];
+			opts[""] = opts["train"];
+			opts["train"] = next_opt("1000");
+			opts["train"] += next_opts();
+			opts["train"] += opts[""];
 			break;
 		case to_hash("-T"):
 		case to_hash("-e"):
 		case to_hash("--test"):
-			opts["temporary"] = opts["test"];
-			opts["test"] = find_opt(i, "1000");
-			opts["test"] += find_opts(i);
-			opts["test"] += opts["temporary"];
+			opts[""] = opts["test"];
+			opts["test"] = next_opt("1000");
+			opts["test"] += next_opts();
+			opts["test"] += opts[""];
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
-		case to_hash("--srand"):
-			opts["seed"] = find_opt(i, "moporgic");
+			opts["seed"] = next_opt("moporgic");
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
-			opts["temporary"] = find_opts(i);
-			opts["weight-input"] += opts["temporary"];
-			opts["weight-output"] += opts["temporary"];
+			opts["weight"]["input"] = opts["weight"]["output"] = next_opt("2048.w");
 			break;
 		case to_hash("-wi"):
 		case to_hash("--weight-input"):
-			opts["weight-input"] += find_opts(i);
+			opts["weight"]["input"] = next_opt("2048.w");
 			break;
 		case to_hash("-wo"):
 		case to_hash("--weight-output"):
-			opts["weight-output"] += find_opts(i);
+			opts["weight"]["output"] = next_opt("2048.w");
 			break;
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			opts["temporary"] = find_opts(i);
-			opts["feature-input"] += opts["temporary"];
-			opts["feature-output"] += opts["temporary"];
+			opts["feature"]["input"] = opts["feature"]["output"] = next_opt("2048.f");
 			break;
 		case to_hash("-fi"):
 		case to_hash("--feature-input"):
-			opts["feature-input"] += find_opts(i);
+			opts["feature"]["input"] = next_opt("2048.f");
 			break;
 		case to_hash("-fo"):
 		case to_hash("--feature-output"):
-			opts["feature-output"] += find_opts(i);
+			opts["feature"]["output"] = next_opt("2048.f");
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
+			opts["weight"]["value"] = opts[""] = next_opts();
+			if (opts("", "input") || opts("", "output") || opts("", "value"))
+				opts["weight"] = opts[""];
+			break;
 		case to_hash("--weight-value"):
-			opts["weight-value"] += find_opts(i);
+			opts["weight"]["value"] = next_opts();
 			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
+			opts["feature"]["value"] = opts[""] = next_opts();
+			if (opts("", "input") || opts("", "output") || opts("", "value"))
+				opts["feature"] = opts[""];
+			break;
 		case to_hash("--feature-value"):
-			opts["feature-value"] += find_opts(i);
+			opts["feature"]["value"] = next_opts();
 			break;
 		case to_hash("-wf"):
 		case to_hash("-fw"):
-			opts["temporary"] = find_opts(i);
-			opts["feature-value"] += opts["temporary"];
-			opts["weight-value"] += opts["temporary"];
+			opts["feature"]["value"] = opts["weight"]["value"] = opts[""] = next_opts();
+			if (opts("", "input") || opts("", "output") || opts("", "value"))
+				opts["feature"] = opts["weight"] = opts[""];
+			if (opts("", "input"))
+				opts["feature"]["input"] += ".f",
+				opts["weight"]["input"] += ".w";
+			if (opts("", "output"))
+				opts["feature"]["output"] += ".f",
+				opts["weight"]["output"] += ".w";
+			break;
+		case to_hash("-wfi"):
+		case to_hash("-fwi"):
+			opts[""] = next_opt("2048");
+			opts["feature"]["input"] = opts[""] + ".f";
+			opts["weight"]["input"] = opts[""] + ".w";
+			break;
+		case to_hash("-wfo"):
+		case to_hash("-fwo"):
+			opts[""] = next_opt("2048");
+			opts["feature"]["output"] = opts[""] + ".f";
+			opts["weight"]["output"] = opts[""] + ".w";
+			break;
+		case to_hash("-wfio"):
+		case to_hash("-fwio"):
+			opts[""] = next_opt("2048");
+			opts["feature"]["input"] = opts["feature"]["output"] = opts[""] + ".f";
+			opts["weight"]["input"] = opts["weight"]["output"] = opts[""] + ".w";
 			break;
 		case to_hash("-i"):
 		case to_hash("--info"):
-			opts["info"] = find_opt(i, "full");
-			opts["info"] += find_opts(i);
+			opts["info"] = next_opt("full");
+			opts["info"] += next_opts();
 			break;
 		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 		case to_hash("--extra"):
-			opts["options"] += find_opts(i);
+			opts["options"] += next_opts();
 			break;
 		case to_hash("-tt"):
 		case to_hash("-tm"):
 		case to_hash("--train-type"):
 		case to_hash("--train-mode"):
-			opts["train"]["mode"] = find_opt(i, "bias");
+			opts["train"]["mode"] = next_opt("bias");
 			break;
 		case to_hash("-Tt"):
 		case to_hash("-et"):
 		case to_hash("-em"):
 		case to_hash("--test-type"):
 		case to_hash("--test-mode"):
-			opts["test"]["mode"] = find_opt(i, "bias");
+			opts["test"]["mode"] = next_opt("bias");
 			break;
 		case to_hash("-tc"):
 		case to_hash("-tu"):
 		case to_hash("--train-check"):
 		case to_hash("--train-unit"):
-			opts["train"]["unit"] = find_opt(i, "1000");
+			opts["train"]["unit"] = next_opt("1000");
 			break;
 		case to_hash("-Tc"):
 		case to_hash("-ec"):
 		case to_hash("-eu"):
 		case to_hash("--test-check"):
 		case to_hash("--test-unit"):
-			opts["test"]["unit"] = find_opt(i, "1000");
+			opts["test"]["unit"] = next_opt("1000");
 			break;
 		case to_hash("-v"):
 		case to_hash("--win"):
-			opts["train"]["win"] = opts["test"]["win"] = find_opt(i, "2048");
+			opts["train"]["win"] = opts["test"]["win"] = next_opt("2048");
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
-			opts["comment"] = find_opts(i);
+			opts["comment"] = next_opts();
 			break;
 		case to_hash("-|"):
 		case to_hash("--|"):
 			opts = {};
 			break;
-		case to_hash("-?"):
-		case to_hash("--help"):
-			std::cout << "TDL2048+ by Hung Guei" << std::endl;
-			std::cout << "Build Alpha (" __DATE__ ")" << std::endl;
-			std::exit(0);
-			break;
 		default:
-			std::cerr << "unknown: " << argv[i];
-			for (auto& v : find_opts(i)) std::cerr << " " << v;
+			std::cerr << "unknown: " << label;
+			for (auto& v : next_opts()) std::cerr << " " << v;
 			std::cerr << std::endl;
 			break;
 		}
@@ -2541,9 +2486,9 @@ int main(int argc, const char* argv[]) {
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = rdtsc();
 
-	std::cout << "TDL2048+ LOG" << std::endl;
-	std::cout << "develop" << " build C++" << __cplusplus;
-	std::cout << " " << __DATE__ << " " << __TIME__ << std::endl;
+	std::cout << "TDL2048+ by Hung Guei" << std::endl;
+	std::cout << "develop" << " build GCC " __VERSION__ << " C++" << __cplusplus;
+	std::cout << " (" __DATE__ " " __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 	std::cout << "time = " << moporgic::millisec() << std::endl;
@@ -2552,13 +2497,13 @@ int main(int argc, const char* argv[]) {
 	std::cout << std::endl;
 
 	utils::make_indexers();
-	utils::load_weights(opts["weight-input"]);
-	utils::make_weights(opts["weight-value"]);
-	utils::load_features(opts["feature-input"]);
-	utils::make_features(opts["feature-value"]);
+	utils::load_weights(opts["weight"]["input"]);
+	utils::make_weights(opts["weight"]["value"]);
+	utils::load_features(opts["feature"]["input"]);
+	utils::make_features(opts["feature"]["value"]);
 	utils::list_mapping();
 
-	std::string type = opts["feature-value"];
+	std::string type = opts["feature"]["value"];
 	if (type == "4x6patt" || type == "5x6patt" || type == "8x6patt") {
 		if (!opts("train", "mode")) opts["train"]["mode"] = "forward-" + type;
 		if (!opts("test", "mode")) opts["test"]["mode"] = "best-" + type;
@@ -2574,8 +2519,8 @@ int main(int argc, const char* argv[]) {
 		if (opts["info"] == "full") stat.summary(opts["train"]);
 	}
 
-	utils::save_weights(opts["weight-output"]);
-	utils::save_features(opts["feature-output"]);
+	utils::save_weights(opts["weight"]["output"]);
+	utils::save_features(opts["feature"]["output"]);
 
 	if (statistic(opts["test"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
