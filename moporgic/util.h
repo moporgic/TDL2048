@@ -26,6 +26,14 @@
 #define noexcept
 #endif
 
+#if defined(__GNUC__)
+#define inline_always inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define inline_always __forceinline
+#else
+#define inline_always inline
+#endif
+
 #define VA_ARG_1(V, ...) V
 #define VA_ARG_2(V, ...) VA_ARG_1(__VA_ARGS__)
 #define VA_ARG_3(V, ...) VA_ARG_2(__VA_ARGS__)
@@ -132,7 +140,7 @@ protected:
 	template<typename engine_t>
 	inline static engine_t* engine(engine_t* e = nullptr) {
 		static engine_t* p = nullptr;
-		if (e) delete std::exchange(p, e);
+		if (e) { delete p; p = e; }
 		return p;
 	}
 };
