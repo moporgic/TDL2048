@@ -1437,10 +1437,7 @@ struct select {
 		move[1].estimate(range);
 		move[2].estimate(range);
 		move[3].estimate(range);
-		best = move;
-		best = move[1] > *best ? move + 1 : best;
-		best = move[2] > *best ? move + 2 : best;
-		best = move[3] > *best ? move + 3 : best;
+		best = std::max_element(move, move + 4);
 		return *this;
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
