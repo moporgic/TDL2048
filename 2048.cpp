@@ -1903,6 +1903,22 @@ statistic test(utils::options opts = {}) {
 			stats.update(score, b.hash(), opers);
 		}
 		break;
+
+	case to_hash("random"):
+		for (stats.init(opts["test"]); stats; stats++) {
+
+			u32 score = 0;
+			u32 opers = 0;
+			hex a;
+
+			for (b.init(); (a = b.actions()).size(); b.next()) {
+				score += b.operate(a[moporgic::rand() % a.size()]);
+				opers += 1;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
 	}
 
 	return stats;
