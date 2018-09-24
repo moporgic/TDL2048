@@ -1156,6 +1156,7 @@ u32 make_weights(std::string res = "") {
 	alias["khyeh"] = "012345 456789 012456 45689a ";
 	alias["patt/42-33"] = "012345 456789 89abcd 012456 45689a ";
 	alias["patt/4-22"] = "0123 4567 0145 1256 569a ";
+	alias["patt/4"] = "0123 4567 ";
 	alias["k.matsuzaki"] = "012456 12569d 012345 01567a 01259a 0159de 01589d 01246a ";
 	alias["k.matsuzaki-opt"] = "012456 456789 012345 234569 01259a 345678 134567 01489a ";
 	alias["monotonic"] = "fd012301:^24 fd456701:^24 ";
@@ -1164,6 +1165,8 @@ u32 make_weights(std::string res = "") {
 	alias["5x6patt"] = alias["patt/42-33"];
 	alias["8x6patt"] = alias["k.matsuzaki-opt"];
 	alias["5x4patt"] = alias["patt/4-22"];
+	alias["2x4patt"] = alias["patt/4"];
+	alias["mono"] = alias["monotonic"];
 
 	if (res.empty() && weight::wghts().empty())
 		res = { "default" };
@@ -1246,6 +1249,7 @@ u32 make_features(std::string res = "") {
 	alias["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] ";
 	alias["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!] ";
 	alias["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!] ";
+	alias["patt/4"] = "0123[0123!] 4567[4567!] ";
 	alias["monotonic"] = "fd012301[fd012301] fd012301[fd37bf01] fd012301[fdfedc01] fd012301[fdc84001] "
 	                     "fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01] "
 	                     "fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101] "
@@ -1259,6 +1263,7 @@ u32 make_features(std::string res = "") {
 	alias["5x6patt"] = alias["patt/42-33"];
 	alias["8x6patt"] = alias["k.matsuzaki-opt"];
 	alias["5x4patt"] = alias["patt/4-22"];
+	alias["2x4patt"] = alias["patt/4"];
 	alias["mono"] = alias["monotonic"];
 
 	if (res.empty() && feature::feats().empty())
