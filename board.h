@@ -22,8 +22,7 @@ private:
 	u32 inf;
 
 public:
-	inline constexpr board(u64 raw = 0) : raw(raw), ext(0), inf(0) {}
-	inline constexpr board(u64 raw, u32 ext) : raw(raw), ext(ext), inf(0) {}
+	inline constexpr board(u64 raw = 0, u32 ext = 0, u32 inf = 0) : raw(raw), ext(ext), inf(inf) {}
 	inline constexpr board(u64 raw, u16 ext) : board(raw, u32(ext) << 16) {}
 	inline constexpr board(const board& b) = default;
 	inline constexpr board& operator =(u64 raw) { this->raw = raw; this->ext = 0; return *this; }
