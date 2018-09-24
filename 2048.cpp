@@ -1625,7 +1625,7 @@ struct statistic {
 		for (auto left = total, i = 0; left; left -= count[i++]) {
 			if (count[i] == 0) continue;
 			snprintf(buf, sizeof(buf), "%-6d" "%8d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
-					(1 << (i)) & 0xfffffffeu, u32(count[i]),
+					board::tile::itov(i), u32(count[i]),
 					u32(score[i] / count[i]), u32(opers[i] / count[i]),
 					count[i] * 100.0 / total, left * 100.0 / total);
 			std::cout << buf << std::endl;

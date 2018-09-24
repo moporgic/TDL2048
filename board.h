@@ -799,6 +799,9 @@ public:
 		inline constexpr operator u32() const { return at(is(style::extend), is(style::exact)); }
 		inline constexpr tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
 	public:
+		inline static constexpr u32 itov(u32 i) { return (1u << i) & 0xfffffffeu; }
+		inline static constexpr u32 vtoi(u32 v) { return math::log2(v); }
+	public:
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
 			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return t.is(style::binary) ? moporgic::write_cast<byte>(out, v) : (out << v);
@@ -816,10 +819,10 @@ public:
 		inline constexpr bool is(u32 item) const { return b.inf & item; }
 		inline constexpr u32 at(bool extend, bool exact) const {
 			u32 v = extend ? b.at5(i) : b.at4(i);
-			return exact ? (1 << v) & -2u : v;
+			return exact ? tile::itov(v) : v;
 		}
 		inline constexpr void set(u32 k, bool extend, bool exact) const {
-			u32 v = exact ? math::lg(k) : k;
+			u32 v = exact ? tile::itov(k) : k;
 			if (extend) b.set5(i, v); else b.set4(i, v);
 		}
 	};
