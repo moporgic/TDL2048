@@ -39,7 +39,7 @@ public:
 			static byte block[sizeof(cache) * (1 << 20)] = {};
 			return pointer_cast<cache>(block)[i];
 		}
-		static inline void make() {
+		static __attribute__((constructor)) void make() {
 			if (load(0).moved) return;
 			for (u32 i = 0; i < (1 << 20); i++) new (const_cast<board::cache*>(&load(i))) board::cache(i);
 		}
@@ -937,8 +937,5 @@ public:
 	}
 
 };
-
-__attribute__((constructor)) static
-void __board_cache_init__() { board::cache::make(); }
 
 } // namespace moporgic
