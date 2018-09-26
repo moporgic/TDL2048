@@ -1196,6 +1196,7 @@ u32 make_weights(std::string res = "") {
 	alias["khyeh"] = "012345 456789 012456 45689a ";
 	alias["patt/42-33"] = "012345 456789 89abcd 012456 45689a ";
 	alias["patt/4-22"] = "0123 4567 0145 1256 569a ";
+	alias["patt/4"] = "0123 4567 ";
 	alias["k.matsuzaki"] = "012456 12569d 012345 01567a 01259a 0159de 01589d 01246a ";
 	alias["k.matsuzaki-opt"] = "012456 456789 012345 234569 01259a 345678 134567 01489a ";
 	alias["monotonic"] = "fd012301:^24 fd456701:^24 ";
@@ -1204,6 +1205,8 @@ u32 make_weights(std::string res = "") {
 	alias["5x6patt"] = alias["patt/42-33"];
 	alias["8x6patt"] = alias["k.matsuzaki-opt"];
 	alias["5x4patt"] = alias["patt/4-22"];
+	alias["2x4patt"] = alias["patt/4"];
+	alias["mono"] = alias["monotonic"];
 
 	if (res.empty() && weight::wghts().empty())
 		res = { "default" };
@@ -1286,6 +1289,7 @@ u32 make_features(std::string res = "") {
 	alias["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] ";
 	alias["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!] ";
 	alias["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!] ";
+	alias["patt/4"] = "0123[0123!] 4567[4567!] ";
 	alias["monotonic"] = "fd012301[fd012301] fd012301[fd37bf01] fd012301[fdfedc01] fd012301[fdc84001] "
 	                     "fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01] "
 	                     "fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101] "
@@ -1299,6 +1303,7 @@ u32 make_features(std::string res = "") {
 	alias["5x6patt"] = alias["patt/42-33"];
 	alias["8x6patt"] = alias["k.matsuzaki-opt"];
 	alias["5x4patt"] = alias["patt/4-22"];
+	alias["2x4patt"] = alias["patt/4"];
 	alias["mono"] = alias["monotonic"];
 
 	if (res.empty() && feature::feats().empty())
@@ -1407,7 +1412,7 @@ void list_mapping() {
 }
 
 typedef numeric(*estimator)(const board&, clip<feature>);
-typedef numeric(*optimizer)(const board&, numeric, numeric, clip<feature>);
+typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
 
 inline numeric estimate_4x6patt(const board& state,
 		clip<feature> range = feature::feats()) {
@@ -1456,9 +1461,8 @@ inline numeric estimate_4x6patt(const board& state,
 	return esti;
 }
 
-inline numeric optimize_4x6patt(const board& state, numeric error, numeric alpha,
+inline numeric optimize_4x6patt(const board& state, numeric updv,
 		clip<feature> range = feature::feats()) {
-	register numeric updv = alpha * error;
 	register numeric esti = 0;
 	register feature* f = range.begin();
 	register board iso = state;
@@ -1558,9 +1562,8 @@ inline numeric estimate_5x6patt(const board& state,
 	esti += f[4 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)];
 	return esti;
 }
-inline numeric optimize_5x6patt(const board& state, numeric error, numeric alpha,
+inline numeric optimize_5x6patt(const board& state, numeric updv,
 		clip<feature> range = feature::feats()) {
-	register numeric updv = alpha * error;
 	register numeric esti = 0;
 	register feature* f = range.begin();
 	register board iso = state;
@@ -1693,9 +1696,8 @@ inline numeric estimate_8x6patt(const board& state,
 	return esti;
 }
 
-inline numeric optimize_8x6patt(const board& state, numeric error, numeric alpha,
+inline numeric optimize_8x6patt(const board& state, numeric updv,
 		clip<feature> range = feature::feats()) {
-	register numeric updv = alpha * error;
 	register numeric esti = 0;
 	register feature* f = range.begin();
 	register board iso = state;
@@ -1781,12 +1783,11 @@ inline numeric estimate(const board& state,
 	return esti;
 }
 
-inline numeric optimize(const board& state, numeric error, numeric alpha,
+inline numeric optimize(const board& state, numeric error,
 		clip<feature> range = feature::feats()) {
-	register numeric updv = alpha * error;
 	register numeric esti = 0;
 	for (register feature& feat : range)
-		esti += (feat[state] += updv);
+		esti += (feat[state] += error);
 	return esti;
 }
 
@@ -1821,10 +1822,10 @@ struct state {
 		}
 		return esti;
 	}
-	inline numeric optimize(numeric accu, numeric alpha = state::alpha(),
+	inline numeric optimize(numeric exact, numeric alpha = state::alpha(),
 			clip<feature> range = feature::feats(),
 			utils::optimizer optim = utils::optimize) {
-		esti = state::reward() + optim(move, accu - state::value(), alpha, range);
+		esti = state::reward() + optim(move, (exact - state::value()) * alpha, range);
 		return esti;
 	}
 
@@ -1844,10 +1845,7 @@ struct select {
 		move[1].estimate(range, estim);
 		move[2].estimate(range, estim);
 		move[3].estimate(range, estim);
-		best = move;
-		best = move[1] > *best ? move + 1 : best;
-		best = move[2] > *best ? move + 2 : best;
-		best = move[3] > *best ? move + 3 : best;
+		best = std::max_element(move, move + 4);
 		return *this;
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
@@ -2030,7 +2028,7 @@ struct statistic {
 		for (auto left = total, i = 0; left; left -= count[i++]) {
 			if (count[i] == 0) continue;
 			snprintf(buf, sizeof(buf), "%-6d" "%8d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
-					(1 << (i)) & 0xfffffffeu, u32(count[i]),
+					board::tile::itov(i), u32(count[i]),
 					u32(score[i] / count[i]), u32(opers[i] / count[i]),
 					count[i] * 100.0 / total, left * 100.0 / total);
 			std::cout << buf << std::endl;
@@ -2469,6 +2467,22 @@ statistic test(utils::options opts = {}) {
 				score += best.score();
 				opers += 1;
 				best >> b;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("random"):
+		for (stats.init(opts["test"]); stats; stats++) {
+
+			u32 score = 0;
+			u32 opers = 0;
+			hex a;
+
+			for (b.init(); (a = b.actions()).size(); b.next()) {
+				score += b.operate(a[moporgic::rand() % a.size()]);
+				opers += 1;
 			}
 
 			stats.update(score, b.hash(), opers);

@@ -22,8 +22,7 @@ private:
 	u32 inf;
 
 public:
-	inline constexpr board(u64 raw = 0) : raw(raw), ext(0), inf(0) {}
-	inline constexpr board(u64 raw, u32 ext) : raw(raw), ext(ext), inf(0) {}
+	inline constexpr board(u64 raw = 0, u32 ext = 0, u32 inf = 0) : raw(raw), ext(ext), inf(inf) {}
 	inline constexpr board(u64 raw, u16 ext) : board(raw, u32(ext) << 16) {}
 	inline constexpr board(const board& b) = default;
 	inline constexpr board& operator =(u64 raw) { this->raw = raw; this->ext = 0; return *this; }
@@ -40,7 +39,7 @@ public:
 			static byte block[sizeof(cache) * (1 << 20)] = {};
 			return pointer_cast<cache>(block)[i];
 		}
-		static inline void make() {
+		static __attribute__((constructor)) void make() {
 			if (load(0).moved) return;
 			for (u32 i = 0; i < (1 << 20); i++) new (const_cast<board::cache*>(&load(i))) board::cache(i);
 		}
@@ -800,6 +799,9 @@ public:
 		inline constexpr operator u32() const { return at(is(style::extend), is(style::exact)); }
 		inline constexpr tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
 	public:
+		inline static constexpr u32 itov(u32 i) { return (1u << i) & 0xfffffffeu; }
+		inline static constexpr u32 vtoi(u32 v) { return math::log2(v); }
+	public:
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
 			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return t.is(style::binary) ? moporgic::write_cast<byte>(out, v) : (out << v);
@@ -817,10 +819,10 @@ public:
 		inline constexpr bool is(u32 item) const { return b.inf & item; }
 		inline constexpr u32 at(bool extend, bool exact) const {
 			u32 v = extend ? b.at5(i) : b.at4(i);
-			return exact ? (1 << v) & -2u : v;
+			return exact ? tile::itov(v) : v;
 		}
 		inline constexpr void set(u32 k, bool extend, bool exact) const {
-			u32 v = exact ? math::lg(k) : k;
+			u32 v = exact ? tile::itov(k) : k;
 			if (extend) b.set5(i, v); else b.set4(i, v);
 		}
 	};
@@ -935,8 +937,5 @@ public:
 	}
 
 };
-
-__attribute__((constructor)) static
-void __board_cache_init__() { board::cache::make(); }
 
 } // namespace moporgic
