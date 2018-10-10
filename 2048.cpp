@@ -1791,6 +1791,11 @@ inline numeric optimize(const board& state, numeric error,
 	return esti;
 }
 
+inline constexpr numeric illegal(const board& state,
+		clip<feature> range = feature::feats()) {
+	return -std::numeric_limits<numeric>::max();
+}
+
 } // utils
 
 
@@ -1815,11 +1820,8 @@ struct state {
 	inline numeric estimate(
 			clip<feature> range = feature::feats(),
 			utils::estimator estim = utils::estimate) {
-		if (score >= 0) {
-			esti = state::reward() + estim(move, range);
-		} else {
-			esti = -std::numeric_limits<numeric>::max();
-		}
+		estim = score >= 0 ? estim : utils::illegal;
+		esti = state::reward() + estim(move, range);
 		return esti;
 	}
 	inline numeric optimize(numeric exact, numeric alpha = state::alpha(),
