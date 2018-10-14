@@ -13,6 +13,10 @@
 #include <iostream>
 #include <cstdio>
 
+#include <mmintrin.h>
+#include <emmintrin.h>
+#include <immintrin.h>
+
 namespace moporgic {
 
 class board {
@@ -433,39 +437,71 @@ public:
 	}
 	inline i32 left64x() {
 		register u64 rawp = raw;
-		register board rawn = raw;
+		register __m64 rawn = _mm_cvtsi64_m64(rawp);
 		register u32 score = 0;
-		for (u32 i = 0; i < 4; i++) {
-			u32 row = rawn.fetch16(i);
-			u32 fill, test, tile;
-			fill = (((row >> (0 << 2)) & 0xf) != 0);
-			row = fill ? row : (row >> 4);
-			fill = (((row >> (0 << 2)) & 0xf) != 0);
-			row = fill ? row : (row >> 4);
-			fill = (((row >> (0 << 2)) & 0xf) != 0);
-			row = fill ? row : (row >> 4);
-			fill = (((row >> (1 << 2)) & 0xf) != 0);
-			row = fill ? row : (row & 0x000f) | ((row >> 4) & 0xfff0);
-			fill = (((row >> (1 << 2)) & 0xf) != 0);
-			row = fill ? row : (row & 0x000f) | ((row >> 4) & 0xfff0);
-			fill = (((row >> (2 << 2)) & 0xf) != 0);
-			row = fill ? row : (row & 0x00ff) | ((row >> 4) & 0xff00);
-			tile = (row >> (0 << 2)) & 0xf;
-			test = (tile != 0) & (tile == ((row >> (1 << 2)) & 0xf));
-			row = test ? (((row + 0x0001) & 0x000f) | ((row >> 4) & 0x0ff0)) : row;
-			score += test << (tile + 1);
-			tile = (row >> (1 << 2)) & 0xf;
-			test = (tile != 0) & (tile == ((row >> (2 << 2)) & 0xf));
-			row = test ? (((row + 0x0010) & 0x00ff) | ((row >> 4) & 0x0f00)) : row;
-			score += test << (tile + 1);
-			tile = (row >> (2 << 2)) & 0xf;
-			test = (tile != 0) & (tile == ((row >> (3 << 2)) & 0xf));
-			row = test ? (((row + 0x0100) & 0x0fff)) : row;
-			score += test << (tile + 1);
-			rawn.place16(i, row);
-		}
-		register i32 moved = (rawp ^ u64(rawn)) ? 0 : -1;
-		raw = rawn;
+
+		__m64 v_0x0000 = _mm_cvtsi64_m64(0x0000000000000000ull);
+		__m64 v_0x0001 = _mm_cvtsi64_m64(0x0001000100010001ull);
+		__m64 v_0x0010 = _mm_cvtsi64_m64(0x0010001000100010ull);
+		__m64 v_0x0100 = _mm_cvtsi64_m64(0x0100010001000100ull);
+		__m64 v_0x000f = _mm_cvtsi64_m64(0x000f000f000f000full);
+		__m64 v_0x00ff = _mm_cvtsi64_m64(0x00ff00ff00ff00ffull);
+		__m64 v_0x0fff = _mm_cvtsi64_m64(0x0fff0fff0fff0fffull);
+		__m64 v_0xfff0 = _mm_cvtsi64_m64(0xfff0fff0fff0fff0ull);
+		__m64 v_0xff00 = _mm_cvtsi64_m64(0xff00ff00ff00ff00ull);
+		__m64 v_0x0ff0 = _mm_cvtsi64_m64(0x0ff00ff00ff00ff0ull);
+		__m64 v_0x0f00 = _mm_cvtsi64_m64(0x0f000f000f000f00ull);
+
+		__m64 fill, tile, test;
+		u64 i, t;
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_srli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_srli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_srli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0x000f), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0xfff0))), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0x000f), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0xfff0))), _mm_andnot_si64(fill, rawn));
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0x00ff), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0xff00))), _mm_andnot_si64(fill, rawn));
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0001), v_0x000f), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0x0ff0)), test), _mm_andnot_si64(test, rawn));
+		i = _mm_cvtm64_si64(test) & 0x0001000100010001ull;
+		t = _mm_cvtm64_si64(tile) + 0x0001000100010001ull;
+		score += ((i >>  0) & 0xffff) << ((t >>  0) & 0xffff);
+		score += ((i >> 16) & 0xffff) << ((t >> 16) & 0xffff);
+		score += ((i >> 32) & 0xffff) << ((t >> 32) & 0xffff);
+		score += ((i >> 48) & 0xffff) << ((t >> 48) & 0xffff);
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0010), v_0x00ff), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0x0f00)), test), _mm_andnot_si64(test, rawn));
+		i = _mm_cvtm64_si64(test) & 0x0001000100010001ull;
+		t = _mm_cvtm64_si64(tile) + 0x0001000100010001ull;
+		score += ((i >>  0) & 0xffff) << ((t >>  0) & 0xffff);
+		score += ((i >> 16) & 0xffff) << ((t >> 16) & 0xffff);
+		score += ((i >> 32) & 0xffff) << ((t >> 32) & 0xffff);
+		score += ((i >> 48) & 0xffff) << ((t >> 48) & 0xffff);
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0100), v_0x0fff), test), _mm_andnot_si64(test, rawn));
+		i = _mm_cvtm64_si64(test) & 0x0001000100010001ull;
+		t = _mm_cvtm64_si64(tile) + 0x0001000100010001ull;
+		score += ((i >>  0) & 0xffff) << ((t >>  0) & 0xffff);
+		score += ((i >> 16) & 0xffff) << ((t >> 16) & 0xffff);
+		score += ((i >> 32) & 0xffff) << ((t >> 32) & 0xffff);
+		score += ((i >> 48) & 0xffff) << ((t >> 48) & 0xffff);
+
+		register i32 moved = (rawp ^ _mm_cvtm64_si64(rawn)) ? 0 : -1;
+		raw = _mm_cvtm64_si64(rawn);
 		return score | moved;
 	}
 	inline i32 right64() {
@@ -481,39 +517,72 @@ public:
 	}
 	inline i32 right64x() {
 		register u64 rawp = raw;
-		register board rawn = raw;
+		register __m64 rawn = _mm_cvtsi64_m64(rawp);
 		register u32 score = 0;
-		for (u32 i = 0; i < 4; i++) {
-			u32 row = rawn.fetch16(i);
-			u32 fill, test, tile;
-			fill = (((row >> (3 << 2)) & 0xf) != 0);
-			row = fill ? row : (row << 4);
-			fill = (((row >> (3 << 2)) & 0xf) != 0);
-			row = fill ? row : (row << 4);
-			fill = (((row >> (3 << 2)) & 0xf) != 0);
-			row = fill ? row : (row << 4);
-			fill = (((row >> (2 << 2)) & 0xf) != 0);
-			row = fill ? row : (row & 0xf000) | ((row << 4) & 0x0fff);
-			fill = (((row >> (2 << 2)) & 0xf) != 0);
-			row = fill ? row : (row & 0xf000) | ((row << 4) & 0x0fff);
-			fill = (((row >> (1 << 2)) & 0xf) != 0);
-			row = fill ? row : (row & 0xff00) | ((row << 4) & 0x00ff);
-			tile = (row >> (3 << 2)) & 0xf;
-			test = (tile != 0) & (tile == ((row >> (2 << 2)) & 0xf));
-			row = test ? (((row + 0x1000) & 0xf000) | ((row << 4) & 0x0ff0)) : row;
-			score += test << (tile + 1);
-			tile = (row >> (2 << 2)) & 0xf;
-			test = (tile != 0) & ((tile) == ((row >> (1 << 2)) & 0xf));
-			row = test ? (((row + 0x0100) & 0xff00) | ((row << 4) & 0x00f0)) : row;
-			score += test << (tile + 1);
-			tile = (row >> (1 << 2)) & 0xf;
-			test = (tile != 0) & (tile == ((row >> (0 << 2)) & 0xf));
-			row = test ? (((row + 0x0010) & 0xfff0)) : row;
-			score += test << (tile + 1);
-			rawn.place16(i, row);
-		}
-		register i32 moved = (rawp ^ u64(rawn)) ? 0 : -1;
-		raw = rawn;
+
+		__m64 v_0x0000 = _mm_cvtsi64_m64(0x0000000000000000ull);
+		__m64 v_0x0010 = _mm_cvtsi64_m64(0x0010001000100010ull);
+		__m64 v_0x0100 = _mm_cvtsi64_m64(0x0100010001000100ull);
+		__m64 v_0x000f = _mm_cvtsi64_m64(0x000f000f000f000full);
+		__m64 v_0x00ff = _mm_cvtsi64_m64(0x00ff00ff00ff00ffull);
+		__m64 v_0x0fff = _mm_cvtsi64_m64(0x0fff0fff0fff0fffull);
+		__m64 v_0xfff0 = _mm_cvtsi64_m64(0xfff0fff0fff0fff0ull);
+		__m64 v_0xff00 = _mm_cvtsi64_m64(0xff00ff00ff00ff00ull);
+		__m64 v_0x0ff0 = _mm_cvtsi64_m64(0x0ff00ff00ff00ff0ull);
+		__m64 v_0xf000 = _mm_cvtsi64_m64(0xf000f000f000f000ull);
+		__m64 v_0x1000 = _mm_cvtsi64_m64(0x1000100010001000ull);
+		__m64 v_0x00f0 = _mm_cvtsi64_m64(0x00f000f000f000f0ull);
+
+		__m64 fill, tile, test;
+		u64 i, t;
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_slli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_slli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_slli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0xf000), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x0fff))), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0xf000), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x0fff))), _mm_andnot_si64(fill, rawn));
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0xff00), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x00ff))), _mm_andnot_si64(fill, rawn));
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x1000), v_0xf000), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x0ff0)), test), _mm_andnot_si64(test, rawn));
+		i = _mm_cvtm64_si64(test) & 0x0001000100010001ull;
+		t = _mm_cvtm64_si64(tile) + 0x0001000100010001ull;
+		score += ((i >>  0) & 0xffff) << ((t >>  0) & 0xffff);
+		score += ((i >> 16) & 0xffff) << ((t >> 16) & 0xffff);
+		score += ((i >> 32) & 0xffff) << ((t >> 32) & 0xffff);
+		score += ((i >> 48) & 0xffff) << ((t >> 48) & 0xffff);
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0100), v_0xff00), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x00f0)), test), _mm_andnot_si64(test, rawn));
+		i = _mm_cvtm64_si64(test) & 0x0001000100010001ull;
+		t = _mm_cvtm64_si64(tile) + 0x0001000100010001ull;
+		score += ((i >>  0) & 0xffff) << ((t >>  0) & 0xffff);
+		score += ((i >> 16) & 0xffff) << ((t >> 16) & 0xffff);
+		score += ((i >> 32) & 0xffff) << ((t >> 32) & 0xffff);
+		score += ((i >> 48) & 0xffff) << ((t >> 48) & 0xffff);
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0010), v_0xfff0), test), _mm_andnot_si64(test, rawn));
+		i = _mm_cvtm64_si64(test) & 0x0001000100010001ull;
+		t = _mm_cvtm64_si64(tile) + 0x0001000100010001ull;
+		score += ((i >>  0) & 0xffff) << ((t >>  0) & 0xffff);
+		score += ((i >> 16) & 0xffff) << ((t >> 16) & 0xffff);
+		score += ((i >> 32) & 0xffff) << ((t >> 32) & 0xffff);
+		score += ((i >> 48) & 0xffff) << ((t >> 48) & 0xffff);
+
+		register i32 moved = (rawp ^ _mm_cvtm64_si64(rawn)) ? 0 : -1;
+		raw = _mm_cvtm64_si64(rawn);
 		return score | moved;
 	}
 	inline i32 up64() {
@@ -646,10 +715,10 @@ public:
 	}
 	inline i32 operate64(u32 op) {
 		switch (op & 0x0fu) {
-		case action::up:    return up64();
-		case action::right: return right64();
-		case action::down:  return down64();
-		case action::left:  return left64();
+		case action::up:    return up64x();
+		case action::right: return right64x();
+		case action::down:  return down64x();
+		case action::left:  return left64x();
 		case action::next:  return popup64() ? 0 : -1;
 		case action::init:  return init(), 0;
 		default:            return -1;

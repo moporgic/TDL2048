@@ -1595,6 +1595,7 @@ struct statistic {
 
 		std::cout << std::endl;
 		char buf[64];
+		snprintf(buf, sizeof(buf), "%f", 0.0);
 		snprintf(buf, sizeof(buf), indexf, // "%03llu/%03llu %llums %.2fops",
 				loop / unit,
 				limit / unit,
