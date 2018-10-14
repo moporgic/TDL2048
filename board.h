@@ -90,26 +90,86 @@ public:
 				u32 row[] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
 							((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
 				if (reverse) std::reverse(row, row + 4);
-				u32 top = 0, hold = 0;
-				for (u32 i = 0; i < 4; i++) {
-					u32 tile = row[i];
-					if (tile == 0) continue;
-					row[i] = 0;
-					if (hold) {
-						if (tile == hold) {
-							row[top++] = ++tile;
-							score += (1 << tile);
-							merge++;
-							hold = 0;
+				u32 ori[4]; std::copy_n(row, 4, ori);
+				u32 bak[4]; std::copy_n(row, 4, bak);
+				{
+					u32 top = 0, hold = 0;
+					for (u32 i = 0; i < 4; i++) {
+						u32 tile = row[i];
+						if (tile == 0) continue;
+						row[i] = 0;
+						if (hold) {
+							if (tile == hold) {
+								row[top++] = ++tile;
+								score += (1 << tile);
+								merge++;
+								hold = 0;
+							} else {
+								row[top++] = hold;
+								hold = tile;
+							}
 						} else {
-							row[top++] = hold;
 							hold = tile;
 						}
-					} else {
-						hold = tile;
 					}
+					if (hold) row[top] = hold;
 				}
-				if (hold) row[top] = hold;
+				u32 xcore = 0, xerge = 0;
+				{
+					u32* row = bak;
+					u32& score = xcore;
+					u32& merge = xerge;
+
+					u32 fill, test;
+					fill = (row[0] != 0);
+					row[0] = fill ? row[0] : row[1];
+					row[1] = fill ? row[1] : 0;
+					fill = (row[1] != 0);
+					row[1] = fill ? row[1] : row[2];
+					row[2] = fill ? row[2] : 0;
+					fill = (row[2] != 0);
+					row[2] = fill ? row[2] : row[3];
+					row[3] = fill ? row[3] : 0;
+
+					fill = (row[0] != 0);
+					row[0] = fill ? row[0] : row[1];
+					row[1] = fill ? row[1] : 0;
+					fill = (row[1] != 0);
+					row[1] = fill ? row[1] : row[2];
+					row[2] = fill ? row[2] : 0;
+
+					fill = (row[0] != 0);
+					row[0] = fill ? row[0] : row[1];
+					row[1] = fill ? row[1] : 0;
+
+					test = (row[0] != 0) & (row[0] == row[1]);
+					row[0] = row[0] + test;
+					row[1] = test ? row[2] : row[1];
+					row[2] = test ? row[3] : row[2];
+					row[3] = test ? 0 : row[3];
+					merge += test;
+					score += test << row[0];
+
+					test = (row[1] != 0) & (row[1] == row[2]);
+					row[1] = row[1] + test;
+					row[2] = test ? row[3] : row[2];
+					row[3] = test ? 0 : row[3];
+					merge += test;
+					score += test << row[1];
+
+					test = (row[2] != 0) & (row[2] == row[3]);
+					row[2] = row[2] + test;
+					row[3] = test ? 0 : row[3];
+					merge += test;
+					score += test << row[2];
+				}
+				if (!std::equal(row, row + 4, bak) || (score != xcore) || (merge != xerge)) {
+					std::cout << ori[0] << " " << ori[1] << " " << ori[2] << " " << ori[3] << std::endl;
+					std::cout << row[0] << " " << row[1] << " " << row[2] << " " << row[3] << std::endl;
+					std::cout << bak[0] << " " << bak[1] << " " << bak[2] << " " << bak[3] << std::endl;
+					std::cout << score << " " << merge << " / " << xcore << " " << xerge << std::endl;
+					std::exit(0);
+				}
 				if (reverse) std::reverse(row, row + 4);
 
 				u32 lo[] = { (row[0] & 0x0f), (row[1] & 0x0f), (row[2] & 0x0f), (row[3] & 0x0f) };
@@ -371,6 +431,43 @@ public:
 		raw = rawn;
 		return score | moved;
 	}
+	inline i32 left64x() {
+		register u64 rawp = raw;
+		register board rawn = raw;
+		register u32 score = 0;
+		for (u32 i = 0; i < 4; i++) {
+			u32 row = rawn.fetch16(i);
+			u32 fill, test, tile;
+			fill = (((row >> (0 << 2)) & 0xf) != 0);
+			row = fill ? row : (row >> 4);
+			fill = (((row >> (0 << 2)) & 0xf) != 0);
+			row = fill ? row : (row >> 4);
+			fill = (((row >> (0 << 2)) & 0xf) != 0);
+			row = fill ? row : (row >> 4);
+			fill = (((row >> (1 << 2)) & 0xf) != 0);
+			row = fill ? row : (row & 0x000f) | ((row >> 4) & 0xfff0);
+			fill = (((row >> (1 << 2)) & 0xf) != 0);
+			row = fill ? row : (row & 0x000f) | ((row >> 4) & 0xfff0);
+			fill = (((row >> (2 << 2)) & 0xf) != 0);
+			row = fill ? row : (row & 0x00ff) | ((row >> 4) & 0xff00);
+			tile = (row >> (0 << 2)) & 0xf;
+			test = (tile != 0) & (tile == ((row >> (1 << 2)) & 0xf));
+			row = test ? (((row + 0x0001) & 0x000f) | ((row >> 4) & 0x0ff0)) : row;
+			score += test << (tile + 1);
+			tile = (row >> (1 << 2)) & 0xf;
+			test = (tile != 0) & (tile == ((row >> (2 << 2)) & 0xf));
+			row = test ? (((row + 0x0010) & 0x00ff) | ((row >> 4) & 0x0f00)) : row;
+			score += test << (tile + 1);
+			tile = (row >> (2 << 2)) & 0xf;
+			test = (tile != 0) & (tile == ((row >> (3 << 2)) & 0xf));
+			row = test ? (((row + 0x0100) & 0x0fff)) : row;
+			score += test << (tile + 1);
+			rawn.place16(i, row);
+		}
+		register i32 moved = (rawp ^ u64(rawn)) ? 0 : -1;
+		raw = rawn;
+		return score | moved;
+	}
 	inline i32 right64() {
 		register u64 rawp = raw, rawn = 0;
 		register u32 score = 0;
@@ -379,6 +476,43 @@ public:
 		query16(2).right.moveh64<2>(rawn, score);
 		query16(3).right.moveh64<3>(rawn, score);
 		register i32 moved = (rawp ^ rawn) ? 0 : -1;
+		raw = rawn;
+		return score | moved;
+	}
+	inline i32 right64x() {
+		register u64 rawp = raw;
+		register board rawn = raw;
+		register u32 score = 0;
+		for (u32 i = 0; i < 4; i++) {
+			u32 row = rawn.fetch16(i);
+			u32 fill, test, tile;
+			fill = (((row >> (3 << 2)) & 0xf) != 0);
+			row = fill ? row : (row << 4);
+			fill = (((row >> (3 << 2)) & 0xf) != 0);
+			row = fill ? row : (row << 4);
+			fill = (((row >> (3 << 2)) & 0xf) != 0);
+			row = fill ? row : (row << 4);
+			fill = (((row >> (2 << 2)) & 0xf) != 0);
+			row = fill ? row : (row & 0xf000) | ((row << 4) & 0x0fff);
+			fill = (((row >> (2 << 2)) & 0xf) != 0);
+			row = fill ? row : (row & 0xf000) | ((row << 4) & 0x0fff);
+			fill = (((row >> (1 << 2)) & 0xf) != 0);
+			row = fill ? row : (row & 0xff00) | ((row << 4) & 0x00ff);
+			tile = (row >> (3 << 2)) & 0xf;
+			test = (tile != 0) & (tile == ((row >> (2 << 2)) & 0xf));
+			row = test ? (((row + 0x1000) & 0xf000) | ((row << 4) & 0x0ff0)) : row;
+			score += test << (tile + 1);
+			tile = (row >> (2 << 2)) & 0xf;
+			test = (tile != 0) & ((tile) == ((row >> (1 << 2)) & 0xf));
+			row = test ? (((row + 0x0100) & 0xff00) | ((row << 4) & 0x00f0)) : row;
+			score += test << (tile + 1);
+			tile = (row >> (1 << 2)) & 0xf;
+			test = (tile != 0) & (tile == ((row >> (0 << 2)) & 0xf));
+			row = test ? (((row + 0x0010) & 0xfff0)) : row;
+			score += test << (tile + 1);
+			rawn.place16(i, row);
+		}
+		register i32 moved = (rawp ^ u64(rawn)) ? 0 : -1;
 		raw = rawn;
 		return score | moved;
 	}
@@ -394,6 +528,12 @@ public:
 		raw = rawn;
 		return score | moved;
 	}
+	inline i32 up64x() {
+		transpose64();
+		i32 score = left64x();
+		transpose64();
+		return score;
+	}
 	inline i32 down64() {
 		register u64 rawp = raw, rawn = 0;
 		register u32 score = 0;
@@ -405,6 +545,12 @@ public:
 		register i32 moved = (rawp ^ rawn) ? 0 : -1;
 		raw = rawn;
 		return score | moved;
+	}
+	inline i32 down64x() {
+		transpose64();
+		i32 score = right64x();
+		transpose64();
+		return score;
 	}
 
 	inline i32 left80() {
