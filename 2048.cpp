@@ -1450,10 +1450,11 @@ struct select {
 	state *best;
 	inline select() : best(move) {}
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats()) {
-		move[0].assign(b, 0);
-		move[1].assign(b, 1);
-		move[2].assign(b, 2);
-		move[3].assign(b, 3);
+//		move[0].assign(b, 0);
+//		move[1].assign(b, 1);
+//		move[2].assign(b, 2);
+//		move[3].assign(b, 3);
+		b.operate64x(move[0].move, move[0].score, move[1].move, move[1].score, move[2].move, move[2].score, move[3].move, move[3].score);
 		move[0].estimate(range);
 		move[1].estimate(range);
 		move[2].estimate(range);
