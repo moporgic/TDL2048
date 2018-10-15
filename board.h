@@ -426,96 +426,109 @@ public:
 	inline i32 down()  { return down64(); }
 
 	inline void operate64x(board& bu, i32& ru, board& br, i32& rr, board& bd, i32& rd, board& bl, i32& rl) const {
-		// use left for all 4 directions
-		board iso;
-		iso = raw;
-		u64 rawl = iso; // L = left
-		iso.transpose64();
-		u64 rawu = iso; // U = transpose left transpose
-		iso.mirror64();
-		u64 rawd = iso; // D = transpose mirror left mirror transpose
-		iso = raw;
-		iso.mirror64();
-		u64 rawr = iso; // R = mirror left mirror
-		__m256i rawn = _mm256_set_epi64x(rawl, rawd, rawr, rawu);
+		__m256i dst = {}, rwd = {}, chk, rbf, buf;
 
-		// some constants
-		__m256i v_0x0000 = _mm256_set1_epi64x(0x0000000000000000ull);
-		__m256i v_0x0001 = _mm256_set1_epi64x(0x0001000100010001ull);
-		__m256i v_0x0010 = _mm256_set1_epi64x(0x0010001000100010ull);
-		__m256i v_0x0100 = _mm256_set1_epi64x(0x0100010001000100ull);
-		__m256i v_0x000f = _mm256_set1_epi64x(0x000f000f000f000full);
-		__m256i v_0x00ff = _mm256_set1_epi64x(0x00ff00ff00ff00ffull);
-		__m256i v_0x0fff = _mm256_set1_epi64x(0x0fff0fff0fff0fffull);
-		__m256i v_0xfff0 = _mm256_set1_epi64x(0xfff0fff0fff0fff0ull);
-		__m256i v_0xff00 = _mm256_set1_epi64x(0xff00ff00ff00ff00ull);
-		__m256i v_0x0ff0 = _mm256_set1_epi64x(0x0ff00ff00ff00ff0ull);
-		__m256i v_0x0f00 = _mm256_set1_epi64x(0x0f000f000f000f00ull);
+		// use left for all 4 directions, transpose and mirror first
+		rbf = _mm256_set1_epi64x(raw);
+		buf = _mm256_and_si256(_mm256_xor_si256(rbf, _mm256_srli_epi64(rbf, 12)), _mm256_set1_epi64x(0x0000f0f00000f0f0ull));
+		rbf = _mm256_xor_si256(rbf, _mm256_xor_si256(buf, _mm256_slli_epi64(buf, 12)));
+		buf = _mm256_and_si256(_mm256_xor_si256(rbf, _mm256_srli_epi64(rbf, 24)), _mm256_set1_epi64x(0x00000000ff00ff00ull));
+		rbf = _mm256_xor_si256(rbf, _mm256_xor_si256(buf, _mm256_slli_epi64(buf, 24)));
+		dst = _mm256_insert_epi64(dst, raw, 3); // L = left
+		dst = _mm256_insert_epi64(dst, _mm256_extract_epi64(rbf, 0), 0); // U = transpose left transpose
 
-		// temporary variables
-		__m256i fill, tile, test;
+		rbf = _mm256_insert_epi64(rbf, raw, 1);
+		buf = _mm256_slli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x000f)), 12);
+		buf = _mm256_or_si256(buf, _mm256_slli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x00f0)), 4));
+		buf = _mm256_or_si256(buf, _mm256_srli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x0f00)), 4));
+		rbf = _mm256_or_si256(buf, _mm256_srli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0xf000)), 12));
+		dst = _mm256_insert_epi64(dst, _mm256_extract_epi64(rbf, 1), 1); // R = mirror left mirror
+		dst = _mm256_insert_epi64(dst, _mm256_extract_epi64(rbf, 2), 2); // D = transpose mirror left mirror transpose
 
 		// slide to left most
-		fill = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(rawn, 0 << 2), v_0x000f), v_0x0000);
-		rawn = _mm256_or_si256(_mm256_and_si256(fill, _mm256_srli_epi16(rawn, 4)), _mm256_andnot_si256(fill, rawn));
-		fill = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(rawn, 0 << 2), v_0x000f), v_0x0000);
-		rawn = _mm256_or_si256(_mm256_and_si256(fill, _mm256_srli_epi16(rawn, 4)), _mm256_andnot_si256(fill, rawn));
-		fill = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(rawn, 0 << 2), v_0x000f), v_0x0000);
-		rawn = _mm256_or_si256(_mm256_and_si256(fill, _mm256_srli_epi16(rawn, 4)), _mm256_andnot_si256(fill, rawn));
+		chk = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(dst, 0), _mm256_set1_epi16(0x000f)), _mm256_setzero_si256());
+		buf = _mm256_srli_epi16(dst, 4);
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
+		chk = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(dst, 0), _mm256_set1_epi16(0x000f)), _mm256_setzero_si256());
+		buf = _mm256_srli_epi16(dst, 4);
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
+		chk = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(dst, 0), _mm256_set1_epi16(0x000f)), _mm256_setzero_si256());
+		buf = _mm256_srli_epi16(dst, 4);
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
 
-		fill = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(rawn, 1 << 2), v_0x000f), v_0x0000);
-		rawn = _mm256_or_si256(_mm256_and_si256(fill, _mm256_or_si256(_mm256_and_si256(rawn, v_0x000f), _mm256_and_si256(_mm256_srli_epi16(rawn, 4), v_0xfff0))), _mm256_andnot_si256(fill, rawn));
-		fill = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(rawn, 1 << 2), v_0x000f), v_0x0000);
-		rawn = _mm256_or_si256(_mm256_and_si256(fill, _mm256_or_si256(_mm256_and_si256(rawn, v_0x000f), _mm256_and_si256(_mm256_srli_epi16(rawn, 4), v_0xfff0))), _mm256_andnot_si256(fill, rawn));
+		chk = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x000f)), _mm256_setzero_si256());
+		buf = _mm256_or_si256(_mm256_and_si256(dst, _mm256_set1_epi16(0x000f)), _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0xfff0)));
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
+		chk = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x000f)), _mm256_setzero_si256());
+		buf = _mm256_or_si256(_mm256_and_si256(dst, _mm256_set1_epi16(0x000f)), _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0xfff0)));
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
 
-		fill = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(rawn, 2 << 2), v_0x000f), v_0x0000);
-		rawn = _mm256_or_si256(_mm256_and_si256(fill, _mm256_or_si256(_mm256_and_si256(rawn, v_0x00ff), _mm256_and_si256(_mm256_srli_epi16(rawn, 4), v_0xff00))), _mm256_andnot_si256(fill, rawn));
+		chk = _mm256_cmpeq_epi16(_mm256_and_si256(_mm256_srli_epi16(dst, 8), _mm256_set1_epi16(0x000f)), _mm256_setzero_si256());
+		buf = _mm256_or_si256(_mm256_and_si256(dst, _mm256_set1_epi16(0x00ff)), _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0xff00)));
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
 
 		// merge same tiles, slide if necessary
-		__m256i score;
+		rbf = _mm256_and_si256(dst, _mm256_set1_epi16(0x000f));
+		buf = _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x000f));
+		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, buf));
+		buf = _mm256_and_si256(_mm256_add_epi16(dst, _mm256_set1_epi16(0x0001)), _mm256_set1_epi16(0x000f));
+		buf = _mm256_or_si256(buf, _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x0ff0)));
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
+		chk = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_and_si256(chk, _mm256_set1_epi16(0x0001)), 0));
+		rbf = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(rbf, _mm256_set1_epi16(0x0001)), 0));
+		rwd = _mm256_sllv_epi32(chk, rbf);
 
-		tile = _mm256_and_si256(_mm256_srli_epi16(rawn, 0 << 2), v_0x000f);
-		test = _mm256_andnot_si256(_mm256_cmpeq_epi16(tile, v_0x0000), _mm256_cmpeq_epi16(tile, _mm256_and_si256(_mm256_srli_epi16(rawn, 1 << 2), v_0x000f)));
-		rawn = _mm256_or_si256(_mm256_and_si256(_mm256_or_si256(_mm256_and_si256(_mm256_add_epi16(rawn, v_0x0001), v_0x000f), _mm256_and_si256(_mm256_srli_epi16(rawn, 4), v_0x0ff0)), test), _mm256_andnot_si256(test, rawn));
-		test = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_and_si256(test, v_0x0001), 0));
-		tile = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(tile, v_0x0001), 0));
-		score = _mm256_sllv_epi32(test, tile);
+		rbf = _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x000f));
+		buf = _mm256_and_si256(_mm256_srli_epi16(dst, 8), _mm256_set1_epi16(0x000f));
+		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, buf));
+		buf = _mm256_and_si256(_mm256_add_epi16(dst, _mm256_set1_epi16(0x0010)), _mm256_set1_epi16(0x00ff));
+		buf = _mm256_or_si256(buf, _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x0f00)));
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
+		chk = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_and_si256(chk, _mm256_set1_epi16(0x0001)), 0));
+		rbf = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(rbf, _mm256_set1_epi16(0x0001)), 0));
+		rwd = _mm256_add_epi32(rwd, _mm256_sllv_epi32(chk, rbf));
 
-		tile = _mm256_and_si256(_mm256_srli_epi16(rawn, 1 << 2), v_0x000f);
-		test = _mm256_andnot_si256(_mm256_cmpeq_epi16(tile, v_0x0000), _mm256_cmpeq_epi16(tile, _mm256_and_si256(_mm256_srli_epi16(rawn, 2 << 2), v_0x000f)));
-		rawn = _mm256_or_si256(_mm256_and_si256(_mm256_or_si256(_mm256_and_si256(_mm256_add_epi16(rawn, v_0x0010), v_0x00ff), _mm256_and_si256(_mm256_srli_epi16(rawn, 4), v_0x0f00)), test), _mm256_andnot_si256(test, rawn));
-		test = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_and_si256(test, v_0x0001), 0));
-		tile = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(tile, v_0x0001), 0));
-		score = _mm256_add_epi32(score, _mm256_sllv_epi32(test, tile));
+		rbf = _mm256_and_si256(_mm256_srli_epi16(dst, 8), _mm256_set1_epi16(0x000f));
+		buf = _mm256_and_si256(_mm256_srli_epi16(dst, 12), _mm256_set1_epi16(0x000f));
+		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, buf));
+		buf = _mm256_and_si256(_mm256_add_epi16(dst, _mm256_set1_epi16(0x0100)), _mm256_set1_epi16(0x0fff));
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
+		chk = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_and_si256(chk, _mm256_set1_epi16(0x0001)), 0));
+		rbf = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(rbf, _mm256_set1_epi16(0x0001)), 0));
+		rwd = _mm256_add_epi32(rwd, _mm256_sllv_epi32(chk, rbf));
 
-		tile = _mm256_and_si256(_mm256_srli_epi16(rawn, 2 << 2), v_0x000f);
-		test = _mm256_andnot_si256(_mm256_cmpeq_epi16(tile, v_0x0000), _mm256_cmpeq_epi16(tile, _mm256_and_si256(_mm256_srli_epi16(rawn, 3 << 2), v_0x000f)));
-		rawn = _mm256_or_si256(_mm256_and_si256(_mm256_and_si256(_mm256_add_epi16(rawn, v_0x0100), v_0x0fff), test), _mm256_andnot_si256(test, rawn));
-		test = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_and_si256(test, v_0x0001), 0));
-		tile = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(tile, v_0x0001), 0));
-		score = _mm256_add_epi32(score, _mm256_sllv_epi32(test, tile));
+		// mirror and transpose back to original direction
+		rbf = dst;
+		bl = _mm256_extract_epi64(rbf, 3); // L = left
+		buf = _mm256_slli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x000f)), 12);
+		buf = _mm256_or_si256(buf, _mm256_slli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x00f0)), 4));
+		buf = _mm256_or_si256(buf, _mm256_srli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x0f00)), 4));
+		rbf = _mm256_or_si256(buf, _mm256_srli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0xf000)), 12));
+		br = _mm256_extract_epi64(rbf, 1); // R = mirror left mirror
 
-		bu = _mm256_extract_epi64(rawn, 0); // U = transpose left transpose
-		br = _mm256_extract_epi64(rawn, 1); // R = mirror left mirror
-		bd = _mm256_extract_epi64(rawn, 2); // D = transpose mirror left mirror transpose
-		bl = _mm256_extract_epi64(rawn, 3); // L = left
+		rbf = _mm256_insert_epi64(rbf, _mm256_extract_epi64(dst, 0), 0);
+		buf = _mm256_and_si256(_mm256_xor_si256(rbf, _mm256_srli_epi64(rbf, 12)), _mm256_set1_epi64x(0x0000f0f00000f0f0ull));
+		rbf = _mm256_xor_si256(rbf, _mm256_xor_si256(buf, _mm256_slli_epi64(buf, 12)));
+		buf = _mm256_and_si256(_mm256_xor_si256(rbf, _mm256_srli_epi64(rbf, 24)), _mm256_set1_epi64x(0x00000000ff00ff00ull));
+		rbf = _mm256_xor_si256(rbf, _mm256_xor_si256(buf, _mm256_slli_epi64(buf, 24)));
+		bu = _mm256_extract_epi64(rbf, 0); // U = transpose left transpose
+		bd = _mm256_extract_epi64(rbf, 2); // D = transpose mirror left mirror transpose
 
-		bu.transpose64();
-		bd.mirror64(); bd.transpose64();
-		br.mirror64();
+		// sum the final reward and check moved or not
+		rwd = _mm256_add_epi64(rwd, _mm256_srli_si256(rwd, 8 /* bytes */));
+		rwd = _mm256_add_epi64(rwd, _mm256_srli_epi64(rwd, 32));
+		ru = _mm256_extract_epi32(rwd, 0);
+		rr = _mm256_extract_epi32(rwd, 4);
+		rwd = _mm256_set_epi64x(rr, ru, rr, ru);
+		chk = _mm256_cmpeq_epi64(_mm256_set_epi64x(bl, bd, br, bu), _mm256_set1_epi64x(raw));
+		rwd = _mm256_or_si256(rwd, chk);
+		ru = i32(_mm256_extract_epi32(rwd, 0));
+		rr = i32(_mm256_extract_epi32(rwd, 2));
+		rd = i32(_mm256_extract_epi32(rwd, 4));
+		rl = i32(_mm256_extract_epi32(rwd, 6));
 
-		__m256i moved = _mm256_cmpeq_epi64(_mm256_set_epi64x(u64(bl), u64(bd), u64(br), u64(bu)), _mm256_set1_epi64x(raw));
-
-		u64 stampv = _mm256_extract_epi64(score, 0) + _mm256_extract_epi64(score, 1);
-		u64 stamph = _mm256_extract_epi64(score, 2) + _mm256_extract_epi64(score, 3);
-		u32 scorev = u32(stampv) + u32(stampv >> 32);
-		u32 scoreh = u32(stamph) + u32(stamph >> 32);
-
-		ru = scorev | i32(_mm256_extract_epi64(moved, 0));
-		rr = scoreh | i32(_mm256_extract_epi64(moved, 1));
-		rd = scorev | i32(_mm256_extract_epi64(moved, 2));
-		rl = scoreh | i32(_mm256_extract_epi64(moved, 3));
-
+		// regression test
+//		board iso;
 //		iso = raw; if (iso.operate64(0) != ru || iso != bu) std::exit(0);
 //		iso = raw; if (iso.operate64(1) != rr || iso != br) std::exit(0);
 //		iso = raw; if (iso.operate64(2) != rd || iso != bd) std::exit(0);
@@ -866,13 +879,13 @@ public:
 	inline i32 operate(u32 op) {
 		if (op & action::x64) return operate64(op);
 		if (op & action::x80) return operate80(op);
-		return operate64x(op);
+		return operate64(op);
 
 //		board o = *this;
 //		i32 score = operate64(op);
 //		board af[4]; i32 sc[4];
 //		o.operate64x(af[0], sc[0], af[1], sc[1], af[2], sc[2], af[3], sc[3]);
-//		if (af[op] != *this || score != sc[op]) {
+//		if (af[op] == *this || score != sc[op]) {
 //			std::cout << o << op << std::endl;
 //			std::cout << *this << af[op] << score << " " << sc[op] << std::endl;
 //			std::exit(0);
