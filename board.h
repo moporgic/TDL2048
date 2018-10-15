@@ -522,10 +522,10 @@ public:
 		rwd = _mm256_set_epi64x(rr, ru, rr, ru);
 		chk = _mm256_cmpeq_epi64(_mm256_set_epi64x(bl, bd, br, bu), _mm256_set1_epi64x(raw));
 		rwd = _mm256_or_si256(rwd, chk);
-		ru = i32(_mm256_extract_epi32(rwd, 0));
-		rr = i32(_mm256_extract_epi32(rwd, 2));
-		rd = i32(_mm256_extract_epi32(rwd, 4));
-		rl = i32(_mm256_extract_epi32(rwd, 6));
+		ru = _mm256_extract_epi32(rwd, 0);
+		rr = _mm256_extract_epi32(rwd, 2);
+		rd = _mm256_extract_epi32(rwd, 4);
+		rl = _mm256_extract_epi32(rwd, 6);
 
 		// regression test
 //		board iso;
