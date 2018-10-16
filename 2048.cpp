@@ -1161,24 +1161,33 @@ u32 load_weights(std::string path) {
 }
 u32 make_weights(std::string res = "") {
 	std::map<std::string, std::string> alias;
-	alias["khyeh"] = "012345 456789 012456 45689a ";
-	alias["patt/42-33"] = "012345 456789 89abcd 012456 45689a ";
-	alias["patt/4-22"] = "0123 4567 0145 1256 569a ";
-	alias["patt/4"] = "0123 4567 ";
-	alias["patt/44"] = "01234567 456789ab ";
-	alias["patt/44-4211"] = "01234567 456789ab 0123458c ";
-	alias["k.matsuzaki"] = "012456 12569d 012345 01567a 01259a 0159de 01589d 01246a ";
-	alias["k.matsuzaki-opt"] = "012456 456789 012345 234569 01259a 345678 134567 01489a ";
+	alias["4x6patt/khyeh"] = "012345 456789 012456 45689a ";
+	alias["khyeh"] = alias["4x6patt/khyeh"];
+	alias["5x6patt/42-33"] = "012345 456789 89abcd 012456 45689a ";
+	alias["2x4patt/4"] = "0123 4567 ";
+	alias["5x4patt/4-22"] = alias["2x4patt/4"] + "0145 1256 569a ";
+	alias["2x8patt/44"] = "01234567 456789ab ";
+	alias["3x8patt/44-4211"] = alias["2x8patt/44"] + "0123458c ";
+//	alias["k.matsuzaki"] = "012456 12569d 012345 01567a 01259a 0159de 01589d 01246a ";
+	alias["4x6patt/k.matsuzaki"] = "012456 456789 012345 234569 ";
+	alias["5x6patt/k.matsuzaki"] = alias["4x6patt/k.matsuzaki"] + "01259a ";
+	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678 ";
+	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567 ";
+	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a ";
+	alias["k.matsuzaki"] = alias["8x6patt/k.matsuzaki"];
 	alias["monotonic"] = "fd012301:^24 fd456701:^24 ";
-	alias["default"] = alias["khyeh"] + alias["monotonic"] + "fe000005:^24 fe000015:^24 ";
-	alias["4x6patt"] = alias["khyeh"];
-	alias["5x6patt"] = alias["patt/42-33"];
-	alias["8x6patt"] = alias["k.matsuzaki-opt"];
-	alias["5x4patt"] = alias["patt/4-22"];
-	alias["2x4patt"] = alias["patt/4"];
-	alias["2x8patt"] = alias["patt/44"];
-	alias["3x8patt"] = alias["patt/44-4211"];
-	alias["mono"] = alias["monotonic"];
+	alias["quantity"] = "fe000005:^24 fe000015:^24 ";
+	alias["moporgic"] = alias["4x6patt/khyeh"] + alias["monotonic"] + alias["quantity"];
+	alias["4x6patt"] = alias["4x6patt/khyeh"];
+	alias["5x6patt"] = alias["5x6patt/42-33"];
+	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
+	alias["7x6patt"] = alias["7x6patt/k.matsuzaki"];
+	alias["8x6patt"] = alias["8x6patt/k.matsuzaki"];
+	alias["5x4patt"] = alias["5x4patt/4-22"];
+	alias["2x4patt"] = alias["2x4patt/4"];
+	alias["2x8patt"] = alias["2x8patt/44"];
+	alias["3x8patt"] = alias["3x8patt/44-4211"];
+	alias["default"] = alias["4x6patt"];
 
 	if (res.empty() && weight::wghts().empty())
 		res = { "default" };
@@ -1258,29 +1267,36 @@ u32 load_features(std::string path) {
 }
 u32 make_features(std::string res = "") {
 	std::map<std::string, std::string> alias;
-	alias["khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] ";
-	alias["patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!] ";
-	alias["patt/4-22"] = "0123[0123!] 4567[4567!] 0145[0145!] 1256[1256!] 569a[569a!] ";
-	alias["patt/4"] = "0123[0123!] 4567[4567!] ";
-	alias["patt/44"] = "01234567:01234567! 456789ab:456789ab! ";
-	alias["patt/44-4211"] = "01234567:01234567! 456789ab:456789ab! 0123458c:0123458c! ";
+	alias["4x6patt/khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] ";
+	alias["khyeh"] = alias["4x6patt/khyeh"];
+	alias["5x6patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!] ";
+	alias["2x4patt/4"] = "0123[0123!] 4567[4567!] ";
+	alias["5x4patt/4-22"] = alias["2x4patt/4"] + "0145[0145!] 1256[1256!] 569a[569a!] ";
+	alias["2x8patt/44"] = "01234567:01234567! 456789ab:456789ab! ";
+	alias["3x8patt/44-4211"] = alias["2x8patt/44"] + "0123458c:0123458c! ";
+//	alias["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! 01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
+	alias["4x6patt/k.matsuzaki"] = "012456:012456! 456789:456789! 012345:012345! 234569:234569! ";
+	alias["5x6patt/k.matsuzaki"] = alias["4x6patt/k.matsuzaki"] + "01259a:01259a! ";
+	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678:345678! ";
+	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567:134567! ";
+	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a:01489a! ";
+	alias["k.matsuzaki"] = alias["8x6patt/k.matsuzaki"];
 	alias["monotonic"] = "fd012301[fd012301] fd012301[fd37bf01] fd012301[fdfedc01] fd012301[fdc84001] "
 	                     "fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01] "
 	                     "fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101] "
 	                     "fd456701[fd765401] fd456701[fdea6201] fd456701[fd89ab01] fd456701[fd159d01] ";
-	alias["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! "
-	                       "01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
-	alias["k.matsuzaki-opt"] = "012456:012456! 456789:456789! 012345:012345! 234569:234569! "
-	                           "01259a:01259a! 345678:345678! 134567:134567! 01489a:01489a! ";
-	alias["default"] = alias["khyeh"] + alias["monotonic"] + "fe000005[fe000005] fe000015[fe000015] ";
-	alias["4x6patt"] = alias["khyeh"];
-	alias["5x6patt"] = alias["patt/42-33"];
-	alias["8x6patt"] = alias["k.matsuzaki-opt"];
-	alias["5x4patt"] = alias["patt/4-22"];
-	alias["2x4patt"] = alias["patt/4"];
-	alias["2x8patt"] = alias["patt/44"];
-	alias["3x8patt"] = alias["patt/44-4211"];
-	alias["mono"] = alias["monotonic"];
+	alias["quantity"] = "fe000005[fe000005] fe000015[fe000015] ";
+	alias["moporgic"] = alias["4x6patt/khyeh"] + alias["monotonic"] + alias["quantity"];
+	alias["4x6patt"] = alias["4x6patt/khyeh"];
+	alias["5x6patt"] = alias["5x6patt/42-33"];
+	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
+	alias["7x6patt"] = alias["7x6patt/k.matsuzaki"];
+	alias["8x6patt"] = alias["8x6patt/k.matsuzaki"];
+	alias["5x4patt"] = alias["5x4patt/4-22"];
+	alias["2x4patt"] = alias["2x4patt/4"];
+	alias["2x8patt"] = alias["2x8patt/44"];
+	alias["3x8patt"] = alias["3x8patt/44-4211"];
+	alias["default"] = alias["4x6patt"];
 
 	if (res.empty() && feature::feats().empty())
 		res = { "default" };
