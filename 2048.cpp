@@ -1458,6 +1458,46 @@ void list_mapping() {
 typedef numeric(*estimator)(const board&, clip<feature>);
 typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
 
+#define invoke_4x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
+#define invoke_5x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x8,0x9,0xa,0xb,0xc,0xd>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
+#define invoke_6x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+
+#define invoke_7x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
+
+#define invoke_8x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[7 << 3][index6t<0x0,0x1,0x4,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
 #define invoke_specialized(name, state, range, ...)({\
 register numeric esti = 0;\
 register board iso = state;\
@@ -1478,55 +1518,17 @@ iso.mirror();\
 invoke_##name(esti, range, iso, ##__VA_ARGS__);\
 esti;})\
 
-#define invoke_4x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+#define declare_specialized(name)\
+inline numeric estimate_##name(const board& state, clip<feature> range = feature::feats()) {\
+	return invoke_specialized(name, state, range); }\
+inline numeric optimize_##name(const board& state, numeric updv, clip<feature> range = feature::feats()) {\
+	return invoke_specialized(name, state, range, += updv); }\
 
-#define invoke_5x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x8,0x9,0xa,0xb,0xc,0xd>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
-
-#define invoke_8x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[7 << 3][index6t<0x0,0x1,0x4,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
-
-inline numeric estimate_4x6patt(const board& state,
-		clip<feature> range = feature::feats()) {
-	return invoke_specialized(4x6patt, state, range);
-}
-inline numeric optimize_4x6patt(const board& state, numeric updv,
-		clip<feature> range = feature::feats()) {
-	return invoke_specialized(4x6patt, state, range, += updv);
-}
-
-inline numeric estimate_5x6patt(const board& state,
-		clip<feature> range = feature::feats()) {
-	return invoke_specialized(5x6patt, state, range);
-}
-inline numeric optimize_5x6patt(const board& state, numeric updv,
-		clip<feature> range = feature::feats()) {
-	return invoke_specialized(5x6patt, state, range, += updv);
-}
-
-inline numeric estimate_8x6patt(const board& state,
-		clip<feature> range = feature::feats()) {
-	return invoke_specialized(8x6patt, state, range);
-}
-inline numeric optimize_8x6patt(const board& state, numeric updv,
-		clip<feature> range = feature::feats()) {
-	return invoke_specialized(8x6patt, state, range, += updv);
-}
+declare_specialized(4x6patt);
+declare_specialized(5x6patt);
+declare_specialized(6x6patt);
+declare_specialized(7x6patt);
+declare_specialized(8x6patt);
 
 inline numeric estimate(const board& state,
 		clip<feature> range = feature::feats()) {
@@ -1974,6 +1976,46 @@ utils::options parse(int argc, const char* argv[]) {
 	return opts;
 }
 
+#define train_specialized(name){\
+	clip<feature> feats = feature::feats();\
+	numeric alpha = state::alpha();\
+	u32 score = 0;\
+	u32 opers = 0;\
+	\
+	b.init();\
+	best(b, feats, utils::estimate_##name);\
+	score += best.score();\
+	opers += 1;\
+	best >> last;\
+	best >> b;\
+	b.next();\
+	while (best(b, feats, utils::estimate_##name)) {\
+		last.optimize(best.esti(), alpha, feats, utils::optimize_##name);\
+		score += best.score();\
+		opers += 1;\
+		best >> last;\
+		best >> b;\
+		b.next();\
+	}\
+	last.optimize(0, alpha, feats, utils::optimize_##name);\
+	\
+	stats.update(score, b.hash(), opers);\
+}
+
+#define test_specialized(name){\
+	clip<feature> feats = feature::feats();\
+	u32 score = 0;\
+	u32 opers = 0;\
+	\
+	for (b.init(); best(b, feats, utils::estimate_##name); b.next()) {\
+		score += best.score();\
+		opers += 1;\
+		best >> b;\
+	}\
+	\
+	stats.update(score, b.hash(), opers);\
+}
+
 statistic train(utils::options opts = {}) {
 	std::vector<state> path;
 	path.reserve(65536);
@@ -2062,92 +2104,23 @@ statistic train(utils::options opts = {}) {
 
 	case to_hash("forward-4x6patt"):
 	case to_hash("forward-best-4x6patt"):
-		for (stats.init(opts["train"]); stats; stats++) {
-
-			clip<feature> feats = feature::feats();
-			numeric alpha = state::alpha();
-			u32 score = 0;
-			u32 opers = 0;
-
-			b.init();
-			best(b, feats, utils::estimate_4x6patt);
-			score += best.score();
-			opers += 1;
-			best >> last;
-			best >> b;
-			b.next();
-			while (best(b, feats, utils::estimate_4x6patt)) {
-				last.optimize(best.esti(), alpha, feats, utils::optimize_4x6patt);
-				score += best.score();
-				opers += 1;
-				best >> last;
-				best >> b;
-				b.next();
-			}
-			last.optimize(0, alpha, feats, utils::optimize_4x6patt);
-
-			stats.update(score, b.hash(), opers);
-		}
+		for (stats.init(opts["train"]); stats; stats++) train_specialized(4x6patt);
 		break;
-
 	case to_hash("forward-5x6patt"):
 	case to_hash("forward-best-5x6patt"):
-		for (stats.init(opts["train"]); stats; stats++) {
-
-			clip<feature> feats = feature::feats();
-			numeric alpha = state::alpha();
-			u32 score = 0;
-			u32 opers = 0;
-
-			b.init();
-			best(b, feats, utils::estimate_5x6patt);
-			score += best.score();
-			opers += 1;
-			best >> last;
-			best >> b;
-			b.next();
-			while (best(b, feats, utils::estimate_5x6patt)) {
-				last.optimize(best.esti(), alpha, feats, utils::optimize_5x6patt);
-				score += best.score();
-				opers += 1;
-				best >> last;
-				best >> b;
-				b.next();
-			}
-			last.optimize(0, alpha, feats, utils::optimize_5x6patt);
-
-			stats.update(score, b.hash(), opers);
-		}
+		for (stats.init(opts["train"]); stats; stats++) train_specialized(5x6patt);
 		break;
-
+	case to_hash("forward-6x6patt"):
+	case to_hash("forward-best-6x6patt"):
+		for (stats.init(opts["train"]); stats; stats++) train_specialized(6x6patt);
+		break;
+	case to_hash("forward-7x6patt"):
+	case to_hash("forward-best-7x6patt"):
+		for (stats.init(opts["train"]); stats; stats++) train_specialized(7x6patt);
+		break;
 	case to_hash("forward-8x6patt"):
 	case to_hash("forward-best-8x6patt"):
-		for (stats.init(opts["train"]); stats; stats++) {
-
-			clip<feature> feats = feature::feats();
-			numeric alpha = state::alpha();
-			u32 score = 0;
-			u32 opers = 0;
-
-			b.init();
-			best(b, feats, utils::estimate_8x6patt);
-			score += best.score();
-			opers += 1;
-			best >> last;
-			best >> b;
-			b.next();
-			while (best(b, feats, utils::estimate_8x6patt)) {
-				last.optimize(best.esti(), alpha, feats, utils::optimize_8x6patt);
-				score += best.score();
-				opers += 1;
-				best >> last;
-				best >> b;
-				b.next();
-			}
-			last.optimize(0, alpha, feats, utils::optimize_8x6patt);
-
-			stats.update(score, b.hash(), opers);
-		}
+		for (stats.init(opts["train"]); stats; stats++) train_specialized(8x6patt);
 		break;
 	}
 
@@ -2178,54 +2151,19 @@ statistic test(utils::options opts = {}) {
 		break;
 
 	case to_hash("best-4x6patt"):
-		for (stats.init(opts["test"]); stats; stats++) {
-
-			clip<feature> feats = feature::feats();
-			u32 score = 0;
-			u32 opers = 0;
-
-			for (b.init(); best(b, feats, utils::estimate_4x6patt); b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> b;
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
+		for (stats.init(opts["test"]); stats; stats++) test_specialized(4x6patt);
 		break;
-
 	case to_hash("best-5x6patt"):
-		for (stats.init(opts["test"]); stats; stats++) {
-
-			clip<feature> feats = feature::feats();
-			u32 score = 0;
-			u32 opers = 0;
-
-			for (b.init(); best(b, feats, utils::estimate_5x6patt); b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> b;
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
+		for (stats.init(opts["test"]); stats; stats++) test_specialized(5x6patt);
 		break;
-
+	case to_hash("best-6x6patt"):
+		for (stats.init(opts["test"]); stats; stats++) test_specialized(6x6patt);
+		break;
+	case to_hash("best-7x6patt"):
+		for (stats.init(opts["test"]); stats; stats++) test_specialized(7x6patt);
+		break;
 	case to_hash("best-8x6patt"):
-		for (stats.init(opts["test"]); stats; stats++) {
-
-			clip<feature> feats = feature::feats();
-			u32 score = 0;
-			u32 opers = 0;
-
-			for (b.init(); best(b, feats, utils::estimate_8x6patt); b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> b;
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
+		for (stats.init(opts["test"]); stats; stats++) test_specialized(8x6patt);
 		break;
 
 	case to_hash("random"):
