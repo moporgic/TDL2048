@@ -1417,6 +1417,18 @@ u32 make_features(std::string res = "") {
 	return succ;
 }
 
+std::string specialize(utils::options& opts, const char* spec = "spec") {
+	std::string feat = opts["feature"]["value"];
+	if (feat.empty()) feat = "4x6patt";
+	if (opts["option"].find(spec, "on") == "on")
+		if (feat == "4x6patt" || feat == "5x6patt" || feat == "8x6patt") {
+			if (!opts("train", "mode")) opts["train"]["mode"] = "forward-" + feat;
+			if (!opts("test",  "mode")) opts["test"]["mode"]  = "best-" + feat;
+			return (opts["option"][spec] = "on");
+		}
+	return (opts["option"][spec] = "off");
+}
+
 void list_mapping() {
 	for (weight w : list<weight>(weight::wghts())) {
 		char buf[64];
@@ -2542,6 +2554,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << moporgic::millisec() << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
+	std::cout << "spec = " << utils::specialize(opts, "spec") << std::endl;
 	std::cout << std::endl;
 
 	utils::make_indexers();
@@ -2550,12 +2563,6 @@ int main(int argc, const char* argv[]) {
 	utils::load_features(opts["feature"]["input"]);
 	utils::make_features(opts["feature"]["value"]);
 	utils::list_mapping();
-
-	std::string type = opts["feature"]["value"];
-	if (type == "4x6patt" || type == "5x6patt" || type == "8x6patt") {
-		if (!opts("train", "mode")) opts["train"]["mode"] = "forward-" + type;
-		if (!opts("test", "mode")) opts["test"]["mode"] = "best-" + type;
-	}
 
 	moporgic::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
