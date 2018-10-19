@@ -48,6 +48,7 @@
 #include <random>
 #include <type_traits>
 #include <regex>
+#include <atomic>
 
 #ifdef INC_MOPORGIOUS_LIB
 #include "type.h"
