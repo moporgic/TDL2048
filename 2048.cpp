@@ -197,8 +197,8 @@ public:
 private:
 	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
 
-	static inline numeric* alloc(size_t size) { return shm::alloc<numeric>(size); }
-	static inline void free(numeric* v) { shm::free(v); }
+	static inline segment* alloc(size_t size) { return shm::alloc<segment>(size); }
+	static inline void free(segment* v) { shm::free(v); }
 
 	u64 id;
 	size_t length;
