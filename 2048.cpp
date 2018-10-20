@@ -1686,7 +1686,7 @@ struct statistic {
 		total += stat.total;
 		local += stat.local;
 		every += stat.every;
-		format();
+		if (loop < limit) format();
 		return *this;
 	}
 };
