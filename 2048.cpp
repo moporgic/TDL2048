@@ -65,17 +65,10 @@ public:
 	template<size_t i>
 	struct block : std::array<numeric, sizeof(segment) / sizeof(numeric)> {
 		block() = delete;
-		inline operator f16() const { return operator [](i); }
-		inline operator f32() const { return operator [](i); }
-		inline operator f64() const { return operator [](i); }
-		inline numeric& operator =(const f16& f) { return (operator [](i) = f); }
-		inline numeric& operator =(const f32& f) { return (operator [](i) = f); }
-		inline numeric& operator =(const f64& f) { return (operator [](i) = f); }
-		inline numeric& operator =(const block<i>& blk) { return (operator [](i) = blk[i]); }
-		declare_comparators_with(f16, f16(operator [](i)), v, inline);
-		declare_comparators_with(f32, f32(operator [](i)), v, inline);
-		declare_comparators_with(f64, f64(operator [](i)), v, inline);
-		declare_comparators(const block<i>&, operator [](i), inline);
+		inline operator numeric&() { return operator [](i); }
+		inline operator const numeric&() const { return operator [](i); }
+		inline numeric& operator =(numeric v) { return (operator [](i) = v); }
+		declare_comparators_with(const numeric&, operator [](i), v, inline);
 	};
 	inline clip<block<0>> value() const { return { cast<block<0>*>(raw), cast<block<0>*>(raw) + length }; }
 	inline clip<block<1>> accum() const { return { cast<block<1>*>(raw), cast<block<1>*>(raw) + length }; }
