@@ -1168,7 +1168,6 @@ u32 make_weights(std::string res = "") {
 	alias["5x4patt/4-22"] = alias["2x4patt/4"] + "0145 1256 569a ";
 	alias["2x8patt/44"] = "01234567 456789ab ";
 	alias["3x8patt/44-4211"] = alias["2x8patt/44"] + "0123458c ";
-//	alias["k.matsuzaki"] = "012456 12569d 012345 01567a 01259a 0159de 01589d 01246a ";
 	alias["4x6patt/k.matsuzaki"] = "012456 456789 012345 234569 ";
 	alias["5x6patt/k.matsuzaki"] = alias["4x6patt/k.matsuzaki"] + "01259a ";
 	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678 ";
@@ -1192,60 +1191,68 @@ u32 make_weights(std::string res = "") {
 	if (res.empty() && weight::wghts().empty())
 		res = { "default" };
 	for (auto def : alias) { // insert predefined weights
-		auto pos = (" " + res + " ").find(" " + def.first + " ");
-		if (pos != std::string::npos)
-			res.replace(pos, def.first.size(), def.second);
+		const auto npos = std::string::npos;
+		std::string label = def.first;
+		std::string full = def.second;
+		size_t pos = (" " + res + " ").find(" " + label + " ");
+		if (pos == npos && (pos = (" " + res + " ").find(" " + label + "=")) != npos) {
+			std::string opt = res.substr(0, res.find(' ', pos)).substr(res.find('=', pos));
+			for (size_t i = 0; (i = full.find(' ', i)) != npos; i += opt.size()) {
+				 full.replace(i, 1, opt);
+			}
+		}
+		if (pos != npos) {
+			res.replace(pos, label.size(), full);
+		}
 	}
 
-	u32 succ = 0;
 	std::stringstream split(res);
 	std::string token;
 	while (split >> token) {
-		// weight:size weight(size) weight[size] weight:patt weight:? weight:^bit old=new old=new:size
-		for (size_t i; (i = token.find_first_of(":()[],")) != std::string::npos; token[i] = ' ');
-		std::stringstream info(token);
+		const auto npos = std::string::npos;
+		// allocate: weight:size weight(size) weight[size] weight:patt weight:? weight:^bit
+		// initialize: ...=0 ...=10000
+		// map or remove: destination={source} id={}
+		for (size_t i; (i = token.find_first_of(":()[],")) != npos; token[i] = ' ');
+		std::string name = token.substr(0, token.find_first_of("= "));
+		std::string info = token.find(' ') != npos ? token.substr(0, token.find('=')).substr(token.find(' ') + 1) : "?";
+		std::string init = token.find('=') != npos ? token.substr(token.find('=') + 1) : "?";
 
-		std::string signs;
-		if (!(info >> signs)) continue;
-		u64 prev = std::stoull(signs.substr(0), nullptr, 16);
-		u64 sign = std::stoull(signs.substr(signs.find('=') + 1), nullptr, 16);
-		if (prev != sign && weight::find(prev) != weight::wghts().end()) {
-			std::cerr << "move weight to a new sign (" << signs << ")..." << std::endl;
-			signs = signs.substr(signs.find('=') + 1);
-			weight wsrc = weight::at(prev);
-			weight wdst = weight::make(sign, wsrc.size());
-			std::copy_n(wsrc.data(), wsrc.size(), wdst.data());
-			weight::erase(prev);
-		}
-
-		std::string sizes = "?";
-		info >> sizes;
+		u64 sign = std::stoull(name, nullptr, 16);
 		size_t size = 0;
-		switch (sizes.front()) {
-		case 'p':
-		case '?':
-			size = std::pow(16ull, signs.size());
-			break;
-		case '^':
-			size = std::pow(2ull, std::stol(sizes.substr(1)));
-			break;
-		default:
-			size = std::stoull(sizes, nullptr, 0);
-			break;
+		if (info.find_first_of("p^?") != npos) { // ^10 16^10 16^ p ?
+			u32 base = 16, power = name.size();
+			if (info.find('^') != npos) {
+				base = info.front() != '^' ? std::stoul(info.substr(0, info.find('^'))) : 2;
+				power = info.back() != '^' ? std::stoul(info.substr(info.find('^') + 1)) : name.size();
+			}
+			size = std::pow(base, power);
+		} else if (info.find_first_not_of("0123456789.-x") == npos) {
+			size = std::stoull(info, nullptr, 0);
+		}
+		if (init.find_first_of("{}") != npos && init != "{}") {
+			size = std::max(size, weight::at(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16)).size());
+		} else if (init == "{}") {
+			size = 0;
 		}
 
-		if (weight::find(sign) == weight::wghts().end()) {
-			weight::make(sign, size);
-			succ++;
-		} else if (weight::at(sign).size() != size) {
-			std::cerr << "size mismatch for weight (" << signs << ") at make_weights, ";
-			std::cerr << "override previous weight table..." << std::endl;
+		if (weight::find(sign) != weight::wghts().end() && weight::at(sign).size() != size)
 			weight::erase(sign);
+		if (weight::find(sign) == weight::wghts().end() && size)
 			weight::make(sign, size);
-			succ++;
+		if (init.find_first_of("{}") != npos && init != "{}") {
+			weight src = weight::at(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
+			weight dst = weight::at(sign);
+			for (size_t n = 0; n < dst.size(); n += src.size()) {
+				std::copy_n(src.data(), src.size(), dst.data() + n);
+			}
+		} else if (init.find_first_not_of("0123456789.-") == npos && init.size()) {
+			numeric val = std::stod(init);
+			std::fill_n(weight::at(sign).data(), weight::at(sign).size(), val);
 		}
 	}
-	return succ;
+
+	return 0;
 }
 
 u32 save_features(std::string path) {
