@@ -404,11 +404,16 @@ inline u32 hashpatt(const std::vector<u32>& patt) {
 	for (auto tile : patt) hash = (hash << 4) | tile;
 	return hash;
 }
-inline std::vector<u32> hashpatt(const std::string& hashs) {
+inline std::vector<u32> hashpatt(const std::string& hashs, int iso = 0) {
 	u32 hash; std::stringstream(hashs) >> std::hex >> hash;
 	std::vector<u32> patt(hashs.size());
 	for (auto it = patt.rbegin(); it != patt.rend(); it++, hash >>= 4)
 		(*it) = hash & 0x0f;
+	std::transform(patt.begin(), patt.end(), patt.begin(), [=](u32 v) {
+		board x(0xfedcba9876543210ull);
+		x.isomorphic(-iso);
+		return x.at(v);
+	});
 	return patt;
 }
 inline std::string hashpatt(u32 hash, size_t n = 0) {
@@ -1306,116 +1311,154 @@ u32 load_features(std::string path) {
 	in.close();
 	return in.rdstate();
 }
-u32 make_features(std::string res = "") {
-	std::map<std::string, std::string> alias;
-	alias["4x6patt/khyeh"] = "012345[012345!] 456789[456789!] 012456[012456!] 45689a[45689a!] ";
-	alias["khyeh"] = alias["4x6patt/khyeh"];
-	alias["5x6patt/42-33"] = "012345[012345!] 456789[456789!] 89abcd[89abcd!] 012456[012456!] 45689a[45689a!] ";
-	alias["2x4patt/4"] = "0123[0123!] 4567[4567!] ";
-	alias["5x4patt/4-22"] = alias["2x4patt/4"] + "0145[0145!] 1256[1256!] 569a[569a!] ";
-	alias["2x8patt/44"] = "01234567:01234567! 456789ab:456789ab! ";
-	alias["3x8patt/44-4211"] = alias["2x8patt/44"] + "0123458c:0123458c! ";
-//	alias["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! 01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
-	alias["4x6patt/k.matsuzaki"] = "012456:012456! 456789:456789! 012345:012345! 234569:234569! ";
-	alias["5x6patt/k.matsuzaki"] = alias["4x6patt/k.matsuzaki"] + "01259a:01259a! ";
-	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678:345678! ";
-	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567:134567! ";
-	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a:01489a! ";
-	alias["k.matsuzaki"] = alias["8x6patt/k.matsuzaki"];
-	alias["monotonic"] = "fd012301[fd012301] fd012301[fd37bf01] fd012301[fdfedc01] fd012301[fdc84001] "
-	                     "fd012301[fd321001] fd012301[fdfb7301] fd012301[fdcdef01] fd012301[fd048c01] "
-	                     "fd456701[fd456701] fd456701[fd26ae01] fd456701[fdba9801] fd456701[fdd95101] "
-	                     "fd456701[fd765401] fd456701[fdea6201] fd456701[fd89ab01] fd456701[fd159d01] ";
-	alias["quantity"] = "fe000005[fe000005] fe000015[fe000015] ";
-	alias["moporgic"] = alias["4x6patt/khyeh"] + alias["monotonic"] + alias["quantity"];
-	alias["4x6patt"] = alias["4x6patt/khyeh"];
-	alias["5x6patt"] = alias["5x6patt/42-33"];
-	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
-	alias["7x6patt"] = alias["7x6patt/k.matsuzaki"];
-	alias["8x6patt"] = alias["8x6patt/k.matsuzaki"];
-	alias["5x4patt"] = alias["5x4patt/4-22"];
-	alias["2x4patt"] = alias["2x4patt/4"];
-	alias["2x8patt"] = alias["2x8patt/44"];
-	alias["3x8patt"] = alias["3x8patt/44-4211"];
-	alias["default"] = alias["4x6patt"];
+u32 make_features(std::string tokens = "") {
+	if (tokens.empty() && feature::feats().empty())
+		tokens = "default";
 
-	if (res.empty() && feature::feats().empty())
-		res = { "default" };
-	for (auto def : alias) { // insert predefined features
-		auto pos = (" " + res + " ").find(" " + def.first + " ");
-		if (pos != std::string::npos)
-			res.replace(pos, def.first.size(), def.second);
+	const auto npos = std::string::npos;
+	for (size_t i; (i = tokens.find(" norm")) != npos; tokens[i] = '/');
+
+	auto aliases = utils::aliases();
+	std::stringstream unalias(tokens); tokens.clear();
+	for (std::string token; unalias >> token; tokens += (token + ' ')) {
+		if (token.find(':') != npos) continue;
+		std::string name = token.substr(0, token.find_first_of("&|="));
+		std::string info = token != name ? token.substr(name.size()) : "";
+		if (aliases.find(name) != aliases.end()) token = aliases[name];
+		if (info.empty()) continue;
+
+		std::string winfo, iinfo, buff;
+		for (char set : std::string("&|=")) {
+			if (info.find(set) != npos) buff = info.substr(0, info.find_first_of("&|=", info.find(set) + 1)).substr(info.find(set));
+			if (buff.find(set) != npos) winfo += buff.substr(0, buff.find(':'));
+			if (buff.find(':') != npos) iinfo += buff.substr(buff.find(':') + 1).insert(0, 1, set);
+		}
+		std::stringstream rephrase(token); token.clear();
+		for (std::string wtok, itok; rephrase >> buff; token += (wtok + itok + ' ')) {
+			wtok = buff.substr(0, buff.find(':')) + winfo;
+			itok = buff.find(':') != npos ? buff.substr(buff.find(':')) + iinfo : "";
+		}
 	}
 
-	u32 succ = 0;
-	std::stringstream split(res);
+	std::stringstream uncomma(tokens); tokens.clear();
+	for (std::string token; uncomma >> token; tokens += (token + ' ')) {
+		if (token.find(':') == npos || token.find(',') == npos) continue;
+		for (size_t i; (i = token.find(',')) != npos; token[i] = ' ');
+		std::stringstream lbuf(token.substr(0, token.find(':')));
+		std::stringstream rbuf(token.substr(token.find(':') + 1));
+		std::vector<std::string> lvals, rvals;
+		for (std::string val; lbuf >> val; lvals.push_back(val));
+		for (std::string val; rbuf >> val; rvals.push_back(val));
+		token.clear();
+		for (auto lval : lvals) for (auto rval : rvals) {
+			token += (lval + ':' + rval + ' ');
+			lval = lval.substr(0, lval.find('='));
+		}
+	}
+
+	std::stringstream unisomorphic(tokens); tokens.clear();
+	for (std::string token; unisomorphic >> token; tokens += (token + ' ')) {
+		if (token.find('!') == npos) continue;
+		std::vector<std::string> lvals, rvals;
+		lvals.push_back(token.substr(0, token.find(':')));
+		rvals.push_back(token.find(':') != npos ? token.substr(token.find(':')) : "");
+		if (lvals.back().find('!') != npos) {
+			std::string lval = lvals.back(); lvals.clear();
+			std::string hash = lval.substr(0, lval.find('!'));
+			std::string tail = lval.substr(lval.find('!') + 1);
+			for (u32 iso = 0; iso < 8; iso++) lvals.push_back(hashpatt(hashpatt(hashpatt(hash, iso)), hash.size()) + tail);
+		}
+		if (rvals.back().find('!') != npos) {
+			std::string rval = rvals.back(); rvals.clear();
+			std::string hash = rval.substr(0, rval.find('!')).substr(1);
+			std::string tail = rval.substr(rval.find('!') + 1);
+			for (u32 iso = 0; iso < 8; iso++) rvals.push_back(':' + hashpatt(hashpatt(hashpatt(hash, iso)), hash.size()) + tail);
+		}
+		lvals.resize(8, lvals.back().substr(0, lvals.back().find('=')));
+		rvals.resize(8, rvals.front());
+		token.clear();
+		for (size_t iso = 0; iso < 8; iso++) token += (lvals[iso] + rvals[iso] + ' ');
+	}
+
+	size_t num = 0;
+	std::stringstream counter(tokens);
+	for (std::string token; counter >> token; num++);
+
+	std::stringstream parser(tokens);
 	std::string token;
-	while (split >> token) {
-		// weight:indexer weight(indexer) weight[indexer] weight[and&or|pattern!]
-		for (size_t i; (i = token.find_first_of(":()[],")) != std::string::npos; token[i] = ' ');
-		std::stringstream info(token);
+	while (parser >> token) {
+		u64 wght = 0, idxr = 0;
+		std::string wtok = token.substr(0, token.find(':'));
+		std::string itok = token.substr(token.find(':') + 1);
 
-		std::string wghts, idxrs;
-		if (!(info >> wghts && info >> idxrs)) continue;
-
-		u64 wght = std::stoull(wghts, nullptr, 16);
-		if (weight::find(wght) == weight::wghts().end()) {
-			std::cerr << "unknown weight (" << wghts << ") at make_features, ";
-			std::cerr << "assume as pattern descriptor..." << std::endl;
-			weight::make(wght, std::pow(16ull, wghts.size()));
+		if (wtok.size()) {
+			// allocate: weight[size] weight(size)
+			// initialize: ...=0 ...=10000 ...=100000+norm
+			// map or remove: destination={source} id={}
+			for (size_t i; (i = wtok.find_first_of("[]()")) != npos; wtok[i] = ' ');
+			std::string name = wtok.substr(0, wtok.find_first_of("!&|:= "));
+			std::string info = wtok.find(' ') != npos ? wtok.substr(0, wtok.find_first_of("!&|:=")).substr(wtok.find(' ') + 1) : "?";
+			std::string init = wtok.find('=') != npos ? wtok.substr(wtok.find('=') + 1) : "?";
+			u64 mska = wtok.find('&') != npos ? std::stoull(wtok.substr(wtok.find('&') + 1), nullptr, 16) : -1ull;
+			u64 msko = wtok.find('|') != npos ? std::stoull(wtok.substr(wtok.find('|') + 1), nullptr, 16) : 0ull;
+			u64 sign = (std::stoull(name, nullptr, 16) & mska) | msko;
+			size_t size = 0;
+			if (info.find_first_of("p^?") != npos) { // ^10 16^10 16^ p ?
+				u32 base = 16, power = name.size();
+				if (info.find('^') != npos) {
+					base = info.front() != '^' ? std::stoul(info.substr(0, info.find('^'))) : 2;
+					power = info.back() != '^' ? std::stoul(info.substr(info.find('^') + 1)) : name.size();
+				}
+				size = std::pow(base, power);
+			} else if (info.find_first_not_of("0123456789.-x") == npos) {
+				size = std::stoull(info, nullptr, 0);
+			}
+			if (init.find_first_of("{}") != npos && init != "{}") {
+				weight src = weight::at(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
+				size = std::max(size, src.size());
+			} else if (init == "{}") {
+				size = 0;
+			}
+			if (weight::find(sign) != weight::wghts().end() && weight::at(sign).size() != size)
+				weight::erase(sign);
+			if (weight::find(sign) == weight::wghts().end() && size) {
+				weight::make(sign, size);
+				if (init.find_first_of("{}") != npos && init != "{}") {
+					weight src = weight::at(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
+					weight dst = weight::at(sign);
+					for (size_t n = 0; n < dst.size(); n += src.size()) {
+						std::copy_n(src.data(), src.size(), dst.data() + n);
+					}
+				} else if (init.find_first_of("0123456789.-") == 0) {
+					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
+					std::fill_n(weight::at(sign).data(), weight::at(sign).size(), val);
+				}
+			}
+			if (weight::find(sign) != weight::wghts().end()) wght = sign;
 		}
 
-		std::string idxv;
-		u32 isomorphic = 1;
-		u64 op_bitand = -1ull, op_bitor = 0ull;
-		while (idxv.empty() && std::isxdigit(idxrs[0])) {
-			size_t pos = 0;
-			u64 value = std::stoull(idxrs, &pos, 16);
-			switch (idxrs[pos]) {
-			case '!':
-				isomorphic = 8;
-				idxv = idxrs.substr(0, pos);
-				break;
-			default:
-				idxv = idxrs.substr(0, pos);
-				break;
-			case '&':
-				op_bitand = value;
-				idxrs.erase(0, pos + 1);
-				break;
-			case '|':
-				op_bitor = value;
-				idxrs.erase(0, pos + 1);
-				break;
+		if (itok.size()) {
+			// indexer indexer,indexer,indexer pattern! signature&mask|mask
+			std::string name = itok.substr(0, itok.find_first_of("!&|"));
+			u64 mska = itok.find('&') != npos ? std::stoull(itok.substr(itok.find('&') + 1), nullptr, 16) : -1ull;
+			u64 msko = itok.find('|') != npos ? std::stoull(itok.substr(itok.find('|') + 1), nullptr, 16) : 0ull;
+			u64 hash = std::stoull(name, nullptr, 16);
+			u64 sign = (hash & mska) | msko;
+			if (indexer::find(sign) == indexer::idxrs().end()) {
+				if (indexer::find(hash) != indexer::idxrs().end()) {
+					indexer::make(sign, indexer::at(hash).index());
+				} else {
+					auto ntahdr = std::bind(utils::indexnta, std::placeholders::_1, utils::hashpatt(name));
+					indexer::make(sign, utils::indexhdr(ntahdr));
+				}
 			}
+			if (indexer::find(sign) != indexer::idxrs().end()) idxr = sign;
 		}
 
-		if (idxv.empty()) continue;
-
-		for (u32 iso = 0; iso < isomorphic; iso++) {
-			std::vector<u32> xpatt = utils::hashpatt(idxv);
-			std::transform(xpatt.begin(), xpatt.end(), xpatt.begin(), [=](u32 v) {
-				board x(0xfedcba9876543210ull);
-				x.isomorphic(-iso);
-				return x.at(v);
-			});
-
-			u64 idxr = (utils::hashpatt(xpatt) & op_bitand) | op_bitor;
-			if (indexer::find(idxr) == indexer::idxrs().end()) {
-				idxrs = utils::hashpatt(idxr, idxv.size());
-				std::cerr << "unknown indexer (" << idxrs << ") at make_features, ";
-				std::cerr << "assume as pattern descriptor..." << std::endl;
-				std::function<u64(const board&)> adapter = std::bind(utils::indexnta, std::placeholders::_1, xpatt);
-				indexer::make(idxr, utils::indexhdr(adapter));
-			}
-
-			if (feature::find(wght, idxr) == feature::feats().end()) {
-				feature::make(wght, idxr);
-				succ++;
-			}
-		}
+		if (wght && idxr) feature::make(wght, idxr);
 	}
-	return succ;
+
+	return 0;
 }
 
 void list_mapping() {
@@ -2014,9 +2057,9 @@ int main(int argc, const char* argv[]) {
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << std::endl;
 
-	utils::make_indexers();
+//	utils::make_indexers();
 	utils::load_weights(opts["weight"]["input"]);
-	utils::make_weights(opts["weight"]["value"]);
+//	utils::make_weights(opts["weight"]["value"]);
 	utils::load_features(opts["feature"]["input"]);
 	utils::make_features(opts["feature"]["value"]);
 	utils::list_mapping();
