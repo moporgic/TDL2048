@@ -1135,6 +1135,39 @@ struct indexhdr {
 	}
 };
 
+std::map<std::string, std::string> aliases() {
+	std::map<std::string, std::string> alias;
+	alias["4x6patt/khyeh"] = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
+	alias["khyeh"] = alias["4x6patt/khyeh"];
+	alias["5x6patt/42-33"] = "012345:012345! 456789:456789! 89abcd:89abcd! 012456:012456! 45689a:45689a! ";
+	alias["2x4patt/4"] = "0123:0123! 4567:4567! ";
+	alias["5x4patt/4-22"] = alias["2x4patt/4"] + "0145:0145! 1256:1256! 569a:569a! ";
+	alias["2x8patt/44"] = "01234567:01234567! 456789ab:456789ab! ";
+	alias["3x8patt/44-4211"] = alias["2x8patt/44"] + "0123458c:0123458c! ";
+//	alias["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! 01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
+	alias["4x6patt/k.matsuzaki"] = "012456:012456! 456789:456789! 012345:012345! 234569:234569! ";
+	alias["5x6patt/k.matsuzaki"] = alias["4x6patt/k.matsuzaki"] + "01259a:01259a! ";
+	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678:345678! ";
+	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567:134567! ";
+	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a:01489a! ";
+	alias["k.matsuzaki"] = alias["8x6patt/k.matsuzaki"];
+	alias["monotonic"] = "fd012301[^24]:fd012301,fd37bf01,fdfedc01,fdc84001,fd321001,fdfb7301,fdcdef01,fd048c01 "
+	                     "fd456701[^24]:fd456701,fd26ae01,fdba9801,fdd95101,fd765401,fdea6201,fd89ab01,fd159d01 ";
+	alias["quantity"] = "fe000005[^24]:fe000005 fe000015[^24]:fe000015 ";
+	alias["moporgic"] = alias["4x6patt/khyeh"] + alias["monotonic"] + alias["quantity"];
+	alias["4x6patt"] = alias["4x6patt/khyeh"];
+	alias["5x6patt"] = alias["5x6patt/42-33"];
+	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
+	alias["7x6patt"] = alias["7x6patt/k.matsuzaki"];
+	alias["8x6patt"] = alias["8x6patt/k.matsuzaki"];
+	alias["5x4patt"] = alias["5x4patt/4-22"];
+	alias["2x4patt"] = alias["2x4patt/4"];
+	alias["2x8patt"] = alias["2x8patt/44"];
+	alias["3x8patt"] = alias["3x8patt/44-4211"];
+	alias["default"] = alias["4x6patt"];
+	return alias;
+}
+
 u32 make_indexers(std::string res = "") {
 	return 0;
 }
