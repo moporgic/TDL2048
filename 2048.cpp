@@ -1173,10 +1173,6 @@ std::map<std::string, std::string> aliases() {
 	return alias;
 }
 
-u32 make_indexers(std::string res = "") {
-	return 0;
-}
-
 u32 save_weights(std::string path) {
 	std::ofstream out;
 	char buf[1 << 20];
@@ -1198,101 +1194,6 @@ u32 load_weights(std::string path) {
 	in.close();
 	return in.rdstate();
 }
-u32 make_weights(std::string res = "") {
-	std::map<std::string, std::string> alias;
-	alias["4x6patt/khyeh"] = "012345 456789 012456 45689a ";
-	alias["khyeh"] = alias["4x6patt/khyeh"];
-	alias["5x6patt/42-33"] = "012345 456789 89abcd 012456 45689a ";
-	alias["2x4patt/4"] = "0123 4567 ";
-	alias["5x4patt/4-22"] = alias["2x4patt/4"] + "0145 1256 569a ";
-	alias["2x8patt/44"] = "01234567 456789ab ";
-	alias["3x8patt/44-4211"] = alias["2x8patt/44"] + "0123458c ";
-	alias["4x6patt/k.matsuzaki"] = "012456 456789 012345 234569 ";
-	alias["5x6patt/k.matsuzaki"] = alias["4x6patt/k.matsuzaki"] + "01259a ";
-	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678 ";
-	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567 ";
-	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a ";
-	alias["k.matsuzaki"] = alias["8x6patt/k.matsuzaki"];
-	alias["monotonic"] = "fd012301:^24 fd456701:^24 ";
-	alias["quantity"] = "fe000005:^24 fe000015:^24 ";
-	alias["moporgic"] = alias["4x6patt/khyeh"] + alias["monotonic"] + alias["quantity"];
-	alias["4x6patt"] = alias["4x6patt/khyeh"];
-	alias["5x6patt"] = alias["5x6patt/42-33"];
-	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
-	alias["7x6patt"] = alias["7x6patt/k.matsuzaki"];
-	alias["8x6patt"] = alias["8x6patt/k.matsuzaki"];
-	alias["5x4patt"] = alias["5x4patt/4-22"];
-	alias["2x4patt"] = alias["2x4patt/4"];
-	alias["2x8patt"] = alias["2x8patt/44"];
-	alias["3x8patt"] = alias["3x8patt/44-4211"];
-	alias["default"] = alias["4x6patt"];
-
-	if (res.empty() && weight::wghts().empty())
-		res = { "default" };
-	for (auto def : alias) { // insert predefined weights
-		const auto npos = std::string::npos;
-		std::string label = def.first;
-		std::string full = def.second;
-		size_t pos = (" " + res + " ").find(" " + label + " ");
-		if (pos == npos && (pos = (" " + res + " ").find(" " + label + "=")) != npos) {
-			std::string opt = res.substr(0, res.find(' ', pos)).substr(res.find('=', pos));
-			for (size_t i = 0; (i = full.find(' ', i)) != npos; i += opt.size()) {
-				 full.replace(i, 1, opt);
-			}
-		}
-		if (pos != npos) {
-			res.replace(pos, label.size(), full);
-		}
-	}
-
-	std::stringstream split(res);
-	std::string token;
-	while (split >> token) {
-		const auto npos = std::string::npos;
-		// allocate: weight:size weight(size) weight[size] weight:patt weight:? weight:^bit
-		// initialize: ...=0 ...=10000
-		// map or remove: destination={source} id={}
-		for (size_t i; (i = token.find_first_of(":()[],")) != npos; token[i] = ' ');
-		std::string name = token.substr(0, token.find_first_of("= "));
-		std::string info = token.find(' ') != npos ? token.substr(0, token.find('=')).substr(token.find(' ') + 1) : "?";
-		std::string init = token.find('=') != npos ? token.substr(token.find('=') + 1) : "?";
-
-		u64 sign = std::stoull(name, nullptr, 16);
-		size_t size = 0;
-		if (info.find_first_of("p^?") != npos) { // ^10 16^10 16^ p ?
-			u32 base = 16, power = name.size();
-			if (info.find('^') != npos) {
-				base = info.front() != '^' ? std::stoul(info.substr(0, info.find('^'))) : 2;
-				power = info.back() != '^' ? std::stoul(info.substr(info.find('^') + 1)) : name.size();
-			}
-			size = std::pow(base, power);
-		} else if (info.find_first_not_of("0123456789.-x") == npos) {
-			size = std::stoull(info, nullptr, 0);
-		}
-		if (init.find_first_of("{}") != npos && init != "{}") {
-			size = std::max(size, weight::at(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16)).size());
-		} else if (init == "{}") {
-			size = 0;
-		}
-
-		if (weight::find(sign) != weight::wghts().end() && weight::at(sign).size() != size)
-			weight::erase(sign);
-		if (weight::find(sign) == weight::wghts().end() && size)
-			weight::make(sign, size);
-		if (init.find_first_of("{}") != npos && init != "{}") {
-			weight src = weight::at(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
-			weight dst = weight::at(sign);
-			for (size_t n = 0; n < dst.size(); n += src.size()) {
-				std::copy_n(src.data(), src.size(), dst.data() + n);
-			}
-		} else if (init.find_first_not_of("0123456789.-") == npos && init.size()) {
-			numeric val = std::stod(init);
-			std::fill_n(weight::at(sign).data(), weight::at(sign).size(), val);
-		}
-	}
-
-	return 0;
-}
 
 u32 save_features(std::string path) {
 	std::ofstream out;
@@ -1311,6 +1212,7 @@ u32 load_features(std::string path) {
 	in.close();
 	return in.rdstate();
 }
+
 u32 make_features(std::string tokens = "") {
 	if (tokens.empty() && feature::feats().empty())
 		tokens = "default";
@@ -2057,9 +1959,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << std::endl;
 
-//	utils::make_indexers();
 	utils::load_weights(opts["weight"]["input"]);
-//	utils::make_weights(opts["weight"]["value"]);
 	utils::load_features(opts["feature"]["input"]);
 	utils::make_features(opts["feature"]["value"]);
 	utils::list_mapping();
