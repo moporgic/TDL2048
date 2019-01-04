@@ -1172,48 +1172,8 @@ std::map<std::string, std::string> aliases() {
 	alias["default"] = alias["4x6patt"];
 	return alias;
 }
-
-u32 save_weights(std::string path) {
-	std::ofstream out;
-	char buf[1 << 20];
-	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
-	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-	if (!out.is_open()) return -1;
-	weight::save(out);
-	out.flush();
-	out.close();
-	return out.rdstate();
-}
-u32 load_weights(std::string path) {
-	std::ifstream in;
-	char buf[1 << 20];
-	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
-	in.open(path, std::ios::in | std::ios::binary);
-	if (!in.is_open()) return 0;
-	weight::load(in);
-	in.close();
-	return in.rdstate();
-}
-
-u32 save_features(std::string path) {
-	std::ofstream out;
-	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-	if (!out.is_open()) return 0;
-	feature::save(out);
-	out.flush();
-	out.close();
-	return out.rdstate();
-}
-u32 load_features(std::string path) {
-	std::ifstream in;
-	in.open(path, std::ios::in | std::ios::binary);
-	if (!in.is_open()) return 0;
-	feature::load(in);
-	in.close();
-	return in.rdstate();
-}
-
-u32 make_features(std::string tokens = "") {
+u32 make_network(utils::options::option opt) {
+	std::string tokens = opt;
 	if (tokens.empty() && feature::feats().empty())
 		tokens = "default";
 
@@ -1357,9 +1317,39 @@ u32 make_features(std::string tokens = "") {
 			if (indexer::find(sign) != indexer::idxrs().end()) idxr = sign;
 		}
 
-		if (wght && idxr) feature::make(wght, idxr);
+		if (wght && idxr && feature::find(wght, idxr) == feature::feats().end()) feature::make(wght, idxr);
 	}
 
+	return 0;
+}
+u32 load_network(utils::options::option opt) {
+	for (std::string path : opt) {
+		std::ifstream in;
+		in.open(path, std::ios::in | std::ios::binary);
+		while (in.peek() != -1) {
+			auto type = in.peek();
+			if (type != 0) { // legacy binaries always beginning with 0
+				in.ignore(1);
+			} else { // use name suffix to determine the type
+				type = path[path.find_last_of(".") + 1];
+			}
+			if (type == 'w') weight::load(in);
+			if (type == 'f') feature::load(in);
+		}
+		in.close();
+	}
+	return 0;
+}
+u32 save_network(utils::options::option opt) {
+	for (std::string path : opt) {
+		std::ofstream out;
+		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+		auto type = path[path.find_last_of(".") + 1];
+		if (type != 'f') weight::save(out.write("w", 1));
+		if (type != 'w') feature::save(out.write("f", 1));
+		out.flush();
+		out.close();
+	}
 	return 0;
 }
 
@@ -1699,81 +1689,54 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["test"] += next_opts();
 			opts["test"] += opts[""];
 			break;
-		case to_hash("-s"):
+		case to_hash("-d"):
 		case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
 			break;
 		case to_hash("-wio"):
 		case to_hash("--weight-input-output"):
-			opts["weight"]["input"] = opts["weight"]["output"] = next_opt("2048.w");
-			break;
-		case to_hash("-wi"):
-		case to_hash("--weight-input"):
-			opts["weight"]["input"] = next_opt("2048.w");
-			break;
-		case to_hash("-wo"):
-		case to_hash("--weight-output"):
-			opts["weight"]["output"] = next_opt("2048.w");
-			break;
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			opts["feature"]["input"] = opts["feature"]["output"] = next_opt("2048.f");
+			opts[""] = next_opt("2048." + label.substr(label.find_first_not_of('-'), 1));
+			opts[""] += next_opts();
+			opts["load"] += opts[""];
+			opts["save"] += opts[""];
 			break;
+		case to_hash("-l"):
+		case to_hash("-lf"):
+		case to_hash("--load"):
+		case to_hash("-wi"):
+		case to_hash("--weight-input"):
 		case to_hash("-fi"):
 		case to_hash("--feature-input"):
-			opts["feature"]["input"] = next_opt("2048.f");
+		case to_hash("-ni"):
+		case to_hash("--network-input"):
+			opts[""] = next_opt("2048." + label.substr(label.find_first_not_of('-'), 1));
+			opts[""] += next_opts();
+			opts["load"] += opts[""];
 			break;
+		case to_hash("-s"):
+		case to_hash("-sa"):
+		case to_hash("--save"):
+		case to_hash("-wo"):
+		case to_hash("--weight-output"):
 		case to_hash("-fo"):
 		case to_hash("--feature-output"):
-			opts["feature"]["output"] = next_opt("2048.f");
+		case to_hash("-no"):
+		case to_hash("--network-output"):
+			opts[""] = next_opt("2048." + label.substr(label.find_first_not_of('-'), 1));
+			opts[""] += next_opts();
+			opts["save"] += opts[""];
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
-			opts["weight"]["value"] = opts[""] = next_opts();
-			if (opts("", "input") || opts("", "output") || opts("", "value"))
-				opts["weight"] = opts[""];
-			break;
-		case to_hash("--weight-value"):
-			opts["weight"]["value"] = next_opts();
-			break;
 		case to_hash("-f"):
 		case to_hash("--feature"):
-			opts["feature"]["value"] = opts[""] = next_opts();
-			if (opts("", "input") || opts("", "output") || opts("", "value"))
-				opts["feature"] = opts[""];
-			break;
-		case to_hash("--feature-value"):
-			opts["feature"]["value"] = next_opts();
-			break;
+		case to_hash("-n"):
+		case to_hash("--network"):
 		case to_hash("-wf"):
 		case to_hash("-fw"):
-			opts["feature"]["value"] = opts["weight"]["value"] = opts[""] = next_opts();
-			if (opts("", "input") || opts("", "output") || opts("", "value"))
-				opts["feature"] = opts["weight"] = opts[""];
-			if (opts("", "input"))
-				opts["feature"]["input"] += ".f",
-				opts["weight"]["input"] += ".w";
-			if (opts("", "output"))
-				opts["feature"]["output"] += ".f",
-				opts["weight"]["output"] += ".w";
-			break;
-		case to_hash("-wfi"):
-		case to_hash("-fwi"):
-			opts[""] = next_opt("2048");
-			opts["feature"]["input"] = opts[""] + ".f";
-			opts["weight"]["input"] = opts[""] + ".w";
-			break;
-		case to_hash("-wfo"):
-		case to_hash("-fwo"):
-			opts[""] = next_opt("2048");
-			opts["feature"]["output"] = opts[""] + ".f";
-			opts["weight"]["output"] = opts[""] + ".w";
-			break;
-		case to_hash("-wfio"):
-		case to_hash("-fwio"):
-			opts[""] = next_opt("2048");
-			opts["feature"]["input"] = opts["feature"]["output"] = opts[""] + ".f";
-			opts["weight"]["input"] = opts["weight"]["output"] = opts[""] + ".w";
+			opts["make"] += next_opts();
 			break;
 		case to_hash("-i"):
 		case to_hash("--info"):
@@ -1959,9 +1922,8 @@ int main(int argc, const char* argv[]) {
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << std::endl;
 
-	utils::load_weights(opts["weight"]["input"]);
-	utils::load_features(opts["feature"]["input"]);
-	utils::make_features(opts["feature"]["value"]);
+	utils::load_network(opts["load"]);
+	utils::make_network(opts["make"]);
 	utils::list_mapping();
 
 	moporgic::srand(moporgic::to_hash(opts["seed"]));
@@ -1974,8 +1936,7 @@ int main(int argc, const char* argv[]) {
 		if (opts["info"] == "full") stat.summary(opts["train"]);
 	}
 
-	utils::save_weights(opts["weight"]["output"]);
-	utils::save_features(opts["feature"]["output"]);
+	utils::save_network(opts["save"]);
 
 	if (statistic(opts["test"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
