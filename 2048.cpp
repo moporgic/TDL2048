@@ -1656,148 +1656,7 @@ struct statistic {
 	}
 };
 
-utils::options parse(int argc, const char* argv[]) {
-	utils::options opts;
-	for (int i = 1; i < argc; i++) {
-		std::string label = argv[i];
-		auto next_opt = [&](const std::string& v) -> std::string {
-			return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
-		};
-		auto next_opts = [&]() -> utils::options::list {
-			utils::options::list args;
-			for (std::string v; (v = next_opt("")).size(); ) args.push_back(v);
-			return args;
-		};
-		switch (to_hash(label)) {
-		case to_hash("-a"):
-		case to_hash("--alpha"):
-			opts["alpha"] = next_opt(std::to_string(state::alpha()));
-			opts["alpha"] += next_opts();
-			break;
-		case to_hash("-t"):
-		case to_hash("--train"):
-			opts[""] = opts["train"];
-			opts["train"] = next_opt("1000");
-			opts["train"] += next_opts();
-			opts["train"] += opts[""];
-			break;
-		case to_hash("-T"):
-		case to_hash("-e"):
-		case to_hash("--test"):
-			opts[""] = opts["test"];
-			opts["test"] = next_opt("1000");
-			opts["test"] += next_opts();
-			opts["test"] += opts[""];
-			break;
-		case to_hash("-d"):
-		case to_hash("--seed"):
-			opts["seed"] = next_opt("moporgic");
-			break;
-		case to_hash("-wio"):
-		case to_hash("--weight-input-output"):
-		case to_hash("-fio"):
-		case to_hash("--feature-input-output"):
-			opts[""] = next_opt("2048." + label.substr(label.find_first_not_of('-'), 1));
-			opts[""] += next_opts();
-			opts["load"] += opts[""];
-			opts["save"] += opts[""];
-			break;
-		case to_hash("-l"):
-		case to_hash("-lf"):
-		case to_hash("--load"):
-		case to_hash("-wi"):
-		case to_hash("--weight-input"):
-		case to_hash("-fi"):
-		case to_hash("--feature-input"):
-		case to_hash("-ni"):
-		case to_hash("--network-input"):
-			opts[""] = next_opt("2048." + label.substr(label.find_first_not_of('-'), 1));
-			opts[""] += next_opts();
-			opts["load"] += opts[""];
-			break;
-		case to_hash("-s"):
-		case to_hash("-sa"):
-		case to_hash("--save"):
-		case to_hash("-wo"):
-		case to_hash("--weight-output"):
-		case to_hash("-fo"):
-		case to_hash("--feature-output"):
-		case to_hash("-no"):
-		case to_hash("--network-output"):
-			opts[""] = next_opt("2048." + label.substr(label.find_first_not_of('-'), 1));
-			opts[""] += next_opts();
-			opts["save"] += opts[""];
-			break;
-		case to_hash("-w"):
-		case to_hash("--weight"):
-		case to_hash("-f"):
-		case to_hash("--feature"):
-		case to_hash("-n"):
-		case to_hash("--network"):
-		case to_hash("-wf"):
-		case to_hash("-fw"):
-			opts["make"] += next_opts();
-			break;
-		case to_hash("-i"):
-		case to_hash("--info"):
-			opts["info"] = next_opt("full");
-			opts["info"] += next_opts();
-			break;
-		case to_hash("-o"):
-		case to_hash("--option"):
-		case to_hash("--options"):
-		case to_hash("--extra"):
-			opts["options"] += next_opts();
-			break;
-		case to_hash("-tt"):
-		case to_hash("-tm"):
-		case to_hash("--train-type"):
-		case to_hash("--train-mode"):
-			opts["train"]["mode"] = next_opt("bias");
-			break;
-		case to_hash("-Tt"):
-		case to_hash("-et"):
-		case to_hash("-em"):
-		case to_hash("--test-type"):
-		case to_hash("--test-mode"):
-			opts["test"]["mode"] = next_opt("bias");
-			break;
-		case to_hash("-tc"):
-		case to_hash("-tu"):
-		case to_hash("--train-check"):
-		case to_hash("--train-unit"):
-			opts["train"]["unit"] = next_opt("1000");
-			break;
-		case to_hash("-Tc"):
-		case to_hash("-ec"):
-		case to_hash("-eu"):
-		case to_hash("--test-check"):
-		case to_hash("--test-unit"):
-			opts["test"]["unit"] = next_opt("1000");
-			break;
-		case to_hash("-v"):
-		case to_hash("--win"):
-			opts["train"]["win"] = opts["test"]["win"] = next_opt("2048");
-			break;
-		case to_hash("-c"):
-		case to_hash("--comment"):
-			opts["comment"] = next_opts();
-			break;
-		case to_hash("-|"):
-		case to_hash("--|"):
-			opts = {};
-			break;
-		default:
-			std::cerr << "unknown: " << label;
-			for (auto& v : next_opts()) std::cerr << " " << v;
-			std::cerr << std::endl;
-			break;
-		}
-	}
-	return opts;
-}
-
-statistic train(utils::options opts = {}) {
+statistic optimize(utils::options::option args, utils::options::option opts = {}) {
 	std::vector<state> path;
 	path.reserve(65536);
 	statistic stats;
@@ -1805,10 +1664,10 @@ statistic train(utils::options opts = {}) {
 	state last;
 	board b;
 
-	switch (to_hash(opts["train"]["mode"])) {
+	switch (to_hash(args["mode"])) {
 	case to_hash("backward"):
 	case to_hash("backward-best"):
-		for (stats.init(opts["train"]); stats; stats++) {
+		for (stats.init(args); stats; stats++) {
 
 			u32 score = 0;
 			u32 opers = 0;
@@ -1832,7 +1691,7 @@ statistic train(utils::options opts = {}) {
 	default:
 	case to_hash("forward"):
 	case to_hash("forward-best"):
-		for (stats.init(opts["train"]); stats; stats++) {
+		for (stats.init(args); stats; stats++) {
 
 			u32 score = 0;
 			u32 opers = 0;
@@ -1862,15 +1721,15 @@ statistic train(utils::options opts = {}) {
 	return stats;
 }
 
-statistic test(utils::options opts = {}) {
+statistic evaluate(utils::options::option args, utils::options::option opts = {}) {
 	statistic stats;
 	select best;
 	board b;
 
-	switch (to_hash(opts["test"]["mode"])) {
+	switch (to_hash(args["mode"])) {
 	default:
 	case to_hash("best"):
-		for (stats.init(opts["test"]); stats; stats++) {
+		for (stats.init(args); stats; stats++) {
 
 			u32 score = 0;
 			u32 opers = 0;
@@ -1886,7 +1745,7 @@ statistic test(utils::options opts = {}) {
 		break;
 
 	case to_hash("random"):
-		for (stats.init(opts["test"]); stats; stats++) {
+		for (stats.init(args); stats; stats++) {
 
 			u32 score = 0;
 			u32 opers = 0;
@@ -1905,10 +1764,154 @@ statistic test(utils::options opts = {}) {
 	return stats;
 }
 
+utils::options parse(int argc, const char* argv[]) {
+	utils::options opts;
+	for (int i = 1; i < argc; i++) {
+		std::string label = argv[i];
+		auto next_opt = [&](const std::string& v) -> std::string {
+			return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
+		};
+		auto next_opts = [&]() -> utils::options::list {
+			utils::options::list args;
+			for (std::string v; (v = next_opt("")).size(); ) args.push_back(v);
+			return args;
+		};
+		switch (to_hash(label)) {
+		case to_hash("-a"):
+		case to_hash("--alpha"):
+			opts["alpha"] = next_opt(std::to_string(state::alpha()));
+			opts["alpha"] += next_opts();
+			break;
+		case to_hash("-t"):
+		case to_hash("--train"):
+		case to_hash("--optimize"):
+			opts[""] = opts["optimize"];
+			opts["optimize"] = next_opt("1000");
+			opts["optimize"] += next_opts();
+			opts["optimize"] += opts[""];
+			break;
+		case to_hash("-T"):
+		case to_hash("-e"):
+		case to_hash("--test"):
+		case to_hash("--evaluate"):
+			opts[""] = opts["evaluate"];
+			opts["evaluate"] = next_opt("1000");
+			opts["evaluate"] += next_opts();
+			opts["evaluate"] += opts[""];
+			break;
+		case to_hash("-d"):
+		case to_hash("--seed"):
+			opts["seed"] = next_opt("moporgic");
+			break;
+		case to_hash("-nio"):
+		case to_hash("--network-input-output"):
+		case to_hash("-wio"):
+		case to_hash("--weight-input-output"):
+		case to_hash("-fio"):
+		case to_hash("--feature-input-output"):
+			label = "2048." + label.substr(label.find_first_not_of('-'), 1);
+			opts[""] = next_opt(label);
+			opts[""] += next_opts();
+			opts["load"] += opts[""];
+			opts["save"] += opts[""];
+			break;
+		case to_hash("-l"):
+		case to_hash("--load"):
+		case to_hash("-wi"):
+		case to_hash("--weight-input"):
+		case to_hash("-fi"):
+		case to_hash("--feature-input"):
+		case to_hash("-ni"):
+		case to_hash("--network-input"):
+			label = "2048." + label.substr(label.find_first_not_of('-'), 1);
+			opts[""] = next_opt(label);
+			opts[""] += next_opts();
+			opts["load"] += opts[""];
+			break;
+		case to_hash("-s"):
+		case to_hash("--save"):
+		case to_hash("-wo"):
+		case to_hash("--weight-output"):
+		case to_hash("-fo"):
+		case to_hash("--feature-output"):
+		case to_hash("-no"):
+		case to_hash("--network-output"):
+			label = "2048." + label.substr(label.find_first_not_of('-'), 1);
+			opts[""] = next_opt(label);
+			opts[""] += next_opts();
+			opts["save"] += opts[""];
+			break;
+		case to_hash("-w"):
+		case to_hash("--weight"):
+		case to_hash("-f"):
+		case to_hash("--feature"):
+		case to_hash("-n"):
+		case to_hash("--network"):
+		case to_hash("-wf"):
+		case to_hash("-fw"):
+			opts["make"] += next_opts();
+			break;
+		case to_hash("-i"):
+		case to_hash("--info"):
+			opts["info"] = next_opt("full");
+			opts["info"] += next_opts();
+			break;
+		case to_hash("-o"):
+		case to_hash("--option"):
+		case to_hash("--options"):
+			opts["options"] += next_opts();
+			break;
+		case to_hash("-tt"):
+		case to_hash("-tm"):
+		case to_hash("--train-type"):
+		case to_hash("--train-mode"):
+			opts["optimize"]["mode"] = next_opt("bias");
+			break;
+		case to_hash("-Tt"):
+		case to_hash("-et"):
+		case to_hash("-em"):
+		case to_hash("--test-type"):
+		case to_hash("--test-mode"):
+			opts["evaluate"]["mode"] = next_opt("bias");
+			break;
+		case to_hash("-tc"):
+		case to_hash("-tu"):
+		case to_hash("--train-check"):
+		case to_hash("--train-unit"):
+			opts["optimize"]["unit"] = next_opt("1000");
+			break;
+		case to_hash("-Tc"):
+		case to_hash("-ec"):
+		case to_hash("-eu"):
+		case to_hash("--test-check"):
+		case to_hash("--test-unit"):
+			opts["evaluate"]["unit"] = next_opt("1000");
+			break;
+		case to_hash("-v"):
+		case to_hash("--win"):
+			opts["optimize"]["win"] = opts["evaluate"]["win"] = next_opt("2048");
+			break;
+		case to_hash("-c"):
+		case to_hash("--comment"):
+			opts["comment"] = next_opts();
+			break;
+		case to_hash("-|"):
+		case to_hash("--|"):
+			opts = {};
+			break;
+		default:
+			label = label.substr(label.find_first_not_of('-') + 1);
+			opts["options"][label] += next_opts();
+			break;
+		}
+	}
+	return opts;
+}
+
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts("train")) opts["train"] = opts("test") ? 0 : 1000;
-	if (!opts("test")) opts["test"] = opts("train") ? 0 : 1000;
+	if (!opts("optimize")) opts["optimize"] = opts("evaluate") ? 0 : 1000;
+	if (!opts("evaluate")) opts["evaluate"] = opts("optimize") ? 0 : 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 
@@ -1930,18 +1933,18 @@ int main(int argc, const char* argv[]) {
 	state::alpha(std::stod(opts["alpha"]));
 	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
 
-	if (statistic(opts["train"])) {
+	if (statistic(opts["optimize"])) {
 		std::cout << std::endl << "start training..." << std::endl;
-		statistic stat = train(opts);
-		if (opts["info"] == "full") stat.summary(opts["train"]);
+		statistic stat = optimize(opts["optimize"], opts["options"]);
+		if (opts["info"] == "full") stat.summary(opts["optimize"]);
 	}
 
 	utils::save_network(opts["save"]);
 
-	if (statistic(opts["test"])) {
+	if (statistic(opts["evaluate"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
-		statistic stat = test(opts);
-		if (opts["info"] != "none") stat.summary(opts["test"]);
+		statistic stat = evaluate(opts["evaluate"], opts["options"]);
+		if (opts["info"] != "none") stat.summary(opts["evaluate"]);
 	}
 
 	std::cout << std::endl;
