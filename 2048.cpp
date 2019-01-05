@@ -399,6 +399,16 @@ private:
 	}
 };
 
+void logging(std::string path) {
+	static std::ofstream logout;
+	if (logout.is_open()) return;
+	logout.open(path, std::ios::out | std::ios::app);
+	if (logout.is_open()) {
+		static moporgic::teestream tee(std::cout, logout);
+		static moporgic::redirector redirect(tee, std::cout);
+	}
+}
+
 inline u32 hashpatt(const std::vector<u32>& patt) {
 	u32 hash = 0;
 	for (auto tile : patt) hash = (hash << 4) | tile;
@@ -1911,6 +1921,11 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--comment"):
 			opts["comment"] = next_opts();
 			break;
+		case to_hash("-x"):
+		case to_hash("-log"):
+		case to_hash("--logging"):
+			opts["logging"] = next_opt("2048.x");
+			break;
 		case to_hash("-"):
 		case to_hash("-|"):
 		case to_hash("--|"):
@@ -1932,6 +1947,7 @@ int main(int argc, const char* argv[]) {
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 
+	utils::logging(opts["logging"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
 	std::cout << "develop" << " build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" __DATE__ " " __TIME__ ")" << std::endl;
