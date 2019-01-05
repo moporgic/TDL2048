@@ -1790,7 +1790,6 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["optimize"] += next_opts();
 			opts["optimize"] += opts[""];
 			break;
-		case to_hash("-T"):
 		case to_hash("-e"):
 		case to_hash("--test"):
 		case to_hash("--evaluate"):
@@ -1803,6 +1802,8 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
 			break;
+		case to_hash("-io"):
+		case to_hash("--input-output"):
 		case to_hash("-nio"):
 		case to_hash("--network-input-output"):
 		case to_hash("-wio"):
@@ -1815,8 +1816,8 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["load"] += opts[""];
 			opts["save"] += opts[""];
 			break;
-		case to_hash("-l"):
-		case to_hash("--load"):
+		case to_hash("-i"):
+		case to_hash("--input"):
 		case to_hash("-wi"):
 		case to_hash("--weight-input"):
 		case to_hash("-fi"):
@@ -1828,8 +1829,8 @@ utils::options parse(int argc, const char* argv[]) {
 			opts[""] += next_opts();
 			opts["load"] += opts[""];
 			break;
-		case to_hash("-s"):
-		case to_hash("--save"):
+		case to_hash("-o"):
+		case to_hash("--output"):
 		case to_hash("-wo"):
 		case to_hash("--weight-output"):
 		case to_hash("-fo"):
@@ -1851,12 +1852,11 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-fw"):
 			opts["make"] += next_opts();
 			break;
-		case to_hash("-i"):
+		case to_hash("-%"):
 		case to_hash("--info"):
 			opts["info"] = next_opt("full");
 			opts["info"] += next_opts();
 			break;
-		case to_hash("-o"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 			opts["options"] += next_opts();
@@ -1867,7 +1867,6 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--train-mode"):
 			opts["optimize"]["mode"] = next_opt("bias");
 			break;
-		case to_hash("-Tt"):
 		case to_hash("-et"):
 		case to_hash("-em"):
 		case to_hash("--test-type"):
@@ -1880,12 +1879,17 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--train-unit"):
 			opts["optimize"]["unit"] = next_opt("1000");
 			break;
-		case to_hash("-Tc"):
 		case to_hash("-ec"):
 		case to_hash("-eu"):
 		case to_hash("--test-check"):
 		case to_hash("--test-unit"):
 			opts["evaluate"]["unit"] = next_opt("1000");
+			break;
+		case to_hash("-u"):
+		case to_hash("--unit"):
+		case to_hash("-chk"):
+		case to_hash("--check"):
+			opts["optimize"]["unit"] = opts["evaluate"]["unit"] = next_opt("1000");
 			break;
 		case to_hash("-v"):
 		case to_hash("--win"):
@@ -1895,12 +1899,13 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--comment"):
 			opts["comment"] = next_opts();
 			break;
+		case to_hash("-"):
 		case to_hash("-|"):
 		case to_hash("--|"):
 			opts = {};
 			break;
 		default:
-			label = label.substr(label.find_first_not_of('-') + 1);
+			label = label.substr(label.find_first_not_of('-'));
 			opts["options"][label] += next_opts();
 			break;
 		}
