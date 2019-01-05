@@ -266,6 +266,7 @@ public:
 	typedef const type* const_iterator, const_pointer;
 	typedef const type& const_reference;
 	typedef size_t size_type, difference_type;
+	static constexpr size_t npos = -1ull;
 public:
 	constexpr type* data() const noexcept { return first; }
 	constexpr type* begin() const noexcept { return first; }
@@ -282,6 +283,7 @@ public:
 	constexpr size_t capacity() const noexcept { return size(); }
 	constexpr size_t max_size() const noexcept { return -1ull; }
 	constexpr bool empty() const noexcept { return size() == 0; }
+	constexpr clip<type> subc(size_t i, size_t n = npos) const noexcept { return {begin() + i, (n != npos) & (i + n < size()) ? begin() + i + n : end()}; }
 public:
 	constexpr bool operator==(const clip<type>& c) const noexcept { return begin() == c.begin() && end() == c.end(); }
 	constexpr bool operator!=(const clip<type>& c) const noexcept { return begin() != c.begin() || end() != c.end(); }
@@ -290,6 +292,7 @@ public:
 	constexpr bool operator> (const clip<type>& c) const noexcept { return begin() >  c.begin(); }
 	constexpr bool operator>=(const clip<type>& c) const noexcept { return begin() >= c.begin(); }
 public:
+	constexpr operator type*() const noexcept { return data(); }
 	constexpr void swap(clip<type>& c) noexcept { std::swap(first, c.first); std::swap(last, c.last); }
 	constexpr clip<type>& operator=(const clip<type>& c) noexcept = default;
 protected:
@@ -353,6 +356,7 @@ public:
 	list<type>& operator=(const clip<type>& c) { assign(c.cbegin(), c.cend()); return *this; }
 	list<type>& operator=(const list<type>& l) { assign(l.cbegin(), l.cend()); return *this; }
 	list<type>& operator=(list<type>&& l) { clip<type>::swap(l); return *this; }
+	list<type> subl(size_t i, size_t n = clip<type>::npos) const noexcept { return list<type>(clip<type>::subc(i, n)); }
 public:
 	static constexpr list<type>& as(clip<type>& c) noexcept { return raw_cast<list<type>>(c); }
 	static constexpr const list<type>& as(const clip<type>& c) noexcept { return raw_cast<list<type>>(c); }
@@ -363,6 +367,10 @@ protected:
 		clip<type>::operator=(clip<type>(first, last));
 	}
 };
+
+} /* namespace moporgic */
+
+namespace moporgic {
 
 class hexadeca { // iter?
 public:
@@ -499,6 +507,15 @@ protected:
 	u64 ext;
 };
 
+} /* namespace moporgic */
+
+namespace std {
+constexpr static inline void swap(moporgic::hexadeca::cell lc, moporgic::hexadeca::cell rc) noexcept { u32 t = lc; lc = rc; rc = t; }
+constexpr static inline u32 exchange(moporgic::hexadeca::cell c, u32 val) noexcept { u32 o = c; c = val; return o; }
+} /* namespace std */
+
+namespace moporgic {
+
 template<typename type,
 	template<typename...> class list = moporgic::list,
 	template<typename...> class alloc = std::allocator,
@@ -552,6 +569,27 @@ public:
 private:
 	list<clip<type>, alloc<clip<type>>> space;
 	constexpr inline auto& idle() noexcept { return space; }
+};
+
+} /* namespace moporgic */
+
+
+namespace moporgic {
+
+template<typename type>
+class once {
+public:
+	constexpr inline once() : data({}), pass(0) {}
+	constexpr inline once(const type& v ) : data({ v, v }), pass(1) {}
+	constexpr inline once(const once& o) = default;
+	constexpr inline operator type&() { pass = 0; return data[0]; }
+	constexpr inline operator const type&() const { const_cast<u32&>(pass) = 0; return data[0]; }
+	constexpr inline type& operator =(const type& v) { return data[std::min(pass++, 1u)] = v; }
+	constexpr inline u32 reset() { std::fill_n(data, 2, type()); return std::exchange(pass, 0); }
+	constexpr inline u32 set() const { return pass; }
+private:
+	type data[2];
+	u32 pass;
 };
 
 } /* namespace moporgic */
