@@ -1516,7 +1516,9 @@ struct statistic {
 	statistic(const utils::options::option& opt) : statistic() { init(opt); }
 	statistic(const statistic& stat) = default;
 
+	utils::options::option opts;
 	bool init(const utils::options::option& opt = {}) {
+		opts = opt;
 		loop = 1000;
 		unit = 1000;
 		winv = 2048;
@@ -1625,7 +1627,7 @@ struct statistic {
 		local.time = tick;
 	}
 
-	void summary(const utils::options::option& opt = {}) const {
+	void summary() const {
 		char buf[1024];
 		u32 size = 0;
 
@@ -1969,7 +1971,7 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["optimize"])) {
 		std::cout << std::endl << "start training..." << std::endl;
 		statistic stat = optimize(opts["optimize"], opts["options"]);
-		if (opts["info"] == "full") stat.summary(opts["optimize"]);
+		if (opts["info"] == "full") stat.summary();
 	}
 
 	utils::save_network(opts["save"]);
@@ -1977,7 +1979,7 @@ int main(int argc, const char* argv[]) {
 	if (statistic(opts["evaluate"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
 		statistic stat = evaluate(opts["evaluate"], opts["options"]);
-		if (opts["info"] != "none") stat.summary(opts["evaluate"]);
+		if (opts["info"] != "none") stat.summary();
 	}
 
 	std::cout << std::endl;
