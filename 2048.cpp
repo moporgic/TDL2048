@@ -1338,12 +1338,12 @@ u32 load_network(utils::options::option opt) {
 		in.open(path, std::ios::in | std::ios::binary);
 		while (in.peek() != -1) {
 			auto type = in.peek();
-			if (type != 0) { // legacy binaries always beginning with 0
+			if (type != 0) {
 				in.ignore(1);
-			} else { // use name suffix to determine the type
+			} else { // legacy binaries always beginning with 0, so use name suffix to determine the type
 				type = path[path.find_last_of(".") + 1];
 			}
-			if (type == 'w') weight::load(in);
+			if (type == 'w')  weight::load(in);
 			if (type == 'f') feature::load(in);
 		}
 		in.close();
@@ -1354,9 +1354,10 @@ u32 save_network(utils::options::option opt) {
 	for (std::string path : opt) {
 		std::ofstream out;
 		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+		if (!out.is_open()) continue;
 		auto type = path[path.find_last_of(".") + 1];
-		if (type != 'f') weight::save(out.write("w", 1));
-		if (type != 'w') feature::save(out.write("f", 1));
+		if (type != 'f')  weight::save(type != 'w' ? out.write("w", 1) : out);
+		if (type != 'w') feature::save(type != 'f' ? out.write("f", 1) : out);
 		out.flush();
 		out.close();
 	}
