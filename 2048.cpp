@@ -1585,59 +1585,71 @@ struct statistic {
 		total.hash |= local.hash;
 		total.max = std::max(total.max, local.max);
 
-		std::cout << std::endl;
-		char buf[64];
-		snprintf(buf, sizeof(buf), indexf, // "%03llu/%03llu %llums %.2fops",
+		char buf[256];
+		u32 size = 0;
+
+		buf[size++] = '\n';
+		size += snprintf(buf + size, sizeof(buf) - size, indexf, // "%03llu/%03llu %llums %.2fops",
 				loop / unit,
 				limit / unit,
 				local.time,
 				local.opers * 1000.0 / local.time);
-		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), localf, // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
+		buf[size++] = '\n';
+		size += snprintf(buf + size, sizeof(buf) - size, localf, // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / unit,
 				local.max,
 				math::msb32(local.hash),
 				local.win * 100.0 / unit);
-		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
+		buf[size++] = '\n';
+		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / loop,
 				total.max,
 				math::msb32(total.hash),
 				total.win * 100.0 / loop);
-		std::cout << buf << std::endl;
+		buf[size++] = '\n';
+		buf[size++] = '\0';
+
+		std::cout << buf << std::flush;
 
 		local = {};
 		local.time = tick;
 	}
 
 	void summary(const utils::options::option& opt = {}) const {
-		std::cout << std::endl;
-		char buf[80];
-		snprintf(buf, sizeof(buf), summaf,
+		char buf[1024];
+		u32 size = 0;
+
+		buf[size++] = '\n';
+		size += snprintf(buf + size, sizeof(buf) - size, summaf,
 				total.time,
 				total.opers * 1000.0 / total.time);
-		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
+		buf[size++] = '\n';
+		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / limit,
 				total.max,
 				math::msb32(total.hash),
 				total.win * 100.0 / limit);
-		std::cout << buf << std::endl;
-		snprintf(buf, sizeof(buf), "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
-		                           "tile", "count", "score", "move", "rate", "win");
-		std::cout << buf << std::endl;
+		buf[size++] = '\n';
+		size += snprintf(buf + size, sizeof(buf) - size,
+		        "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
+		        "tile", "count", "score", "move", "rate", "win");
+		buf[size++] = '\n';
 		const auto& count = every.count;
 		const auto& score = every.score;
 		const auto& opers = every.opers;
 		auto total = std::accumulate(count.begin(), count.end(), 0);
 		for (auto left = total, i = 0; left; left -= count[i++]) {
 			if (count[i] == 0) continue;
-			snprintf(buf, sizeof(buf), "%-6d" "%8d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
+			size += snprintf(buf + size, sizeof(buf) - size,
+					"%-6d" "%8d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
 					board::tile::itov(i), u32(count[i]),
 					u32(score[i] / count[i]), u32(opers[i] / count[i]),
 					count[i] * 100.0 / total, left * 100.0 / total);
-			std::cout << buf << std::endl;
+			buf[size++] = '\n';
 		}
+		buf[size++] = '\0';
+
+		std::cout << buf << std::flush;
 	}
 
 	statistic  operator + (const statistic& stat) const {
