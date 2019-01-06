@@ -1538,13 +1538,13 @@ struct statistic {
 		winv = std::stol(opt.find("win",  std::to_string(winv)));
 
 		limit = loop * unit;
-		loop = 1;
 		format();
 
 		every = {};
 		total = {};
 		local = {};
 		local.time = moporgic::millisec();
+		loop = 1;
 
 		return limit;
 	}
