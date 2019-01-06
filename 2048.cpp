@@ -1824,7 +1824,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["evaluate"] += next_opts();
 			opts["evaluate"] += opts[""];
 			break;
-		case to_hash("-d"):
+		case to_hash("-s"):
 		case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
 			break;
@@ -1879,6 +1879,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["make"] += next_opts();
 			break;
 		case to_hash("-%"):
+		case to_hash("-I"):
 		case to_hash("--info"):
 			opts["info"] = next_opt("full");
 			opts["info"] += next_opts();
