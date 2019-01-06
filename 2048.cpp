@@ -51,7 +51,7 @@ public:
 		inline constexpr segment& operator =(const segment& s) = default;
 		inline constexpr numeric& operator =(numeric val) { return value = val; }
 		inline constexpr numeric& operator +=(numeric aupdv) {
-			value += updvu ? (std::abs(accum) / updvu) * aupdv : aupdv;
+			value += aupdv * (updvu ? (std::abs(accum) / updvu) : 1);
 			accum += aupdv;
 			updvu += std::abs(aupdv);
 			return value;
