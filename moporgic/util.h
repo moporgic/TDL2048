@@ -12,6 +12,7 @@
 #include <string>
 #include <cstdio>
 #include <iostream>
+#include <sstream>
 #include <random>
 #include <utility>
 
@@ -24,6 +25,14 @@
 #if !defined(__cplusplus) || __cplusplus < 201103L
 #define constexpr
 #define noexcept
+#endif
+
+#if defined(__GNUC__)
+#define inline_always inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define inline_always __forceinline
+#else
+#define inline_always inline
 #endif
 
 #define VA_ARG_1(V, ...) V
@@ -75,6 +84,22 @@ declare_extern_comparators_rel(ltype, rtype, __VA_ARGS__)
 #define declare_extern_comparators(ltype, rtype, cmp, ...)\
 declare_extern_comparators_with(ltype, rtype, lv.cmp, rv.cmp, __VA_ARGS__)
 
+namespace moporgic {
+template<typename run>
+struct invoke_on_destruct_t {
+	invoke_on_destruct_t(run fx = run()) : fx(fx) {}
+	invoke_on_destruct_t(const invoke_on_destruct_t&) = delete;
+	invoke_on_destruct_t(invoke_on_destruct_t&& move) { fx = std::exchange(move.fx, run()); }
+	~invoke_on_destruct_t() { if (fx) fx(); }
+	invoke_on_destruct_t& operator =(run x) { fx = x; return *this; }
+	invoke_on_destruct_t& operator =(const invoke_on_destruct_t&) = delete;
+	invoke_on_destruct_t& operator =(invoke_on_destruct_t&& move) { fx = std::exchange(move.fx, run()); return *this; }
+	run fx;
+};
+
+template<typename run> static inline
+invoke_on_destruct_t<run> invoke_on_destruct(run fx) { return invoke_on_destruct_t<run>(fx); }
+} /* moporgic */
 
 namespace moporgic {
 
@@ -107,33 +132,38 @@ uint32_t to_hash(const std::string& str) noexcept {
 class random {
 public:
 	template<typename engine_t = std::mt19937>
-	inline operator uint16_t() const { return (*engine<engine_t>())(); }
+	inline_always operator uint16_t() const { return (engine<engine_t>())(); }
 	template<typename engine_t = std::mt19937>
-	inline operator uint32_t() const { return (*engine<engine_t>())(); }
+	inline_always operator uint32_t() const { return (engine<engine_t>())(); }
 	template<typename engine_t = std::mt19937_64>
-	inline operator uint64_t() const { return (*engine<engine_t>())(); }
+	inline_always operator uint64_t() const { return (engine<engine_t>())(); }
 	template<typename engine_t = std::mt19937>
-	inline operator float() const { return std::uniform_real_distribution<float>(0.0f, 1.0f)(*engine<engine_t>()); }
+	inline_always operator float() const { return std::uniform_real_distribution<float>(0.0f, 1.0f)(engine<engine_t>()); }
 	template<typename engine_t = std::mt19937_64>
-	inline operator double() const { return std::uniform_real_distribution<double>(0.0, 1.0)(*engine<engine_t>()); }
+	inline_always operator double() const { return std::uniform_real_distribution<double>(0.0, 1.0)(engine<engine_t>()); }
 
 	template<typename engine_t = std::mt19937>
-	static inline void init() {
-		engine<engine_t>(new engine_t(moporgic::to_hash("moporgic")));
+	static inline_always engine_t& engine(engine_t* e = nullptr) {
+		static engine_t* p = nullptr;
+		if (e) { delete p; p = e; }
+		return (*p);
+	}
+	template<typename engine_t = std::mt19937>
+	static inline_always auto next() { return (engine<engine_t>())(); }
+
+	template<typename engine_t = std::mt19937, typename seed_t = decltype(engine_t::default_seed)>
+	static inline void init(seed_t seed = engine_t::default_seed) {
+		engine<engine_t>(new engine_t(seed));
 	}
 	template<typename engine_t = std::mt19937, typename seed_t = decltype(engine_t::default_seed)>
 	static inline void seed(seed_t seed = engine_t::default_seed) {
-		if (engine<engine_t>()) engine<engine_t>()->seed(seed);
-		else                    engine<engine_t>(new engine_t(seed));
+		if (&engine<engine_t>()) engine<engine_t>().seed(seed);
+		else                     init<engine_t>(seed);
 	}
-	template<typename engine_t = std::mt19937>
-	static inline auto next() { return (*engine<engine_t>())(); }
 protected:
-	template<typename engine_t>
-	inline static engine_t* engine(engine_t* e = nullptr) {
-		static engine_t* p = nullptr;
-		if (e) delete std::exchange(p, e);
-		return p;
+	static __attribute__((constructor)) void __init__(void) {
+		init<std::mt19937>(moporgic::to_hash("moporgic::mt19937"));
+		init<std::mt19937_64>(moporgic::to_hash("moporgic::mt19937_64"));
 	}
 };
 
@@ -383,13 +413,55 @@ std::istream& read_cast(std::istream& in, const type* begin, const type* end, co
 
 } /* moporgic */
 
+namespace moporgic { // reference://wordaligned.org/articles/cpp-streambufs
+
+class redirector {
+public:
+	redirector(std::ostream& dst, std::ostream& src) : src(src), sbuf(src.rdbuf(dst.rdbuf())) {}
+	~redirector() { src.rdbuf(sbuf); }
+private:
+	std::ostream& src;
+	std::streambuf* const sbuf;
+};
+
+class teestreambuf : public std::streambuf {
+public:
+	teestreambuf(std::streambuf* sb1, std::streambuf* sb2) : sb1(sb1), sb2(sb2) {}
+	virtual int sync() {
+		const auto r1 = sb1->pubsync();
+		const auto r2 = sb2->pubsync();
+		return ((r1 == 0) & (r2 == 0)) ? 0 : -1;
+	}
+	virtual int overflow(int c) {
+		constexpr auto eof = std::char_traits<char>::eof();
+		if (c == eof) return !eof;
+		const auto r1 = sb1->sputc(c);
+		const auto r2 = sb2->sputc(c);
+		return ((r1 == eof) | (r2 == eof)) ? eof : c;
+	}
+private:
+	std::streambuf* sb1;
+	std::streambuf* sb2;
+};
+
+class teestream : public std::ostream {
+public:
+	teestream(std::ostream& o1, std::ostream& o2 = std::cout) : std::ostream(&tbuf) , tbuf(o1.rdbuf(), o2.rdbuf()) {}
+private:
+	teestreambuf tbuf;
+};
+typedef teestream oostream;
+
+} /* moporgic */
+
+namespace std {
+static inline std::ostream& lf(std::ostream& os) { return os.put(os.widen('\n')); }
+}
+
 namespace moporgic {
 
 __attribute__((constructor))
-static void __util_init__(void) {
-	moporgic::random::init<std::mt19937>();
-	moporgic::random::init<std::mt19937_64>();
-}
+static void __util_init__(void) {}
 
 __attribute__((destructor))
 static void __util_exit__(void) {}
