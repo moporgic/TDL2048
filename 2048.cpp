@@ -1543,14 +1543,14 @@ struct statistic {
 		u32 thdnum = std::stol(opt.find("thread", "1"));
 		loop = loop / thdnum + (loop % thdnum && thdid < (loop % thdnum) ? 1 : 0);
 		limit = loop * unit;
-		loop = 1;
-		format();
+		format((thdnum > 1) ? (" [" + std::to_string(thdid) + "]") : "");
 
 		every = {};
 		total = {};
 		local = {};
 		for (u32 i = 0; i <= thdid; i++) moporgic::rand();
 		local.time = moporgic::millisec();
+		loop = 1;
 
 		return limit;
 	}
@@ -1566,16 +1566,13 @@ struct statistic {
 	format_t totalf;
 	format_t summaf;
 
-	void format() {
-		u32 thdid = std::stol(opts.find("thread#", "0"));
-		u32 thdnum = std::stol(opts.find("thread", "1"));
-		std::string suffix = (thdnum > 1) ? (" [" + std::to_string(thdid) + "]") : "";
-		if (!opts("padding")) opts["padding"] = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
-		u32 dec = opts["padding"];
+	void format(const std::string& suffix = "") {
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		summaf = "summary %llums %.2fops";
+		if (!opts("padding")) opts["padding"] = u32(limit / unit);
+		u32 dec = std::max(std::floor(std::log10(u32(opts["padding"]))) + 1, 3.0);
 		indexf = "%0" + std::to_string(dec) + PRIu64 "/%0" + std::to_string(dec) + PRIu64 " %" PRIu64 "ms %.2fops" + suffix;
 		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
 		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
