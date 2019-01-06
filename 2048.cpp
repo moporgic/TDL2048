@@ -1560,16 +1560,17 @@ struct statistic {
 	format_t totalf;
 	format_t summaf;
 
-	void format() {
+	void format(const std::string& suffix = "") {
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		summaf = "summary %llums %.2fops";
-		u32 dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
-		indexf = "%0" + std::to_string(dec) + PRIu64 "/%0" + std::to_string(dec) + PRIu64 " %" PRIu64 "ms %.2fops";
+		if (!opts("padding")) opts["padding"] = u32(limit / unit);
+		u32 dec = std::max(std::floor(std::log10(u32(opts["padding"]))) + 1, 3.0);
+		indexf = "%0" + std::to_string(dec) + PRIu64 "/%0" + std::to_string(dec) + PRIu64 " %" PRIu64 "ms %.2fops" + suffix;
 		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
 		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
-		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%" PRIu64 "ms %.2fops";
+		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%" PRIu64 "ms %.2fops" + suffix;
 	}
 
 	inline u64 operator++(int) { return (++loop) - 1; }
