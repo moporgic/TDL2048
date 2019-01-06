@@ -1544,7 +1544,7 @@ struct statistic {
 		loop = loop / thdnum + (loop % thdnum && thdid < (loop % thdnum) ? 1 : 0);
 		limit = loop * unit;
 		loop = 1;
-		format((thdnum > 1) ? (" [" + std::to_string(thdid) + "]") : "");
+		format();
 
 		every = {};
 		total = {};
@@ -1566,12 +1566,16 @@ struct statistic {
 	format_t totalf;
 	format_t summaf;
 
-	void format(const std::string& suffix = "") {
+	void format() {
+		u32 thdid = std::stol(opts.find("thread#", "0"));
+		u32 thdnum = std::stol(opts.find("thread", "1"));
+		std::string suffix = (thdnum > 1) ? (" [" + std::to_string(thdid) + "]") : "";
+		if (!opts("padding")) opts["padding"] = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
+		u32 dec = opts["padding"];
 //		indexf = "%03llu/%03llu %llums %.2fops";
 //		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
 //		summaf = "summary %llums %.2fops";
-		u32 dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
 		indexf = "%0" + std::to_string(dec) + PRIu64 "/%0" + std::to_string(dec) + PRIu64 " %" PRIu64 "ms %.2fops" + suffix;
 		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
 		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
@@ -1643,9 +1647,8 @@ struct statistic {
 		size += snprintf(buf + size, sizeof(buf) - size, summaf,
 				total.time / thdnum,
 				total.opers * 1000.0 * thdnum / total.time);
-		if (thdnum > 1) {
-			size += snprintf(buf + size, sizeof(buf) - size, " (%dx)", thdnum);
-		}
+		size += snprintf(buf + size, sizeof(buf) - size, " (%dx)",
+				thdnum);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / limit,
@@ -1686,7 +1689,7 @@ struct statistic {
 		total += stat.total;
 		local += stat.local;
 		every += stat.every;
-		if (loop < limit) format();
+		format();
 		return *this;
 	}
 };
