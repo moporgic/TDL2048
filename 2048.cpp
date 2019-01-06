@@ -135,7 +135,7 @@ public:
 		constexpr container() noexcept : clip<weight>() {}
 		constexpr container(const clip<weight>& w) : clip<weight>(w) {}
 	public:
-		weight make(u64 sign, size_t size) { return list<weight>::as(*this).emplace_back(weight(sign, size)); }
+		weight& make(u64 sign, size_t size) { return list<weight>::as(*this).emplace_back(weight(sign, size)); }
 		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? free(it->data()), list<weight>::as(*this).erase(it), erase(sign) + 1 : 0; }
 		weight* find(u64 sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
 		weight& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
@@ -143,26 +143,11 @@ public:
 		weight operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : weight(); }
 	};
 
-	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
-
-	static inline weight& make(u64 sign, size_t size) {
-		list<weight>::as(wghts()).push_back(weight(sign, size));
-		return wghts().back();
-	}
-	static inline weight* find(u64 sign, clip<weight> range = wghts()) {
-		return std::find_if(range.begin(), range.end(), [=](const weight& w) { return w.sign() == sign; });
-	}
-	static inline weight& at(u64 sign, clip<weight> range = wghts()) {
-		auto it = find(sign, range);
-		if (it != range.end()) return (*it);
-		throw std::out_of_range("weight::at");
-	}
-	static inline weight erase(u64 sign, bool del = true) {
-		weight w = at(sign);
-		if (del) free(w.data());
-		list<weight>::as(wghts()).erase(find(sign));
-		return w;
-	}
+	static inline weight::container& wghts() { static container w; return w; }
+	static inline weight& make(u64 sign, size_t size) { return wghts().make(sign, size); }
+	static inline weight* find(u64 sign) { return wghts().find(sign); }
+	static inline weight& at(u64 sign) { return wghts().at(sign); }
+	static inline size_t erase(u64 sign) { return wghts().erase(sign); }
 
 private:
 	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
@@ -194,7 +179,7 @@ public:
 		constexpr container() noexcept : clip<indexer>() {}
 		constexpr container(const clip<indexer>& i) : clip<indexer>(i) {}
 	public:
-		indexer make(u64 sign, mapper map) { return list<indexer>::as(*this).emplace_back(indexer(sign, map)); }
+		indexer& make(u64 sign, mapper map) { return list<indexer>::as(*this).emplace_back(indexer(sign, map)); }
 		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<indexer>::as(*this).erase(it), erase(sign) + 1 : 0; }
 		indexer* find(u64 sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
 		indexer& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
@@ -202,25 +187,11 @@ public:
 		indexer operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : indexer(); }
 	};
 
-	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
-
-	static inline indexer& make(u64 sign, mapper map) {
-		list<indexer>::as(idxrs()).push_back(indexer(sign, map));
-		return idxrs().back();
-	}
-	static inline indexer* find(u64 sign, clip<indexer> range = idxrs()) {
-		return std::find_if(range.begin(), range.end(), [=](const indexer& i) { return i.sign() == sign; });
-	}
-	static inline indexer& at(u64 sign, clip<indexer> range = idxrs()) {
-		const auto it = find(sign, range);
-		if (it != range.end()) return (*it);
-		throw std::out_of_range("indexer::at");
-	}
-	static inline indexer erase(u64 sign) {
-		indexer i = at(sign);
-		list<indexer>::as(idxrs()).erase(find(sign));
-		return i;
-	}
+	static inline indexer::container& idxrs() { static container i; return i; }
+	static inline indexer& make(u64 sign, mapper map) { return idxrs().make(sign, map); }
+	static inline indexer* find(u64 sign) { return idxrs().find(sign); }
+	static inline indexer& at(u64 sign) { return idxrs().at(sign); }
+	static inline size_t erase(u64 sign) { return idxrs().erase(sign); }
 
 private:
 	inline indexer(u64 sign, mapper map) : id(sign), map(map) {}
@@ -304,8 +275,8 @@ public:
 		constexpr container() noexcept : clip<feature>() {}
 		constexpr container(const clip<feature>& f) : clip<feature>(f) {}
 	public:
-		feature make(u64 wgt, u64 idx) { return list<feature>::as(*this).emplace_back(feature(weight::at(wgt), indexer::at(idx))); }
-		feature make(u64 sign) { return make(u32(sign >> 32), u32(sign)); }
+		feature& make(u64 wgt, u64 idx) { return list<feature>::as(*this).emplace_back(feature(weight::at(wgt), indexer::at(idx))); }
+		feature& make(u64 sign) { return make(u32(sign >> 32), u32(sign)); }
 		size_t erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
 		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<feature>::as(*this).erase(it), erase(sign) + 1 : 0; }
 		feature* find(u64 wgt, u64 idx) const { return find((wgt << 32) | idx); }
@@ -317,26 +288,11 @@ public:
 		feature operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : feature(); }
 	};
 
-	static inline clip<feature>& feats() { static clip<feature> f; return f; }
-
-	static inline feature& make(u64 wgt, u64 idx) {
-		list<feature>::as(feats()).push_back(feature(weight::at(wgt), indexer::at(idx)));
-		return feats().back();
-	}
-	static inline feature* find(u64 wght, u64 idxr, clip<feature> range = feats()) {
-		return std::find_if(range.begin(), range.end(),
-			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
-	}
-	static inline feature& at(u64 wgt, u64 idx, clip<feature> range = feats()) {
-		const auto it = find(wgt, idx, range);
-		if (it != range.end()) return (*it);
-		throw std::out_of_range("feature::at");
-	}
-	static inline feature erase(u64 wgt, u64 idx) {
-		feature f = at(wgt, idx);
-		list<feature>::as(feats()).erase(find(wgt, idx));
-		return f;
-	}
+	static inline feature::container& feats() { static container f; return f; }
+	static inline feature& make(u64 wgt, u64 idx) { return feats().make(wgt, idx); }
+	static inline feature* find(u64 wgt, u64 idx) { return feats().find(wgt, idx); }
+	static inline feature& at(u64 wgt, u64 idx) { return feats().at(wgt, idx); }
+	static inline size_t erase(u64 wgt, u64 idx) { return feats().erase(wgt, idx); }
 
 private:
 	inline feature(const weight& value, const indexer& index) : index(index), value(value) {}
