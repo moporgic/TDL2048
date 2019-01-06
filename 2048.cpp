@@ -140,7 +140,7 @@ public:
 		weight* find(u64 sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
 		weight& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
 		weight& operator[](u64 sign) const { return (*find(sign)); }
-		bool operator()(u64 sign) const { return find(sign) != end(); }
+		weight operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : weight(); }
 	};
 
 	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
@@ -199,7 +199,7 @@ public:
 		indexer* find(u64 sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
 		indexer& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
 		indexer& operator[](u64 sign) const { return (*find(sign)); }
-		bool operator()(u64 sign) const { return find(sign) != end(); }
+		indexer operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : indexer(); }
 	};
 
 	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
@@ -313,8 +313,8 @@ public:
 		feature& at(u64 wgt, u64 idx) const { return at((wgt << 32) | idx); }
 		feature& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("feature::at"); }
 		feature& operator[](u64 sign) const { return (*find(sign)); }
-		bool operator()(u64 wgt, u64 idx) const { return find(wgt, idx) != end(); }
-		bool operator()(u64 sign) const { return find(sign) != end(); }
+		feature operator()(u64 wgt, u64 idx) const { return operator()((wgt << 32) | idx); }
+		feature operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : feature(); }
 	};
 
 	static inline clip<feature>& feats() { static clip<feature> f; return f; }
