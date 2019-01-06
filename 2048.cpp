@@ -47,6 +47,7 @@ public:
 	inline numeric& operator [](u64 i) { return raw[i]; }
 	inline segment* data(u64 i = 0) { return raw + i; }
 	inline clip<numeric> value() const { return { raw, raw + length }; }
+	inline operator bool() const { return raw; }
 	declare_comparators(const weight&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
@@ -129,6 +130,19 @@ public:
 		}
 	}
 
+	class container : public clip<weight> {
+	public:
+		constexpr container() noexcept : clip<weight>() {}
+		constexpr container(const clip<weight>& w) : clip<weight>(w) {}
+	public:
+		weight make(u64 sign, size_t size) { return list<weight>::as(*this).emplace_back(weight(sign, size)); }
+		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? free(it->data()), list<weight>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		weight* find(u64 sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
+		weight& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
+		weight& operator[](u64 sign) const { return (*find(sign)); }
+		bool operator()(u64 sign) const { return find(sign) != end(); }
+	};
+
 	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
 
 	static inline weight& make(u64 sign, size_t size) {
@@ -172,7 +186,21 @@ public:
 	inline u64 sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return (*map)(b); }
+	inline operator bool() const { return map; }
 	declare_comparators(const indexer&, sign(), inline);
+
+	class container : public clip<indexer> {
+	public:
+		constexpr container() noexcept : clip<indexer>() {}
+		constexpr container(const clip<indexer>& i) : clip<indexer>(i) {}
+	public:
+		indexer make(u64 sign, mapper map) { return list<indexer>::as(*this).emplace_back(indexer(sign, map)); }
+		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<indexer>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		indexer* find(u64 sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
+		indexer& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
+		indexer& operator[](u64 sign) const { return (*find(sign)); }
+		bool operator()(u64 sign) const { return find(sign) != end(); }
+	};
 
 	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
 
@@ -214,6 +242,7 @@ public:
 
 	inline operator indexer() const { return index; }
 	inline operator weight() const { return value; }
+	inline operator bool() const { return index && value; }
 	declare_comparators(const feature&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
@@ -269,6 +298,24 @@ public:
 			break;
 		}
 	}
+
+	class container : public clip<feature> {
+	public:
+		constexpr container() noexcept : clip<feature>() {}
+		constexpr container(const clip<feature>& f) : clip<feature>(f) {}
+	public:
+		feature make(u64 wgt, u64 idx) { return list<feature>::as(*this).emplace_back(feature(weight::at(wgt), indexer::at(idx))); }
+		feature make(u64 sign) { return make(u32(sign >> 32), u32(sign)); }
+		size_t erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
+		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<feature>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		feature* find(u64 wgt, u64 idx) const { return find((wgt << 32) | idx); }
+		feature* find(u64 sign) const { return std::find_if(begin(), end(), [=](const feature& f) { return f.sign() == sign; }); }
+		feature& at(u64 wgt, u64 idx) const { return at((wgt << 32) | idx); }
+		feature& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("feature::at"); }
+		feature& operator[](u64 sign) const { return (*find(sign)); }
+		bool operator()(u64 wgt, u64 idx) const { return find(wgt, idx) != end(); }
+		bool operator()(u64 sign) const { return find(sign) != end(); }
+	};
 
 	static inline clip<feature>& feats() { static clip<feature> f; return f; }
 
