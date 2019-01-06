@@ -148,6 +148,7 @@ public:
 	static inline weight* find(u64 sign) { return wghts().find(sign); }
 	static inline weight& at(u64 sign) { return wghts().at(sign); }
 	static inline size_t erase(u64 sign) { return wghts().erase(sign); }
+	inline weight(u64 sign, const container& src = wghts()) : weight(src(sign)) {}
 
 private:
 	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
@@ -192,6 +193,7 @@ public:
 	static inline indexer* find(u64 sign) { return idxrs().find(sign); }
 	static inline indexer& at(u64 sign) { return idxrs().at(sign); }
 	static inline size_t erase(u64 sign) { return idxrs().erase(sign); }
+	inline indexer(u64 sign, const container& src = idxrs()) : indexer(src(sign)) {}
 
 private:
 	inline indexer(u64 sign, mapper map) : id(sign), map(map) {}
@@ -206,19 +208,21 @@ public:
 	inline feature(const feature& t) = default;
 	inline ~feature() {}
 
-	inline u64 sign() const { return (value.sign() << 32) | index.sign(); }
-	inline weight::numeric& operator [](const board& b) { return value[index(b)]; }
-	inline weight::numeric& operator [](u64 idx) { return value[idx]; }
-	inline u64 operator ()(const board& b) const { return index(b); }
+	inline u64 sign() const { return (raw.sign() << 32) | map.sign(); }
+	inline weight::numeric& operator [](const board& b) { return raw[map(b)]; }
+	inline weight::numeric& operator [](u64 idx) { return raw[idx]; }
+	inline u64 operator ()(const board& b) const { return map(b); }
 
-	inline operator indexer() const { return index; }
-	inline operator weight() const { return value; }
-	inline operator bool() const { return index && value; }
+	inline indexer index() const { return map; }
+	inline weight  value() const { return raw; }
+	inline operator indexer() const { return map; }
+	inline operator weight()  const { return raw; }
+	inline operator bool() const { return map && raw; }
 	declare_comparators(const feature&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
-		auto& index = f.index;
-		auto& value = f.value;
+		auto& index = f.map;
+		auto& value = f.raw;
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -231,8 +235,8 @@ public:
 		return out;
 	}
 	friend std::istream& operator >>(std::istream& in, feature& f) {
-		auto& index = f.index;
-		auto& value = f.value;
+		auto& index = f.map;
+		auto& value = f.raw;
 		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
@@ -293,12 +297,13 @@ public:
 	static inline feature* find(u64 wgt, u64 idx) { return feats().find(wgt, idx); }
 	static inline feature& at(u64 wgt, u64 idx) { return feats().at(wgt, idx); }
 	static inline size_t erase(u64 wgt, u64 idx) { return feats().erase(wgt, idx); }
+	inline feature(u64 wgt, u64 idx, const container& src = feats()) : feature(src(wgt, idx)) {}
 
 private:
-	inline feature(const weight& value, const indexer& index) : index(index), value(value) {}
+	inline feature(const weight& value, const indexer& index) : map(index), raw(value) {}
 
-	indexer index;
-	weight value;
+	indexer map;
+	weight raw;
 };
 
 namespace utils {
@@ -1372,8 +1377,8 @@ void list_mapping() {
 		char buf[64];
 		std::string feats;
 		for (feature f : feature::feats()) {
-			if (weight(f) == w) {
-				snprintf(buf, sizeof(buf), " %08" PRIx64, indexer(f).sign());
+			if (f.value() == w) {
+				snprintf(buf, sizeof(buf), " %08" PRIx64, f.index().sign());
 				feats += buf;
 			}
 		}
