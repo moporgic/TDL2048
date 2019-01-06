@@ -144,10 +144,8 @@ public:
 	};
 
 	static inline weight::container& wghts() { static container w; return w; }
-	static inline weight& make(u64 sign, size_t size) { return wghts().make(sign, size); }
-	static inline weight* find(u64 sign) { return wghts().find(sign); }
-	static inline weight& at(u64 sign) { return wghts().at(sign); }
-	static inline size_t erase(u64 sign) { return wghts().erase(sign); }
+	static inline weight& make(u64 sign, size_t size, container& src = wghts()) { return src.make(sign, size); }
+	static inline size_t erase(u64 sign, container& src = wghts()) { return src.erase(sign); }
 	inline weight(u64 sign, const container& src = wghts()) : weight(src(sign)) {}
 
 private:
@@ -189,10 +187,8 @@ public:
 	};
 
 	static inline indexer::container& idxrs() { static container i; return i; }
-	static inline indexer& make(u64 sign, mapper map) { return idxrs().make(sign, map); }
-	static inline indexer* find(u64 sign) { return idxrs().find(sign); }
-	static inline indexer& at(u64 sign) { return idxrs().at(sign); }
-	static inline size_t erase(u64 sign) { return idxrs().erase(sign); }
+	static inline indexer& make(u64 sign, mapper map, container& src = idxrs()) { return src.make(sign, map); }
+	static inline size_t erase(u64 sign, container& src = idxrs()) { return src.erase(sign); }
 	inline indexer(u64 sign, const container& src = idxrs()) : indexer(src(sign)) {}
 
 private:
@@ -243,9 +239,9 @@ public:
 		default:
 		case 0:
 			read_cast<u32>(in, code);
-			index = indexer::at(code);
+			index = indexer(code);
 			read_cast<u32>(in, code);
-			value = weight::at(code);
+			value = weight(code);
 			break;
 		}
 		return in;
@@ -279,7 +275,7 @@ public:
 		constexpr container() noexcept : clip<feature>() {}
 		constexpr container(const clip<feature>& f) : clip<feature>(f) {}
 	public:
-		feature& make(u64 wgt, u64 idx) { return list<feature>::as(*this).emplace_back(feature(weight::at(wgt), indexer::at(idx))); }
+		feature& make(u64 wgt, u64 idx) { return list<feature>::as(*this).emplace_back(feature(weight(wgt), indexer(idx))); }
 		feature& make(u64 sign) { return make(u32(sign >> 32), u32(sign)); }
 		size_t erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
 		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<feature>::as(*this).erase(it), erase(sign) + 1 : 0; }
@@ -293,10 +289,8 @@ public:
 	};
 
 	static inline feature::container& feats() { static container f; return f; }
-	static inline feature& make(u64 wgt, u64 idx) { return feats().make(wgt, idx); }
-	static inline feature* find(u64 wgt, u64 idx) { return feats().find(wgt, idx); }
-	static inline feature& at(u64 wgt, u64 idx) { return feats().at(wgt, idx); }
-	static inline size_t erase(u64 wgt, u64 idx) { return feats().erase(wgt, idx); }
+	static inline feature& make(u64 wgt, u64 idx, container& src = feats()) { return src.make(wgt, idx); }
+	static inline size_t erase(u64 wgt, u64 idx, container& src = feats()) { return src.erase(wgt, idx); }
 	inline feature(u64 wgt, u64 idx, const container& src = feats()) : feature(src(wgt, idx)) {}
 
 private:
@@ -726,7 +720,7 @@ struct indexhdr {
 
 	static __attribute__((constructor)) void init() {
 		auto make = [&](u64 sign, indexer::mapper func) {
-			if (indexer::find(sign) == indexer::idxrs().end()) indexer::make(sign, func);
+			if (!indexer(sign)) indexer::make(sign, func);
 		};
 		make(0x00012367, utils::index6t<0x0,0x1,0x2,0x3,0x6,0x7>);
 		make(0x0037bfae, utils::index6t<0x3,0x7,0xb,0xf,0xa,0xe>);
@@ -1294,27 +1288,26 @@ u32 make_network(utils::options::option opt) {
 				size = std::stoull(info, nullptr, 0);
 			}
 			if (init.find_first_of("{}") != npos && init != "{}") {
-				weight src = weight::at(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
+				weight src(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
 				size = std::max(size, src.size());
 			} else if (init == "{}") {
 				size = 0;
 			}
-			if (weight::find(sign) != weight::wghts().end() && weight::at(sign).size() != size)
+			if (weight(sign) && weight(sign).size() != size)
 				weight::erase(sign);
-			if (weight::find(sign) == weight::wghts().end() && size) {
-				weight::make(sign, size);
+			if (!weight(sign) && size) {
+				weight dst = weight::make(sign, size);
 				if (init.find_first_of("{}") != npos && init != "{}") {
-					weight src = weight::at(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
-					weight dst = weight::at(sign);
+					weight src(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
 					for (size_t n = 0; n < dst.size(); n += src.size()) {
 						std::copy_n(src.data(), src.size(), dst.data() + n);
 					}
 				} else if (init.find_first_of("0123456789.-") == 0) {
 					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
-					std::fill_n(weight::at(sign).data(), weight::at(sign).size(), val);
+					std::fill_n(dst.data(), dst.size(), val);
 				}
 			}
-			if (weight::find(sign) != weight::wghts().end()) wght = sign;
+			wght = weight(sign).sign();
 		}
 
 		if (itok.size()) {
@@ -1324,18 +1317,15 @@ u32 make_network(utils::options::option opt) {
 			u64 msko = itok.find('|') != npos ? std::stoull(itok.substr(itok.find('|') + 1), nullptr, 16) : 0ull;
 			u64 hash = std::stoull(name, nullptr, 16);
 			u64 sign = (hash & mska) | msko;
-			if (indexer::find(sign) == indexer::idxrs().end()) {
-				if (indexer::find(hash) != indexer::idxrs().end()) {
-					indexer::make(sign, indexer::at(hash).index());
-				} else {
-					auto ntahdr = std::bind(utils::indexnta, std::placeholders::_1, utils::hashpatt(name));
-					indexer::make(sign, utils::indexhdr(ntahdr));
-				}
+			if (!indexer(sign)) {
+				indexer::mapper index = indexer(hash).index();
+				if (!index) index = utils::indexhdr(std::bind(utils::indexnta, std::placeholders::_1, utils::hashpatt(name)));
+				indexer::make(sign, index);
 			}
-			if (indexer::find(sign) != indexer::idxrs().end()) idxr = sign;
+			idxr = indexer(sign).sign();
 		}
 
-		if (wght && idxr && feature::find(wght, idxr) == feature::feats().end()) feature::make(wght, idxr);
+		if (wght && idxr && !feature(wght, idxr)) feature::make(wght, idxr);
 	}
 
 	return 0;
