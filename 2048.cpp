@@ -2037,7 +2037,7 @@ int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (!opts("optimize")) opts["optimize"] = opts("evaluate") ? 0 : 1000;
 	if (!opts("evaluate")) opts["evaluate"] = opts("optimize") ? 0 : 1000;
-	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
+	if (!opts("alpha")) opts["alpha"] = 1.0, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 
 	utils::logging(opts["logging"]);
