@@ -48,6 +48,7 @@ public:
 	inline numeric& operator [](u64 i) { return raw[i]; }
 	inline segment* data(u64 i = 0) { return raw + i; }
 	inline clip<numeric> value() const { return { raw, raw + length }; }
+	inline operator bool() const { return raw; }
 	declare_comparators(const weight&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
@@ -130,26 +131,23 @@ public:
 		}
 	}
 
-	static inline clip<weight>& wghts() { static clip<weight> w; return w; }
+	class container : public clip<weight> {
+	public:
+		constexpr container() noexcept : clip<weight>() {}
+		constexpr container(const clip<weight>& w) : clip<weight>(w) {}
+	public:
+		weight& make(u64 sign, size_t size) { return list<weight>::as(*this).emplace_back(weight(sign, size)); }
+		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? free(it->data()), list<weight>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		weight* find(u64 sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
+		weight& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
+		weight& operator[](u64 sign) const { return (*find(sign)); }
+		weight operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : weight(); }
+	};
 
-	static inline weight& make(u64 sign, size_t size) {
-		list<weight>::as(wghts()).push_back(weight(sign, size));
-		return wghts().back();
-	}
-	static inline weight* find(u64 sign, clip<weight> range = wghts()) {
-		return std::find_if(range.begin(), range.end(), [=](const weight& w) { return w.sign() == sign; });
-	}
-	static inline weight& at(u64 sign, clip<weight> range = wghts()) {
-		auto it = find(sign, range);
-		if (it != range.end()) return (*it);
-		throw std::out_of_range("weight::at");
-	}
-	static inline weight erase(u64 sign, bool del = true) {
-		weight w = at(sign);
-		if (del) free(w.data());
-		list<weight>::as(wghts()).erase(find(sign));
-		return w;
-	}
+	static inline weight::container& wghts() { static container w; return w; }
+	static inline weight& make(u64 sign, size_t size, container& src = wghts()) { return src.make(sign, size); }
+	static inline size_t erase(u64 sign, container& src = wghts()) { return src.erase(sign); }
+	inline weight(u64 sign, const container& src = wghts()) : weight(src(sign)) {}
 
 private:
 	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
@@ -173,27 +171,26 @@ public:
 	inline u64 sign() const { return id; }
 	inline mapper index() const { return map; }
 	inline u64 operator ()(const board& b) const { return (*map)(b); }
+	inline operator bool() const { return map; }
 	declare_comparators(const indexer&, sign(), inline);
 
-	static inline clip<indexer>& idxrs() { static clip<indexer> i; return i; }
+	class container : public clip<indexer> {
+	public:
+		constexpr container() noexcept : clip<indexer>() {}
+		constexpr container(const clip<indexer>& i) : clip<indexer>(i) {}
+	public:
+		indexer& make(u64 sign, mapper map) { return list<indexer>::as(*this).emplace_back(indexer(sign, map)); }
+		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<indexer>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		indexer* find(u64 sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
+		indexer& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
+		indexer& operator[](u64 sign) const { return (*find(sign)); }
+		indexer operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : indexer(); }
+	};
 
-	static inline indexer& make(u64 sign, mapper map) {
-		list<indexer>::as(idxrs()).push_back(indexer(sign, map));
-		return idxrs().back();
-	}
-	static inline indexer* find(u64 sign, clip<indexer> range = idxrs()) {
-		return std::find_if(range.begin(), range.end(), [=](const indexer& i) { return i.sign() == sign; });
-	}
-	static inline indexer& at(u64 sign, clip<indexer> range = idxrs()) {
-		const auto it = find(sign, range);
-		if (it != range.end()) return (*it);
-		throw std::out_of_range("indexer::at");
-	}
-	static inline indexer erase(u64 sign) {
-		indexer i = at(sign);
-		list<indexer>::as(idxrs()).erase(find(sign));
-		return i;
-	}
+	static inline indexer::container& idxrs() { static container i; return i; }
+	static inline indexer& make(u64 sign, mapper map, container& src = idxrs()) { return src.make(sign, map); }
+	static inline size_t erase(u64 sign, container& src = idxrs()) { return src.erase(sign); }
+	inline indexer(u64 sign, const container& src = idxrs()) : indexer(src(sign)) {}
 
 private:
 	inline indexer(u64 sign, mapper map) : id(sign), map(map) {}
@@ -208,18 +205,21 @@ public:
 	inline feature(const feature& t) = default;
 	inline ~feature() {}
 
-	inline u64 sign() const { return (value.sign() << 32) | index.sign(); }
-	inline weight::numeric& operator [](const board& b) { return value[index(b)]; }
-	inline weight::numeric& operator [](u64 idx) { return value[idx]; }
-	inline u64 operator ()(const board& b) const { return index(b); }
+	inline u64 sign() const { return (raw.sign() << 32) | map.sign(); }
+	inline weight::numeric& operator [](const board& b) { return raw[map(b)]; }
+	inline weight::numeric& operator [](u64 idx) { return raw[idx]; }
+	inline u64 operator ()(const board& b) const { return map(b); }
 
-	inline operator indexer() const { return index; }
-	inline operator weight() const { return value; }
+	inline indexer index() const { return map; }
+	inline weight  value() const { return raw; }
+	inline operator indexer() const { return map; }
+	inline operator weight()  const { return raw; }
+	inline operator bool() const { return map && raw; }
 	declare_comparators(const feature&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
-		auto& index = f.index;
-		auto& value = f.value;
+		auto& index = f.map;
+		auto& value = f.raw;
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -232,17 +232,17 @@ public:
 		return out;
 	}
 	friend std::istream& operator >>(std::istream& in, feature& f) {
-		auto& index = f.index;
-		auto& value = f.value;
+		auto& index = f.map;
+		auto& value = f.raw;
 		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
 		default:
 		case 0:
 			read_cast<u32>(in, code);
-			index = indexer::at(code);
+			index = indexer(code);
 			read_cast<u32>(in, code);
-			value = weight::at(code);
+			value = weight(code);
 			break;
 		}
 		return in;
@@ -271,32 +271,34 @@ public:
 		}
 	}
 
-	static inline clip<feature>& feats() { static clip<feature> f; return f; }
+	class container : public clip<feature> {
+	public:
+		constexpr container() noexcept : clip<feature>() {}
+		constexpr container(const clip<feature>& f) : clip<feature>(f) {}
+	public:
+		feature& make(u64 wgt, u64 idx) { return list<feature>::as(*this).emplace_back(feature(weight(wgt), indexer(idx))); }
+		feature& make(u64 sign) { return make(u32(sign >> 32), u32(sign)); }
+		size_t erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
+		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<feature>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		feature* find(u64 wgt, u64 idx) const { return find((wgt << 32) | idx); }
+		feature* find(u64 sign) const { return std::find_if(begin(), end(), [=](const feature& f) { return f.sign() == sign; }); }
+		feature& at(u64 wgt, u64 idx) const { return at((wgt << 32) | idx); }
+		feature& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("feature::at"); }
+		feature& operator[](u64 sign) const { return (*find(sign)); }
+		feature operator()(u64 wgt, u64 idx) const { return operator()((wgt << 32) | idx); }
+		feature operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : feature(); }
+	};
 
-	static inline feature& make(u64 wgt, u64 idx) {
-		list<feature>::as(feats()).push_back(feature(weight::at(wgt), indexer::at(idx)));
-		return feats().back();
-	}
-	static inline feature* find(u64 wght, u64 idxr, clip<feature> range = feats()) {
-		return std::find_if(range.begin(), range.end(),
-			[=](const feature& f) { return weight(f).sign() == wght && indexer(f).sign() == idxr; });
-	}
-	static inline feature& at(u64 wgt, u64 idx, clip<feature> range = feats()) {
-		const auto it = find(wgt, idx, range);
-		if (it != range.end()) return (*it);
-		throw std::out_of_range("feature::at");
-	}
-	static inline feature erase(u64 wgt, u64 idx) {
-		feature f = at(wgt, idx);
-		list<feature>::as(feats()).erase(find(wgt, idx));
-		return f;
-	}
+	static inline feature::container& feats() { static container f; return f; }
+	static inline feature& make(u64 wgt, u64 idx, container& src = feats()) { return src.make(wgt, idx); }
+	static inline size_t erase(u64 wgt, u64 idx, container& src = feats()) { return src.erase(wgt, idx); }
+	inline feature(u64 wgt, u64 idx, const container& src = feats()) : feature(src(wgt, idx)) {}
 
 private:
-	inline feature(const weight& value, const indexer& index) : index(index), value(value) {}
+	inline feature(const weight& value, const indexer& index) : map(index), raw(value) {}
 
-	indexer index;
-	weight value;
+	indexer map;
+	weight raw;
 };
 
 class transposition {
@@ -690,9 +692,10 @@ private:
 	}
 };
 
-void logging(std::string path) {
+void logging(utils::options::option opt) {
 	static std::ofstream logout;
 	if (logout.is_open()) return;
+	std::string path = opt.size() ? opt.back() : "";
 	logout.open(path, std::ios::out | std::ios::app);
 	if (logout.is_open()) {
 		static moporgic::teestream tee(std::cout, logout);
@@ -1009,7 +1012,7 @@ struct indexhdr {
 
 	static __attribute__((constructor)) void init() {
 		auto make = [&](u64 sign, indexer::mapper func) {
-			if (indexer::find(sign) == indexer::idxrs().end()) indexer::make(sign, func);
+			if (!indexer(sign)) indexer::make(sign, func);
 		};
 		make(0x00012367, utils::index6t<0x0,0x1,0x2,0x3,0x6,0x7>);
 		make(0x0037bfae, utils::index6t<0x3,0x7,0xb,0xf,0xa,0xe>);
@@ -1577,27 +1580,26 @@ u32 make_network(utils::options::option opt) {
 				size = std::stoull(info, nullptr, 0);
 			}
 			if (init.find_first_of("{}") != npos && init != "{}") {
-				weight src = weight::at(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
+				weight src(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
 				size = std::max(size, src.size());
 			} else if (init == "{}") {
 				size = 0;
 			}
-			if (weight::find(sign) != weight::wghts().end() && weight::at(sign).size() != size)
+			if (weight(sign) && weight(sign).size() != size)
 				weight::erase(sign);
-			if (weight::find(sign) == weight::wghts().end() && size) {
-				weight::make(sign, size);
+			if (!weight(sign) && size) {
+				weight dst = weight::make(sign, size);
 				if (init.find_first_of("{}") != npos && init != "{}") {
-					weight src = weight::at(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
-					weight dst = weight::at(sign);
+					weight src(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
 					for (size_t n = 0; n < dst.size(); n += src.size()) {
 						std::copy_n(src.data(), src.size(), dst.data() + n);
 					}
 				} else if (init.find_first_of("0123456789.-") == 0) {
 					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
-					std::fill_n(weight::at(sign).data(), weight::at(sign).size(), val);
+					std::fill_n(dst.data(), dst.size(), val);
 				}
 			}
-			if (weight::find(sign) != weight::wghts().end()) wght = sign;
+			wght = weight(sign).sign();
 		}
 
 		if (itok.size()) {
@@ -1607,18 +1609,15 @@ u32 make_network(utils::options::option opt) {
 			u64 msko = itok.find('|') != npos ? std::stoull(itok.substr(itok.find('|') + 1), nullptr, 16) : 0ull;
 			u64 hash = std::stoull(name, nullptr, 16);
 			u64 sign = (hash & mska) | msko;
-			if (indexer::find(sign) == indexer::idxrs().end()) {
-				if (indexer::find(hash) != indexer::idxrs().end()) {
-					indexer::make(sign, indexer::at(hash).index());
-				} else {
-					auto ntahdr = std::bind(utils::indexnta, std::placeholders::_1, utils::hashpatt(name));
-					indexer::make(sign, utils::indexhdr(ntahdr));
-				}
+			if (!indexer(sign)) {
+				indexer::mapper index = indexer(hash).index();
+				if (!index) index = utils::indexhdr(std::bind(utils::indexnta, std::placeholders::_1, utils::hashpatt(name)));
+				indexer::make(sign, index);
 			}
-			if (indexer::find(sign) != indexer::idxrs().end()) idxr = sign;
+			idxr = indexer(sign).sign();
 		}
 
-		if (wght && idxr && feature::find(wght, idxr) == feature::feats().end()) feature::make(wght, idxr);
+		if (wght && idxr && !feature(wght, idxr)) feature::make(wght, idxr);
 	}
 
 	return 0;
@@ -1660,8 +1659,8 @@ void list_mapping() {
 		char buf[64];
 		std::string feats;
 		for (feature f : feature::feats()) {
-			if (weight(f) == w) {
-				snprintf(buf, sizeof(buf), " %08" PRIx64, indexer(f).sign());
+			if (f.value() == w) {
+				snprintf(buf, sizeof(buf), " %08" PRIx64, f.index().sign());
 				feats += buf;
 			}
 		}
@@ -2322,8 +2321,9 @@ utils::options parse(int argc, const char* argv[]) {
 		switch (to_hash(label)) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
-			opts["alpha"] = next_opt(std::to_string(state::alpha()));
-			opts["alpha"] += next_opts();
+			opts[""] = next_opts();
+			if (opts[""].empty()) (opts[""] += "0.1") += "norm";
+			opts["alpha"] = opts[""];
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
@@ -2353,8 +2353,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--weight-input-output"):
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			label = "2048." + label.substr(label.find_first_not_of('-'), 1);
-			opts[""] = next_opt(label);
+			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
 			opts["load"] += opts[""];
 			opts["save"] += opts[""];
@@ -2367,8 +2366,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--feature-input"):
 		case to_hash("-ni"):
 		case to_hash("--network-input"):
-			label = "2048." + label.substr(label.find_first_not_of('-'), 1);
-			opts[""] = next_opt(label);
+			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
 			opts["load"] += opts[""];
 			break;
@@ -2380,10 +2378,13 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--feature-output"):
 		case to_hash("-no"):
 		case to_hash("--network-output"):
-			label = "2048." + label.substr(label.find_first_not_of('-'), 1);
-			opts[""] = next_opt(label);
+			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
-			opts["save"] += opts[""];
+//			opts["save"] += opts[""];
+			for (auto opt : opts[""]) { // e.g. "-o 2048.x" indicates logging
+				auto flag = opt[opt.find('.') + 1] != 'x' ? "save" : "logging";
+				opts[flag] += opt;
+			}
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
@@ -2393,9 +2394,12 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--network"):
 		case to_hash("-wf"):
 		case to_hash("-fw"):
-			opts["make"] += next_opts();
+			opts[""] = next_opt("default");
+			opts[""] += next_opts();
+			opts["make"] += opts[""];
 			break;
 		case to_hash("-%"):
+		case to_hash("-I"):
 		case to_hash("--info"):
 			opts["info"] = next_opt("full");
 			opts["info"] += next_opts();
@@ -2473,7 +2477,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-x"):
 		case to_hash("-log"):
 		case to_hash("--logging"):
-			opts["logging"] = next_opt("2048.x");
+			opts["logging"] = next_opt(opts.find("make", argv[0]) + ".x");
 			break;
 		case to_hash("-"):
 		case to_hash("-|"):
@@ -2481,8 +2485,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts = {};
 			break;
 		default:
-			label = label.substr(label.find_first_not_of('-'));
-			opts["options"][label] += next_opts();
+			opts["options"][label.substr(label.find_first_not_of('-'))] += next_opts();
 			break;
 		}
 	}
