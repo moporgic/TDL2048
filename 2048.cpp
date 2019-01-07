@@ -1446,9 +1446,9 @@ struct state {
 
 	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
 	inline static numeric& alpha(numeric a) { return (state::alpha() = a); }
-	inline static u32& lambda() { static u32 l = 0; return l; }
+	inline static u32& lambda() { static u32 l = 0.5; return l; }
 	inline static u32& lambda(u32 l) { return (state::lambda() = l); }
-	inline static u32& step() { static u32 n = 1; return n; }
+	inline static u32& step() { static u32 n = 5; return n; }
 	inline static u32& step(u32 n) { return (state::step() = n); }
 };
 struct select {
@@ -1892,9 +1892,6 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-l"):
 		case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
-			break;
-		case to_hash("-n"):
-		case to_hash("--step"):
 			opts["step"] = next_opt("5");
 			break;
 		case to_hash("-t"):
