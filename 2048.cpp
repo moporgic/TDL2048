@@ -1885,8 +1885,9 @@ utils::options parse(int argc, const char* argv[]) {
 		switch (to_hash(label)) {
 		case to_hash("-a"):
 		case to_hash("--alpha"):
-			opts["alpha"] = next_opt(std::to_string(state::alpha()));
-			opts["alpha"] += next_opts();
+			opts[""] = next_opts();
+			if (opts[""].empty()) (opts[""] += "0.1") += "norm";
+			opts["alpha"] = opts[""];
 			break;
 		case to_hash("-l"):
 		case to_hash("--lambda"):
