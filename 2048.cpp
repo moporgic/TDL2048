@@ -401,9 +401,10 @@ private:
 	}
 };
 
-void logging(std::string path) {
+void logging(utils::options::option opt) {
 	static std::ofstream logout;
 	if (logout.is_open()) return;
+	std::string path = opt.size() ? opt.back() : "";
 	logout.open(path, std::ios::out | std::ios::app);
 	if (logout.is_open()) {
 		static moporgic::teestream tee(std::cout, logout);
