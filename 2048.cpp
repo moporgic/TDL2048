@@ -1834,8 +1834,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--weight-input-output"):
 		case to_hash("-fio"):
 		case to_hash("--feature-input-output"):
-			label = "2048." + label.substr(label.find_first_not_of('-'), 1);
-			opts[""] = next_opt(label);
+			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
 			opts["load"] += opts[""];
 			opts["save"] += opts[""];
@@ -1848,8 +1847,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--feature-input"):
 		case to_hash("-ni"):
 		case to_hash("--network-input"):
-			label = "2048." + label.substr(label.find_first_not_of('-'), 1);
-			opts[""] = next_opt(label);
+			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
 			opts["load"] += opts[""];
 			break;
@@ -1861,10 +1859,13 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--feature-output"):
 		case to_hash("-no"):
 		case to_hash("--network-output"):
-			label = "2048." + label.substr(label.find_first_not_of('-'), 1);
-			opts[""] = next_opt(label);
+			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
-			opts["save"] += opts[""];
+//			opts["save"] += opts[""];
+			for (auto opt : opts[""]) { // e.g. "-o 2048.x" indicates logging
+				auto flag = opt[opt.find('.') + 1] != 'x' ? "save" : "logging";
+				opts[flag] += opt;
+			}
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
@@ -1874,7 +1875,9 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--network"):
 		case to_hash("-wf"):
 		case to_hash("-fw"):
-			opts["make"] += next_opts();
+			opts[""] = next_opt("default");
+			opts[""] += next_opts();
+			opts["make"] += opts[""];
 			break;
 		case to_hash("-%"):
 		case to_hash("-I"):
@@ -1927,7 +1930,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-x"):
 		case to_hash("-log"):
 		case to_hash("--logging"):
-			opts["logging"] = next_opt("2048.x");
+			opts["logging"] = next_opt(opts.find("make", argv[0]) + ".x");
 			break;
 		case to_hash("-"):
 		case to_hash("-|"):
@@ -1935,8 +1938,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts = {};
 			break;
 		default:
-			label = label.substr(label.find_first_not_of('-'));
-			opts["options"][label] += next_opts();
+			opts["options"][label.substr(label.find_first_not_of('-'))] += next_opts();
 			break;
 		}
 	}
