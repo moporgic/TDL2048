@@ -45,12 +45,17 @@ typedef float numeric;
 namespace shm {
 typedef std::pair<int, void*> shm_t;
 std::vector<shm_t> info;
-std::string hook = "./2048";
+
+const char* hook(const std::string& hpth = "") {
+	static std::string path = "./2048";
+	if (hpth.size()) path = hpth;
+	return path.c_str();
+}
 
 template<typename type>
 type* alloc(size_t size, byte seq = 0) {
 	if (++seq == 0) throw std::bad_alloc();
-	auto key = ftok(hook.c_str(), seq);
+	auto key = ftok(hook(), seq);
 	int id = shmget(key, size * sizeof(type), IPC_CREAT | IPC_EXCL | 0600);
 	void* shm = shmat(id, nullptr, 0);
 	if (shm == cast<void*>(-1ull)) {
@@ -2030,7 +2035,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "agent = " << opts["thread"] << "x" << std::endl;
-	std::cout << "shm = " << (shm::hook = opts["shared-memory"]["hook"]) << std::endl;
+	std::cout << "shm = " << shm::hook(opts["shared-memory"]["hook"]) << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
