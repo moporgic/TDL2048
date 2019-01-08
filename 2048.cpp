@@ -1554,7 +1554,12 @@ struct statistic {
 		}
 	} every;
 
-	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
+	struct execinfo {
+		u32 thdid;
+		u32 thdnum;
+	} info;
+
+	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}), info({0, 1}) {}
 	statistic(const utils::options::option& opt) : statistic() { init(opt); }
 	statistic(const statistic& stat) = default;
 
@@ -1576,16 +1581,16 @@ struct statistic {
 		unit = std::stol(opt.find("unit", std::to_string(unit)));
 		winv = std::stol(opt.find("win",  std::to_string(winv)));
 
-		u32 thdid = std::stol(opt.find("thread#", "0"));
-		u32 thdnum = std::stol(opt.find("thread", "1"));
-		loop = loop / thdnum + (loop % thdnum && thdid < (loop % thdnum) ? 1 : 0);
+		info.thdid = std::stol(opt.find("thread#", "0"));
+		info.thdnum = std::stol(opt.find("thread", "1"));
+		loop = loop / info.thdnum + (loop % info.thdnum && info.thdid < (loop % info.thdnum) ? 1 : 0);
 		limit = loop * unit;
-		format((thdnum > 1) ? (" [" + std::to_string(thdid) + "]") : "");
+		format(0, (info.thdnum > 1) ? (" [" + std::to_string(info.thdid) + "]") : "");
 
 		every = {};
 		total = {};
 		local = {};
-		for (u32 i = 0; i <= thdid; i++) moporgic::rand();
+		for (u32 i = 0; i <= info.thdid; i++) moporgic::rand();
 		local.time = moporgic::millisec();
 		loop = 1;
 
@@ -1675,13 +1680,10 @@ struct statistic {
 		char buf[1024];
 		u32 size = 0;
 
-		u32 thdnum = std::stol(opts.find("thread", "1"));
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, summaf,
-				total.time / thdnum,
-				total.opers * 1000.0 * thdnum / total.time);
-		size += snprintf(buf + size, sizeof(buf) - size, " (%dx)",
-				thdnum);
+				total.time / info.thdnum,
+				total.opers * 1000.0 * info.thdnum / total.time);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / limit,
@@ -1722,7 +1724,8 @@ struct statistic {
 		total += stat.total;
 		local += stat.local;
 		every += stat.every;
-		format();
+		u32 dec = (std::string(summaf).find('%') - std::string(summaf).find('y') + 5) / 2;
+		format(dec, (info.thdnum > 1) ? (" (" + std::to_string(info.thdnum) + "x)") : "");
 		return *this;
 	}
 };
