@@ -2055,7 +2055,6 @@ int main(int argc, const char* argv[]) {
 		if (thdid == 0) while (wait(nullptr) > 0); else return 0;
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
 		if (opts["info"] == "full") stat.summary();
-		shm::free(stats);
 	}
 
 	utils::save_network(opts["save"]);
@@ -2070,7 +2069,6 @@ int main(int argc, const char* argv[]) {
 		if (thdid == 0) while (wait(nullptr) > 0); else return 0;
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
 		if (opts["info"] != "none") stat.summary();
-		shm::free(stats);
 	}
 
 	std::cout << std::endl;
