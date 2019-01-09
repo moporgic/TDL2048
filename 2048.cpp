@@ -43,11 +43,10 @@ namespace moporgic {
 typedef float numeric;
 
 namespace shm {
-typedef std::pair<int, void*> shm_t;
-std::vector<shm_t> info;
+std::map<void*, int> info;
 
 const char* hook(const std::string& hpth = "") {
-	static std::string path = "./2048";
+	static std::string path = ".";
 	if (hpth.size()) path = hpth;
 	return path.c_str();
 }
@@ -62,22 +61,31 @@ type* alloc(size_t size, byte seq = 0) {
 		if (errno & EEXIST) return alloc<type>(size, seq);
 		throw std::bad_alloc();
 	}
+	info.emplace(shm, id);
 	std::fill_n(cast<type*>(shm), size, type());
-	info.emplace_back(id, shm);
 	return cast<type*>(shm);
 }
 
-void free(void* p) {
-	auto it = std::find_if(info.begin(), info.end(),
-			[=](const shm_t& shm) { return shm.second == p; });
-	if (it != info.end()) {
-		shmdt(it->second);
-		shmctl(it->first, IPC_RMID, nullptr);
-		info.erase(it);
-	}
+void free(void* shm) {
+	shmdt(shm);
+	shmctl(info.at(shm), IPC_RMID, nullptr);
+	info.erase(shm);
 }
 
-void release() { while (info.size()) free(info.front().second); }
+__attribute__((destructor)) void clear() {
+	for (auto blk : info) {
+		shmdt(blk.first);
+		shmctl(blk.second, IPC_RMID, nullptr);
+	}
+	info.clear();
+}
+
+__attribute__((constructor)) void init() {
+	signal(SIGINT, [](int i) { std::exit(i); });
+//	signal(SIGSEGV, [](int i) { std::exit(i); });
+//	std::set_terminate([]() { clear(); __gnu_cxx::__verbose_terminate_handler(); });
+//	std::atexit(shm::clear);
+}
 
 } // namespace shm
 
@@ -1995,11 +2003,6 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--parallel"):
 			opts["thread"] = next_opt(std::to_string(std::thread::hardware_concurrency()));
 			break;
-		case to_hash("-shm"):
-		case to_hash("--shm"):
-		case to_hash("--shared-memory"):
-			opts["shared-memory"] = next_opts();
-			break;
 		case to_hash("-"):
 		case to_hash("-|"):
 		case to_hash("--|"):
@@ -2020,11 +2023,6 @@ int main(int argc, const char* argv[]) {
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("thread")) opts["thread"] = 1;
-	if (!opts("shared-memory", "hook")) opts["shared-memory"]["hook"] = argv[0];
-
-	signal(SIGINT, [] (int i) { std::exit(0); });
-	std::set_terminate(shm::release);
-	std::atexit(shm::release);
 
 	utils::logging(opts["logging"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
@@ -2036,7 +2034,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "agent = " << opts["thread"] << "x" << std::endl;
-	std::cout << "shm = " << shm::hook(opts["shared-memory"]["hook"]) << std::endl;
+	std::cout << "shm = " << shm::hook(argv[0]) << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
