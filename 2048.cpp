@@ -76,6 +76,9 @@ void free(void* p) {
 		info.erase(it);
 	}
 }
+
+void release() { while (info.size()) free(info.front().second); }
+
 } // namespace shm
 
 class weight {
@@ -192,8 +195,6 @@ public:
 	static inline weight& make(u64 sign, size_t size, container& src = wghts()) { return src.make(sign, size); }
 	static inline size_t erase(u64 sign, container& src = wghts()) { return src.erase(sign); }
 	inline weight(u64 sign, const container& src = wghts()) : weight(src(sign)) {}
-
-	static inline void release() { for (weight w : wghts()) free(w.data()); }
 
 private:
 	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
@@ -2022,8 +2023,8 @@ int main(int argc, const char* argv[]) {
 	if (!opts("shared-memory", "hook")) opts["shared-memory"]["hook"] = argv[0];
 
 	signal(SIGINT, [] (int i) { std::exit(0); });
-	std::set_terminate(weight::release);
-	std::atexit(weight::release);
+	std::set_terminate(shm::release);
+	std::atexit(shm::release);
 
 	utils::logging(opts["logging"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
