@@ -2047,9 +2047,8 @@ int main(int argc, const char* argv[]) {
 
 	if (statistic(opts["optimize"])) {
 		std::cout << std::endl << "start training..." << std::endl;
-		u32 thdnum = std::stol(opts["optimize"]["thread"] = opts["thread"]);
+		u32 thdnum = std::stol(opts["optimize"]["thread"] = opts["thread"]), thdid = thdnum;
 		statistic* stats = shm::alloc<statistic>(thdnum);
-		u32 thdid = thdnum;
 		while (std::stol(opts["optimize"]["thread#"] = --thdid) && fork());
 		statistic& stat = stats[thdid] = optimize(opts["optimize"], opts["options"]);
 		if (thdid == 0) while (wait(nullptr) > 0); else return 0;
@@ -2061,9 +2060,8 @@ int main(int argc, const char* argv[]) {
 
 	if (statistic(opts["evaluate"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
-		u32 thdnum = std::stol(opts["evaluate"]["thread"] = opts["thread"]);
+		u32 thdnum = std::stol(opts["evaluate"]["thread"] = opts["thread"]), thdid = thdnum;
 		statistic* stats = shm::alloc<statistic>(thdnum);
-		u32 thdid = thdnum;
 		while (std::stol(opts["evaluate"]["thread#"] = --thdid) && fork());
 		statistic& stat = stats[thdid] = evaluate(opts["evaluate"], opts["options"]);
 		if (thdid == 0) while (wait(nullptr) > 0); else return 0;
