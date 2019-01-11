@@ -29,11 +29,65 @@
 #include <sstream>
 #include <list>
 #include <thread>
-#include <future>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <signal.h>
 
 namespace moporgic {
 
 typedef float numeric;
+
+namespace shm {
+std::map<void*, int> info;
+
+const char* hook(const std::string& hpth = "") {
+	static std::string path = ".";
+	if (hpth.size()) path = hpth;
+	return path.c_str();
+}
+
+template<typename type>
+type* alloc(size_t size, byte seq = 0) {
+	if (++seq == 0) throw std::bad_alloc();
+	auto key = ftok(hook(), seq);
+	int id = shmget(key, size * sizeof(type), IPC_CREAT | IPC_EXCL | 0600);
+	void* shm = shmat(id, nullptr, 0);
+	if (shm == cast<void*>(-1ull)) {
+		if (errno & EEXIST) return alloc<type>(size, seq);
+		throw std::bad_alloc();
+	}
+	info.emplace(shm, id);
+	std::fill_n(cast<type*>(shm), size, type());
+	return cast<type*>(shm);
+}
+
+void free(void* shm) {
+	shmdt(shm);
+	shmctl(info.at(shm), IPC_RMID, nullptr);
+	info.erase(shm);
+}
+
+__attribute__((destructor)) void clear() {
+	for (auto blk : info) {
+		shmdt(blk.first);
+		shmctl(blk.second, IPC_RMID, nullptr);
+	}
+	info.clear();
+}
+
+__attribute__((constructor)) void init() {
+	signal(SIGINT, [](int i) { std::exit(i); });
+//	signal(SIGSEGV, [](int i) { std::exit(i); });
+//	std::set_terminate([]() { clear(); __gnu_cxx::__verbose_terminate_handler(); });
+//	std::atexit(shm::clear);
+}
+
+} // namespace shm
 
 class weight {
 public:
@@ -153,8 +207,8 @@ public:
 private:
 	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
 
-	static inline segment* alloc(size_t size) { return new segment[size](); }
-	static inline void free(segment* v) { delete[] v; }
+	static inline segment* alloc(size_t size) { return shm::alloc<segment>(size); }
+	static inline void free(segment* v) { shm::free(v); }
 
 	u64 id;
 	size_t length;
@@ -1980,6 +2034,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "agent = " << opts["thread"] << "x" << std::endl;
+	std::cout << "shm = " << shm::hook(argv[0]) << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
@@ -1992,12 +2047,12 @@ int main(int argc, const char* argv[]) {
 
 	if (statistic(opts["optimize"])) {
 		std::cout << std::endl << "start training..." << std::endl;
-		std::list<std::future<statistic>> agents;
-		u32 thdid = std::stol(opts["optimize"]["thread"] = opts["thread"]);
-		while (std::stol(opts["optimize"]["thread#"] = (--thdid)))
-			agents.push_back(std::async(std::launch::async, optimize, opts["optimize"], opts["options"]));
-		statistic stat = std::accumulate(agents.begin(), agents.end(), optimize(opts["optimize"], opts["options"]),
-				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
+		u32 thdnum = std::stol(opts["optimize"]["thread"] = opts["thread"]), thdid = thdnum;
+		statistic* stats = shm::alloc<statistic>(thdnum);
+		while (std::stol(opts["optimize"]["thread#"] = --thdid) && fork());
+		statistic& stat = stats[thdid] = optimize(opts["optimize"], opts["options"]);
+		if (thdid == 0) while (wait(nullptr) > 0); else return 0;
+		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
 		if (opts["info"] == "full") stat.summary();
 	}
 
@@ -2005,12 +2060,12 @@ int main(int argc, const char* argv[]) {
 
 	if (statistic(opts["evaluate"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
-		std::list<std::future<statistic>> agents;
-		u32 thdid = std::stol(opts["evaluate"]["thread"] = opts["thread"]);
-		while (std::stol(opts["evaluate"]["thread#"] = (--thdid)))
-			agents.push_back(std::async(std::launch::async, evaluate, opts["evaluate"], opts["options"]));
-		statistic stat = std::accumulate(agents.begin(), agents.end(), evaluate(opts["evaluate"], opts["options"]),
-				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
+		u32 thdnum = std::stol(opts["evaluate"]["thread"] = opts["thread"]), thdid = thdnum;
+		statistic* stats = shm::alloc<statistic>(thdnum);
+		while (std::stol(opts["evaluate"]["thread#"] = --thdid) && fork());
+		statistic& stat = stats[thdid] = evaluate(opts["evaluate"], opts["options"]);
+		if (thdid == 0) while (wait(nullptr) > 0); else return 0;
+		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
 		if (opts["info"] != "none") stat.summary();
 	}
 
