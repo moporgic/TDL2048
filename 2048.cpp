@@ -44,9 +44,12 @@
 namespace shm {
 std::map<void*, int> info;
 
-const char* hook(const std::string& hpth = "") {
+const char* hook() {
 	static std::string path = ".";
-	if (hpth.size()) path = hpth;
+	if (path == ".") {
+		std::ifstream in("/proc/self/cmdline", std::ios::in);
+		std::getline(in, path, '\0');
+	}
 	return path.c_str();
 }
 
@@ -2044,7 +2047,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "agent = " << opts["thread"] << "x" << std::endl;
 #if defined(__linux__) && !defined(NOSHM)
-	std::cout << "shm = " << shm::hook(argv[0]) << std::endl;
+	std::cout << "shm = " << shm::hook() << std::endl;
 #endif
 	std::cout << std::endl;
 
