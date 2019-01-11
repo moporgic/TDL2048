@@ -29,6 +29,9 @@
 #include <sstream>
 #include <list>
 #include <thread>
+#include <future>
+
+#if defined(__linux__) && !defined(NOSHM)
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -37,10 +40,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <signal.h>
-
-namespace moporgic {
-
-typedef float numeric;
 
 namespace shm {
 std::map<void*, int> info;
@@ -88,6 +87,11 @@ __attribute__((constructor)) void init() {
 }
 
 } // namespace shm
+#endif
+
+namespace moporgic {
+
+typedef float numeric;
 
 class weight {
 public:
@@ -207,8 +211,13 @@ public:
 private:
 	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
 
+#if !defined(__linux__) || defined(NOSHM)
+	static inline segment* alloc(size_t size) { return new segment[size](); }
+	static inline void free(segment* v) { delete[] v; }
+#else
 	static inline segment* alloc(size_t size) { return shm::alloc<segment>(size); }
 	static inline void free(segment* v) { shm::free(v); }
+#endif
 
 	u64 id;
 	size_t length;
@@ -2034,7 +2043,9 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "agent = " << opts["thread"] << "x" << std::endl;
+#if defined(__linux__) && !defined(NOSHM)
 	std::cout << "shm = " << shm::hook(argv[0]) << std::endl;
+#endif
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
@@ -2047,12 +2058,21 @@ int main(int argc, const char* argv[]) {
 
 	if (statistic(opts["optimize"])) {
 		std::cout << std::endl << "start training..." << std::endl;
+#if !defined(__linux__) || defined(NOSHM)
+		std::list<std::future<statistic>> agents;
+		u32 thdid = std::stol(opts["optimize"]["thread"] = opts["thread"]);
+		while (std::stol(opts["optimize"]["thread#"] = (--thdid)))
+			agents.push_back(std::async(std::launch::async, optimize, opts["optimize"], opts["options"]));
+		statistic stat = std::accumulate(agents.begin(), agents.end(), optimize(opts["optimize"], opts["options"]),
+				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
+#else
 		u32 thdnum = std::stol(opts["optimize"]["thread"] = opts["thread"]), thdid = thdnum;
 		statistic* stats = shm::alloc<statistic>(thdnum);
 		while (std::stol(opts["optimize"]["thread#"] = --thdid) && fork());
 		statistic& stat = stats[thdid] = optimize(opts["optimize"], opts["options"]);
 		if (thdid == 0) while (wait(nullptr) > 0); else return 0;
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
+#endif
 		if (opts["info"] == "full") stat.summary();
 	}
 
@@ -2060,12 +2080,21 @@ int main(int argc, const char* argv[]) {
 
 	if (statistic(opts["evaluate"])) {
 		std::cout << std::endl << "start testing..." << std::endl;
+#if !defined(__linux__) || defined(NOSHM)
+		std::list<std::future<statistic>> agents;
+		u32 thdid = std::stol(opts["evaluate"]["thread"] = opts["thread"]);
+		while (std::stol(opts["evaluate"]["thread#"] = (--thdid)))
+			agents.push_back(std::async(std::launch::async, evaluate, opts["evaluate"], opts["options"]));
+		statistic stat = std::accumulate(agents.begin(), agents.end(), evaluate(opts["evaluate"], opts["options"]),
+				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
+#else
 		u32 thdnum = std::stol(opts["evaluate"]["thread"] = opts["thread"]), thdid = thdnum;
 		statistic* stats = shm::alloc<statistic>(thdnum);
 		while (std::stol(opts["evaluate"]["thread#"] = --thdid) && fork());
 		statistic& stat = stats[thdid] = evaluate(opts["evaluate"], opts["options"]);
 		if (thdid == 0) while (wait(nullptr) > 0); else return 0;
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
+#endif
 		if (opts["info"] != "none") stat.summary();
 	}
 
