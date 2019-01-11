@@ -47,6 +47,7 @@ std::map<void*, int> info;
 const char* hook() {
 	static std::string path = ".";
 	if (path == ".") {
+		// do not move this into ((constructor)), does not work!
 		std::ifstream in("/proc/self/cmdline", std::ios::in);
 		std::getline(in, path, '\0');
 	}
@@ -2046,9 +2047,6 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "agent = " << opts["thread"] << "x" << std::endl;
-#if defined(__linux__) && !defined(NOSHM)
-	std::cout << "shm = " << shm::hook() << std::endl;
-#endif
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
