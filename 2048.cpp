@@ -45,19 +45,20 @@ namespace shm {
 std::map<void*, int> info;
 
 template<typename type>
-type* alloc(size_t size, byte seq = 0) {
-	if (++seq == 0) throw std::bad_alloc();
+type* alloc(size_t size) {
+	static byte seq = 0;
 	static std::string hook = ({
 		std::string path = ".";
 		std::ifstream in("/proc/self/cmdline", std::ios::in);
 		std::getline(in, path, '\0');
 		path;
 	});
+	if (++seq == 0) throw std::bad_alloc();
 	auto key = ftok(hook.c_str(), seq);
 	int id = shmget(key, size * sizeof(type), IPC_CREAT | IPC_EXCL | 0600);
 	void* shm = shmat(id, nullptr, 0);
 	if (shm == cast<void*>(-1ull)) {
-		if (errno & EEXIST) return alloc<type>(size, seq);
+		if (errno & EEXIST) return alloc<type>(size);
 		throw std::bad_alloc();
 	}
 	info.emplace(shm, id);
