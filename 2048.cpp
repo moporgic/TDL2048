@@ -44,20 +44,16 @@
 namespace shm {
 std::map<void*, int> info;
 
-const char* hook() {
-	static std::string path = ".";
-	if (path == ".") {
-		// do not move this into ((constructor)), does not work!
-		std::ifstream in("/proc/self/cmdline", std::ios::in);
-		std::getline(in, path, '\0');
-	}
-	return path.c_str();
-}
-
 template<typename type>
 type* alloc(size_t size, byte seq = 0) {
 	if (++seq == 0) throw std::bad_alloc();
-	auto key = ftok(hook(), seq);
+	static std::string hook = ({
+		std::string path = ".";
+		std::ifstream in("/proc/self/cmdline", std::ios::in);
+		std::getline(in, path, '\0');
+		path;
+	});
+	auto key = ftok(hook.c_str(), seq);
 	int id = shmget(key, size * sizeof(type), IPC_CREAT | IPC_EXCL | 0600);
 	void* shm = shmat(id, nullptr, 0);
 	if (shm == cast<void*>(-1ull)) {
