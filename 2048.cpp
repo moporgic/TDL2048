@@ -1404,10 +1404,10 @@ u32 save_network(utils::options::option opt) {
 }
 
 std::string specialize(utils::options& opts, const char* spec = "spec") {
-	std::string feat = opts["make"];
-	if (feat.empty()) feat = "4x6patt"; // assume that default 4x6patt
+	std::string feat = opts.find("make", "4x6patt"); // assume that default 4x6patt
+	feat = feat.substr(0, feat.find_first_of("&|="));
 	if (opts["options"].find(spec, "on") == "on")
-		if (feat == "4x6patt" || feat == "5x6patt" || feat == "8x6patt") {
+		if (feat == "4x6patt" || feat == "5x6patt" || feat == "6x6patt" || feat == "7x6patt" || feat == "8x6patt") {
 			if (!opts("optimize", "mode")) opts["optimize"]["mode"] = "forward-" + feat;
 			if (!opts("evaluate", "mode")) opts["evaluate"]["mode"] = "best-" + feat;
 			return (opts["options"][spec] = "on");
@@ -1808,37 +1808,40 @@ struct statistic {
 };
 
 #define optimize_specialized(name){\
+	utils::estimator estim = utils::estimate_##name;\
+	utils::optimizer optim = utils::optimize_##name;\
 	clip<feature> feats = feature::feats();\
 	numeric alpha = state::alpha();\
 	u32 score = 0;\
 	u32 opers = 0;\
 	\
 	b.init();\
-	best(b, feats, utils::estimate_##name);\
+	best(b, feats, estim);\
 	score += best.score();\
 	opers += 1;\
 	best >> last;\
 	best >> b;\
 	b.next();\
-	while (best(b, feats, utils::estimate_##name)) {\
-		last.optimize(best.esti(), alpha, feats, utils::optimize_##name);\
+	while (best(b, feats, estim)) {\
+		last.optimize(best.esti(), alpha, feats, optim);\
 		score += best.score();\
 		opers += 1;\
 		best >> last;\
 		best >> b;\
 		b.next();\
 	}\
-	last.optimize(0, alpha, feats, utils::optimize_##name);\
+	last.optimize(0, alpha, feats, optim);\
 	\
 	stats.update(score, b.hash(), opers);\
 }
 
 #define evaluate_specialized(name){\
+	utils::estimator estim = utils::estimate_##name;\
 	clip<feature> feats = feature::feats();\
 	u32 score = 0;\
 	u32 opers = 0;\
 	\
-	for (b.init(); best(b, feats, utils::estimate_##name); b.next()) {\
+	for (b.init(); best(b, feats, estim); b.next()) {\
 		score += best.score();\
 		opers += 1;\
 		best >> b;\
