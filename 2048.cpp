@@ -1568,7 +1568,8 @@ struct state {
 	inline numeric optimize(numeric exact, numeric alpha = state::alpha(),
 			clip<feature> range = feature::feats(),
 			utils::optimizer optim = utils::optimize) {
-		esti = state::reward() + optim(move, (exact - state::value()) * alpha, range);
+		numeric update = (exact - state::value()) * alpha;
+		esti = state::reward() + optim(move, update, range);
 		return esti;
 	}
 
@@ -1806,7 +1807,7 @@ struct statistic {
 	}
 };
 
-#define train_specialized(name){\
+#define optimize_specialized(name){\
 	clip<feature> feats = feature::feats();\
 	numeric alpha = state::alpha();\
 	u32 score = 0;\
@@ -1832,7 +1833,7 @@ struct statistic {
 	stats.update(score, b.hash(), opers);\
 }
 
-#define test_specialized(name){\
+#define evaluate_specialized(name){\
 	clip<feature> feats = feature::feats();\
 	u32 score = 0;\
 	u32 opers = 0;\
@@ -1934,23 +1935,23 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 
 	case to_hash("forward-4x6patt"):
 	case to_hash("forward-best-4x6patt"):
-		for (stats.init(args); stats; stats++) train_specialized(4x6patt);
+		for (stats.init(args); stats; stats++) optimize_specialized(4x6patt);
 		break;
 	case to_hash("forward-5x6patt"):
 	case to_hash("forward-best-5x6patt"):
-		for (stats.init(args); stats; stats++) train_specialized(5x6patt);
+		for (stats.init(args); stats; stats++) optimize_specialized(5x6patt);
 		break;
 	case to_hash("forward-6x6patt"):
 	case to_hash("forward-best-6x6patt"):
-		for (stats.init(args); stats; stats++) train_specialized(6x6patt);
+		for (stats.init(args); stats; stats++) optimize_specialized(6x6patt);
 		break;
 	case to_hash("forward-7x6patt"):
 	case to_hash("forward-best-7x6patt"):
-		for (stats.init(args); stats; stats++) train_specialized(7x6patt);
+		for (stats.init(args); stats; stats++) optimize_specialized(7x6patt);
 		break;
 	case to_hash("forward-8x6patt"):
 	case to_hash("forward-best-8x6patt"):
-		for (stats.init(args); stats; stats++) train_specialized(8x6patt);
+		for (stats.init(args); stats; stats++) optimize_specialized(8x6patt);
 		break;
 	}
 
@@ -1981,19 +1982,19 @@ statistic evaluate(utils::options::option args, utils::options::option opts = {}
 		break;
 
 	case to_hash("best-4x6patt"):
-		for (stats.init(args); stats; stats++) test_specialized(4x6patt);
+		for (stats.init(args); stats; stats++) evaluate_specialized(4x6patt);
 		break;
 	case to_hash("best-5x6patt"):
-		for (stats.init(args); stats; stats++) test_specialized(5x6patt);
+		for (stats.init(args); stats; stats++) evaluate_specialized(5x6patt);
 		break;
 	case to_hash("best-6x6patt"):
-		for (stats.init(args); stats; stats++) test_specialized(6x6patt);
+		for (stats.init(args); stats; stats++) evaluate_specialized(6x6patt);
 		break;
 	case to_hash("best-7x6patt"):
-		for (stats.init(args); stats; stats++) test_specialized(7x6patt);
+		for (stats.init(args); stats; stats++) evaluate_specialized(7x6patt);
 		break;
 	case to_hash("best-8x6patt"):
-		for (stats.init(args); stats; stats++) test_specialized(8x6patt);
+		for (stats.init(args); stats; stats++) evaluate_specialized(8x6patt);
 		break;
 
 	case to_hash("random"):
