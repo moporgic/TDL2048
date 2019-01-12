@@ -33,57 +33,8 @@
 
 #if defined(__linux__) && !defined(NOSHM)
 #include <sys/wait.h>
-#include <sys/shm.h>
 #include <unistd.h>
-#include <signal.h>
-
-namespace shm {
-std::map<void*, int> info;
-
-template<typename type>
-type* alloc(size_t size) {
-	static byte seq = 0;
-	static std::string hook = ({
-		std::string path = ".";
-		std::ifstream in("/proc/self/cmdline", std::ios::in);
-		std::getline(in, path, '\0');
-		path;
-	});
-	if (++seq == 0) throw std::bad_alloc();
-	auto key = ftok(hook.c_str(), seq);
-	int id = shmget(key, size * sizeof(type), IPC_CREAT | IPC_EXCL | 0600);
-	void* shm = shmat(id, nullptr, 0);
-	if (shm == cast<void*>(-1ull)) {
-		if (errno & EEXIST) return alloc<type>(size);
-		throw std::bad_alloc();
-	}
-	info.emplace(shm, id);
-	std::fill_n(cast<type*>(shm), size, type());
-	return cast<type*>(shm);
-}
-
-void free(void* shm) {
-	shmdt(shm);
-	shmctl(info.at(shm), IPC_RMID, nullptr);
-	info.erase(shm);
-}
-
-__attribute__((destructor)) void clear() {
-	for (auto blk : info) {
-		shmdt(blk.first);
-		shmctl(blk.second, IPC_RMID, nullptr);
-	}
-	info.clear();
-}
-
-__attribute__((constructor)) void init() {
-	signal(SIGINT, [](int i) { std::exit(i); });
-//	signal(SIGSEGV, [](int i) { std::exit(i); });
-//	std::set_terminate([]() { clear(); __gnu_cxx::__verbose_terminate_handler(); });
-//	std::atexit(shm::clear);
-}
-
-} // namespace shm
+#include "moporgic/shm.h"
 #endif
 
 namespace moporgic {
@@ -1399,7 +1350,7 @@ u32 load_network(utils::options::option opt) {
 		in.open(path, std::ios::in | std::ios::binary);
 		while (in.peek() != -1) {
 			auto type = in.peek();
-			if (type != 0) {
+			if (type != 0) { // new binaries already store its type, so use it for the later loading
 				in.ignore(1);
 			} else { // legacy binaries always beginning with 0, so use name suffix to determine the type
 				type = path[path.find_last_of(".") + 1];
@@ -1417,6 +1368,7 @@ u32 save_network(utils::options::option opt) {
 		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) continue;
 		auto type = path[path.find_last_of(".") + 1];
+		// for upward compatibility, we still store legacy binaries if suffix are traditional (.f or .w)
 		if (type != 'f')  weight::save(type != 'w' ? out.write("w", 1) : out);
 		if (type != 'w') feature::save(type != 'f' ? out.write("f", 1) : out);
 		out.flush();
@@ -1701,7 +1653,7 @@ struct statistic {
 		u32 size = 0;
 
 		buf[size++] = '\n';
-		size += snprintf(buf + size, sizeof(buf) - size, summaf,
+		size += snprintf(buf + size, sizeof(buf) - size, summaf, // "summary %llums %.2fops",
 				total.time / info.thdnum,
 				total.opers * 1000.0 * info.thdnum / total.time);
 		buf[size++] = '\n';
@@ -1932,11 +1884,8 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--network-output"):
 			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
-//			opts["save"] += opts[""];
-			for (auto opt : opts[""]) { // e.g. "-o 2048.x" indicates logging
-				auto flag = opt[opt.find('.') + 1] != 'x' ? "save" : "logging";
-				opts[flag] += opt;
-			}
+//			opts["save"] += opts[""]; // e.g. "-o 2048.x" indicates logging
+			for (auto opt : opts[""]) opts[opt[opt.find('.') + 1] != 'x' ? "save" : "logging"] += opt;
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
@@ -2001,7 +1950,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-x"):
 		case to_hash("-log"):
 		case to_hash("--logging"):
-			opts["logging"] = next_opt(opts.find("make", argv[0]) + ".x");
+			opts["logging"] = next_opt(std::string(argv[0]) + ".x");
 			break;
 		case to_hash("-thd"):
 		case to_hash("--thread"):
