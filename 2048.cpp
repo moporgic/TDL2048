@@ -1393,6 +1393,42 @@ void list_mapping() {
 typedef numeric(*estimator)(const board&, clip<feature>);
 typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
 
+inline numeric estimate_32f_avx2(const board& state,
+		clip<feature> range = feature::feats()) {
+	float buf[32];
+	for (u32 i = 0; i < 32; i++) buf[i] = range[i][state];
+	__m256 c1 = _mm256_loadu_ps(buf + 0);
+	__m256 c2 = _mm256_add_ps(c1, _mm256_loadu_ps(buf + 8));
+	__m256 c3 = _mm256_add_ps(c2, _mm256_loadu_ps(buf + 16));
+	__m256 c4 = _mm256_add_ps(c3, _mm256_loadu_ps(buf + 24));
+
+	__m256 t1 = _mm256_hadd_ps(c4, c4);
+	__m256 t2 = _mm256_hadd_ps(t1, t1);
+	__m128 t3 = _mm256_extractf128_ps(t2, 1);
+	__m128 t4 = _mm_add_ss(_mm256_castps256_ps128(t2), t3);
+	return _mm_cvtss_f32(t4);
+}
+
+inline numeric estimate_64f_avx2(const board& state,
+		clip<feature> range = feature::feats()) {
+	float buf[64];
+	for (u32 i = 0; i < 64; i++) buf[i] = range[i][state];
+	__m256 c1 = _mm256_loadu_ps(buf + 0);
+	__m256 c2 = _mm256_add_ps(c1, _mm256_loadu_ps(buf + 8));
+	__m256 c3 = _mm256_add_ps(c2, _mm256_loadu_ps(buf + 16));
+	__m256 c4 = _mm256_add_ps(c3, _mm256_loadu_ps(buf + 24));
+	__m256 c5 = _mm256_add_ps(c4, _mm256_loadu_ps(buf + 32));
+	__m256 c6 = _mm256_add_ps(c5, _mm256_loadu_ps(buf + 40));
+	__m256 c7 = _mm256_add_ps(c6, _mm256_loadu_ps(buf + 48));
+	__m256 c8 = _mm256_add_ps(c7, _mm256_loadu_ps(buf + 56));
+
+	__m256 t1 = _mm256_hadd_ps(c8, c8);
+	__m256 t2 = _mm256_hadd_ps(t1, t1);
+	__m128 t3 = _mm256_extractf128_ps(t2, 1);
+	__m128 t4 = _mm_add_ss(_mm256_castps256_ps128(t2), t3);
+	return _mm_cvtss_f32(t4);
+}
+
 inline numeric estimate(const board& state,
 		clip<feature> range = feature::feats()) {
 	register numeric esti = 0;
