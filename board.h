@@ -278,10 +278,23 @@ public:
 
 	inline void next() { return next64(); }
 	inline void next64() {
-		hexa empty = spaces64();
+//		hexa empty = spaces64();
+//		u32 u = moporgic::rand();
+//		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
+//		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
+		u64 x = raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		x = ~x & 0x1111111111111111ull;
+		u32 e = x + (x >> 32);
+		e += e >> 16;
+		e += e >> 8;
+		e = (e & 0x0f) + ((e >> 4) & 0x0f);
 		u32 u = moporgic::rand();
-		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
+		u32 k = (u >> 16) % e;
+		while (k--) x &= ~(x & -x);
+		u32 p = math::lg64(x & -x);;
+		raw |= (u % 10 ? 1ull : 2ull) << p;
 	}
 	inline void next80() {
 		hexa empty = spaces80();
