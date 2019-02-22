@@ -249,12 +249,12 @@ public:
 		x |= (x >> 2);
 		x |= (x >> 1);
 		x = ~x & 0x1111111111111111ull;
-		register u64 k = ext >> 16;
-		k = ((k & 0xff00ull) << 24) | (k & 0x00ffull);
-		k = ((k & 0xf0000000f0ull) << 12) | (k & 0x0f0000000full);
-		k = ((k & 0x000c000c000c000cull) << 6) | (k & 0x0003000300030003ull);
-		k = ((k & 0x0202020202020202ull) << 3) | (k & 0x0101010101010101ull);
-		x &= ~k & 0x1111111111111111ull;
+		register u64 z = ext >> 16;
+		z = ((z & 0xff00ull) << 24) | (z & 0x00ffull);
+		z = ((z & 0xf0000000f0ull) << 12) | (z & 0x0f0000000full);
+		z = ((z & 0x000c000c000c000cull) << 6) | (z & 0x0003000300030003ull);
+		z = ((z & 0x0202020202020202ull) << 3) | (z & 0x0101010101010101ull);
+		x &= ~z & 0x1111111111111111ull;
 		register u32 e = x + (x >> 32);
 		e += e >> 16;
 		e += e >> 8;
@@ -297,10 +297,10 @@ public:
 		raw |= (u % 10 ? 1ull : 2ull) << p;
 	}
 	inline void next80() {
-		hexa empty = spaces80();
-		u32 u = moporgic::rand();
-		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
+//		hexa empty = spaces80();
+//		u32 u = moporgic::rand();
+//		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
+//		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
 	}
 
 	inline bool popup() { return popup64(); }
