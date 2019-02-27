@@ -301,6 +301,25 @@ public:
 //		u32 u = moporgic::rand();
 //		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
 //		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
+		u64 x = raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		x = ~x & 0x1111111111111111ull;
+		u64 z = ext >> 16;
+		z = ((z & 0xff00ull) << 24) | (z & 0x00ffull);
+		z = ((z & 0xf0000000f0ull) << 12) | (z & 0x0f0000000full);
+		z = ((z & 0x000c000c000c000cull) << 6) | (z & 0x0003000300030003ull);
+		z = ((z & 0x0202020202020202ull) << 3) | (z & 0x0101010101010101ull);
+		x &= ~z & 0x1111111111111111ull;
+		u32 e = x + (x >> 32);
+		e += e >> 16;
+		e += e >> 8;
+		e = (e & 0x0f) + ((e >> 4) & 0x0f);
+		u32 u = moporgic::rand();
+		u32 k = (u >> 16) % e;
+		while (k--) x &= ~(x & -x);
+		u32 p = math::lg64(x & -x);;
+		raw |= (u % 10 ? 1ull : 2ull) << p;
 	}
 
 	inline bool popup() { return popup64(); }
