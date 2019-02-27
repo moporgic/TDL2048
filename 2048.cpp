@@ -1178,6 +1178,7 @@ std::map<std::string, std::string> aliases() {
 	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
 	alias["7x6patt"] = alias["7x6patt/k.matsuzaki"];
 	alias["8x6patt"] = alias["8x6patt/k.matsuzaki"];
+	alias["8x4patt"] = "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
 	alias["5x4patt"] = alias["5x4patt/4-22"];
 	alias["2x4patt"] = alias["2x4patt/4"];
 	alias["2x8patt"] = alias["2x8patt/44"];
