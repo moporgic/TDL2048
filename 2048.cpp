@@ -1970,7 +1970,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
 
 	if (statistic(opts["optimize"])) {
-		std::cout << std::endl << "start training..." << std::endl;
+		std::cout << std::endl << "start optimizing..." << std::endl;
 		statistic stat = optimize(opts["optimize"], opts["options"]);
 		if (opts["info"] == "full") stat.summary();
 	}
@@ -1978,7 +1978,7 @@ int main(int argc, const char* argv[]) {
 	utils::save_network(opts["save"]);
 
 	if (statistic(opts["evaluate"])) {
-		std::cout << std::endl << "start testing..." << std::endl;
+		std::cout << std::endl << "start evaluating..." << std::endl;
 		statistic stat = evaluate(opts["evaluate"], opts["options"]);
 		if (opts["info"] != "none") stat.summary();
 	}
