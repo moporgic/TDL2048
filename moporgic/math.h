@@ -24,7 +24,62 @@
 namespace moporgic {
 
 namespace math {
-// reference:  The Aggregate Magic Algorithms
+/*	reference:  The Aggregate Magic Algorithms
+ *
+ *	@techreport{magicalgorithms,
+ *	author={Henry Gordon Dietz},
+ *	title={{The Aggregate Magic Algorithms}},
+ *	institution={University of Kentucky},
+ *	howpublished={Aggregate.Org online technical report},
+ *	URL={http://aggregate.org/MAGIC/}
+ *	}
+ *
+ */
+
+/**
+ * Absolute Value of a Float
+ * IEEE floating point uses an explicit sign bit,
+ * so the absolute value can be taken by a bitwise AND with the complement of the sign bit.
+ * For IA32 32-bit, the sign bit is an int value of 0x80000000,
+ * for IA32 64-bit, the sign bit is the long long int value 0x8000000000000000. Of course,
+ * if you prefer to use just int values, the IA32 64-bit sign bit is 0x80000000 at an int address offset of +1.
+ */
+static inline constexpr
+float abs(register float x) noexcept {
+	*((int *) &x) &= 0x7fffffff;
+	return x;
+}
+
+static inline constexpr
+float abs(register double x) noexcept {
+	*(((int *) &x) + 1) &= 0x7fffffff;
+	return x;
+}
+
+/**
+ * Average of Integers
+ * This is actually an extension of the "well known" fact that for binary integer values x and y, (x+y) equals ((x&y)+(x|y)) equals ((x^y)+2*(x&y)).
+ * Given two integer values x and y, the (floor of the) average normally would be computed by (x+y)/2; unfortunately,
+ * this can yield incorrect results due to overflow. A very sneaky alternative is to use (x&y)+((x^y)/2).
+ * If we are aware of the potential non-portability due to the fact that C does not specify if shifts are signed, this can be simplified to (x&y)+((x^y)>>1).
+ * In either case, the benefit is that this code sequence cannot overflow.
+ */
+static inline constexpr
+unsigned int avg(register unsigned int x, register unsigned int y) noexcept {
+	return (x&y)+((x^y)>>1);
+}
+static inline constexpr
+int avg(register int x, register int y) noexcept {
+	return (x&y)+((x^y)>>1);
+}
+static inline constexpr
+unsigned long long int avg(register unsigned long long int x, register unsigned long long int y) noexcept {
+	return (x&y)+((x^y)>>1);
+}
+static inline constexpr
+long long int avg(register long long int x, register long long int y) noexcept {
+	return (x&y)+((x^y)>>1);
+}
 
 /**
  * Bit Reversal
@@ -54,6 +109,72 @@ unsigned int reverse_v2(register unsigned int x) noexcept {
 	x = (((x >> 8) & y) | ((x & y) << 8));
 	return ((x >> 16) | (x << 16));
 }
+
+/**
+ * Comparison of Float Values
+ * IEEE floating point has a number of nice properties,
+ * including the ability to use 2's complement integer comparisons to compare floating point values,
+ * provided the native byte order is consistent between float and integer values.
+ * The only complication is the use of sign+magnitude representation in floats.
+ * The AMD Athlon Processor x86 Code Optimization Guide gives a nice summary on Page 43. Here's a set of C routines that embody the same logic:
+ *
+ */
+#define float_FasI(f)  (*((int *) &(f)))
+#define float_FasUI(f) (*((unsigned int *) &(f)))
+
+#define	float_lt0(f)	(float_FasUI(f) > 0x80000000U)
+#define	float_le0(f)	(float_FasI(f) <= 0)
+#define	float_gt0(f)	(float_FasI(f) > 0)
+#define	float_ge0(f)	(float_FasUI(f) <= 0x80000000U)
+
+/**
+ * Integer Selection
+ * A branchless, lookup-free, alternative to code like if (a<b) x=c; else x=d; is ((((a-b) >> (WORDBITS-1)) & (c^d)) ^ d).
+ * This code assumes that the shift is signed, which, of course, C does not promise.
+ */
+static inline constexpr
+int select_lt(register int a, register int b, register int c, register int d) noexcept {
+	return ((((a-b) >> (32-1)) & (c^d)) ^ d);
+}
+static inline constexpr
+long long int select_lt(register long long int a, register long long int b, register long long int c, register long long int d) noexcept {
+	return ((((a-b) >> (64-1)) & (c^d)) ^ d);
+}
+
+/**
+ * Integer Minimum or Maximum
+ * Given 2's complement integer values x and y, the minimum can be computed without any branches as x+(((y-x)>>(WORDBITS-1))&(y-x)).
+ * Logically, this works because the shift by (WORDBITS-1) replicates the sign bit to create a mask -- be aware,
+ * however, that the C language does not require that shifts are signed even if their operands are signed, so there is a potential portability problem.
+ * Additionally, one might think that a shift by any number greater than or equal to WORDBITS would have the same effect,
+ * but many instruction sets have shifts that behave strangely when such shift distances are specified.
+ *
+ * Of course, maximum can be computed using the same trick: x-(((x-y)>>(WORDBITS-1))&(x-y)).
+ *
+ * Actually, the Integer Selection coding trick is just as efficient in encoding minimum and maximum....
+ *
+ */
+static inline constexpr
+int min(register int x, register int y) noexcept {
+	return x+(((y-x)>>(32-1))&(y-x));
+//	return select_lt(x, y, x, y);
+}
+static inline constexpr
+long long int min(register long long int x, register long long int y) noexcept {
+	return x+(((y-x)>>(64-1))&(y-x));
+//	return select_lt(x, y, x, y);
+}
+static inline constexpr
+int max(register int x, register int y) noexcept {
+	return x-(((x-y)>>(32-1))&(x-y));
+//	return select_lt(x, y, y, x);
+}
+static inline constexpr
+long long int max(register long long int x, register long long int y) noexcept {
+	return x-(((x-y)>>(64-1))&(x-y));
+//	return select_lt(x, y, y, x);
+}
+
 /**
  * Is Power of 2
  * A non-negative binary integer value x is a power of 2 iff (x&(x-1)) is 0 using 2's complement arithmetic.
@@ -88,6 +209,11 @@ unsigned int ones64(register unsigned long long x) noexcept {
 	x = (x & 0x3333333333333333ull) + ((x >> 2) & 0x3333333333333333ull);
 	return (((x + (x >> 4)) & 0x0f0f0f0f0f0f0f0full) * 0x0101010101010101ull) >> 56;
 }
+static inline constexpr
+unsigned int ones(register unsigned int x) noexcept { return ones32(x); }
+
+static inline constexpr
+unsigned int ones(register unsigned long long x) noexcept { return ones64(x); }
 
 static inline constexpr
 unsigned int ones16(register unsigned int x) noexcept {
@@ -121,14 +247,28 @@ unsigned int ones4(register unsigned int x) noexcept {
  * into quite a few algorithms, so it is useful to have an efficient implementation:
  */
 static inline constexpr
-unsigned int lzc(register unsigned int x) noexcept {
+unsigned int lzc32(register unsigned int x) noexcept {
 	x |= (x >> 1);
 	x |= (x >> 2);
 	x |= (x >> 4);
 	x |= (x >> 8);
 	x |= (x >> 16);
-	return (sizeof(unsigned int) - ones32(x));
+	return (32 - ones32(x));
 }
+static inline constexpr
+unsigned int lzc64(register unsigned long long int x) noexcept {
+	x |= (x >> 1);
+	x |= (x >> 2);
+	x |= (x >> 4);
+	x |= (x >> 8);
+	x |= (x >> 16);
+	x |= (x >> 32);
+	return (64 - ones64(x));
+}
+static inline constexpr
+unsigned int lzc(register unsigned int x) noexcept { return lzc32(x); }
+static inline constexpr
+unsigned int lzc(register unsigned long long int x) noexcept { return lzc64(x); }
 
 /**
  * Least Significant 1 Bit
@@ -143,13 +283,18 @@ unsigned int lzc(register unsigned int x) noexcept {
  */
 static inline constexpr
 unsigned int lsb32(register unsigned int x) noexcept {
-	return (x ^ (x & (x - 1)));
+	return (x & -x);
+//	return (x ^ (x & (x - 1)));
 }
-
 static inline constexpr
 unsigned long long int lsb64(register unsigned long long int x) noexcept {
-	return (x ^ (x & (x - 1)));
+	return (x & -x);
+//	return (x ^ (x & (x - 1)));
 }
+static inline constexpr
+unsigned int lsb(register unsigned int x) noexcept { return lsb32(x); }
+static inline constexpr
+unsigned long long int lsb(register unsigned long long int x) noexcept { return lsb64(x); }
 
 /**
  * Most Significant 1 Bit
@@ -179,6 +324,11 @@ unsigned long long int msb64(register unsigned long long int x) noexcept {
 	x |= (x >> 32);
 	return (x & ~(x >> 1));
 }
+static inline constexpr
+unsigned int msb(register unsigned int x) noexcept { return msb32(x); }
+
+static inline constexpr
+unsigned long long int msb(register unsigned long long int x) noexcept { return msb64(x); }
 
 static inline constexpr
 unsigned int msb16(register unsigned int x) noexcept {
@@ -362,9 +512,17 @@ void swap_v2(T& x, T& y) noexcept {
  * it is trivial to combine them to construct a trailing zero count (as pointed-out by Joe Bowbeer):
  */
 static inline constexpr
-unsigned int tzc(register int x) noexcept {
+unsigned int tzc32(register unsigned int x) noexcept {
 	return (ones32((x & -x) - 1));
 }
+static inline constexpr
+unsigned int tzc64(register unsigned long long int x) noexcept {
+	return (ones64((x & -x) - 1));
+}
+static inline constexpr
+unsigned int tzc(register unsigned int x) noexcept { return tzc32(x); }
+static inline constexpr
+unsigned int tzc(register unsigned long long int x) noexcept { return tzc64(x); }
 
 /**
  * Tail recursive pow
