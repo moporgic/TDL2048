@@ -46,13 +46,15 @@ namespace math {
  */
 static inline constexpr
 float abs(register float x) noexcept {
-	*((int *) &x) &= 0x7fffffff;
+//	*((int *) &x) &= 0x7fffffff;
+	raw_cast<unsigned int>(x) &= 0x7fffffffu;
 	return x;
 }
 
 static inline constexpr
 float abs(register double x) noexcept {
-	*(((int *) &x) + 1) &= 0x7fffffff;
+//	*(((int *) &x) + 1) &= 0x7fffffff;
+	raw_cast<unsigned int, 1>(x) &= 0x7fffffffu;
 	return x;
 }
 
