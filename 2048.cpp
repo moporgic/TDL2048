@@ -1265,6 +1265,7 @@ std::map<std::string, std::string> aliases() {
 	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
 	alias["7x6patt"] = alias["7x6patt/k.matsuzaki"];
 	alias["8x6patt"] = alias["8x6patt/k.matsuzaki"];
+	alias["8x4patt"] = "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
 	alias["5x4patt"] = alias["5x4patt/4-22"];
 	alias["2x4patt"] = alias["2x4patt/4"];
 	alias["2x8patt"] = alias["2x8patt/44"];
@@ -1424,7 +1425,7 @@ u32 load_network(utils::options::option opt) {
 		in.open(path, std::ios::in | std::ios::binary);
 		while (in.peek() != -1) {
 			auto type = in.peek();
-			if (type != 0) {
+			if (type != 0) { // new binaries already store its type, so use it for the later loading
 				in.ignore(1);
 			} else { // legacy binaries always beginning with 0, so use name suffix to determine the type
 				type = path[path.find_last_of(".") + 1];
@@ -1442,6 +1443,7 @@ u32 save_network(utils::options::option opt) {
 		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) continue;
 		auto type = path[path.find_last_of(".") + 1];
+		// for upward compatibility, we still store legacy binaries if suffix are traditional (.f or .w)
 		if (type != 'f')  weight::save(type != 'w' ? out.write("w", 1) : out);
 		if (type != 'w') feature::save(type != 'f' ? out.write("f", 1) : out);
 		out.flush();
@@ -1719,7 +1721,7 @@ struct statistic {
 		u32 size = 0;
 
 		buf[size++] = '\n';
-		size += snprintf(buf + size, sizeof(buf) - size, summaf,
+		size += snprintf(buf + size, sizeof(buf) - size, summaf, // "summary %llums %.2fops",
 				total.time,
 				total.opers * 1000.0 / total.time);
 		buf[size++] = '\n';
@@ -1949,11 +1951,8 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--network-output"):
 			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
-//			opts["save"] += opts[""];
-			for (auto opt : opts[""]) { // e.g. "-o 2048.x" indicates logging
-				auto flag = opt[opt.find('.') + 1] != 'x' ? "save" : "logging";
-				opts[flag] += opt;
-			}
+//			opts["save"] += opts[""]; // e.g. "-o 2048.x" indicates logging
+			for (auto opt : opts[""]) opts[opt[opt.find_last_of('.') + 1] != 'x' ? "save" : "logging"] += opt;
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
@@ -2018,7 +2017,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-x"):
 		case to_hash("-log"):
 		case to_hash("--logging"):
-			opts["logging"] = next_opt(opts.find("make", argv[0]) + ".x");
+			opts["logging"] = next_opt(std::string(argv[0]) + ".x");
 			break;
 		case to_hash("-"):
 		case to_hash("-|"):
@@ -2060,7 +2059,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
 
 	if (statistic(opts["optimize"])) {
-		std::cout << std::endl << "start training..." << std::endl;
+		std::cout << std::endl << "start optimizing..." << std::endl;
 		statistic stat = optimize(opts["optimize"], opts["options"]);
 		if (opts["info"] == "full") stat.summary();
 	}
@@ -2068,7 +2067,7 @@ int main(int argc, const char* argv[]) {
 	utils::save_network(opts["save"]);
 
 	if (statistic(opts["evaluate"])) {
-		std::cout << std::endl << "start testing..." << std::endl;
+		std::cout << std::endl << "start evaluating..." << std::endl;
 		statistic stat = evaluate(opts["evaluate"], opts["options"]);
 		if (opts["info"] != "none") stat.summary();
 	}

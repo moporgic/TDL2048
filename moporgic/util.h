@@ -439,6 +439,12 @@ public:
 		const auto r2 = sb2->sputc(c);
 		return ((r1 == eof) | (r2 == eof)) ? eof : c;
 	}
+protected:
+	virtual std::streamsize xsputn(const char_type* s, std::streamsize n) {
+		const auto z1 = sb1->sputn(s, n);
+		const auto z2 = sb2->sputn(s, n);
+		return std::min(z1, z2);
+	}
 private:
 	std::streambuf* sb1;
 	std::streambuf* sb2;

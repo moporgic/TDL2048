@@ -50,6 +50,17 @@
 #include <regex>
 #include <atomic>
 
+#ifdef __linux__
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <signal.h>
+#endif
+
 #ifdef INC_MOPORGIOUS_LIB
 #include "type.h"
 #include "util.h"
