@@ -1863,7 +1863,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
 //			opts["save"] += opts[""]; // e.g. "-o 2048.x" indicates logging
-			for (auto opt : opts[""]) opts[opt[opt.find('.') + 1] != 'x' ? "save" : "logging"] += opt;
+			for (auto opt : opts[""]) opts[opt[opt.find_last_of('.') + 1] != 'x' ? "save" : "logging"] += opt;
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
