@@ -1887,10 +1887,10 @@ struct search : select {
 	}
 	inline select& operator ()(const board& b, const clip<feature>& range) {
 		u32 depth = policy[b.spaces().size()] - 1;
-		move[0].assign(b);
-		move[1].assign(b);
-		move[2].assign(b);
-		move[3].assign(b);
+		move[0].assign(b, 0);
+		move[1].assign(b, 1);
+		move[2].assign(b, 2);
+		move[3].assign(b, 3);
 		move[0].search(depth, range);
 		move[1].search(depth, range);
 		move[2].search(depth, range);
