@@ -133,7 +133,7 @@ public:
 		constexpr container(const clip<weight>& w) : clip<weight>(w) {}
 	public:
 		weight& make(u64 sign, size_t size) { return list<weight>::as(*this).emplace_back(weight(sign, size)); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? free(it->data()), list<weight>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		weight erase(u64 sign) { auto it = find(sign); auto w = *it; free(it->data()); list<weight>::as(*this).erase(it); return w; }
 		weight* find(u64 sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
 		weight& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
 		weight& operator[](u64 sign) const { return (*find(sign)); }
@@ -176,7 +176,7 @@ public:
 		constexpr container(const clip<indexer>& i) : clip<indexer>(i) {}
 	public:
 		indexer& make(u64 sign, mapper map) { return list<indexer>::as(*this).emplace_back(indexer(sign, map)); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<indexer>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		weight erase(u64 sign) { auto it = find(sign); auto x = *it; list<indexer>::as(*this).erase(it); return x; }
 		indexer* find(u64 sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
 		indexer& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
 		indexer& operator[](u64 sign) const { return (*find(sign)); }
@@ -268,8 +268,8 @@ public:
 	public:
 		feature& make(u64 wgt, u64 idx) { return list<feature>::as(*this).emplace_back(feature(weight(wgt), indexer(idx))); }
 		feature& make(u64 sign) { return make(u32(sign >> 32), u32(sign)); }
-		size_t erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<feature>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		weight erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
+		weight erase(u64 sign) { auto it = find(sign); auto f = *it; list<feature>::as(*this).erase(it); return f; }
 		feature* find(u64 wgt, u64 idx) const { return find((wgt << 32) | idx); }
 		feature* find(u64 sign) const { return std::find_if(begin(), end(), [=](const feature& f) { return f.sign() == sign; }); }
 		feature& at(u64 wgt, u64 idx) const { return at((wgt << 32) | idx); }
