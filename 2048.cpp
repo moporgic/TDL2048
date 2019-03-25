@@ -1863,7 +1863,6 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 
 	switch (to_hash(args["mode"])) {
 	case to_hash("backward"):
-	case to_hash("backward-best"):
 		for (stats.init(args); stats; stats++) {
 
 			u32 score = 0;
@@ -1886,7 +1885,6 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 		break;
 
 	case to_hash("backward-4x6patt"):
-	case to_hash("backward-best-4x6patt"):
 		for (stats.init(args); stats; stats++) {
 
 			clip<feature> feats = feature::feats();
@@ -1912,7 +1910,6 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 
 	default:
 	case to_hash("forward"):
-	case to_hash("forward-best"):
 		for (stats.init(args); stats; stats++) {
 
 			u32 score = 0;
@@ -1940,23 +1937,18 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 		break;
 
 	case to_hash("forward-4x6patt"):
-	case to_hash("forward-best-4x6patt"):
 		for (stats.init(args); stats; stats++) optimize_specialized(4x6patt);
 		break;
 	case to_hash("forward-5x6patt"):
-	case to_hash("forward-best-5x6patt"):
 		for (stats.init(args); stats; stats++) optimize_specialized(5x6patt);
 		break;
 	case to_hash("forward-6x6patt"):
-	case to_hash("forward-best-6x6patt"):
 		for (stats.init(args); stats; stats++) optimize_specialized(6x6patt);
 		break;
 	case to_hash("forward-7x6patt"):
-	case to_hash("forward-best-7x6patt"):
 		for (stats.init(args); stats; stats++) optimize_specialized(7x6patt);
 		break;
 	case to_hash("forward-8x6patt"):
-	case to_hash("forward-best-8x6patt"):
 		for (stats.init(args); stats; stats++) optimize_specialized(8x6patt);
 		break;
 	}
