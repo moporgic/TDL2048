@@ -1410,10 +1410,9 @@ std::string specialize(utils::options& opts) {
 		if (!opts("evaluate", "mode")) opts["evaluate"]["mode"] = espec;
 	}
 	std::string omode = opts["optimize"]["mode"], emode = opts["evaluate"]["mode"];
-	if (omode == ospec && emode == espec) spec = "on";
-	if (omode == ospec && emode != espec) spec = "semi-on";
-	if (omode != ospec && emode == espec) spec = "semi-on";
-	if (omode != ospec && emode != espec) spec = "off";
+	if (omode == ospec && emode != espec) spec += " (for optimization only)";
+	if (omode != ospec && emode == espec) spec += " (for evaluation only)";
+	if (omode != ospec && emode != espec) spec = "universal";
 	return (opts["options"]["spec"] = spec);
 }
 
