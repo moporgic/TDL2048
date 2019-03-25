@@ -44,7 +44,7 @@ public:
 
 	inline u64 sign() const { return id; }
 	inline size_t size() const { return length; }
-	inline numeric& operator [](u64 i) { return raw[i]; }
+	inline segment& operator [](u64 i) { return raw[i]; }
 	inline segment* data(u64 i = 0) { return raw + i; }
 	inline clip<numeric> value() const { return { raw, raw + length }; }
 	inline operator bool() const { return raw; }
@@ -67,38 +67,35 @@ public:
 		return out;
 	}
 	friend std::istream& operator >>(std::istream& in, weight& w) {
-		auto& id = w.id;
-		auto& length = w.length;
-		auto& raw = w.raw;
 		u32 code = 4;
 		read_cast<u8>(in, code);
 		switch (code) {
 		case 0:
 		case 1:
 		case 2:
-			read_cast<u32>(in, id);
-			read_cast<u64>(in, length);
+			read_cast<u32>(in, w.id);
+			read_cast<u64>(in, w.length);
 			if (code == 2)
 				read_cast<u16>(in, code);
 			else
 				code = code == 1 ? 8 : 4;
-			raw = alloc(length);
+			w.raw = weight::alloc(w.length);
 			switch (code) {
-			case 4: read_cast<f32>(in, raw, raw + length); break;
-			case 8: read_cast<f64>(in, raw, raw + length); break;
+			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
+			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
 			break;
 		default:
 		case 4:
-			read_cast<u32>(in, id);
+			read_cast<u32>(in, w.id);
 			read_cast<u32>(in, code);
 			read_cast<u16>(in, code);
-			read_cast<u64>(in, length);
-			raw = alloc(length);
+			read_cast<u64>(in, w.length);
+			w.raw = weight::alloc(w.length);
 			switch (code) {
-			case 2: read_cast<f16>(in, raw, raw + length); break;
-			case 4: read_cast<f32>(in, raw, raw + length); break;
-			case 8: read_cast<f64>(in, raw, raw + length); break;
+			case 2: read_cast<f16>(in, w.value().begin(), w.value().end()); break;
+			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
+			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
 			while (read_cast<u16>(in, code) && code)
 				in.ignore(code * read<u64>(in));
@@ -136,7 +133,7 @@ public:
 		constexpr container(const clip<weight>& w) : clip<weight>(w) {}
 	public:
 		weight& make(u64 sign, size_t size) { return list<weight>::as(*this).emplace_back(weight(sign, size)); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? free(it->data()), list<weight>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		weight erase(u64 sign) { auto it = find(sign); auto w = *it; free(it->data()); list<weight>::as(*this).erase(it); return w; }
 		weight* find(u64 sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
 		weight& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
 		weight& operator[](u64 sign) const { return (*find(sign)); }
@@ -179,7 +176,7 @@ public:
 		constexpr container(const clip<indexer>& i) : clip<indexer>(i) {}
 	public:
 		indexer& make(u64 sign, mapper map) { return list<indexer>::as(*this).emplace_back(indexer(sign, map)); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<indexer>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		weight erase(u64 sign) { auto it = find(sign); auto x = *it; list<indexer>::as(*this).erase(it); return x; }
 		indexer* find(u64 sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
 		indexer& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
 		indexer& operator[](u64 sign) const { return (*find(sign)); }
@@ -205,43 +202,37 @@ public:
 	inline ~feature() {}
 
 	inline u64 sign() const { return (raw.sign() << 32) | map.sign(); }
-	inline weight::numeric& operator [](const board& b) { return raw[map(b)]; }
-	inline weight::numeric& operator [](u64 idx) { return raw[idx]; }
+	inline weight::segment& operator [](const board& b) { return raw[map(b)]; }
+	inline weight::segment& operator [](u64 idx) { return raw[idx]; }
 	inline u64 operator ()(const board& b) const { return map(b); }
 
 	inline indexer index() const { return map; }
 	inline weight  value() const { return raw; }
-	inline operator indexer() const { return map; }
-	inline operator weight()  const { return raw; }
 	inline operator bool() const { return map && raw; }
 	declare_comparators(const feature&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
-		auto& index = f.map;
-		auto& value = f.raw;
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
 		default:
 		case 0:
-			write_cast<u32>(out, index.sign());
-			write_cast<u32>(out, value.sign());
+			write_cast<u32>(out, f.map.sign());
+			write_cast<u32>(out, f.raw.sign());
 			break;
 		}
 		return out;
 	}
 	friend std::istream& operator >>(std::istream& in, feature& f) {
-		auto& index = f.map;
-		auto& value = f.raw;
 		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
 		default:
 		case 0:
 			read_cast<u32>(in, code);
-			index = indexer(code);
+			f.map = indexer(code);
 			read_cast<u32>(in, code);
-			value = weight(code);
+			f.raw = weight(code);
 			break;
 		}
 		return in;
@@ -277,8 +268,8 @@ public:
 	public:
 		feature& make(u64 wgt, u64 idx) { return list<feature>::as(*this).emplace_back(feature(weight(wgt), indexer(idx))); }
 		feature& make(u64 sign) { return make(u32(sign >> 32), u32(sign)); }
-		size_t erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<feature>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		weight erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
+		weight erase(u64 sign) { auto it = find(sign); auto f = *it; list<feature>::as(*this).erase(it); return f; }
 		feature* find(u64 wgt, u64 idx) const { return find((wgt << 32) | idx); }
 		feature* find(u64 sign) const { return std::find_if(begin(), end(), [=](const feature& f) { return f.sign() == sign; }); }
 		feature& at(u64 wgt, u64 idx) const { return at((wgt << 32) | idx); }
@@ -1218,6 +1209,7 @@ std::map<std::string, std::string> aliases() {
 	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
 	alias["7x6patt"] = alias["7x6patt/k.matsuzaki"];
 	alias["8x6patt"] = alias["8x6patt/k.matsuzaki"];
+	alias["8x4patt"] = "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
 	alias["5x4patt"] = alias["5x4patt/4-22"];
 	alias["2x4patt"] = alias["2x4patt/4"];
 	alias["2x8patt"] = alias["2x8patt/44"];
@@ -1432,7 +1424,9 @@ void list_mapping() {
 			u32 usageG = usageM >> 10;
 			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
 			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-			snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c", w.sign(), w.size(), usage, scale);
+			int n = snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c", w.sign(), w.size(), usage, scale);
+			u32 stride = sizeof(weight::segment) / sizeof(weight::numeric);
+			if (stride > 1) snprintf(buf + n, sizeof(buf) - n, " x%u", stride);
 			std::cout << buf << " :" << feats << std::endl;
 		} else {
 			snprintf(buf, sizeof(buf), "%08" PRIx64, w.sign());
@@ -2096,7 +2090,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
 //			opts["save"] += opts[""]; // e.g. "-o 2048.x" indicates logging
-			for (auto opt : opts[""]) opts[opt[opt.find('.') + 1] != 'x' ? "save" : "logging"] += opt;
+			for (auto opt : opts[""]) opts[opt[opt.find_last_of('.') + 1] != 'x' ? "save" : "logging"] += opt;
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
@@ -2204,7 +2198,7 @@ int main(int argc, const char* argv[]) {
 	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
 
 	if (statistic(opts["optimize"])) {
-		std::cout << std::endl << "start training..." << std::endl;
+		std::cout << std::endl << "start optimizing..." << std::endl;
 		statistic stat = optimize(opts["optimize"], opts["options"]);
 		if (opts["info"] == "full") stat.summary();
 	}
@@ -2212,7 +2206,7 @@ int main(int argc, const char* argv[]) {
 	utils::save_network(opts["save"]);
 
 	if (statistic(opts["evaluate"])) {
-		std::cout << std::endl << "start testing..." << std::endl;
+		std::cout << std::endl << "start evaluating..." << std::endl;
 		statistic stat = evaluate(opts["evaluate"], opts["options"]);
 		if (opts["info"] != "none") stat.summary();
 	}
