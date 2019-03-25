@@ -437,6 +437,46 @@ u64 index6t(const board& b) {
 	index += b.at(p5) << 20;
 	return index;
 }
+template<>
+u64 index6t<0x0,0x1,0x2,0x3,0x4,0x5>(const board& b) {
+	return (u32(u64(b)) & 0xffffff);
+}
+template<>
+u64 index6t<0x4,0x5,0x6,0x7,0x8,0x9>(const board& b) {
+	return (u32(u64(b) >> 16) & 0xffffff);
+}
+template<>
+u64 index6t<0x8,0x9,0xa,0xb,0xc,0xd>(const board& b) {
+	return (u32(u64(b) >> 32) & 0xffffff);
+}
+template<>
+u64 index6t<0x0,0x1,0x2,0x4,0x5,0x6>(const board& b) {
+	return (u32(u64(b)) & 0x000fff) | ((u32(u64(b)) >> 4) & 0xfff000);
+}
+template<>
+u64 index6t<0x4,0x5,0x6,0x8,0x9,0xa>(const board& b) {
+	return (u32(u64(b) >> 16) & 0x000fff) | (u32(u64(b) >> 20) & 0xfff000);
+}
+template<>
+u64 index6t<0x2,0x3,0x4,0x5,0x6,0x9>(const board& b) {
+	return (u32(u64(b) >> 8) & 0x0fffff) | (u32(u64(b) >> 16) & 0xf00000);
+}
+template<>
+u64 index6t<0x0,0x1,0x2,0x5,0x9,0xa>(const board& b) {
+	return (u32(u64(b)) & 0x000fff) | (u32(u64(b) >> 8) & 0x00f000) | (u32(u64(b) >> 20) & 0xff0000);
+}
+template<>
+u64 index6t<0x3,0x4,0x5,0x6,0x7,0x8>(const board& b) {
+	return (u32(u64(b) >> 12) & 0xffffff);
+}
+template<>
+u64 index6t<0x1,0x3,0x4,0x5,0x6,0x7>(const board& b) {
+	return (u32(u64(b) >> 4) & 0x00000f) | (u32(u64(b) >> 8) & 0xfffff0);
+}
+template<>
+u64 index6t<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) {
+	return (u32(u64(b)) & 0x0000ff) | (u32(u64(b) >> 8) & 0x000f00) | (u32(u64(b) >> 20) & 0xfff000);
+}
 template<u32 p0, u32 p1, u32 p2, u32 p3>
 u64 index4t(const board& b) {
 	register u64 index = 0;
@@ -1356,6 +1396,26 @@ u32 save_network(utils::options::option opt) {
 	return 0;
 }
 
+std::string specialize(utils::options& opts) {
+	std::string spec = opts["options"].find("spec", "auto");
+	if (spec == "auto" || spec == "on") {
+		spec = opts.find("make", "4x6patt"); // assume that default 4x6patt
+		spec = spec.substr(0, spec.find_first_of("&|="));
+	}
+	std::string ospec = "n/a", espec = "n/a";
+	if (spec == "4x6patt" || spec == "5x6patt" || spec == "6x6patt" || spec == "7x6patt" || spec == "8x6patt") {
+		ospec = "forward-" + spec;
+		espec = "best-" + spec;
+		if (!opts("optimize", "mode")) opts["optimize"]["mode"] = ospec;
+		if (!opts("evaluate", "mode")) opts["evaluate"]["mode"] = espec;
+	}
+	std::string omode = opts["optimize"]["mode"], emode = opts["evaluate"]["mode"];
+	if (omode == ospec && emode != espec) spec += " (for optimization only)";
+	if (omode != ospec && emode == espec) spec += " (for evaluation only)";
+	if (omode != ospec && emode != espec) spec = "universal";
+	return (opts["options"]["spec"] = spec);
+}
+
 void list_mapping() {
 	for (weight w : list<weight>(weight::wghts())) {
 		char buf[64];
@@ -1387,6 +1447,78 @@ void list_mapping() {
 typedef numeric(*estimator)(const board&, clip<feature>);
 typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
 
+#define invoke_4x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
+#define invoke_5x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x8,0x9,0xa,0xb,0xc,0xd>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
+#define invoke_6x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+
+#define invoke_7x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
+
+#define invoke_8x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[7 << 3][index6t<0x0,0x1,0x4,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
+#define invoke_specialized(name, state, range, ...)({\
+register numeric esti = 0;\
+register board iso = state;\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.transpose();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.transpose();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.transpose();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+esti;})\
+
+#define declare_specialized(name)\
+inline numeric estimate_##name(const board& state, clip<feature> range = feature::feats()) {\
+	return invoke_specialized(name, state, range); }\
+inline numeric optimize_##name(const board& state, numeric updv, clip<feature> range = feature::feats()) {\
+	return invoke_specialized(name, state, range, += updv); }\
+
+declare_specialized(4x6patt);
+declare_specialized(5x6patt);
+declare_specialized(6x6patt);
+declare_specialized(7x6patt);
+declare_specialized(8x6patt);
+
 inline numeric estimate(const board& state,
 		clip<feature> range = feature::feats()) {
 	register numeric esti = 0;
@@ -1401,6 +1533,11 @@ inline numeric optimize(const board& state, numeric error,
 	for (register feature& feat : range)
 		esti += (feat[state] += error);
 	return esti;
+}
+
+inline constexpr numeric illegal(const board& state,
+		clip<feature> range = feature::feats()) {
+	return -std::numeric_limits<numeric>::max();
 }
 
 } // utils
@@ -1425,17 +1562,17 @@ struct state {
 		score = move.operate(op);
 	}
 	inline numeric estimate(
-			clip<feature> range = feature::feats()) {
-		if (score >= 0) {
-			esti = state::reward() + utils::estimate(move, range);
-		} else {
-			esti = -std::numeric_limits<numeric>::max();
-		}
+			clip<feature> range = feature::feats(),
+			utils::estimator estim = utils::estimate) {
+		estim = score >= 0 ? estim : utils::illegal;
+		esti = state::reward() + estim(move, range);
 		return esti;
 	}
 	inline numeric optimize(numeric exact, numeric alpha = state::alpha(),
-			clip<feature> range = feature::feats()) {
-		esti = state::reward() + utils::optimize(move, (exact - state::value()) * alpha, range);
+			clip<feature> range = feature::feats(),
+			utils::optimizer optim = utils::optimize) {
+		numeric update = (exact - state::value()) * alpha;
+		esti = state::reward() + optim(move, update, range);
 		return esti;
 	}
 
@@ -1446,15 +1583,15 @@ struct select {
 	state move[4];
 	state *best;
 	inline select() : best(move) {}
-	inline select& operator ()(const board& b, clip<feature> range = feature::feats()) {
+	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), utils::estimator estim = utils::estimate) {
 		move[0].assign(b, 0);
 		move[1].assign(b, 1);
 		move[2].assign(b, 2);
 		move[3].assign(b, 3);
-		move[0].estimate(range);
-		move[1].estimate(range);
-		move[2].estimate(range);
-		move[3].estimate(range);
+		move[0].estimate(range, estim);
+		move[1].estimate(range, estim);
+		move[2].estimate(range, estim);
+		move[3].estimate(range, estim);
 		best = std::max_element(move, move + 4);
 		return *this;
 	}
@@ -1673,6 +1810,49 @@ struct statistic {
 	}
 };
 
+#define optimize_specialized(name){\
+	utils::estimator estim = utils::estimate_##name;\
+	utils::optimizer optim = utils::optimize_##name;\
+	clip<feature> feats = feature::feats();\
+	numeric alpha = state::alpha();\
+	u32 score = 0;\
+	u32 opers = 0;\
+	\
+	b.init();\
+	best(b, feats, estim);\
+	score += best.score();\
+	opers += 1;\
+	best >> last;\
+	best >> b;\
+	b.next();\
+	while (best(b, feats, estim)) {\
+		last.optimize(best.esti(), alpha, feats, optim);\
+		score += best.score();\
+		opers += 1;\
+		best >> last;\
+		best >> b;\
+		b.next();\
+	}\
+	last.optimize(0, alpha, feats, optim);\
+	\
+	stats.update(score, b.hash(), opers);\
+}
+
+#define evaluate_specialized(name){\
+	utils::estimator estim = utils::estimate_##name;\
+	clip<feature> feats = feature::feats();\
+	u32 score = 0;\
+	u32 opers = 0;\
+	\
+	for (b.init(); best(b, feats, estim); b.next()) {\
+		score += best.score();\
+		opers += 1;\
+		best >> b;\
+	}\
+	\
+	stats.update(score, b.hash(), opers);\
+}
+
 statistic optimize(utils::options::option args, utils::options::option opts = {}) {
 	std::vector<state> path;
 	path.reserve(65536);
@@ -1699,6 +1879,31 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 			for (numeric v = 0; path.size(); path.pop_back()) {
 				path.back().estimate();
 				v = path.back().optimize(v);
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("backward-4x6patt"):
+	case to_hash("backward-best-4x6patt"):
+		for (stats.init(args); stats; stats++) {
+
+			clip<feature> feats = feature::feats();
+			numeric alpha = state::alpha();
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, utils::estimate_4x6patt); b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				path.back().estimate(feats, utils::estimate_4x6patt);
+				v = path.back().optimize(v, alpha, feats, utils::optimize_4x6patt);
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -1733,6 +1938,27 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 			stats.update(score, b.hash(), opers);
 		}
 		break;
+
+	case to_hash("forward-4x6patt"):
+	case to_hash("forward-best-4x6patt"):
+		for (stats.init(args); stats; stats++) optimize_specialized(4x6patt);
+		break;
+	case to_hash("forward-5x6patt"):
+	case to_hash("forward-best-5x6patt"):
+		for (stats.init(args); stats; stats++) optimize_specialized(5x6patt);
+		break;
+	case to_hash("forward-6x6patt"):
+	case to_hash("forward-best-6x6patt"):
+		for (stats.init(args); stats; stats++) optimize_specialized(6x6patt);
+		break;
+	case to_hash("forward-7x6patt"):
+	case to_hash("forward-best-7x6patt"):
+		for (stats.init(args); stats; stats++) optimize_specialized(7x6patt);
+		break;
+	case to_hash("forward-8x6patt"):
+	case to_hash("forward-best-8x6patt"):
+		for (stats.init(args); stats; stats++) optimize_specialized(8x6patt);
+		break;
 	}
 
 	return stats;
@@ -1759,6 +1985,22 @@ statistic evaluate(utils::options::option args, utils::options::option opts = {}
 
 			stats.update(score, b.hash(), opers);
 		}
+		break;
+
+	case to_hash("best-4x6patt"):
+		for (stats.init(args); stats; stats++) evaluate_specialized(4x6patt);
+		break;
+	case to_hash("best-5x6patt"):
+		for (stats.init(args); stats; stats++) evaluate_specialized(5x6patt);
+		break;
+	case to_hash("best-6x6patt"):
+		for (stats.init(args); stats; stats++) evaluate_specialized(6x6patt);
+		break;
+	case to_hash("best-7x6patt"):
+		for (stats.init(args); stats; stats++) evaluate_specialized(7x6patt);
+		break;
+	case to_hash("best-8x6patt"):
+		for (stats.init(args); stats; stats++) evaluate_specialized(8x6patt);
 		break;
 
 	case to_hash("random"):
@@ -1952,6 +2194,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << moporgic::millisec() << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
+	std::cout << "spec = " << utils::specialize(opts) << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
