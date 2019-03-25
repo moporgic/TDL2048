@@ -1396,16 +1396,25 @@ u32 save_network(utils::options::option opt) {
 	return 0;
 }
 
-std::string specialize(utils::options& opts, const char* spec = "spec") {
-	std::string feat = opts.find("make", "4x6patt"); // assume that default 4x6patt
-	feat = feat.substr(0, feat.find_first_of("&|="));
-	if (opts["options"].find(spec, "on") == "on")
-		if (feat == "4x6patt" || feat == "5x6patt" || feat == "6x6patt" || feat == "7x6patt" || feat == "8x6patt") {
-			if (!opts("optimize", "mode")) opts["optimize"]["mode"] = "forward-" + feat;
-			if (!opts("evaluate", "mode")) opts["evaluate"]["mode"] = "best-" + feat;
-			return (opts["options"][spec] = "on");
-		}
-	return (opts["options"][spec] = "off");
+std::string specialize(utils::options& opts) {
+	std::string spec = opts["options"].find("spec", "auto");
+	if (spec == "auto" || spec == "on") {
+		spec = opts.find("make", "4x6patt"); // assume that default 4x6patt
+		spec = spec.substr(0, spec.find_first_of("&|="));
+	}
+	std::string ospec = "n/a", espec = "n/a";
+	if (spec == "4x6patt" || spec == "5x6patt" || spec == "6x6patt" || spec == "7x6patt" || spec == "8x6patt") {
+		ospec = "forward-" + spec;
+		espec = "best-" + spec;
+		if (!opts("optimize", "mode")) opts["optimize"]["mode"] = ospec;
+		if (!opts("evaluate", "mode")) opts["evaluate"]["mode"] = espec;
+	}
+	std::string omode = opts["optimize"]["mode"], emode = opts["evaluate"]["mode"];
+	if (omode == ospec && emode == espec) spec = "on";
+	if (omode == ospec && emode != espec) spec = "semi-on";
+	if (omode != ospec && emode == espec) spec = "semi-on";
+	if (omode != ospec && emode != espec) spec = "off";
+	return (opts["options"]["spec"] = spec);
 }
 
 void list_mapping() {
@@ -2186,7 +2195,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << moporgic::millisec() << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
-	std::cout << "spec = " << utils::specialize(opts, "spec") << std::endl;
+	std::cout << "spec = " << utils::specialize(opts) << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
