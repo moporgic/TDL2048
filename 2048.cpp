@@ -137,7 +137,7 @@ public:
 		weight* find(u64 sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
 		weight& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
 		weight& operator[](u64 sign) const { return (*find(sign)); }
-		weight operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : weight(); }
+		weight operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ weight w; w.id = sign; w; }); }
 	};
 
 	static inline weight::container& wghts() { static container w; return w; }
@@ -180,7 +180,7 @@ public:
 		indexer* find(u64 sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
 		indexer& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
 		indexer& operator[](u64 sign) const { return (*find(sign)); }
-		indexer operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : indexer(); }
+		indexer operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ indexer x; x.id = sign; x; }); }
 	};
 
 	static inline indexer::container& idxrs() { static container i; return i; }
@@ -197,11 +197,11 @@ private:
 
 class feature {
 public:
-	inline feature() {}
+	inline feature() : id(0), raw(), map() {}
 	inline feature(const feature& t) = default;
 	inline ~feature() {}
 
-	inline u64 sign() const { return (raw.sign() << 32) | map.sign(); }
+	inline u64 sign() const { return id; }
 	inline weight::segment& operator [](const board& b) { return raw[map(b)]; }
 	inline weight::segment& operator [](u64 idx) { return raw[idx]; }
 	inline u64 operator ()(const board& b) const { return map(b); }
@@ -217,8 +217,8 @@ public:
 		switch (code) {
 		default:
 		case 0:
-			write_cast<u32>(out, f.map.sign());
-			write_cast<u32>(out, f.raw.sign());
+			write_cast<u32>(out, u32(f.sign()));
+			write_cast<u32>(out, u32(f.sign() >> 32));
 			break;
 		}
 		return out;
@@ -231,8 +231,10 @@ public:
 		case 0:
 			read_cast<u32>(in, code);
 			f.map = indexer(code);
+			f.id = u64(code);
 			read_cast<u32>(in, code);
 			f.raw = weight(code);
+			f.id |= u64(code) << 32;
 			break;
 		}
 		return in;
@@ -276,7 +278,7 @@ public:
 		feature& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("feature::at"); }
 		feature& operator[](u64 sign) const { return (*find(sign)); }
 		feature operator()(u64 wgt, u64 idx) const { return operator()((wgt << 32) | idx); }
-		feature operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : feature(); }
+		feature operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ feature f; f.id = sign; f; }); }
 	};
 
 	static inline feature::container& feats() { static container f; return f; }
@@ -285,10 +287,11 @@ public:
 	inline feature(u64 wgt, u64 idx, const container& src = feats()) : feature(src(wgt, idx)) {}
 
 private:
-	inline feature(const weight& value, const indexer& index) : map(index), raw(value) {}
+	inline feature(const weight& value, const indexer& index) : id((value.sign() << 32) | index.sign()), raw(value), map(index) {}
 
-	indexer map;
+	u64 id;
 	weight raw;
+	indexer map;
 };
 
 namespace utils {
