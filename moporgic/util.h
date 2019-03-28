@@ -46,6 +46,8 @@
 #define VA_ARG_9(V, ...) VA_ARG_8(__VA_ARGS__)
 #define VA_PASS(...) __VA_ARGS__
 
+#define PASTE_PASS(a, b) a##b
+#define PASTE(a, b) PASTE_PASS(a, b)
 
 #define declare_alias_spec(alias, name, head, tail, ...)\
 template <typename... types> VA_PASS(head inline) \
