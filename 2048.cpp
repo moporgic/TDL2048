@@ -1399,28 +1399,6 @@ u32 save_network(utils::options::option opt) {
 	return 0;
 }
 
-std::string specialize(utils::options& opts) {
-	std::string spec = opts["options"].find("spec", "auto");
-	if (spec == "auto" || spec == "on") {
-		spec = opts.find("make", "4x6patt"); // assume that default 4x6patt
-		spec = spec.substr(0, spec.find_first_of("&|="));
-	}
-	std::string ospec = "n/a", espec = "n/a";
-	if (spec == "4x6patt" || spec == "5x6patt" || spec == "6x6patt" || spec == "7x6patt" || spec == "8x6patt") {
-		opts["optimize"]["spec"] = spec;
-		opts["evaluate"]["spec"] = spec;
-		ospec = "forward-" + spec;
-		espec = "best-" + spec;
-//		if (!opts("optimize", "mode")) opts["optimize"]["mode"] = ospec;
-//		if (!opts("evaluate", "mode")) opts["evaluate"]["mode"] = espec;
-	}
-	std::string omode = opts["optimize"]["mode"], emode = opts["evaluate"]["mode"];
-	if (omode == ospec && emode != espec) spec += " (for optimization only)";
-	if (omode != ospec && emode == espec) spec += " (for evaluation only)";
-	if (omode != ospec && emode != espec) spec = "universal";
-	return (opts["options"]["spec"] = spec);
-}
-
 void list_mapping() {
 	for (weight w : list<weight>(weight::wghts())) {
 		char buf[64];
@@ -1451,6 +1429,27 @@ void list_mapping() {
 
 typedef numeric(*estimator)(const board&, clip<feature>);
 typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
+
+inline numeric estimate(const board& state,
+		clip<feature> range = feature::feats()) {
+	register numeric esti = 0;
+	for (register feature& feat : range)
+		esti += feat[state];
+	return esti;
+}
+
+inline numeric optimize(const board& state, numeric error,
+		clip<feature> range = feature::feats()) {
+	register numeric esti = 0;
+	for (register feature& feat : range)
+		esti += (feat[state] += error);
+	return esti;
+}
+
+inline constexpr numeric illegal(const board& state,
+		clip<feature> range = feature::feats()) {
+	return -std::numeric_limits<numeric>::max();
+}
 
 #define invoke_4x6patt(esti, f, iso, ...)\
 esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
@@ -1524,26 +1523,27 @@ declare_specialized(6x6patt);
 declare_specialized(7x6patt);
 declare_specialized(8x6patt);
 
-inline numeric estimate(const board& state,
-		clip<feature> range = feature::feats()) {
-	register numeric esti = 0;
-	for (register feature& feat : range)
-		esti += feat[state];
-	return esti;
-}
-
-inline numeric optimize(const board& state, numeric error,
-		clip<feature> range = feature::feats()) {
-	register numeric esti = 0;
-	for (register feature& feat : range)
-		esti += (feat[state] += error);
-	return esti;
-}
-
-inline constexpr numeric illegal(const board& state,
-		clip<feature> range = feature::feats()) {
-	return -std::numeric_limits<numeric>::max();
-}
+struct specialize {
+	specialize(utils::options& opts) : estim(utils::estimate), optim(utils::optimize) {
+		std::string spec = opts["options"].find("spec", "auto");
+		if (spec == "auto" || spec == "on") {
+			spec = opts.find("make", "4x6patt"); // assume that default 4x6patt
+			spec = spec.substr(0, spec.find_first_of("&|="));
+		}
+		switch (to_hash(spec)) {
+		case to_hash("4x6patt"): estim = utils::estimate_4x6patt; optim = utils::optimize_4x6patt; break;
+		case to_hash("5x6patt"): estim = utils::estimate_5x6patt; optim = utils::optimize_5x6patt; break;
+		case to_hash("6x6patt"): estim = utils::estimate_6x6patt; optim = utils::optimize_6x6patt; break;
+		case to_hash("7x6patt"): estim = utils::estimate_7x6patt; optim = utils::optimize_7x6patt; break;
+		case to_hash("8x6patt"): estim = utils::estimate_8x6patt; optim = utils::optimize_8x6patt; break;
+		}
+	}
+	constexpr specialize(utils::estimator estim, utils::optimizer optim) : estim(estim), optim(optim) {}
+	constexpr operator utils::estimator() const { return estim; }
+	constexpr operator utils::optimizer() const { return optim; }
+	utils::estimator estim;
+	utils::optimizer optim;
+};
 
 } // utils
 
@@ -1815,50 +1815,9 @@ struct statistic {
 	}
 };
 
-#define optimize_specialized(name){\
-	utils::estimator estim = utils::estimate_##name;\
-	utils::optimizer optim = utils::optimize_##name;\
-	clip<feature> feats = feature::feats();\
-	numeric alpha = state::alpha();\
-	u32 score = 0;\
-	u32 opers = 0;\
-	\
-	b.init();\
-	best(b, feats, estim);\
-	score += best.score();\
-	opers += 1;\
-	best >> last;\
-	best >> b;\
-	b.next();\
-	while (best(b, feats, estim)) {\
-		last.optimize(best.esti(), alpha, feats, optim);\
-		score += best.score();\
-		opers += 1;\
-		best >> last;\
-		best >> b;\
-		b.next();\
-	}\
-	last.optimize(0, alpha, feats, optim);\
-	\
-	stats.update(score, b.hash(), opers);\
-}
+statistic optimize(utils::options opts, const std::string& type) {
+	auto& args = opts[type];
 
-#define evaluate_specialized(name){\
-	utils::estimator estim = utils::estimate_##name;\
-	clip<feature> feats = feature::feats();\
-	u32 score = 0;\
-	u32 opers = 0;\
-	\
-	for (b.init(); best(b, feats, estim); b.next()) {\
-		score += best.score();\
-		opers += 1;\
-		best >> b;\
-	}\
-	\
-	stats.update(score, b.hash(), opers);\
-}
-
-statistic optimize(utils::options::option args, utils::options::option opts = {}) {
 	std::vector<state> path;
 	path.reserve(65536);
 	statistic stats;
@@ -1869,33 +1828,10 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 	numeric alpha = state::alpha();
 	clip<feature> feats = feature::feats();
 
-	utils::estimator estim = utils::estimate;
-	utils::optimizer optim = utils::optimize;
+	utils::estimator estim = utils::specialize(opts);
+	utils::optimizer optim = utils::specialize(opts);
 
 	switch (to_hash(args["mode"])) {
-
-	case to_hash("backward"):
-		for (stats.init(args); stats; stats++) {
-
-			u32 score = 0;
-			u32 opers = 0;
-
-			for (b.init(); best(b, feats, estim); b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> path;
-				best >> b;
-			}
-
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				path.back().estimate(feats, estim);
-				v = path.back().optimize(v, alpha, feats, optim);
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
-
 	default:
 	case to_hash("forward"):
 		for (stats.init(args); stats; stats++) {
@@ -1924,30 +1860,42 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 		}
 		break;
 
-	case to_hash("forward-4x6patt"):
-		for (stats.init(args); stats; stats++) optimize_specialized(4x6patt);
-		break;
-	case to_hash("forward-5x6patt"):
-		for (stats.init(args); stats; stats++) optimize_specialized(5x6patt);
-		break;
-	case to_hash("forward-6x6patt"):
-		for (stats.init(args); stats; stats++) optimize_specialized(6x6patt);
-		break;
-	case to_hash("forward-7x6patt"):
-		for (stats.init(args); stats; stats++) optimize_specialized(7x6patt);
-		break;
-	case to_hash("forward-8x6patt"):
-		for (stats.init(args); stats; stats++) optimize_specialized(8x6patt);
+	case to_hash("backward"):
+		for (stats.init(args); stats; stats++) {
+
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, estim); b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			for (numeric v = 0; path.size(); path.pop_back()) {
+				path.back().estimate(feats, estim);
+				v = path.back().optimize(v, alpha, feats, optim);
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
 		break;
 	}
 
 	return stats;
 }
 
-statistic evaluate(utils::options::option args, utils::options::option opts = {}) {
+statistic evaluate(utils::options opts, const std::string& type) {
+	auto& args = opts[type];
+
 	statistic stats;
 	select best;
 	board b;
+
+	clip<feature> feats = feature::feats();
+
+	utils::estimator estim = utils::specialize(opts);
 
 	switch (to_hash(args["mode"])) {
 	default:
@@ -1957,7 +1905,7 @@ statistic evaluate(utils::options::option args, utils::options::option opts = {}
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best << b; b.next()) {
+			for (b.init(); best(b, feats, estim); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> b;
@@ -1965,22 +1913,6 @@ statistic evaluate(utils::options::option args, utils::options::option opts = {}
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
-
-	case to_hash("best-4x6patt"):
-		for (stats.init(args); stats; stats++) evaluate_specialized(4x6patt);
-		break;
-	case to_hash("best-5x6patt"):
-		for (stats.init(args); stats; stats++) evaluate_specialized(5x6patt);
-		break;
-	case to_hash("best-6x6patt"):
-		for (stats.init(args); stats; stats++) evaluate_specialized(6x6patt);
-		break;
-	case to_hash("best-7x6patt"):
-		for (stats.init(args); stats; stats++) evaluate_specialized(7x6patt);
-		break;
-	case to_hash("best-8x6patt"):
-		for (stats.init(args); stats; stats++) evaluate_specialized(8x6patt);
 		break;
 
 	case to_hash("random"):
@@ -2175,7 +2107,6 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << moporgic::millisec() << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
-	std::cout << "spec = " << utils::specialize(opts) << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
@@ -2188,7 +2119,7 @@ int main(int argc, const char* argv[]) {
 
 	if (statistic(opts["optimize"])) {
 		std::cout << std::endl << "start optimizing..." << std::endl;
-		statistic stat = optimize(opts["optimize"], opts["options"]);
+		statistic stat = optimize(opts, "optimize");
 		if (opts["info"] == "full") stat.summary();
 	}
 
@@ -2196,7 +2127,7 @@ int main(int argc, const char* argv[]) {
 
 	if (statistic(opts["evaluate"])) {
 		std::cout << std::endl << "start evaluating..." << std::endl;
-		statistic stat = evaluate(opts["evaluate"], opts["options"]);
+		statistic stat = evaluate(opts, "evaluate");
 		if (opts["info"] != "none") stat.summary();
 	}
 
