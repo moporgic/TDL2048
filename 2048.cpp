@@ -1407,10 +1407,12 @@ std::string specialize(utils::options& opts) {
 	}
 	std::string ospec = "n/a", espec = "n/a";
 	if (spec == "4x6patt" || spec == "5x6patt" || spec == "6x6patt" || spec == "7x6patt" || spec == "8x6patt") {
+		opts["optimize"]["spec"] = spec;
+		opts["evaluate"]["spec"] = spec;
 		ospec = "forward-" + spec;
 		espec = "best-" + spec;
-		if (!opts("optimize", "mode")) opts["optimize"]["mode"] = ospec;
-		if (!opts("evaluate", "mode")) opts["evaluate"]["mode"] = espec;
+//		if (!opts("optimize", "mode")) opts["optimize"]["mode"] = ospec;
+//		if (!opts("evaluate", "mode")) opts["evaluate"]["mode"] = espec;
 	}
 	std::string omode = opts["optimize"]["mode"], emode = opts["evaluate"]["mode"];
 	if (omode == ospec && emode != espec) spec += " (for optimization only)";
@@ -1864,14 +1866,21 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 	state last;
 	board b;
 
+	numeric alpha = state::alpha();
+	clip<feature> feats = feature::feats();
+
+	utils::estimator estim = utils::estimate;
+	utils::optimizer optim = utils::optimize;
+
 	switch (to_hash(args["mode"])) {
+
 	case to_hash("backward"):
 		for (stats.init(args); stats; stats++) {
 
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best << b; b.next()) {
+			for (b.init(); best(b, feats, estim); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -1879,32 +1888,8 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 			}
 
 			for (numeric v = 0; path.size(); path.pop_back()) {
-				path.back().estimate();
-				v = path.back().optimize(v);
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
-
-	case to_hash("backward-4x6patt"):
-		for (stats.init(args); stats; stats++) {
-
-			clip<feature> feats = feature::feats();
-			numeric alpha = state::alpha();
-			u32 score = 0;
-			u32 opers = 0;
-
-			for (b.init(); best(b, feats, utils::estimate_4x6patt); b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> path;
-				best >> b;
-			}
-
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				path.back().estimate(feats, utils::estimate_4x6patt);
-				v = path.back().optimize(v, alpha, feats, utils::optimize_4x6patt);
+				path.back().estimate(feats, estim);
+				v = path.back().optimize(v, alpha, feats, optim);
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -1919,21 +1904,21 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 			u32 opers = 0;
 
 			b.init();
-			best << b;
+			best(b, feats, estim);
 			score += best.score();
 			opers += 1;
 			best >> last;
 			best >> b;
 			b.next();
-			while (best << b) {
-				last.optimize(best.esti());
+			while (best(b, feats, estim)) {
+				last.optimize(best.esti(), alpha, feats, optim);
 				score += best.score();
 				opers += 1;
 				best >> last;
 				best >> b;
 				b.next();
 			}
-			last.optimize(0);
+			last.optimize(0, alpha, feats, optim);
 
 			stats.update(score, b.hash(), opers);
 		}
