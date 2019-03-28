@@ -1528,8 +1528,8 @@ struct specialize {
 	specialize(utils::options& opts) : estim(utils::estimate), optim(utils::optimize) {
 		std::string spec = opts["options"].find("spec", "auto");
 		if (spec == "auto" || spec == "on") {
-			spec = opts.find("make", "4x6patt"); // assume that default 4x6patt
-			spec = spec.substr(0, spec.find_first_of("&|="));
+			spec = opts.find("make", "4x6patt");
+			spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
 		}
 		switch (to_hash(spec)) {
 		case to_hash("4x6patt"): estim = utils::estimate_4x6patt; optim = utils::optimize_4x6patt; break;
