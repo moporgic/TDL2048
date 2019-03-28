@@ -1491,7 +1491,7 @@ esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));
 esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
 esti += (VA_PASS(f[7 << 3][index6t<0x0,0x1,0x4,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
 
-#define invoke_specialized(name, state, range, ...)({\
+#define invoke_specialized_features(name, state, range, ...)({\
 register numeric esti = 0;\
 register board iso = state;\
 invoke_##name(esti, range, iso, ##__VA_ARGS__);\
@@ -1511,23 +1511,23 @@ iso.mirror();\
 invoke_##name(esti, range, iso, ##__VA_ARGS__);\
 esti;})\
 
-#define declare_specialized(name)\
+#define declare_specialization(name)\
 inline numeric estimate_##name(const board& state, clip<feature> range = feature::feats()) {\
-	return invoke_specialized(name, state, range); }\
+	return invoke_specialized_features(name, state, range); }\
 inline numeric optimize_##name(const board& state, numeric updv, clip<feature> range = feature::feats()) {\
-	return invoke_specialized(name, state, range, += updv); }\
+	return invoke_specialized_features(name, state, range, += updv); }\
 
-declare_specialized(4x6patt);
-declare_specialized(5x6patt);
-declare_specialized(6x6patt);
-declare_specialized(7x6patt);
-declare_specialized(8x6patt);
+declare_specialization(4x6patt);
+declare_specialization(5x6patt);
+declare_specialization(6x6patt);
+declare_specialization(7x6patt);
+declare_specialization(8x6patt);
 
 struct specialize {
 	specialize(utils::options& opts) : estim(utils::estimate), optim(utils::optimize) {
 		std::string spec = opts["options"].find("spec", "auto");
 		if (spec == "auto" || spec == "on") {
-			spec = opts.find("make", "4x6patt");
+			spec = opts["make"].value();
 			spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
 		}
 		switch (to_hash(spec)) {
