@@ -2098,6 +2098,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["info"] = next_opt("full");
 			opts["info"] += next_opts();
 			break;
+		case to_hash("-x"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 			opts["options"] += next_opts();
@@ -2140,8 +2141,8 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--comment"):
 			opts["comment"] = next_opts();
 			break;
-		case to_hash("-x"):
 		case to_hash("-log"):
+		case to_hash("--log"):
 		case to_hash("--logging"):
 			opts["logging"] = next_opt(std::string(argv[0]) + ".x");
 			break;
