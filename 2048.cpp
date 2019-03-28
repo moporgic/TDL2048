@@ -52,7 +52,7 @@ public:
 
 	inline u64 sign() const { return id; }
 	inline size_t size() const { return length; }
-	inline numeric& operator [](u64 i) { return raw[i]; }
+	inline segment& operator [](u64 i) { return raw[i]; }
 	inline segment* data(u64 i = 0) { return raw + i; }
 	inline clip<numeric> value() const { return { raw, raw + length }; }
 	inline operator bool() const { return raw; }
@@ -75,38 +75,35 @@ public:
 		return out;
 	}
 	friend std::istream& operator >>(std::istream& in, weight& w) {
-		auto& id = w.id;
-		auto& length = w.length;
-		auto& raw = w.raw;
 		u32 code = 4;
 		read_cast<u8>(in, code);
 		switch (code) {
 		case 0:
 		case 1:
 		case 2:
-			read_cast<u32>(in, id);
-			read_cast<u64>(in, length);
+			read_cast<u32>(in, w.id);
+			read_cast<u64>(in, w.length);
 			if (code == 2)
 				read_cast<u16>(in, code);
 			else
 				code = code == 1 ? 8 : 4;
-			raw = alloc(length);
+			w.raw = weight::alloc(w.length);
 			switch (code) {
-			case 4: read_cast<f32>(in, raw, raw + length); break;
-			case 8: read_cast<f64>(in, raw, raw + length); break;
+			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
+			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
 			break;
 		default:
 		case 4:
-			read_cast<u32>(in, id);
+			read_cast<u32>(in, w.id);
 			read_cast<u32>(in, code);
 			read_cast<u16>(in, code);
-			read_cast<u64>(in, length);
-			raw = alloc(length);
+			read_cast<u64>(in, w.length);
+			w.raw = weight::alloc(w.length);
 			switch (code) {
-			case 2: read_cast<f16>(in, raw, raw + length); break;
-			case 4: read_cast<f32>(in, raw, raw + length); break;
-			case 8: read_cast<f64>(in, raw, raw + length); break;
+			case 2: read_cast<f16>(in, w.value().begin(), w.value().end()); break;
+			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
+			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
 			while (read_cast<u16>(in, code) && code)
 				in.ignore(code * read<u64>(in));
@@ -144,11 +141,11 @@ public:
 		constexpr container(const clip<weight>& w) : clip<weight>(w) {}
 	public:
 		weight& make(u64 sign, size_t size) { return list<weight>::as(*this).emplace_back(weight(sign, size)); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? free(it->data()), list<weight>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		weight erase(u64 sign) { auto it = find(sign); auto w = *it; free(it->data()); list<weight>::as(*this).erase(it); return w; }
 		weight* find(u64 sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
 		weight& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
 		weight& operator[](u64 sign) const { return (*find(sign)); }
-		weight operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : weight(); }
+		weight operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ weight w; w.id = sign; w; }); }
 	};
 
 	static inline weight::container& wghts() { static container w; return w; }
@@ -192,11 +189,11 @@ public:
 		constexpr container(const clip<indexer>& i) : clip<indexer>(i) {}
 	public:
 		indexer& make(u64 sign, mapper map) { return list<indexer>::as(*this).emplace_back(indexer(sign, map)); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<indexer>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		indexer erase(u64 sign) { auto it = find(sign); auto x = *it; list<indexer>::as(*this).erase(it); return x; }
 		indexer* find(u64 sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
 		indexer& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
 		indexer& operator[](u64 sign) const { return (*find(sign)); }
-		indexer operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : indexer(); }
+		indexer operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ indexer x; x.id = sign; x; }); }
 	};
 
 	static inline indexer::container& idxrs() { static container i; return i; }
@@ -213,48 +210,44 @@ private:
 
 class feature {
 public:
-	inline feature() {}
+	inline feature() : id(0), raw(), map() {}
 	inline feature(const feature& t) = default;
 	inline ~feature() {}
 
-	inline u64 sign() const { return (raw.sign() << 32) | map.sign(); }
-	inline weight::numeric& operator [](const board& b) { return raw[map(b)]; }
-	inline weight::numeric& operator [](u64 idx) { return raw[idx]; }
+	inline u64 sign() const { return id; }
+	inline weight::segment& operator [](const board& b) { return raw[map(b)]; }
+	inline weight::segment& operator [](u64 idx) { return raw[idx]; }
 	inline u64 operator ()(const board& b) const { return map(b); }
 
 	inline indexer index() const { return map; }
 	inline weight  value() const { return raw; }
-	inline operator indexer() const { return map; }
-	inline operator weight()  const { return raw; }
 	inline operator bool() const { return map && raw; }
 	declare_comparators(const feature&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
-		auto& index = f.map;
-		auto& value = f.raw;
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
 		default:
 		case 0:
-			write_cast<u32>(out, index.sign());
-			write_cast<u32>(out, value.sign());
+			write_cast<u32>(out, u32(f.sign()));
+			write_cast<u32>(out, u32(f.sign() >> 32));
 			break;
 		}
 		return out;
 	}
 	friend std::istream& operator >>(std::istream& in, feature& f) {
-		auto& index = f.map;
-		auto& value = f.raw;
 		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
 		default:
 		case 0:
 			read_cast<u32>(in, code);
-			index = indexer(code);
+			f.map = indexer(code);
+			f.id = u64(code);
 			read_cast<u32>(in, code);
-			value = weight(code);
+			f.raw = weight(code);
+			f.id |= u64(code) << 32;
 			break;
 		}
 		return in;
@@ -290,15 +283,15 @@ public:
 	public:
 		feature& make(u64 wgt, u64 idx) { return list<feature>::as(*this).emplace_back(feature(weight(wgt), indexer(idx))); }
 		feature& make(u64 sign) { return make(u32(sign >> 32), u32(sign)); }
-		size_t erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<feature>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		feature erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
+		feature erase(u64 sign) { auto it = find(sign); auto f = *it; list<feature>::as(*this).erase(it); return f; }
 		feature* find(u64 wgt, u64 idx) const { return find((wgt << 32) | idx); }
 		feature* find(u64 sign) const { return std::find_if(begin(), end(), [=](const feature& f) { return f.sign() == sign; }); }
 		feature& at(u64 wgt, u64 idx) const { return at((wgt << 32) | idx); }
 		feature& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("feature::at"); }
 		feature& operator[](u64 sign) const { return (*find(sign)); }
 		feature operator()(u64 wgt, u64 idx) const { return operator()((wgt << 32) | idx); }
-		feature operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : feature(); }
+		feature operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ feature f; f.id = sign; f; }); }
 	};
 
 	static inline feature::container& feats() { static container f; return f; }
@@ -307,10 +300,11 @@ public:
 	inline feature(u64 wgt, u64 idx, const container& src = feats()) : feature(src(wgt, idx)) {}
 
 private:
-	inline feature(const weight& value, const indexer& index) : map(index), raw(value) {}
+	inline feature(const weight& value, const indexer& index) : id((value.sign() << 32) | index.sign()), raw(value), map(index) {}
 
-	indexer map;
+	u64 id;
 	weight raw;
+	indexer map;
 };
 
 namespace utils {
@@ -458,6 +452,46 @@ u64 index6t(const board& b) {
 	index += b.at(p4) << 16;
 	index += b.at(p5) << 20;
 	return index;
+}
+template<>
+u64 index6t<0x0,0x1,0x2,0x3,0x4,0x5>(const board& b) {
+	return (u32(u64(b)) & 0xffffff);
+}
+template<>
+u64 index6t<0x4,0x5,0x6,0x7,0x8,0x9>(const board& b) {
+	return (u32(u64(b) >> 16) & 0xffffff);
+}
+template<>
+u64 index6t<0x8,0x9,0xa,0xb,0xc,0xd>(const board& b) {
+	return (u32(u64(b) >> 32) & 0xffffff);
+}
+template<>
+u64 index6t<0x0,0x1,0x2,0x4,0x5,0x6>(const board& b) {
+	return (u32(u64(b)) & 0x000fff) | ((u32(u64(b)) >> 4) & 0xfff000);
+}
+template<>
+u64 index6t<0x4,0x5,0x6,0x8,0x9,0xa>(const board& b) {
+	return (u32(u64(b) >> 16) & 0x000fff) | (u32(u64(b) >> 20) & 0xfff000);
+}
+template<>
+u64 index6t<0x2,0x3,0x4,0x5,0x6,0x9>(const board& b) {
+	return (u32(u64(b) >> 8) & 0x0fffff) | (u32(u64(b) >> 16) & 0xf00000);
+}
+template<>
+u64 index6t<0x0,0x1,0x2,0x5,0x9,0xa>(const board& b) {
+	return (u32(u64(b)) & 0x000fff) | (u32(u64(b) >> 8) & 0x00f000) | (u32(u64(b) >> 20) & 0xff0000);
+}
+template<>
+u64 index6t<0x3,0x4,0x5,0x6,0x7,0x8>(const board& b) {
+	return (u32(u64(b) >> 12) & 0xffffff);
+}
+template<>
+u64 index6t<0x1,0x3,0x4,0x5,0x6,0x7>(const board& b) {
+	return (u32(u64(b) >> 4) & 0x00000f) | (u32(u64(b) >> 8) & 0xfffff0);
+}
+template<>
+u64 index6t<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) {
+	return (u32(u64(b)) & 0x0000ff) | (u32(u64(b) >> 8) & 0x000f00) | (u32(u64(b) >> 20) & 0xfff000);
 }
 template<u32 p0, u32 p1, u32 p2, u32 p3>
 u64 index4t(const board& b) {
@@ -1191,6 +1225,7 @@ std::map<std::string, std::string> aliases() {
 	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
 	alias["7x6patt"] = alias["7x6patt/k.matsuzaki"];
 	alias["8x6patt"] = alias["8x6patt/k.matsuzaki"];
+	alias["8x4patt"] = "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
 	alias["5x4patt"] = alias["5x4patt/4-22"];
 	alias["2x4patt"] = alias["2x4patt/4"];
 	alias["2x8patt"] = alias["2x8patt/44"];
@@ -1393,7 +1428,9 @@ void list_mapping() {
 			u32 usageG = usageM >> 10;
 			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
 			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-			snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c", w.sign(), w.size(), usage, scale);
+			int n = snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c", w.sign(), w.size(), usage, scale);
+			u32 stride = sizeof(weight::segment) / sizeof(weight::numeric);
+			if (stride > 1) snprintf(buf + n, sizeof(buf) - n, " x%u", stride);
 			std::cout << buf << " :" << feats << std::endl;
 		} else {
 			snprintf(buf, sizeof(buf), "%08" PRIx64, w.sign());
@@ -1422,6 +1459,105 @@ inline numeric optimize(const board& state, numeric error,
 	return esti;
 }
 
+inline constexpr numeric illegal(const board& state,
+		clip<feature> range = feature::feats()) {
+	return -std::numeric_limits<numeric>::max();
+}
+
+#define invoke_4x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
+#define invoke_5x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x8,0x9,0xa,0xb,0xc,0xd>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
+#define invoke_6x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+
+#define invoke_7x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
+
+#define invoke_8x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[7 << 3][index6t<0x0,0x1,0x4,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
+#define invoke_specialized(name, state, range, ...)({\
+register numeric esti = 0;\
+register board iso = state;\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.transpose();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.transpose();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.transpose();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+esti;})\
+
+#define declare_specialized(name)\
+inline numeric estimate_##name(const board& state, clip<feature> range = feature::feats()) {\
+	return invoke_specialized(name, state, range); }\
+inline numeric optimize_##name(const board& state, numeric updv, clip<feature> range = feature::feats()) {\
+	return invoke_specialized(name, state, range, += updv); }\
+
+declare_specialized(4x6patt);
+declare_specialized(5x6patt);
+declare_specialized(6x6patt);
+declare_specialized(7x6patt);
+declare_specialized(8x6patt);
+
+struct specialize {
+	specialize(utils::options& opts) : estim(utils::estimate), optim(utils::optimize) {
+		std::string spec = opts["options"].find("spec", "auto");
+		if (spec == "auto" || spec == "on") {
+			spec = opts.find("make", "4x6patt"); // assume that default 4x6patt
+			spec = spec.substr(0, spec.find_first_of("&|="));
+		}
+		switch (to_hash(spec)) {
+		case to_hash("4x6patt"): estim = utils::estimate_4x6patt; optim = utils::optimize_4x6patt; break;
+		case to_hash("5x6patt"): estim = utils::estimate_5x6patt; optim = utils::optimize_5x6patt; break;
+		case to_hash("6x6patt"): estim = utils::estimate_6x6patt; optim = utils::optimize_6x6patt; break;
+		case to_hash("7x6patt"): estim = utils::estimate_7x6patt; optim = utils::optimize_7x6patt; break;
+		case to_hash("8x6patt"): estim = utils::estimate_8x6patt; optim = utils::optimize_8x6patt; break;
+		}
+	}
+	constexpr specialize(utils::estimator estim, utils::optimizer optim) : estim(estim), optim(optim) {}
+	constexpr operator utils::estimator() const { return estim; }
+	constexpr operator utils::optimizer() const { return optim; }
+	utils::estimator estim;
+	utils::optimizer optim;
+};
+
 } // utils
 
 
@@ -1444,17 +1580,17 @@ struct state {
 		score = move.operate(op);
 	}
 	inline numeric estimate(
-			clip<feature> range = feature::feats()) {
-		if (score >= 0) {
-			esti = state::reward() + utils::estimate(move, range);
-		} else {
-			esti = -std::numeric_limits<numeric>::max();
-		}
+			clip<feature> range = feature::feats(),
+			utils::estimator estim = utils::estimate) {
+		estim = score >= 0 ? estim : utils::illegal;
+		esti = state::reward() + estim(move, range);
 		return esti;
 	}
 	inline numeric optimize(numeric exact, numeric alpha = state::alpha(),
-			clip<feature> range = feature::feats()) {
-		esti = state::reward() + utils::optimize(move, (exact - state::value()) * alpha, range);
+			clip<feature> range = feature::feats(),
+			utils::optimizer optim = utils::optimize) {
+		numeric update = (exact - state::value()) * alpha;
+		esti = state::reward() + optim(move, update, range);
 		return esti;
 	}
 
@@ -1465,15 +1601,15 @@ struct select {
 	state move[4];
 	state *best;
 	inline select() : best(move) {}
-	inline select& operator ()(const board& b, clip<feature> range = feature::feats()) {
+	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), utils::estimator estim = utils::estimate) {
 		move[0].assign(b, 0);
 		move[1].assign(b, 1);
 		move[2].assign(b, 2);
 		move[3].assign(b, 3);
-		move[0].estimate(range);
-		move[1].estimate(range);
-		move[2].estimate(range);
-		move[3].estimate(range);
+		move[0].estimate(range, estim);
+		move[1].estimate(range, estim);
+		move[2].estimate(range, estim);
+		move[3].estimate(range, estim);
 		best = std::max_element(move, move + 4);
 		return *this;
 	}
@@ -1702,7 +1838,9 @@ struct statistic {
 	}
 };
 
-statistic optimize(utils::options::option args, utils::options::option opts = {}) {
+statistic optimize(utils::options opts, const std::string& type) {
+	auto& args = opts[type];
+
 	std::vector<state> path;
 	path.reserve(65536);
 	statistic stats;
@@ -1710,15 +1848,48 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 	state last;
 	board b;
 
+	numeric alpha = state::alpha();
+	clip<feature> feats = feature::feats();
+
+	utils::estimator estim = utils::specialize(opts);
+	utils::optimizer optim = utils::specialize(opts);
+
 	switch (to_hash(args["mode"])) {
-	case to_hash("backward"):
-	case to_hash("backward-best"):
+	default:
+	case to_hash("forward"):
 		for (stats.init(args); stats; stats++) {
 
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best << b; b.next()) {
+			b.init();
+			best(b, feats, estim);
+			score += best.score();
+			opers += 1;
+			best >> last;
+			best >> b;
+			b.next();
+			while (best(b, feats, estim)) {
+				last.optimize(best.esti(), alpha, feats, optim);
+				score += best.score();
+				opers += 1;
+				best >> last;
+				best >> b;
+				b.next();
+			}
+			last.optimize(0, alpha, feats, optim);
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("backward"):
+		for (stats.init(args); stats; stats++) {
+
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, estim); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -1726,38 +1897,9 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 			}
 
 			for (numeric v = 0; path.size(); path.pop_back()) {
-				path.back().estimate();
-				v = path.back().optimize(v);
+				path.back().estimate(feats, estim);
+				v = path.back().optimize(v, alpha, feats, optim);
 			}
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
-
-	default:
-	case to_hash("forward"):
-	case to_hash("forward-best"):
-		for (stats.init(args); stats; stats++) {
-
-			u32 score = 0;
-			u32 opers = 0;
-
-			b.init();
-			best << b;
-			score += best.score();
-			opers += 1;
-			best >> last;
-			best >> b;
-			b.next();
-			while (best << b) {
-				last.optimize(best.esti());
-				score += best.score();
-				opers += 1;
-				best >> last;
-				best >> b;
-				b.next();
-			}
-			last.optimize(0);
 
 			stats.update(score, b.hash(), opers);
 		}
@@ -1767,10 +1909,16 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 	return stats;
 }
 
-statistic evaluate(utils::options::option args, utils::options::option opts = {}) {
+statistic evaluate(utils::options opts, const std::string& type) {
+	auto& args = opts[type];
+
 	statistic stats;
 	select best;
 	board b;
+
+	clip<feature> feats = feature::feats();
+
+	utils::estimator estim = utils::specialize(opts);
 
 	switch (to_hash(args["mode"])) {
 	default:
@@ -1780,7 +1928,7 @@ statistic evaluate(utils::options::option args, utils::options::option opts = {}
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best << b; b.next()) {
+			for (b.init(); best(b, feats, estim); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> b;
@@ -1885,7 +2033,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
 //			opts["save"] += opts[""]; // e.g. "-o 2048.x" indicates logging
-			for (auto opt : opts[""]) opts[opt[opt.find('.') + 1] != 'x' ? "save" : "logging"] += opt;
+			for (auto opt : opts[""]) opts[opt[opt.find_last_of('.') + 1] != 'x' ? "save" : "logging"] += opt;
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
@@ -1905,6 +2053,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["info"] = next_opt("full");
 			opts["info"] += next_opts();
 			break;
+		case to_hash("-x"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 			opts["options"] += next_opts();
@@ -1947,8 +2096,8 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--comment"):
 			opts["comment"] = next_opts();
 			break;
-		case to_hash("-x"):
 		case to_hash("-log"):
+		case to_hash("--log"):
 		case to_hash("--logging"):
 			opts["logging"] = next_opt(std::string(argv[0]) + ".x");
 			break;
@@ -2000,19 +2149,19 @@ int main(int argc, const char* argv[]) {
 	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
 
 	if (statistic(opts["optimize"])) {
-		std::cout << std::endl << "start training..." << std::endl;
+		std::cout << std::endl << "start optimizing..." << std::endl;
 #if !defined(__linux__) || defined(NOSHM)
 		std::list<std::future<statistic>> agents;
 		u32 thdid = std::stol(opts["optimize"]["thread"] = opts["thread"]);
 		while (std::stol(opts["optimize"]["thread#"] = (--thdid)))
-			agents.push_back(std::async(std::launch::async, optimize, opts["optimize"], opts["options"]));
-		statistic stat = std::accumulate(agents.begin(), agents.end(), optimize(opts["optimize"], opts["options"]),
+			agents.push_back(std::async(std::launch::async, optimize, opts, "optimize"));
+		statistic stat = std::accumulate(agents.begin(), agents.end(), optimize(opts, "optimize"),
 				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
 #else
 		u32 thdnum = std::stol(opts["optimize"]["thread"] = opts["thread"]), thdid = thdnum;
 		statistic* stats = shm::alloc<statistic>(thdnum);
 		while (std::stol(opts["optimize"]["thread#"] = --thdid) && fork());
-		statistic& stat = stats[thdid] = optimize(opts["optimize"], opts["options"]);
+		statistic& stat = stats[thdid] = optimize(opts, "optimize");
 		if (thdid == 0) while (wait(nullptr) > 0); else return 0;
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
 #endif
@@ -2022,19 +2171,19 @@ int main(int argc, const char* argv[]) {
 	utils::save_network(opts["save"]);
 
 	if (statistic(opts["evaluate"])) {
-		std::cout << std::endl << "start testing..." << std::endl;
+		std::cout << std::endl << "start evaluating..." << std::endl;
 #if !defined(__linux__) || defined(NOSHM)
 		std::list<std::future<statistic>> agents;
 		u32 thdid = std::stol(opts["evaluate"]["thread"] = opts["thread"]);
 		while (std::stol(opts["evaluate"]["thread#"] = (--thdid)))
-			agents.push_back(std::async(std::launch::async, evaluate, opts["evaluate"], opts["options"]));
-		statistic stat = std::accumulate(agents.begin(), agents.end(), evaluate(opts["evaluate"], opts["options"]),
+			agents.push_back(std::async(std::launch::async, evaluate, opts, "evaluate"));
+		statistic stat = std::accumulate(agents.begin(), agents.end(), evaluate(opts, "evaluate"),
 				[](statistic& st, std::future<statistic>& fu) { return st += fu.get(); });
 #else
 		u32 thdnum = std::stol(opts["evaluate"]["thread"] = opts["thread"]), thdid = thdnum;
 		statistic* stats = shm::alloc<statistic>(thdnum);
 		while (std::stol(opts["evaluate"]["thread#"] = --thdid) && fork());
-		statistic& stat = stats[thdid] = evaluate(opts["evaluate"], opts["options"]);
+		statistic& stat = stats[thdid] = evaluate(opts, "evaluate");
 		if (thdid == 0) while (wait(nullptr) > 0); else return 0;
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
 #endif
