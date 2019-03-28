@@ -1524,7 +1524,6 @@ declare_specialized(7x6patt);
 declare_specialized(8x6patt);
 
 struct specialize {
-#ifndef SPEC
 	specialize(utils::options& opts) : estim(utils::estimate), optim(utils::optimize) {
 		std::string spec = opts["options"].find("spec", "auto");
 		if (spec == "auto" || spec == "on") {
@@ -1539,9 +1538,6 @@ struct specialize {
 		case to_hash("8x6patt"): estim = utils::estimate_8x6patt; optim = utils::optimize_8x6patt; break;
 		}
 	}
-#else
-	constexpr specialize(utils::options& opts) : estim(PASTE(utils::estimate_, SPEC)), optim(PASTE(utils::optimize_, SPEC)) {}
-#endif
 	constexpr specialize(utils::estimator estim, utils::optimizer optim) : estim(estim), optim(optim) {}
 	constexpr operator utils::estimator() const { return estim; }
 	constexpr operator utils::optimizer() const { return optim; }
