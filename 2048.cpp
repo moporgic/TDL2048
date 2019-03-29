@@ -1839,20 +1839,18 @@ struct statistic {
 };
 
 statistic optimize(utils::options opts, const std::string& type) {
-	auto& args = opts[type];
+	utils::options::option& args = opts[type];
 
 	std::vector<state> path;
-	path.reserve(65536);
 	statistic stats;
 	select best;
 	state last;
 	board b;
 
-	numeric alpha = state::alpha();
-	clip<feature> feats = feature::feats();
-
 	utils::estimator estim = utils::specialize(opts);
 	utils::optimizer optim = utils::specialize(opts);
+	clip<feature> feats = feature::feats();
+	numeric alpha = state::alpha();
 
 	switch (to_hash(args["mode"])) {
 	default:
@@ -1910,15 +1908,14 @@ statistic optimize(utils::options opts, const std::string& type) {
 }
 
 statistic evaluate(utils::options opts, const std::string& type) {
-	auto& args = opts[type];
+	utils::options::option& args = opts[type];
 
 	statistic stats;
 	select best;
 	board b;
 
-	clip<feature> feats = feature::feats();
-
 	utils::estimator estim = utils::specialize(opts);
+	clip<feature> feats = feature::feats();
 
 	switch (to_hash(args["mode"])) {
 	default:
