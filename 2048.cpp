@@ -75,12 +75,8 @@ public:
 		case 2:
 			read_cast<u32>(in, w.id);
 			read_cast<u64>(in, w.length);
-			if (code == 2)
-				read_cast<u16>(in, code);
-			else
-				code = code == 1 ? 8 : 4;
 			w.raw = weight::alloc(w.length);
-			switch (code) {
+			switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
