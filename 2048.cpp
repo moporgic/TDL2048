@@ -2200,6 +2200,7 @@ int main(int argc, const char* argv[]) {
 	state::alpha(std::stod(opts["alpha"]));
 	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
 	state::lambda(opts["lambda"]);
+	if (numeric(opts["lambda"]) && !opts("optimize", "mode")) opts["optimize"]["mode"] = "lambda";
 	state::step(opts["step"]);
 
 	if (statistic(opts["optimize"])) {
