@@ -1867,9 +1867,9 @@ statistic optimize(utils::options opts, const std::string& type) {
 				best >> b;
 			}
 
-			for (numeric v = 0; path.size(); path.pop_back()) {
+			for (numeric esti = 0; path.size(); path.pop_back()) {
 				path.back().estimate(feats, estim);
-				v = path.back().optimize(v, alpha, feats, optim);
+				esti = path.back().optimize(esti, alpha, feats, optim);
 			}
 
 			stats.update(score, b.hash(), opers);
