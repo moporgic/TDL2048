@@ -1579,8 +1579,8 @@ struct state {
 
 	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
 	inline static numeric& alpha(numeric a) { return (state::alpha() = a); }
-	inline static u32& lambda() { static u32 l = 0.5; return l; }
-	inline static u32& lambda(u32 l) { return (state::lambda() = l); }
+	inline static numeric& lambda() { static numeric l = 0.5; return l; }
+	inline static numeric& lambda(numeric l) { return (state::lambda() = l); }
 	inline static u32& step() { static u32 n = 5; return n; }
 	inline static u32& step(u32 n) { return (state::step() = n); }
 };
@@ -1828,6 +1828,8 @@ statistic optimize(utils::options opts, const std::string& type) {
 	utils::optimizer optim = utils::specialize(opts);
 	clip<feature> feats = feature::feats();
 	numeric alpha = state::alpha();
+	numeric lambda = state::lambda();
+	u32 nstep = state::step();
 
 	switch (to_hash(args["mode"])) {
 	default:
@@ -1886,11 +1888,8 @@ statistic optimize(utils::options opts, const std::string& type) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			u32 l = state::lambda();
-			u32 n = state::step();
-
 			b.init();
-			for (u32 i = 0; i < n && best(b, feats, estim); i++) {
+			for (u32 i = 0; i < nstep && best(b, feats, estim); i++) {
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -1899,25 +1898,24 @@ statistic optimize(utils::options opts, const std::string& type) {
 			}
 			while (best(b, feats, estim)) {
 				numeric z = best.esti();
-				for (u32 k = 1; k < n; k++) {
+				for (u32 k = 1; k < nstep; k++) {
 					numeric r = path[opers - k].reward();
 					numeric v = path[opers - k].value();
-					z = r + (l * z + (1 - l) * v);
+					z = r + (lambda * z + (1 - lambda) * v);
 				}
-				path[opers - n].optimize(z, alpha, feats, optim);
+				path[opers - nstep].optimize(z, alpha, feats, optim);
 				score += best.score();
 				opers += 1;
 				best >> path;
 				best >> b;
 				b.next();
 			}
-			u32 o = std::min(n, opers);
-			for (u32 i = 0; i < o; i++) {
+			for (u32 o = std::min(nstep, opers), i = 0; i < o; i++) {
 				numeric z = 0;
 				for (u32 k = i + 1; k < o; k++) {
 					numeric r = path[opers + i - k].reward();
 					numeric v = path[opers + i - k].value();
-					z = r + (l * z + (1 - l) * v);
+					z = r + (lambda * z + (1 - lambda) * v);
 				}
 				path[opers + i - o].optimize(z, alpha, feats, optim);
 			}
@@ -1939,8 +1937,6 @@ statistic optimize(utils::options opts, const std::string& type) {
 				best >> path;
 				best >> b;
 			}
-
-			u32 l = state::lambda();
 
 			numeric z = 0;
 			numeric r = path.back().reward();
