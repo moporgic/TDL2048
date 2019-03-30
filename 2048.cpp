@@ -1829,7 +1829,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 	clip<feature> feats = feature::feats();
 	numeric alpha = state::alpha();
 	numeric lambda = state::lambda();
-	u32 nstep = state::step();
+	u32 step = state::step();
 
 	switch (to_hash(args["mode"])) {
 	default:
@@ -1889,7 +1889,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 			u32 opers = 0;
 
 			b.init();
-			for (u32 i = 0; i < nstep && best(b, feats, estim); i++) {
+			for (u32 i = 0; i < step && best(b, feats, estim); i++) {
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -1898,26 +1898,28 @@ statistic optimize(utils::options opts, const std::string& type) {
 			}
 			while (best(b, feats, estim)) {
 				numeric z = best.esti();
-				for (u32 k = 1; k < nstep; k++) {
-					numeric r = path[opers - k].reward();
-					numeric v = path[opers - k].value();
+				for (u32 k = 1; k < step; k++) {
+					state& source = path[opers - k];
+					numeric r = source.reward();
+					numeric v = source.value();
 					z = r + (lambda * z + (1 - lambda) * v);
 				}
-				path[opers - nstep].optimize(z, alpha, feats, optim);
+				path[opers - step].optimize(z, alpha, feats, optim);
 				score += best.score();
 				opers += 1;
 				best >> path;
 				best >> b;
 				b.next();
 			}
-			for (u32 o = std::min(nstep, opers), i = 0; i < o; i++) {
+			for (u32 tail = std::min(step, opers), i = 0; i < tail; i++) {
 				numeric z = 0;
-				for (u32 k = i + 1; k < o; k++) {
-					numeric r = path[opers + i - k].reward();
-					numeric v = path[opers + i - k].value();
+				for (u32 k = i + 1; k < tail; k++) {
+					state& source = path[opers + i - k];
+					numeric r = source.reward();
+					numeric v = source.value();
 					z = r + (lambda * z + (1 - lambda) * v);
 				}
-				path[opers + i - o].optimize(z, alpha, feats, optim);
+				path[opers + i - tail].optimize(z, alpha, feats, optim);
 			}
 			path.clear();
 
@@ -1942,7 +1944,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 			numeric r = path.back().reward();
 			numeric v = path.back().optimize(0, alpha, feats, optim) - r;
 			for (path.pop_back(); path.size(); path.pop_back()) {
-				z = r + (l * z + (1 - l) * v);
+				z = r + (lambda * z + (1 - lambda) * v);
 				r = path.back().reward();
 				v = path.back().optimize(z, alpha, feats, optim) - r;
 			}
@@ -2025,7 +2027,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-l"):
 		case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
-			opts["step"] = next_opt("5");
+			opts["step"] = next_opt(numeric(opts["lambda"]) ? "5" : "1");
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
