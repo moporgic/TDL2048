@@ -27,6 +27,7 @@
 #include <cctype>
 #include <iterator>
 #include <sstream>
+#include <iomanip>
 #include <list>
 
 namespace moporgic {
@@ -1396,30 +1397,28 @@ u32 save_network(utils::options::option opt) {
 }
 
 void list_network() {
-	for (weight w : list<weight>(weight::wghts())) {
-		char buf[64];
-		std::string feats;
-		for (feature f : feature::feats()) {
-			if (f.value() == w) {
-				snprintf(buf, sizeof(buf), " %08" PRIx64, f.index().sign());
-				feats += buf;
-			}
-		}
-		if (feats.size()) {
-			u32 usageK = (sizeof(weight::numeric) * w.size()) >> 10;
-			u32 usageM = usageK >> 10;
-			u32 usageG = usageM >> 10;
-			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
-			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-			int n = snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c", w.sign(), w.size(), usage, scale);
-			u32 stride = sizeof(weight::segment) / sizeof(weight::numeric);
-			if (stride > 1) snprintf(buf + n, sizeof(buf) - n, " x%u", stride);
-			std::cout << buf << " :" << feats << std::endl;
-		} else {
-			snprintf(buf, sizeof(buf), "%08" PRIx64, w.sign());
-			weight::erase(w.sign());
-			std::cerr << "network: unused weight (" << buf << ") erased" << std::endl;
-		}
+	for (weight w : weight::wghts()) {
+		std::stringstream buf;
+		buf << std::setfill('0');
+
+		buf << std::hex << std::setw(8) << w.sign();
+		buf << "[" << std::dec;
+		if (w.size() >> 30)
+			buf << (w.size() >> 30) << "G";
+		else if (w.size() >> 20)
+			buf << (w.size() >> 20) << "M";
+		else if (w.size() >> 10)
+			buf << (w.size() >> 10) << "k";
+		else
+			buf << (w.size());
+		buf << "]";
+
+		buf << " = (unused)" << std::hex;
+		buf.seekp(-9, std::ios::end);
+		for (feature f : feature::feats()) if (f.value() == w)
+			buf << " " << std::setw(8) << f.index().sign();
+
+		std::cout << buf.rdbuf() << std::endl;
 	}
 	std::cout << std::endl;
 }
