@@ -1818,7 +1818,6 @@ statistic optimize(utils::options opts, const std::string& type) {
 	statistic stats;
 	select best;
 	state last;
-	board b;
 
 	utils::estimator estim = utils::specialize(opts);
 	utils::optimizer optim = utils::specialize(opts);
@@ -1829,7 +1828,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 	default:
 	case to_hash("forward"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1856,7 +1855,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 
 	case to_hash("backward"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1885,7 +1884,6 @@ statistic evaluate(utils::options opts, const std::string& type) {
 
 	statistic stats;
 	select best;
-	board b;
 
 	utils::estimator estim = utils::specialize(opts);
 	clip<feature> feats = feature::feats();
@@ -1894,7 +1892,7 @@ statistic evaluate(utils::options opts, const std::string& type) {
 	default:
 	case to_hash("best"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1910,7 +1908,7 @@ statistic evaluate(utils::options opts, const std::string& type) {
 
 	case to_hash("random"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 			hex a;
