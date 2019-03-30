@@ -1882,7 +1882,6 @@ statistic optimize(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("lambda"):
 	case to_hash("forward-lambda"):
 		for (stats.init(args); stats; stats++) {
 
@@ -1902,11 +1901,14 @@ statistic optimize(utils::options opts, const std::string& type) {
 				numeric retain = 1 - lambda;
 				for (u32 k = 1; k < step; k++) {
 					state& source = path[opers - k];
+					source.estimate(feats, estim);
 					numeric r = source.reward();
 					numeric v = source.value();
 					z = r + (lambda * z + retain * v);
 				}
-				path[opers - step].optimize(z, alpha, feats, optim);
+				state& update = path[opers - step];
+				update.estimate(feats, estim);
+				update.optimize(z, alpha, feats, optim);
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -1918,11 +1920,14 @@ statistic optimize(utils::options opts, const std::string& type) {
 				numeric retain = 1 - lambda;
 				for (u32 k = i + 1; k < tail; k++) {
 					state& source = path[opers + i - k];
+					source.estimate(feats, estim);
 					numeric r = source.reward();
 					numeric v = source.value();
 					z = r + (lambda * z + retain * v);
 				}
-				path[opers + i - tail].optimize(z, alpha, feats, optim);
+				state& update = path[opers + i - tail];
+				update.estimate(feats, estim);
+				update.optimize(z, alpha, feats, optim);
 			}
 			path.clear();
 
@@ -1930,6 +1935,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 		}
 		break;
 
+	case to_hash("lambda"):
 	case to_hash("backward-lambda"):
 		for (stats.init(args); stats; stats++) {
 
