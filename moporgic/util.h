@@ -46,6 +46,8 @@
 #define VA_ARG_9(V, ...) VA_ARG_8(__VA_ARGS__)
 #define VA_PASS(...) __VA_ARGS__
 
+#define PASTE_PASS(a, b) a##b
+#define PASTE(a, b) PASTE_PASS(a, b)
 
 #define declare_alias_spec(alias, name, head, tail, ...)\
 template <typename... types> VA_PASS(head inline) \
@@ -438,6 +440,12 @@ public:
 		const auto r1 = sb1->sputc(c);
 		const auto r2 = sb2->sputc(c);
 		return ((r1 == eof) | (r2 == eof)) ? eof : c;
+	}
+protected:
+	virtual std::streamsize xsputn(const char_type* s, std::streamsize n) {
+		const auto z1 = sb1->sputn(s, n);
+		const auto z2 = sb2->sputn(s, n);
+		return std::min(z1, z2);
 	}
 private:
 	std::streambuf* sb1;
