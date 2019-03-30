@@ -1948,6 +1948,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 			numeric v = path.back().optimize(0, alpha, feats, optim) - r;
 			numeric retain = 1 - lambda;
 			for (path.pop_back(); path.size(); path.pop_back()) {
+				path.back().estimate(feats, estim);
 				z = r + (lambda * z + retain * v);
 				r = path.back().reward();
 				v = path.back().optimize(z, alpha, feats, optim) - r;
