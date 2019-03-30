@@ -1395,7 +1395,7 @@ u32 save_network(utils::options::option opt) {
 	return 0;
 }
 
-void list_mapping() {
+void list_network() {
 	for (weight w : list<weight>(weight::wghts())) {
 		char buf[64];
 		std::string feats;
@@ -1418,9 +1418,10 @@ void list_mapping() {
 		} else {
 			snprintf(buf, sizeof(buf), "%08" PRIx64, w.sign());
 			weight::erase(w.sign());
-			std::cerr << "unused weight (" << buf << ") at list_mapping, erased" << std::endl;
+			std::cerr << "network: unused weight (" << buf << ") erased" << std::endl;
 		}
 	}
+	std::cout << std::endl;
 }
 
 typedef numeric(*estimator)(const board&, clip<feature>);
@@ -1731,7 +1732,6 @@ struct statistic {
 		char buf[256];
 		u32 size = 0;
 
-		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, indexf, // "%03llu/%03llu %llums %.2fops",
 				loop / unit,
 				limit / unit,
@@ -1750,6 +1750,7 @@ struct statistic {
 				math::msb32(total.hash),
 				total.win * 100.0 / loop);
 		buf[size++] = '\n';
+		buf[size++] = '\n';
 		buf[size++] = '\0';
 
 		std::cout << buf << std::flush;
@@ -1762,7 +1763,6 @@ struct statistic {
 		char buf[1024];
 		u32 size = 0;
 
-		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, summaf, // "summary %llums %.2fops",
 				total.time,
 				total.opers * 1000.0 / total.time);
@@ -1790,6 +1790,7 @@ struct statistic {
 					count[i] * 100.0 / total, left * 100.0 / total);
 			buf[size++] = '\n';
 		}
+		buf[size++] = '\n';
 		buf[size++] = '\0';
 
 		std::cout << buf << std::flush;
@@ -2093,7 +2094,7 @@ int main(int argc, const char* argv[]) {
 
 	utils::logging(opts["logging"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "develop" << " build GCC " __VERSION__ << " C++" << __cplusplus;
+	std::cout << "Develop" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" __DATE__ " " __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
@@ -2104,14 +2105,14 @@ int main(int argc, const char* argv[]) {
 
 	utils::load_network(opts["load"]);
 	utils::make_network(opts["make"]);
-	utils::list_mapping();
+	utils::list_network();
 
 	moporgic::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
 	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
 
 	if (statistic(opts["optimize"])) {
-		std::cout << std::endl << "start optimizing..." << std::endl;
+		std::cout << "optimization: " << opts["optimize"] << std::endl << std::endl;
 		statistic stat = optimize(opts, "optimize");
 		if (opts["info"] == "full") stat.summary();
 	}
@@ -2119,12 +2120,11 @@ int main(int argc, const char* argv[]) {
 	utils::save_network(opts["save"]);
 
 	if (statistic(opts["evaluate"])) {
-		std::cout << std::endl << "start evaluating..." << std::endl;
+		std::cout << "verification: " << opts["evaluate"] << std::endl << std::endl;
 		statistic stat = evaluate(opts, "evaluate");
 		if (opts["info"] != "none") stat.summary();
 	}
 
-	std::cout << std::endl;
 	return 0;
 }
 
