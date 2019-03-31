@@ -27,6 +27,7 @@
 #include <cctype>
 #include <iterator>
 #include <sstream>
+#include <iomanip>
 #include <list>
 
 namespace moporgic {
@@ -114,12 +115,8 @@ public:
 		case 2:
 			read_cast<u32>(in, w.id);
 			read_cast<u64>(in, w.length);
-			if (code == 2)
-				read_cast<u16>(in, code);
-			else
-				code = code == 1 ? 8 : 4;
 			w.raw = weight::alloc(w.length);
-			switch (code) {
+			switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
@@ -1486,32 +1483,31 @@ u32 save_network(utils::options::option opt) {
 	return 0;
 }
 
-void list_mapping() {
-	for (weight w : list<weight>(weight::wghts())) {
-		char buf[64];
-		std::string feats;
-		for (feature f : feature::feats()) {
-			if (f.value() == w) {
-				snprintf(buf, sizeof(buf), " %08" PRIx64, f.index().sign());
-				feats += buf;
-			}
-		}
-		if (feats.size()) {
-			u32 usageK = (sizeof(weight::numeric) * w.size()) >> 10;
-			u32 usageM = usageK >> 10;
-			u32 usageG = usageM >> 10;
-			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
-			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-			int n = snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c", w.sign(), w.size(), usage, scale);
-			u32 stride = sizeof(weight::segment) / sizeof(weight::numeric);
-			if (stride > 1) snprintf(buf + n, sizeof(buf) - n, " x%u", stride);
-			std::cout << buf << " :" << feats << std::endl;
-		} else {
-			snprintf(buf, sizeof(buf), "%08" PRIx64, w.sign());
-			weight::erase(w.sign());
-			std::cerr << "unused weight (" << buf << ") at list_mapping, erased" << std::endl;
-		}
+void list_network() {
+	for (weight w : weight::wghts()) {
+		std::stringstream buf;
+		buf << std::setfill('0');
+
+		buf << std::hex << std::setw(8) << w.sign();
+		buf << "[" << std::dec;
+		if (w.size() >> 30)
+			buf << (w.size() >> 30) << "G";
+		else if (w.size() >> 20)
+			buf << (w.size() >> 20) << "M";
+		else if (w.size() >> 10)
+			buf << (w.size() >> 10) << "k";
+		else
+			buf << (w.size());
+		buf << "]";
+
+		buf << " = (unused)" << std::hex;
+		buf.seekp(-9, std::ios::end);
+		for (feature f : feature::feats()) if (f.value() == w)
+			buf << " " << std::setw(8) << f.index().sign();
+
+		std::cout << buf.rdbuf() << std::endl;
 	}
+	std::cout << std::endl;
 }
 
 typedef numeric(*estimator)(const board&, clip<feature>);
@@ -1670,6 +1666,10 @@ struct state {
 
 	inline static numeric& alpha() { static numeric a = numeric(0.01); return a; }
 	inline static numeric& alpha(numeric a) { return (state::alpha() = a); }
+	inline static numeric& lambda() { static numeric l = 0.5; return l; }
+	inline static numeric& lambda(numeric l) { return (state::lambda() = l); }
+	inline static u32& step() { static u32 n = 5; return n; }
+	inline static u32& step(u32 n) { return (state::step() = n); }
 };
 struct select {
 	state move[4];
@@ -1822,7 +1822,6 @@ struct statistic {
 		char buf[256];
 		u32 size = 0;
 
-		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, indexf, // "%03llu/%03llu %llums %.2fops",
 				loop / unit,
 				limit / unit,
@@ -1841,6 +1840,7 @@ struct statistic {
 				math::msb32(total.hash),
 				total.win * 100.0 / loop);
 		buf[size++] = '\n';
+		buf[size++] = '\n';
 		buf[size++] = '\0';
 
 		std::cout << buf << std::flush;
@@ -1853,7 +1853,6 @@ struct statistic {
 		char buf[1024];
 		u32 size = 0;
 
-		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, summaf, // "summary %llums %.2fops",
 				total.time,
 				total.opers * 1000.0 / total.time);
@@ -1881,6 +1880,7 @@ struct statistic {
 					count[i] * 100.0 / total, left * 100.0 / total);
 			buf[size++] = '\n';
 		}
+		buf[size++] = '\n';
 		buf[size++] = '\0';
 
 		std::cout << buf << std::flush;
@@ -1909,18 +1909,19 @@ statistic optimize(utils::options opts, const std::string& type) {
 	statistic stats;
 	select best;
 	state last;
-	board b;
 
 	utils::estimator estim = utils::specialize(opts);
 	utils::optimizer optim = utils::specialize(opts);
 	clip<feature> feats = feature::feats();
 	numeric alpha = state::alpha();
+	numeric lambda = state::lambda();
+	u32 step = state::step();
 
 	switch (to_hash(args["mode"])) {
 	default:
 	case to_hash("forward"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1947,7 +1948,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 
 	case to_hash("backward"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1958,9 +1959,91 @@ statistic optimize(utils::options opts, const std::string& type) {
 				best >> b;
 			}
 
-			for (numeric v = 0; path.size(); path.pop_back()) {
+			for (numeric esti = 0; path.size(); path.pop_back()) {
 				path.back().estimate(feats, estim);
-				v = path.back().optimize(v, alpha, feats, optim);
+				esti = path.back().optimize(esti, alpha, feats, optim);
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("forward-lambda"):
+		for (stats.init(args); stats; stats++) {
+			board b;
+			u32 score = 0;
+			u32 opers = 0;
+
+			b.init();
+			for (u32 i = 0; i < step && best(b, feats, estim); i++) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			while (best(b, feats, estim)) {
+				numeric z = best.esti();
+				numeric retain = 1 - lambda;
+				for (u32 k = 1; k < step; k++) {
+					state& source = path[opers - k];
+					source.estimate(feats, estim);
+					numeric r = source.reward();
+					numeric v = source.value();
+					z = r + (lambda * z + retain * v);
+				}
+				state& update = path[opers - step];
+				update.estimate(feats, estim);
+				update.optimize(z, alpha, feats, optim);
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			for (u32 tail = std::min(step, opers), i = 0; i < tail; i++) {
+				numeric z = 0;
+				numeric retain = 1 - lambda;
+				for (u32 k = i + 1; k < tail; k++) {
+					state& source = path[opers + i - k];
+					source.estimate(feats, estim);
+					numeric r = source.reward();
+					numeric v = source.value();
+					z = r + (lambda * z + retain * v);
+				}
+				state& update = path[opers + i - tail];
+				update.estimate(feats, estim);
+				update.optimize(z, alpha, feats, optim);
+			}
+			path.clear();
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("lambda"):
+	case to_hash("backward-lambda"):
+		for (stats.init(args); stats; stats++) {
+			board b;
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, estim); b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			numeric z = 0;
+			numeric r = path.back().reward();
+			numeric v = path.back().optimize(0, alpha, feats, optim) - r;
+			numeric retain = 1 - lambda;
+			for (path.pop_back(); path.size(); path.pop_back()) {
+				path.back().estimate(feats, estim);
+				z = r + (lambda * z + retain * v);
+				r = path.back().reward();
+				v = path.back().optimize(z, alpha, feats, optim) - r;
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -1976,7 +2059,6 @@ statistic evaluate(utils::options opts, const std::string& type) {
 
 	statistic stats;
 	select best;
-	board b;
 
 	utils::estimator estim = utils::specialize(opts);
 	clip<feature> feats = feature::feats();
@@ -1985,7 +2067,7 @@ statistic evaluate(utils::options opts, const std::string& type) {
 	default:
 	case to_hash("best"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -2001,7 +2083,7 @@ statistic evaluate(utils::options opts, const std::string& type) {
 
 	case to_hash("random"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 			hex a;
@@ -2037,6 +2119,11 @@ utils::options parse(int argc, const char* argv[]) {
 			opts[""] = next_opts();
 			if (opts[""].empty()) (opts[""] += "0.1") += "norm";
 			opts["alpha"] = opts[""];
+			break;
+		case to_hash("-l"):
+		case to_hash("--lambda"):
+			opts["lambda"] = next_opt("0.5");
+			opts["step"] = next_opt(numeric(opts["lambda"]) ? "5" : "1");
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
@@ -2181,28 +2268,34 @@ int main(int argc, const char* argv[]) {
 	if (!opts("evaluate")) opts["evaluate"] = opts("optimize") ? 0 : 1000;
 	if (!opts("alpha")) opts["alpha"] = 1.0, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
+	if (!opts("lambda")) opts["lambda"] = 0;
+	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
 
 	utils::logging(opts["logging"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "develop-coherence" << " build GCC " __VERSION__ << " C++" << __cplusplus;
+	std::cout << "Develop-Coherence" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" __DATE__ " " __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 	std::cout << "time = " << moporgic::millisec() << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
-	std::cout << "alpha = " << opts["alpha"] << std::endl;
+	std::cout << "alpha = " << opts["alpha"] << ", coherence" << std::endl;
+	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
 	utils::make_network(opts["make"]);
-	utils::list_mapping();
+	utils::list_network();
 
 	moporgic::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
 	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
+	state::lambda(opts["lambda"]);
+	if (numeric(opts["lambda"]) && !opts("optimize", "mode")) opts["optimize"]["mode"] = "lambda";
+	state::step(opts["step"]);
 
 	if (statistic(opts["optimize"])) {
-		std::cout << std::endl << "start optimizing..." << std::endl;
+		std::cout << "optimization: " << opts["optimize"] << std::endl << std::endl;
 		statistic stat = optimize(opts, "optimize");
 		if (opts["info"] == "full") stat.summary();
 	}
@@ -2210,12 +2303,11 @@ int main(int argc, const char* argv[]) {
 	utils::save_network(opts["save"]);
 
 	if (statistic(opts["evaluate"])) {
-		std::cout << std::endl << "start evaluating..." << std::endl;
+		std::cout << "verification: " << opts["evaluate"] << std::endl << std::endl;
 		statistic stat = evaluate(opts, "evaluate");
 		if (opts["info"] != "none") stat.summary();
 	}
 
-	std::cout << std::endl;
 	return 0;
 }
 
