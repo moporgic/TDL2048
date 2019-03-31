@@ -305,6 +305,7 @@ public:
 	constexpr list() noexcept : clip<type>() {}
 	list(const clip<type>& c) : list(c.begin(), c.end()) {}
 	list(const list<type>& l) : list(l.begin(), l.end()) {}
+	list(clip<type>&& c) noexcept : list() { clip<type>::swap(c); }
 	list(list<type>&& l) noexcept : list() { clip<type>::swap(l); }
 	template<typename iter, typename = enable_if_is_iterator_convertible<iter>>
 	list(iter first, iter last) : list() { insert(clip<type>::cend(), first, last); }
@@ -434,7 +435,8 @@ public:
 	constexpr cell operator [](u32 idx) const noexcept { return cell(const_cast<u64&>(hex), idx); }
 	constexpr cell at(u32 idx) const noexcept { return operator [](idx); }
 	constexpr size_t size() const noexcept { return at(15); }
-	constexpr void resize(u32 len) noexcept { hex &= (len ? -1ull >> ((16 - len) << 2) : 0); at(15) = len; }
+	constexpr size_t size(u32 len) noexcept { u32 n = size(); at(15) = len; return n; }
+	constexpr void resize(u32 len) noexcept { hex &= (len ? -1ull >> ((16 - len) << 2) : 0); size(len); }
 	constexpr size_t capacity() const noexcept { return 15; }
 	constexpr size_t max_size() const noexcept { return 16; }
 	constexpr bool empty() const noexcept { return size() == 0; }
@@ -443,8 +445,8 @@ public:
 	constexpr iter end() const noexcept { return iter(operator [](size())); }
 	constexpr cell front() const noexcept { return at(0); }
 	constexpr cell back() const noexcept { return at(size() - 1); }
-	constexpr void push_front(u32 v) noexcept { u32 n = size(); hex <<= 4; at(0) = v; resize(n + 1); }
-	constexpr void push_back(u32 v) noexcept { at(size()) = v; resize(size() + 1); }
+	constexpr void push_front(u32 v) noexcept { u32 n = size(); hex <<= 4; at(0) = v; size(n + 1); }
+	constexpr void push_back(u32 v) noexcept { at(size()) = v; size(size() + 1); }
 	constexpr void pop_front() noexcept { u32 n = size(); hex >>= 4; resize(n - 1); }
 	constexpr void pop_back() noexcept { resize(size() - 1); }
 protected:
@@ -486,10 +488,11 @@ public:
 	constexpr cell operator [](u32 idx) const noexcept { return cell(cast<u64*>(this)[idx >> 4], idx & 0x0f); }
 	constexpr cell at(u32 idx) const noexcept { return operator [](idx); }
 	constexpr size_t size() const noexcept { return raw_cast<u8, 7>(ext); }
+	constexpr size_t size(u32 len) noexcept { u32 n = size(); raw_cast<u8, 7>(ext) = len; return n; }
 	constexpr void resize(u32 len) noexcept {
 		if (len > 16) ext &= (-1ull >> ((16 - (len - 16)) << 2));
 		else ext = 0, hex &= (len ? -1ull >> ((16 - len) << 2) : 0);
-		raw_cast<u8, 7>(ext) = len;
+		size(len);
 	}
 	constexpr size_t capacity() const noexcept { return 30; }
 	constexpr size_t max_size() const noexcept { return 32; }
@@ -499,8 +502,8 @@ public:
 	constexpr iter end() const noexcept { return iter(const_cast<u64&>(hex), size()); }
 	constexpr cell front() const noexcept { return at(0); }
 	constexpr cell back() const noexcept { return at(size() - 1); }
-	constexpr void push_front(u32 v) noexcept { u32 n = size(); ext <<= 4; at(16) = at(15); hex <<= 4; at(0) = v; resize(n + 1); }
-	constexpr void push_back(u32 v) noexcept { at(size()) = v; resize(size() + 1); }
+	constexpr void push_front(u32 v) noexcept { u32 n = size(); ext <<= 4; at(16) = at(15); hex <<= 4; at(0) = v; size(n + 1); }
+	constexpr void push_back(u32 v) noexcept { at(size()) = v; size(size() + 1); }
 	constexpr void pop_front() noexcept { u32 n = size(); hex >>= 4; at(15) = at(16); ext >>= 4; resize(n - 1); }
 	constexpr void pop_back() noexcept { resize(size() - 1); }
 protected:

@@ -314,12 +314,8 @@ public:
 		x |= (x >> 2);
 		x |= (x >> 1);
 		x = ~x & 0x1111111111111111ull;
-		register u64 k = ext >> 16;
-		k = ((k & 0xff00ull) << 24) | (k & 0x00ffull);
-		k = ((k & 0xf0000000f0ull) << 12) | (k & 0x0f0000000full);
-		k = ((k & 0x000c000c000c000cull) << 6) | (k & 0x0003000300030003ull);
-		k = ((k & 0x0202020202020202ull) << 3) | (k & 0x0101010101010101ull);
-		x &= ~k & 0x1111111111111111ull;
+		u16 z[]{ 0x1111, 0x1110, 0x1101, 0x1100, 0x1011, 0x1010, 0x1001, 0x1000, 0x0111, 0x0110, 0x0101, 0x0100, 0x0011, 0x0010, 0x0001, 0x0000 };
+		x &= (u64(z[(ext >> 28) & 0x0f]) << 48) | (u64(z[(ext >> 24) & 0x0f]) << 32) | (u64(z[(ext >> 20) & 0x0f]) << 16) | u64(z[(ext >> 16) & 0x0f]);
 		register u32 e = x + (x >> 32);
 		e += e >> 16;
 		e += e >> 8;
@@ -343,16 +339,36 @@ public:
 
 	inline void next() { return next64(); }
 	inline void next64() {
-		hexa empty = spaces64();
+		u64 x = raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		x = ~x & 0x1111111111111111ull;
+		u32 e = x + (x >> 32);
+		e += e >> 16;
+		e += e >> 8;
+		e = (e & 0x0f) + ((e >> 4) & 0x0f);
 		u32 u = moporgic::rand();
-		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
+		u32 k = (u >> 16) % e;
+		while (k--) x &= ~(x & -x);
+		u32 p = math::lg64(x & -x);;
+		raw |= (u % 10 ? 1ull : 2ull) << p;
 	}
 	inline void next80() {
-		hexa empty = spaces80();
+		u64 x = raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		x = ~x & 0x1111111111111111ull;
+		u16 z[]{ 0x1111, 0x1110, 0x1101, 0x1100, 0x1011, 0x1010, 0x1001, 0x1000, 0x0111, 0x0110, 0x0101, 0x0100, 0x0011, 0x0010, 0x0001, 0x0000 };
+		x &= (u64(z[(ext >> 28) & 0x0f]) << 48) | (u64(z[(ext >> 24) & 0x0f]) << 32) | (u64(z[(ext >> 20) & 0x0f]) << 16) | u64(z[(ext >> 16) & 0x0f]);
+		u32 e = x + (x >> 32);
+		e += e >> 16;
+		e += e >> 8;
+		e = (e & 0x0f) + ((e >> 4) & 0x0f);
 		u32 u = moporgic::rand();
-		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
+		u32 k = (u >> 16) % e;
+		while (k--) x &= ~(x & -x);
+		u32 p = math::lg64(x & -x);;
+		raw |= (u % 10 ? 1ull : 2ull) << p;
 	}
 
 	inline bool popup() { return popup64(); }
