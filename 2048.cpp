@@ -809,7 +809,7 @@ u64 indexnta(const board& b, const std::vector<u32>& p) {
 	return index;
 }
 
-u64 indexmerge0(const board& b) { // 16-tpbit
+u64 indexmerge0(const board& b) { // 16-bit
 	board q = b; q.transpose();
 	register u32 hori = 0, vert = 0;
 	hori |= b.query(0).merge << 0;
@@ -834,8 +834,8 @@ u64 indexmerge1(const board& b) { // 8-bit
 	return merge;
 }
 
-u64 indexnum0(const board& b) { // 10-tpbit
-	// 2k ~ 32k, 2-tpbit ea.
+u64 indexnum0(const board& b) { // 10-bit
+	// 2k ~ 32k, 2-bit ea.
 	auto num = b.numof();
 	register u64 index = 0;
 	index += (num[11] & 0x03) << 0;
@@ -846,14 +846,14 @@ u64 indexnum0(const board& b) { // 10-tpbit
 	return index;
 }
 
-u64 indexnum1(const board& b) { // 25-tpbit
+u64 indexnum1(const board& b) { // 25-bit
 	auto num = b.numof();
 	register u64 index = 0;
 	index += ((num[5] + num[6]) & 0x0f) << 0; // 32 & 64, 4-bit
 	index += (num[7] & 0x07) << 4; // 128, 3-bit
 	index += (num[8] & 0x07) << 7; // 256, 3-bit
-	index += (num[9] & 0x07) << 10; // 512, 3-tpbit
-	index += (num[10] & 0x03) << 13; // 1k ~ 32k, 2-tpbit ea.
+	index += (num[9] & 0x07) << 10; // 512, 3-bit
+	index += (num[10] & 0x03) << 13; // 1k ~ 32k, 2-bit ea.
 	index += (num[11] & 0x03) << 15;
 	index += (num[12] & 0x03) << 17;
 	index += (num[13] & 0x03) << 19;
@@ -862,15 +862,15 @@ u64 indexnum1(const board& b) { // 25-tpbit
 	return index;
 }
 
-u64 indexnum2(const board& b) { // 25-tpbit
+u64 indexnum2(const board& b) { // 25-bit
 	auto num = b.numof();
 	register u64 index = 0;
-	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-tpbit
-	index += ((num[3] + num[4]) & 0x07) << 3; // 8 & 16, 3-tpbit
-	index += ((num[5] + num[6]) & 0x07) << 6; // 32 & 64, 3-tpbit
-	index += ((num[7] + num[8]) & 0x07) << 9; // 126 & 256, 3-tpbit
-	index += ((num[9] + num[10]) & 0x07) << 12; // 512 & 1k, 3-tpbit
-	index += ((num[11]) & 0x03) << 15; // 2k ~ 32k, 2-tpbit ea.
+	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-bit
+	index += ((num[3] + num[4]) & 0x07) << 3; // 8 & 16, 3-bit
+	index += ((num[5] + num[6]) & 0x07) << 6; // 32 & 64, 3-bit
+	index += ((num[7] + num[8]) & 0x07) << 9; // 126 & 256, 3-bit
+	index += ((num[9] + num[10]) & 0x07) << 12; // 512 & 1k, 3-bit
+	index += ((num[11]) & 0x03) << 15; // 2k ~ 32k, 2-bit ea.
 	index += ((num[12]) & 0x03) << 17;
 	index += ((num[13]) & 0x03) << 19;
 	index += ((num[14]) & 0x03) << 21;
@@ -886,12 +886,12 @@ u64 indexnum2x(const board& b) { // 25-bit
 	auto& n = o.query(qu1).numof;
 
 	register u64 index = 0;
-	index += ((m[1] + n[1] + m[2] + n[2]) & 0x07) << 0; // 2 & 4, 3-tpbit
-	index += ((m[3] + n[3] + m[4] + n[4]) & 0x07) << 3; // 8 & 16, 3-tpbit
-	index += ((m[5] + n[5] + m[6] + n[6]) & 0x07) << 6; // 32 & 64, 3-tpbit
-	index += ((m[7] + n[7] + m[8] + n[8]) & 0x07) << 9; // 126 & 256, 3-tpbit
-	index += ((m[9] + n[9] + m[10] + n[10]) & 0x07) << 12; // 512 & 1k, 3-tpbit
-	index += ((m[11] + n[11]) & 0x03) << 15; // 2k ~ 32k, 2-tpbit ea.
+	index += ((m[1] + n[1] + m[2] + n[2]) & 0x07) << 0; // 2 & 4, 3-bit
+	index += ((m[3] + n[3] + m[4] + n[4]) & 0x07) << 3; // 8 & 16, 3-bit
+	index += ((m[5] + n[5] + m[6] + n[6]) & 0x07) << 6; // 32 & 64, 3-bit
+	index += ((m[7] + n[7] + m[8] + n[8]) & 0x07) << 9; // 126 & 256, 3-bit
+	index += ((m[9] + n[9] + m[10] + n[10]) & 0x07) << 12; // 512 & 1k, 3-bit
+	index += ((m[11] + n[11]) & 0x03) << 15; // 2k ~ 32k, 2-bit ea.
 	index += ((m[12] + n[12]) & 0x03) << 17;
 	index += ((m[13] + n[13]) & 0x03) << 19;
 	index += ((m[14] + n[14]) & 0x03) << 21;
@@ -900,16 +900,16 @@ u64 indexnum2x(const board& b) { // 25-bit
 	return index;
 }
 
-u64 indexnum3(const board& b) { // 28-tpbit
+u64 indexnum3(const board& b) { // 28-bit
 	auto num = b.numof();
 	register u64 index = 0;
-	index += ((num[0] + num[1] + num[2]) & 0x0f) << 0; // 0 & 2 & 4, 4-tpbit
-	index += ((num[3] + num[4]) & 0x07) << 4; // 8 & 16, 3-tpbit
+	index += ((num[0] + num[1] + num[2]) & 0x0f) << 0; // 0 & 2 & 4, 4-bit
+	index += ((num[3] + num[4]) & 0x07) << 4; // 8 & 16, 3-bit
 	index += ((num[5] + num[6]) & 0x07) << 7; // 32 & 64, 3-bit
 	index += (num[7] & 0x03) << 10; // 128, 2-bit
 	index += (num[8] & 0x03) << 12; // 256, 2-bit
-	index += (num[9] & 0x03) << 14; // 512, 2-tpbit
-	index += (num[10] & 0x03) << 16; // 1k ~ 32k, 2-tpbit ea.
+	index += (num[9] & 0x03) << 14; // 512, 2-bit
+	index += (num[10] & 0x03) << 16; // 1k ~ 32k, 2-bit ea.
 	index += (num[11] & 0x03) << 18;
 	index += (num[12] & 0x03) << 20;
 	index += (num[13] & 0x03) << 22;
