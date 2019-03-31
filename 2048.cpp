@@ -2193,8 +2193,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "time = " << moporgic::millisec() << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
-	std::cout << "lambda = " << opts["lambda"] << std::endl;
-	std::cout << "step = " << opts["step"] << std::endl;
+	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
