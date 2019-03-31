@@ -27,6 +27,7 @@
 #include <cctype>
 #include <iterator>
 #include <sstream>
+#include <iomanip>
 #include <list>
 #include <random>
 
@@ -76,12 +77,8 @@ public:
 		case 2:
 			read_cast<u32>(in, w.id);
 			read_cast<u64>(in, w.length);
-			if (code == 2)
-				read_cast<u16>(in, code);
-			else
-				code = code == 1 ? 8 : 4;
 			w.raw = weight::alloc(w.length);
-			switch (code) {
+			switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
@@ -134,11 +131,11 @@ public:
 		constexpr container(const clip<weight>& w) : clip<weight>(w) {}
 	public:
 		weight& make(u64 sign, size_t size) { return list<weight>::as(*this).emplace_back(weight(sign, size)); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? free(it->data()), list<weight>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		weight erase(u64 sign) { auto it = find(sign); auto w = *it; free(it->data()); list<weight>::as(*this).erase(it); return w; }
 		weight* find(u64 sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
 		weight& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
 		weight& operator[](u64 sign) const { return (*find(sign)); }
-		weight operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : weight(); }
+		weight operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ weight w; w.id = sign; w; }); }
 	};
 
 	static inline weight::container& wghts() { static container w; return w; }
@@ -177,11 +174,11 @@ public:
 		constexpr container(const clip<indexer>& i) : clip<indexer>(i) {}
 	public:
 		indexer& make(u64 sign, mapper map) { return list<indexer>::as(*this).emplace_back(indexer(sign, map)); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<indexer>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		indexer erase(u64 sign) { auto it = find(sign); auto x = *it; list<indexer>::as(*this).erase(it); return x; }
 		indexer* find(u64 sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
 		indexer& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
 		indexer& operator[](u64 sign) const { return (*find(sign)); }
-		indexer operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : indexer(); }
+		indexer operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ indexer x; x.id = sign; x; }); }
 	};
 
 	static inline indexer::container& idxrs() { static container i; return i; }
@@ -198,11 +195,11 @@ private:
 
 class feature {
 public:
-	inline feature() {}
+	inline feature() : id(0), raw(), map() {}
 	inline feature(const feature& t) = default;
 	inline ~feature() {}
 
-	inline u64 sign() const { return (raw.sign() << 32) | map.sign(); }
+	inline u64 sign() const { return id; }
 	inline weight::segment& operator [](const board& b) { return raw[map(b)]; }
 	inline weight::segment& operator [](u64 idx) { return raw[idx]; }
 	inline u64 operator ()(const board& b) const { return map(b); }
@@ -218,8 +215,8 @@ public:
 		switch (code) {
 		default:
 		case 0:
-			write_cast<u32>(out, f.map.sign());
-			write_cast<u32>(out, f.raw.sign());
+			write_cast<u32>(out, u32(f.sign()));
+			write_cast<u32>(out, u32(f.sign() >> 32));
 			break;
 		}
 		return out;
@@ -232,8 +229,10 @@ public:
 		case 0:
 			read_cast<u32>(in, code);
 			f.map = indexer(code);
+			f.id = u64(code);
 			read_cast<u32>(in, code);
 			f.raw = weight(code);
+			f.id |= u64(code) << 32;
 			break;
 		}
 		return in;
@@ -269,15 +268,15 @@ public:
 	public:
 		feature& make(u64 wgt, u64 idx) { return list<feature>::as(*this).emplace_back(feature(weight(wgt), indexer(idx))); }
 		feature& make(u64 sign) { return make(u32(sign >> 32), u32(sign)); }
-		size_t erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
-		size_t erase(u64 sign) { auto it = find(sign); return it != end() ? list<feature>::as(*this).erase(it), erase(sign) + 1 : 0; }
+		feature erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
+		feature erase(u64 sign) { auto it = find(sign); auto f = *it; list<feature>::as(*this).erase(it); return f; }
 		feature* find(u64 wgt, u64 idx) const { return find((wgt << 32) | idx); }
 		feature* find(u64 sign) const { return std::find_if(begin(), end(), [=](const feature& f) { return f.sign() == sign; }); }
 		feature& at(u64 wgt, u64 idx) const { return at((wgt << 32) | idx); }
 		feature& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("feature::at"); }
 		feature& operator[](u64 sign) const { return (*find(sign)); }
 		feature operator()(u64 wgt, u64 idx) const { return operator()((wgt << 32) | idx); }
-		feature operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : feature(); }
+		feature operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ feature f; f.id = sign; f; }); }
 	};
 
 	static inline feature::container& feats() { static container f; return f; }
@@ -286,10 +285,11 @@ public:
 	inline feature(u64 wgt, u64 idx, const container& src = feats()) : feature(src(wgt, idx)) {}
 
 private:
-	inline feature(const weight& value, const indexer& index) : map(index), raw(value) {}
+	inline feature(const weight& value, const indexer& index) : id((value.sign() << 32) | index.sign()), raw(value), map(index) {}
 
-	indexer map;
+	u64 id;
 	weight raw;
+	indexer map;
 };
 
 class transposition {
@@ -683,17 +683,6 @@ private:
 	}
 };
 
-void logging(utils::options::option opt) {
-	static std::ofstream logout;
-	if (logout.is_open()) return;
-	std::string path = opt.size() ? opt.back() : "";
-	logout.open(path, std::ios::out | std::ios::app);
-	if (logout.is_open()) {
-		static moporgic::teestream tee(std::cout, logout);
-		static moporgic::redirector redirect(tee, std::cout);
-	}
-}
-
 inline u32 hashpatt(const std::vector<u32>& patt) {
 	u32 hash = 0;
 	for (auto tile : patt) hash = (hash << 4) | tile;
@@ -727,6 +716,46 @@ u64 index6t(const board& b) {
 	index += b.at(p4) << 16;
 	index += b.at(p5) << 20;
 	return index;
+}
+template<>
+u64 index6t<0x0,0x1,0x2,0x3,0x4,0x5>(const board& b) {
+	return (u32(u64(b)) & 0xffffff);
+}
+template<>
+u64 index6t<0x4,0x5,0x6,0x7,0x8,0x9>(const board& b) {
+	return (u32(u64(b) >> 16) & 0xffffff);
+}
+template<>
+u64 index6t<0x8,0x9,0xa,0xb,0xc,0xd>(const board& b) {
+	return (u32(u64(b) >> 32) & 0xffffff);
+}
+template<>
+u64 index6t<0x0,0x1,0x2,0x4,0x5,0x6>(const board& b) {
+	return (u32(u64(b)) & 0x000fff) | ((u32(u64(b)) >> 4) & 0xfff000);
+}
+template<>
+u64 index6t<0x4,0x5,0x6,0x8,0x9,0xa>(const board& b) {
+	return (u32(u64(b) >> 16) & 0x000fff) | (u32(u64(b) >> 20) & 0xfff000);
+}
+template<>
+u64 index6t<0x2,0x3,0x4,0x5,0x6,0x9>(const board& b) {
+	return (u32(u64(b) >> 8) & 0x0fffff) | (u32(u64(b) >> 16) & 0xf00000);
+}
+template<>
+u64 index6t<0x0,0x1,0x2,0x5,0x9,0xa>(const board& b) {
+	return (u32(u64(b)) & 0x000fff) | (u32(u64(b) >> 8) & 0x00f000) | (u32(u64(b) >> 20) & 0xff0000);
+}
+template<>
+u64 index6t<0x3,0x4,0x5,0x6,0x7,0x8>(const board& b) {
+	return (u32(u64(b) >> 12) & 0xffffff);
+}
+template<>
+u64 index6t<0x1,0x3,0x4,0x5,0x6,0x7>(const board& b) {
+	return (u32(u64(b) >> 4) & 0x00000f) | (u32(u64(b) >> 8) & 0xfffff0);
+}
+template<>
+u64 index6t<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) {
+	return (u32(u64(b)) & 0x0000ff) | (u32(u64(b) >> 8) & 0x000f00) | (u32(u64(b) >> 20) & 0xfff000);
 }
 template<u32 p0, u32 p1, u32 p2, u32 p3>
 u64 index4t(const board& b) {
@@ -1435,6 +1464,18 @@ struct indexhdr {
 	}
 };
 
+void init_logging(utils::options::option opt) {
+	static std::ofstream logout;
+	for (std::string path : opt) {
+		char type = path[path.find_last_of(".") + 1];
+		if (logout.is_open() || (type != 'x' && type != 'l')) continue; // .x and .log are suffix for log files
+		logout.open(path, std::ios::out | std::ios::app);
+	}
+	if (!logout.is_open()) return;
+	static moporgic::teestream tee(std::cout, logout);
+	static moporgic::redirector redirect(tee, std::cout);
+}
+
 std::map<std::string, std::string> aliases() {
 	std::map<std::string, std::string> alias;
 	alias["4x6patt/khyeh"] = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
@@ -1468,7 +1509,7 @@ std::map<std::string, std::string> aliases() {
 	alias["default"] = alias["4x6patt"];
 	return alias;
 }
-u32 make_network(utils::options::option opt) {
+void make_network(utils::options::option opt) {
 	std::string tokens = opt;
 	if (tokens.empty() && feature::feats().empty())
 		tokens = "default";
@@ -1611,15 +1652,13 @@ u32 make_network(utils::options::option opt) {
 
 		if (wght && idxr && !feature(wght, idxr)) feature::make(wght, idxr);
 	}
-
-	return 0;
 }
-u32 load_network(utils::options::option opt) {
+void load_network(utils::options::option opt) {
 	for (std::string path : opt) {
 		std::ifstream in;
 		in.open(path, std::ios::in | std::ios::binary);
 		while (in.peek() != -1) {
-			auto type = in.peek();
+			char type = in.peek();
 			if (type != 0) { // new binaries already store its type, so use it for the later loading
 				in.ignore(1);
 			} else { // legacy binaries always beginning with 0, so use name suffix to determine the type
@@ -1630,49 +1669,49 @@ u32 load_network(utils::options::option opt) {
 		}
 		in.close();
 	}
-	return 0;
+	for (feature f : list<feature>(std::move(feature::feats())))
+		feature::make(f.value().sign(), f.index().sign());
 }
-u32 save_network(utils::options::option opt) {
+void save_network(utils::options::option opt) {
 	for (std::string path : opt) {
+		char type = path[path.find_last_of(".") + 1];
+		if (type == 'x' || type == 'l') continue; // .x and .log are suffix for log files
 		std::ofstream out;
 		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) continue;
-		auto type = path[path.find_last_of(".") + 1];
 		// for upward compatibility, we still store legacy binaries if suffix are traditional (.f or .w)
 		if (type != 'f')  weight::save(type != 'w' ? out.write("w", 1) : out);
 		if (type != 'w') feature::save(type != 'f' ? out.write("f", 1) : out);
 		out.flush();
 		out.close();
 	}
-	return 0;
 }
 
-void list_mapping() {
-	for (weight w : list<weight>(weight::wghts())) {
-		char buf[64];
-		std::string feats;
-		for (feature f : feature::feats()) {
-			if (f.value() == w) {
-				snprintf(buf, sizeof(buf), " %08" PRIx64, f.index().sign());
-				feats += buf;
-			}
-		}
-		if (feats.size()) {
-			u32 usageK = (sizeof(weight::numeric) * w.size()) >> 10;
-			u32 usageM = usageK >> 10;
-			u32 usageG = usageM >> 10;
-			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
-			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-			int n = snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c", w.sign(), w.size(), usage, scale);
-			u32 stride = sizeof(weight::segment) / sizeof(weight::numeric);
-			if (stride > 1) snprintf(buf + n, sizeof(buf) - n, " x%u", stride);
-			std::cout << buf << " :" << feats << std::endl;
-		} else {
-			snprintf(buf, sizeof(buf), "%08" PRIx64, w.sign());
-			weight::erase(w.sign());
-			std::cerr << "unused weight (" << buf << ") at list_mapping, erased" << std::endl;
-		}
+void list_network() {
+	for (weight w : weight::wghts()) {
+		std::stringstream buf;
+		buf << std::setfill('0');
+
+		buf << std::hex << std::setw(8) << w.sign();
+		buf << "[" << std::dec;
+		if (w.size() >> 30)
+			buf << (w.size() >> 30) << "G";
+		else if (w.size() >> 20)
+			buf << (w.size() >> 20) << "M";
+		else if (w.size() >> 10)
+			buf << (w.size() >> 10) << "k";
+		else
+			buf << (w.size());
+		buf << "]";
+
+		buf << " = (unused)" << std::hex;
+		buf.seekp(-9, std::ios::end);
+		for (feature f : feature::feats()) if (f.value() == w)
+			buf << " " << std::setw(8) << f.index().sign();
+
+		std::cout << buf.rdbuf() << std::endl;
 	}
+	std::cout << std::endl;
 }
 
 typedef numeric(*estimator)(const board&, clip<feature>);
@@ -1693,6 +1732,105 @@ inline numeric optimize(const board& state, numeric error,
 		esti += (feat[state] += error);
 	return esti;
 }
+
+inline constexpr numeric illegal(const board& state,
+		clip<feature> range = feature::feats()) {
+	return -std::numeric_limits<numeric>::max();
+}
+
+#define invoke_4x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
+#define invoke_5x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x8,0x9,0xa,0xb,0xc,0xd>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
+#define invoke_6x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+
+#define invoke_7x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
+
+#define invoke_8x6patt(esti, f, iso, ...)\
+esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
+esti += (VA_PASS(f[7 << 3][index6t<0x0,0x1,0x4,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+
+#define invoke_specialized_features(name, state, range, ...)({\
+register numeric esti = 0;\
+register board iso = state;\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.transpose();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.transpose();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.transpose();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+iso.mirror();\
+invoke_##name(esti, range, iso, ##__VA_ARGS__);\
+esti;})\
+
+#define declare_specialization(name)\
+inline numeric estimate_##name(const board& state, clip<feature> range = feature::feats()) {\
+	return invoke_specialized_features(name, state, range); }\
+inline numeric optimize_##name(const board& state, numeric updv, clip<feature> range = feature::feats()) {\
+	return invoke_specialized_features(name, state, range, += updv); }\
+
+declare_specialization(4x6patt);
+declare_specialization(5x6patt);
+declare_specialization(6x6patt);
+declare_specialization(7x6patt);
+declare_specialization(8x6patt);
+
+struct specialize {
+	specialize(utils::options& opts) : estim(utils::estimate), optim(utils::optimize) {
+		std::string spec = opts["options"].find("spec", "auto");
+		if (spec == "auto" || spec == "on") {
+			spec = opts["make"].value();
+			spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
+		}
+		switch (to_hash(spec)) {
+		case to_hash("4x6patt"): estim = utils::estimate_4x6patt; optim = utils::optimize_4x6patt; break;
+		case to_hash("5x6patt"): estim = utils::estimate_5x6patt; optim = utils::optimize_5x6patt; break;
+		case to_hash("6x6patt"): estim = utils::estimate_6x6patt; optim = utils::optimize_6x6patt; break;
+		case to_hash("7x6patt"): estim = utils::estimate_7x6patt; optim = utils::optimize_7x6patt; break;
+		case to_hash("8x6patt"): estim = utils::estimate_8x6patt; optim = utils::optimize_8x6patt; break;
+		}
+	}
+	constexpr specialize(utils::estimator estim, utils::optimizer optim) : estim(estim), optim(optim) {}
+	constexpr operator utils::estimator() const { return estim; }
+	constexpr operator utils::optimizer() const { return optim; }
+	utils::estimator estim;
+	utils::optimizer optim;
+};
 
 void make_transposition(std::string res = "") {
 	std::string in(res);
@@ -1822,17 +1960,17 @@ struct state {
 		score = move.operate(op);
 	}
 	inline numeric estimate(
-			clip<feature> range = feature::feats()) {
-		if (score >= 0) {
-			esti = state::reward() + utils::estimate(move, range);
-		} else {
-			esti = -std::numeric_limits<numeric>::max();
-		}
+			clip<feature> range = feature::feats(),
+			utils::estimator estim = utils::estimate) {
+		estim = score >= 0 ? estim : utils::illegal;
+		esti = state::reward() + estim(move, range);
 		return esti;
 	}
 	inline numeric optimize(numeric exact, numeric alpha = state::alpha(),
-			clip<feature> range = feature::feats()) {
-		esti = state::reward() + utils::optimize(move, (exact - state::value()) * alpha, range);
+			clip<feature> range = feature::feats(),
+			utils::optimizer optim = utils::optimize) {
+		numeric update = (exact - state::value()) * alpha;
+		esti = state::reward() + optim(move, update, range);
 		return esti;
 	}
 	inline numeric search(i32 depth,
@@ -1847,20 +1985,24 @@ struct state {
 
 	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
 	inline static numeric& alpha(numeric a) { return (state::alpha() = a); }
+	inline static numeric& lambda() { static numeric l = 0.5; return l; }
+	inline static numeric& lambda(numeric l) { return (state::lambda() = l); }
+	inline static u32& step() { static u32 n = 5; return n; }
+	inline static u32& step(u32 n) { return (state::step() = n); }
 };
 struct select {
 	state move[4];
 	state *best;
 	inline select() : best(move) {}
-	inline select& operator ()(const board& b, clip<feature> range = feature::feats()) {
+	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), utils::estimator estim = utils::estimate) {
 		move[0].assign(b, 0);
 		move[1].assign(b, 1);
 		move[2].assign(b, 2);
 		move[3].assign(b, 3);
-		move[0].estimate(range);
-		move[1].estimate(range);
-		move[2].estimate(range);
-		move[3].estimate(range);
+		move[0].estimate(range, estim);
+		move[1].estimate(range, estim);
+		move[2].estimate(range, estim);
+		move[3].estimate(range, estim);
 		best = std::max_element(move, move + 4);
 		return *this;
 	}
@@ -2040,7 +2182,6 @@ struct statistic {
 		char buf[256];
 		u32 size = 0;
 
-		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, indexf, // "%03llu/%03llu %llums %.2fops",
 				loop / unit,
 				limit / unit,
@@ -2059,6 +2200,7 @@ struct statistic {
 				math::msb32(total.hash),
 				total.win * 100.0 / loop);
 		buf[size++] = '\n';
+		buf[size++] = '\n';
 		buf[size++] = '\0';
 
 		std::cout << buf << std::flush;
@@ -2071,7 +2213,6 @@ struct statistic {
 		char buf[1024];
 		u32 size = 0;
 
-		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, summaf, // "summary %llums %.2fops",
 				total.time,
 				total.opers * 1000.0 / total.time);
@@ -2099,6 +2240,7 @@ struct statistic {
 					count[i] * 100.0 / total, left * 100.0 / total);
 			buf[size++] = '\n';
 		}
+		buf[size++] = '\n';
 		buf[size++] = '\0';
 
 		std::cout << buf << std::flush;
@@ -2120,115 +2262,150 @@ struct statistic {
 	}
 };
 
-statistic optimize(utils::options::option args, utils::options::option opts = {}) {
+statistic optimize(utils::options opts, const std::string& type) {
+	utils::options::option& args = opts[type];
+
 	std::vector<state> path;
-	path.reserve(65536);
 	statistic stats;
-	search xbest;
+	search xbest; // FIXME: related algorithms are temporarily removed
 	select best;
 	state last;
-	board b;
+
+	utils::estimator estim = utils::specialize(opts);
+	utils::optimizer optim = utils::specialize(opts);
+	clip<feature> feats = feature::feats();
+	numeric alpha = state::alpha();
+	numeric lambda = state::lambda();
+	u32 step = state::step();
 
 	switch (to_hash(args["mode"])) {
-	case to_hash("backward"):
-	case to_hash("backward-best"):
-		for (stats.init(args); stats; stats++) {
-
-			u32 score = 0;
-			u32 opers = 0;
-
-			for (b.init(); best << b; b.next()) {
-				score += best.score();
-				opers += 1;
-				best >> path;
-				best >> b;
-			}
-
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				path.back().estimate();
-				v = path.back().optimize(v);
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
-
+	default:
 	case to_hash("forward"):
-	case to_hash("forward-best"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
 			b.init();
-			best << b;
+			best(b, feats, estim);
 			score += best.score();
 			opers += 1;
 			best >> last;
 			best >> b;
 			b.next();
-			while (best << b) {
-				last.optimize(best.esti());
+			while (best(b, feats, estim)) {
+				last.optimize(best.esti(), alpha, feats, optim);
 				score += best.score();
 				opers += 1;
 				best >> last;
 				best >> b;
 				b.next();
 			}
-			last.optimize(0);
+			last.optimize(0, alpha, feats, optim);
 
 			stats.update(score, b.hash(), opers);
 		}
 		break;
 
-	case to_hash("backward-xbest"):
+	case to_hash("backward"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); xbest << b; b.next()) {
-				score += xbest.score();
+			for (b.init(); best(b, feats, estim); b.next()) {
+				score += best.score();
 				opers += 1;
-				xbest >> path;
-				xbest >> b;
+				best >> path;
+				best >> b;
 			}
 
-			for (numeric v = 0; path.size(); path.pop_back()) {
-				transposition::remove(path.back());
-				path.back().estimate();
-				v = path.back().optimize(v);
+			for (numeric esti = 0; path.size(); path.pop_back()) {
+				path.back().estimate(feats, estim);
+				esti = path.back().optimize(esti, alpha, feats, optim);
 			}
 
 			stats.update(score, b.hash(), opers);
 		}
 		break;
 
-	default:
-	case to_hash("forward-xbest"):
+	case to_hash("forward-lambda"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
 			b.init();
-			xbest << b;
-			score += xbest.score();
-			opers += 1;
-			xbest >> last;
-			xbest >> b;
-			b.next();
-			while (xbest << b) {
-				last.optimize(xbest.estimate());
-				transposition::remove(last);
-				score += xbest.score();
+			for (u32 i = 0; i < step && best(b, feats, estim); i++) {
+				score += best.score();
 				opers += 1;
-				xbest >> last;
-				xbest >> b;
+				best >> path;
+				best >> b;
 				b.next();
 			}
-			last.optimize(0);
-			transposition::remove(last);
+			while (best(b, feats, estim)) {
+				numeric z = best.esti();
+				numeric retain = 1 - lambda;
+				for (u32 k = 1; k < step; k++) {
+					state& source = path[opers - k];
+					source.estimate(feats, estim);
+					numeric r = source.reward();
+					numeric v = source.value();
+					z = r + (lambda * z + retain * v);
+				}
+				state& update = path[opers - step];
+				update.estimate(feats, estim);
+				update.optimize(z, alpha, feats, optim);
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			for (u32 tail = std::min(step, opers), i = 0; i < tail; i++) {
+				numeric z = 0;
+				numeric retain = 1 - lambda;
+				for (u32 k = i + 1; k < tail; k++) {
+					state& source = path[opers + i - k];
+					source.estimate(feats, estim);
+					numeric r = source.reward();
+					numeric v = source.value();
+					z = r + (lambda * z + retain * v);
+				}
+				state& update = path[opers + i - tail];
+				update.estimate(feats, estim);
+				update.optimize(z, alpha, feats, optim);
+			}
+			path.clear();
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("lambda"):
+	case to_hash("backward-lambda"):
+		for (stats.init(args); stats; stats++) {
+			board b;
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, estim); b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			numeric z = 0;
+			numeric r = path.back().reward();
+			numeric v = path.back().optimize(0, alpha, feats, optim) - r;
+			numeric retain = 1 - lambda;
+			for (path.pop_back(); path.size(); path.pop_back()) {
+				path.back().estimate(feats, estim);
+				z = r + (lambda * z + retain * v);
+				r = path.back().reward();
+				v = path.back().optimize(z, alpha, feats, optim) - r;
+			}
 
 			stats.update(score, b.hash(), opers);
 		}
@@ -2238,20 +2415,25 @@ statistic optimize(utils::options::option args, utils::options::option opts = {}
 	return stats;
 }
 
-statistic evaluate(utils::options::option args, utils::options::option opts = {}) {
+statistic evaluate(utils::options opts, const std::string& type) {
+	utils::options::option& args = opts[type];
+
 	statistic stats;
-	search xbest;
+	search xbest; // FIXME: related algorithms are temporarily removed
 	select best;
-	board b;
+
+	utils::estimator estim = utils::specialize(opts);
+	clip<feature> feats = feature::feats();
 
 	switch (to_hash(args["mode"])) {
+	default:
 	case to_hash("best"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best << b; b.next()) {
+			for (b.init(); best(b, feats, estim); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> b;
@@ -2261,26 +2443,9 @@ statistic evaluate(utils::options::option args, utils::options::option opts = {}
 		}
 		break;
 
-	default:
-	case to_hash("xbest"):
-		for (stats.init(args); stats; stats++) {
-
-			u32 score = 0;
-			u32 opers = 0;
-
-			for (b.init(); xbest << b; b.next()) {
-				score += xbest.score();
-				opers += 1;
-				xbest >> b;
-			}
-
-			stats.update(score, b.hash(), opers);
-		}
-		break;
-
 	case to_hash("random"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 			hex a;
@@ -2316,6 +2481,11 @@ utils::options parse(int argc, const char* argv[]) {
 			opts[""] = next_opts();
 			if (opts[""].empty()) (opts[""] += "0.1") += "norm";
 			opts["alpha"] = opts[""];
+			break;
+		case to_hash("-l"):
+		case to_hash("--lambda"):
+			opts["lambda"] = next_opt("0.5");
+			opts["step"] = next_opt(numeric(opts["lambda"]) ? "5" : "1");
 			break;
 		case to_hash("-t"):
 		case to_hash("--train"):
@@ -2372,8 +2542,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--network-output"):
 			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
-//			opts["save"] += opts[""]; // e.g. "-o 2048.x" indicates logging
-			for (auto opt : opts[""]) opts[opt[opt.find_last_of('.') + 1] != 'x' ? "save" : "logging"] += opt;
+			opts["save"] += opts[""];
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
@@ -2393,6 +2562,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["info"] = next_opt("full");
 			opts["info"] += next_opts();
 			break;
+		case to_hash("-x"):
 		case to_hash("--option"):
 		case to_hash("--options"):
 			opts["options"] += next_opts();
@@ -2463,11 +2633,6 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--comment"):
 			opts["comment"] = next_opts();
 			break;
-		case to_hash("-x"):
-		case to_hash("-log"):
-		case to_hash("--logging"):
-			opts["logging"] = next_opt(std::string(argv[0]) + ".x");
-			break;
 		case to_hash("-"):
 		case to_hash("-|"):
 		case to_hash("--|"):
@@ -2487,32 +2652,38 @@ int main(int argc, const char* argv[]) {
 	if (!opts("evaluate")) opts["evaluate"] = opts("optimize") ? 0 : 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
+	if (!opts("lambda")) opts["lambda"] = 0;
+	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
 	if (!opts("depth")) opts["depth"] = "7 7 7 7 5 5 5 5 3 3 3 3 1 1 1 1";
 
-	utils::logging(opts["logging"]);
+	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "develop-search" << " build GCC " __VERSION__ << " C++" << __cplusplus;
+	std::cout << "Develop-Search" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" __DATE__ " " __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 	std::cout << "time = " << moporgic::millisec() << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
+	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
 	std::cout << "depth = " << opts["depth"] << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
 	utils::make_network(opts["make"]);
-	utils::list_mapping();
+	utils::list_network();
 
 	moporgic::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
 	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
+	state::lambda(opts["lambda"]);
+	if (numeric(opts["lambda"]) && !opts("optimize", "mode")) opts["optimize"]["mode"] = "lambda";
+	state::step(opts["step"]);
 	search::parse(opts["depth"]);
 
 	if (statistic(opts["optimize"])) {
-		std::cout << std::endl << "start optimizing..." << std::endl;
-		statistic stat = optimize(opts["optimize"], opts["options"]);
+		std::cout << "optimization: " << opts["optimize"] << std::endl << std::endl;
+		statistic stat = optimize(opts, "optimize");
 		if (opts["info"] == "full") stat.summary();
 	}
 
@@ -2522,15 +2693,14 @@ int main(int argc, const char* argv[]) {
 	utils::make_transposition(opts["cache-make"]);
 
 	if (statistic(opts["evaluate"])) {
-		std::cout << std::endl << "start evaluating..." << std::endl;
-		statistic stat = evaluate(opts["evaluate"], opts["options"]);
+		std::cout << "verification: " << opts["evaluate"] << std::endl << std::endl;
+		statistic stat = evaluate(opts, "evaluate");
 		if (opts["info"] != "none") stat.summary();
 		if (opts["info"] != "none") transposition::instance().summary();
 	}
 
 	utils::save_transposition(opts["cache-save"]);
 
-	std::cout << std::endl;
 	return 0;
 }
 
