@@ -1218,7 +1218,7 @@ std::map<std::string, std::string> aliases() {
 	alias["default"] = alias["4x6patt"];
 	return alias;
 }
-u32 make_network(utils::options::option opt) {
+void make_network(utils::options::option opt) {
 	std::string tokens = opt;
 	if (tokens.empty() && feature::feats().empty())
 		tokens = "default";
@@ -1361,10 +1361,8 @@ u32 make_network(utils::options::option opt) {
 
 		if (wght && idxr && !feature(wght, idxr)) feature::make(wght, idxr);
 	}
-
-	return 0;
 }
-u32 load_network(utils::options::option opt) {
+void load_network(utils::options::option opt) {
 	for (std::string path : opt) {
 		std::ifstream in;
 		in.open(path, std::ios::in | std::ios::binary);
@@ -1382,9 +1380,8 @@ u32 load_network(utils::options::option opt) {
 	}
 	for (feature f : list<feature>(std::move(feature::feats())))
 		feature::make(f.value().sign(), f.index().sign());
-	return 0;
 }
-u32 save_network(utils::options::option opt) {
+void save_network(utils::options::option opt) {
 	for (std::string path : opt) {
 		char type = path[path.find_last_of(".") + 1];
 		if (type == 'x' || type == 'l') continue; // .x and .log are suffix for log files
@@ -1397,7 +1394,6 @@ u32 save_network(utils::options::option opt) {
 		out.flush();
 		out.close();
 	}
-	return 0;
 }
 
 void list_network() {
