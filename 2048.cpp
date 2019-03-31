@@ -392,17 +392,6 @@ private:
 	}
 };
 
-void logging(utils::options::option opt) {
-	static std::ofstream logout;
-	if (logout.is_open()) return;
-	std::string path = opt.size() ? opt.back() : "";
-	logout.open(path, std::ios::out | std::ios::app);
-	if (logout.is_open()) {
-		static moporgic::teestream tee(std::cout, logout);
-		static moporgic::redirector redirect(tee, std::cout);
-	}
-}
-
 inline u32 hashpatt(const std::vector<u32>& patt) {
 	u32 hash = 0;
 	for (auto tile : patt) hash = (hash << 4) | tile;
@@ -1184,6 +1173,18 @@ struct indexhdr {
 	}
 };
 
+void init_logging(utils::options::option opt) {
+	static std::ofstream logout;
+	for (std::string path : opt) {
+		char type = path[path.find_last_of(".") + 1];
+		if (logout.is_open() || (type != 'x' && type != 'l')) continue; // .x and .log are suffix for log files
+		logout.open(path, std::ios::out | std::ios::app);
+	}
+	if (!logout.is_open()) return;
+	static moporgic::teestream tee(std::cout, logout);
+	static moporgic::redirector redirect(tee, std::cout);
+}
+
 std::map<std::string, std::string> aliases() {
 	std::map<std::string, std::string> alias;
 	alias["4x6patt/khyeh"] = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
@@ -1368,7 +1369,7 @@ u32 load_network(utils::options::option opt) {
 		std::ifstream in;
 		in.open(path, std::ios::in | std::ios::binary);
 		while (in.peek() != -1) {
-			auto type = in.peek();
+			char type = in.peek();
 			if (type != 0) { // new binaries already store its type, so use it for the later loading
 				in.ignore(1);
 			} else { // legacy binaries always beginning with 0, so use name suffix to determine the type
@@ -1383,10 +1384,11 @@ u32 load_network(utils::options::option opt) {
 }
 u32 save_network(utils::options::option opt) {
 	for (std::string path : opt) {
+		char type = path[path.find_last_of(".") + 1];
+		if (type == 'x' || type == 'l') continue; // .x and .log are suffix for log files
 		std::ofstream out;
 		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) continue;
-		auto type = path[path.find_last_of(".") + 1];
 		// for upward compatibility, we still store legacy binaries if suffix are traditional (.f or .w)
 		if (type != 'f')  weight::save(type != 'w' ? out.write("w", 1) : out);
 		if (type != 'w') feature::save(type != 'f' ? out.write("f", 1) : out);
@@ -2093,8 +2095,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--network-output"):
 			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
-//			opts["save"] += opts[""]; // e.g. "-o 2048.x" indicates logging
-			for (auto opt : opts[""]) opts[opt[opt.find_last_of('.') + 1] != 'x' ? "save" : "logging"] += opt;
+			opts["save"] += opts[""];
 			break;
 		case to_hash("-w"):
 		case to_hash("--weight"):
@@ -2157,11 +2158,6 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--comment"):
 			opts["comment"] = next_opts();
 			break;
-		case to_hash("-log"):
-		case to_hash("--log"):
-		case to_hash("--logging"):
-			opts["logging"] = next_opt(std::string(argv[0]) + ".x");
-			break;
 		case to_hash("-"):
 		case to_hash("-|"):
 		case to_hash("--|"):
@@ -2184,7 +2180,7 @@ int main(int argc, const char* argv[]) {
 	if (!opts("lambda")) opts["lambda"] = 0;
 	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
 
-	utils::logging(opts["logging"]);
+	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
 	std::cout << "Develop" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" __DATE__ " " __TIME__ ")" << std::endl;
