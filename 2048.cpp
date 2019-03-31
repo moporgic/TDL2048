@@ -2186,7 +2186,7 @@ int main(int argc, const char* argv[]) {
 
 	utils::logging(opts["logging"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "Develop-Lambda" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
+	std::cout << "Develop" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" __DATE__ " " __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
