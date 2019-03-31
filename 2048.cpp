@@ -27,6 +27,7 @@
 #include <cctype>
 #include <iterator>
 #include <sstream>
+#include <iomanip>
 #include <list>
 
 namespace moporgic {
@@ -1395,32 +1396,31 @@ u32 save_network(utils::options::option opt) {
 	return 0;
 }
 
-void list_mapping() {
-	for (weight w : list<weight>(weight::wghts())) {
-		char buf[64];
-		std::string feats;
-		for (feature f : feature::feats()) {
-			if (f.value() == w) {
-				snprintf(buf, sizeof(buf), " %08" PRIx64, f.index().sign());
-				feats += buf;
-			}
-		}
-		if (feats.size()) {
-			u32 usageK = (sizeof(weight::numeric) * w.size()) >> 10;
-			u32 usageM = usageK >> 10;
-			u32 usageG = usageM >> 10;
-			u32 usage = usageG ? usageG : (usageM ? usageM : usageK);
-			char scale = usageG ? 'G' : (usageM ? 'M' : 'K');
-			int n = snprintf(buf, sizeof(buf), "weight(%08" PRIx64 ")[%zu] = %d%c", w.sign(), w.size(), usage, scale);
-			u32 stride = sizeof(weight::segment) / sizeof(weight::numeric);
-			if (stride > 1) snprintf(buf + n, sizeof(buf) - n, " x%u", stride);
-			std::cout << buf << " :" << feats << std::endl;
-		} else {
-			snprintf(buf, sizeof(buf), "%08" PRIx64, w.sign());
-			weight::erase(w.sign());
-			std::cerr << "unused weight (" << buf << ") at list_mapping, erased" << std::endl;
-		}
+void list_network() {
+	for (weight w : weight::wghts()) {
+		std::stringstream buf;
+		buf << std::setfill('0');
+
+		buf << std::hex << std::setw(8) << w.sign();
+		buf << "[" << std::dec;
+		if (w.size() >> 30)
+			buf << (w.size() >> 30) << "G";
+		else if (w.size() >> 20)
+			buf << (w.size() >> 20) << "M";
+		else if (w.size() >> 10)
+			buf << (w.size() >> 10) << "k";
+		else
+			buf << (w.size());
+		buf << "]";
+
+		buf << " = (unused)" << std::hex;
+		buf.seekp(-9, std::ios::end);
+		for (feature f : feature::feats()) if (f.value() == w)
+			buf << " " << std::setw(8) << f.index().sign();
+
+		std::cout << buf.rdbuf() << std::endl;
 	}
+	std::cout << std::endl;
 }
 
 typedef numeric(*estimator)(const board&, clip<feature>);
@@ -1735,7 +1735,6 @@ struct statistic {
 		char buf[256];
 		u32 size = 0;
 
-		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, indexf, // "%03llu/%03llu %llums %.2fops",
 				loop / unit,
 				limit / unit,
@@ -1754,6 +1753,7 @@ struct statistic {
 				math::msb32(total.hash),
 				total.win * 100.0 / loop);
 		buf[size++] = '\n';
+		buf[size++] = '\n';
 		buf[size++] = '\0';
 
 		std::cout << buf << std::flush;
@@ -1766,7 +1766,6 @@ struct statistic {
 		char buf[1024];
 		u32 size = 0;
 
-		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, summaf, // "summary %llums %.2fops",
 				total.time,
 				total.opers * 1000.0 / total.time);
@@ -1794,6 +1793,7 @@ struct statistic {
 					count[i] * 100.0 / total, left * 100.0 / total);
 			buf[size++] = '\n';
 		}
+		buf[size++] = '\n';
 		buf[size++] = '\0';
 
 		std::cout << buf << std::flush;
@@ -1822,7 +1822,6 @@ statistic optimize(utils::options opts, const std::string& type) {
 	statistic stats;
 	select best;
 	state last;
-	board b;
 
 	utils::estimator estim = utils::specialize(opts);
 	utils::optimizer optim = utils::specialize(opts);
@@ -1835,7 +1834,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 	default:
 	case to_hash("forward"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1862,7 +1861,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 
 	case to_hash("backward"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1873,9 +1872,9 @@ statistic optimize(utils::options opts, const std::string& type) {
 				best >> b;
 			}
 
-			for (numeric v = 0; path.size(); path.pop_back()) {
+			for (numeric esti = 0; path.size(); path.pop_back()) {
 				path.back().estimate(feats, estim);
-				v = path.back().optimize(v, alpha, feats, optim);
+				esti = path.back().optimize(esti, alpha, feats, optim);
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -1884,7 +1883,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 
 	case to_hash("forward-lambda"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1938,7 +1937,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 	case to_hash("lambda"):
 	case to_hash("backward-lambda"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1973,7 +1972,6 @@ statistic evaluate(utils::options opts, const std::string& type) {
 
 	statistic stats;
 	select best;
-	board b;
 
 	utils::estimator estim = utils::specialize(opts);
 	clip<feature> feats = feature::feats();
@@ -1982,7 +1980,7 @@ statistic evaluate(utils::options opts, const std::string& type) {
 	default:
 	case to_hash("best"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1998,7 +1996,7 @@ statistic evaluate(utils::options opts, const std::string& type) {
 
 	case to_hash("random"):
 		for (stats.init(args); stats; stats++) {
-
+			board b;
 			u32 score = 0;
 			u32 opers = 0;
 			hex a;
@@ -2188,7 +2186,7 @@ int main(int argc, const char* argv[]) {
 
 	utils::logging(opts["logging"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "develop-lambda" << " build GCC " __VERSION__ << " C++" << __cplusplus;
+	std::cout << "Develop-Lambda" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" __DATE__ " " __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
@@ -2201,7 +2199,7 @@ int main(int argc, const char* argv[]) {
 
 	utils::load_network(opts["load"]);
 	utils::make_network(opts["make"]);
-	utils::list_mapping();
+	utils::list_network();
 
 	moporgic::srand(moporgic::to_hash(opts["seed"]));
 	state::alpha(std::stod(opts["alpha"]));
@@ -2211,7 +2209,7 @@ int main(int argc, const char* argv[]) {
 	state::step(opts["step"]);
 
 	if (statistic(opts["optimize"])) {
-		std::cout << std::endl << "start optimizing..." << std::endl;
+		std::cout << "optimization: " << opts["optimize"] << std::endl << std::endl;
 		statistic stat = optimize(opts, "optimize");
 		if (opts["info"] == "full") stat.summary();
 	}
@@ -2219,12 +2217,11 @@ int main(int argc, const char* argv[]) {
 	utils::save_network(opts["save"]);
 
 	if (statistic(opts["evaluate"])) {
-		std::cout << std::endl << "start evaluating..." << std::endl;
+		std::cout << "verification: " << opts["evaluate"] << std::endl << std::endl;
 		statistic stat = evaluate(opts, "evaluate");
 		if (opts["info"] != "none") stat.summary();
 	}
 
-	std::cout << std::endl;
 	return 0;
 }
 
