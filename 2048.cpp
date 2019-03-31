@@ -1380,6 +1380,8 @@ u32 load_network(utils::options::option opt) {
 		}
 		in.close();
 	}
+	for (feature f : list<feature>(std::move(feature::feats())))
+		feature::make(f.value().sign(), f.index().sign());
 	return 0;
 }
 u32 save_network(utils::options::option opt) {
