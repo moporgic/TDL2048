@@ -1890,24 +1890,69 @@ bool save_transposition(std::string path) {
 }
 
 numeric search_expt(const board& after, i32 depth,
-		const clip<feature>& range = feature::feats());
+		clip<feature> range = feature::feats(),
+		utils::estimator estim = utils::estimate);
 numeric search_max(const board& before, i32 depth,
-		const clip<feature>& range = feature::feats());
+		clip<feature> range = feature::feats(),
+		utils::estimator estim = utils::estimate);
+
+struct search {
+	static std::array<u32, 16>& depth() {
+		static std::array<u32, 16> res = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 1, 1, 1, 1 };
+		return res;
+	}
+	static std::array<u32, 16>& depth(const std::array<u32, 16>& res) { return (depth() = res); }
+
+	static void parse(const std::string& res) {
+		std::array<u32, 16> depthres;
+		std::string dyndepth(res);
+		for (u32 d = 0, e = 0; e < 16; depthres[e++] = d) {
+			if (dyndepth.empty()) continue;
+			auto it = dyndepth.find_first_of(", ");
+			d = std::stol(dyndepth.substr(0, it));
+			dyndepth = dyndepth.substr(it + 1);
+		}
+		depth(depthres);
+	}
+
+
+	template<utils::estimator estim = utils::estimate>
+	static numeric estimate(const board& after,
+			clip<feature> range = feature::feats()) {
+
+		const std::array<u32, 16>& policy = search::depth(); // FIXME
+		i32 depth = policy[after.spaces().size()] - 1;
+		return search_expt(after, depth, range, estim);
+	}
+
+	static utils::estimator wrap(utils::estimator estim) { // FIXME
+		switch (estim) {
+		default:
+		case utils::estimate:         return estimate<utils::estimate>;
+		case utils::estimate_4x6patt: return estimate<utils::estimate_4x6patt>;
+		case utils::estimate_5x6patt: return estimate<utils::estimate_5x6patt>;
+		case utils::estimate_6x6patt: return estimate<utils::estimate_6x6patt>;
+		case utils::estimate_7x6patt: return estimate<utils::estimate_7x6patt>;
+		case utils::estimate_8x6patt: return estimate<utils::estimate_8x6patt>;
+		}
+	}
+};
 
 numeric search_expt(const board& after, i32 depth,
-		const clip<feature>& range) {
+		clip<feature> range,
+		utils::estimator estim) {
 	auto& t = transposition::find(after);
 	if (t >= depth) return t;
-	if (depth <= 0) return t.save(utils::estimate(after, range), 0);
+	if (depth <= 0) return estim(after, range);
 	const auto spaces = after.spaces();
 	numeric expt = 0;
 	board before = after;
 	for (size_t i = 0; i < spaces.size(); i++) {
 		const u32 pos = spaces[i];
 		before.set(pos, 1);
-		expt += 9 * search_max(before, depth - 1, range);
+		expt += 9 * search_max(before, depth - 1, range, estim);
 		before.set(pos, 2);
-		expt += 1 * search_max(before, depth - 1, range);
+		expt += 1 * search_max(before, depth - 1, range, estim);
 		before = after;
 	}
 	numeric esti = expt / (10 * spaces.size());
@@ -1915,24 +1960,25 @@ numeric search_expt(const board& after, i32 depth,
 }
 
 numeric search_max(const board& before, i32 depth,
-		const clip<feature>& range) {
+		clip<feature> range,
+		utils::estimator estim) {
 	numeric expt = 0;
 	board after = before;
 	register i32 reward;
 	if ((reward = after.up()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1, range));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, range, estim));
 		after = before;
 	}
 	if ((reward = after.right()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1, range));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, range, estim));
 		after = before;
 	}
 	if ((reward = after.down()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1, range));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, range, estim));
 		after = before;
 	}
 	if ((reward = after.left()) != -1) {
-		expt = std::max(expt, reward + search_expt(after, depth - 1, range));
+		expt = std::max(expt, reward + search_expt(after, depth - 1, range, estim));
 		after = before;
 	}
 	return expt;
@@ -1973,15 +2019,6 @@ struct state {
 		esti = state::reward() + optim(move, update, range);
 		return esti;
 	}
-	inline numeric search(i32 depth,
-			const clip<feature>& range = feature::feats()) {
-		if (score >= 0) {
-			esti = state::reward() + utils::search_expt(move, depth, range);
-		} else {
-			esti = -std::numeric_limits<numeric>::max();
-		}
-		return esti;
-	}
 
 	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
 	inline static numeric& alpha(numeric a) { return (state::alpha() = a); }
@@ -2019,46 +2056,6 @@ struct select {
 
 	inline state* begin() { return move; }
 	inline state* end() { return move + 4; }
-};
-struct search : select {
-	std::array<u32, 16> policy;
-	search(const std::array<u32, 16>& res = search::depth()) : select(), policy(res) {}
-
-	inline select& operator ()(const board& b) {
-		return operator ()(b, feature::feats());
-	}
-	inline select& operator ()(const board& b, const clip<feature>& range) {
-		u32 depth = policy[b.spaces().size()] - 1;
-		move[0].assign(b, 0);
-		move[1].assign(b, 1);
-		move[2].assign(b, 2);
-		move[3].assign(b, 3);
-		move[0].search(depth, range);
-		move[1].search(depth, range);
-		move[2].search(depth, range);
-		move[3].search(depth, range);
-		best = std::max_element(move, move + 4);
-		return *this;
-	}
-	inline select& operator <<(const board& b) { return operator ()(b); }
-
-	static std::array<u32, 16>& depth() {
-		static std::array<u32, 16> res = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 1, 1, 1, 1 };
-		return res;
-	}
-	static std::array<u32, 16>& depth(const std::array<u32, 16>& res) { return (depth() = res); }
-
-	static void parse(const std::string& res) {
-		std::array<u32, 16> depthres;
-		std::string dyndepth(res);
-		for (u32 d = 0, e = 0; e < 16; depthres[e++] = d) {
-			if (dyndepth.empty()) continue;
-			auto it = dyndepth.find_first_of(", ");
-			d = std::stol(dyndepth.substr(0, it));
-			dyndepth = dyndepth.substr(it + 1);
-		}
-		depth(depthres);
-	}
 };
 struct statistic {
 	u64 limit;
@@ -2267,7 +2264,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 
 	std::vector<state> path;
 	statistic stats;
-	search xbest; // FIXME: related algorithms are temporarily removed
+	// search xbest; FIXME: related algorithms are temporarily removed
 	select best;
 	state last;
 
@@ -2419,7 +2416,7 @@ statistic evaluate(utils::options opts, const std::string& type) {
 	utils::options::option& args = opts[type];
 
 	statistic stats;
-	search xbest; // FIXME: related algorithms are temporarily removed
+	// search xbest; FIXME: related algorithms are temporarily removed
 	select best;
 
 	utils::estimator estim = utils::specialize(opts);
@@ -2601,7 +2598,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--win"):
 			opts["optimize"]["win"] = opts["evaluate"]["win"] = next_opt("2048");
 			break;
-		case to_hash("-d"):
+		case to_hash("-d"): // FIXME
 		case to_hash("--depth"):
 		case to_hash("-dd"):
 		case to_hash("--depth-dynamic"):
@@ -2679,7 +2676,7 @@ int main(int argc, const char* argv[]) {
 	state::lambda(opts["lambda"]);
 	if (numeric(opts["lambda"]) && !opts("optimize", "mode")) opts["optimize"]["mode"] = "lambda";
 	state::step(opts["step"]);
-	search::parse(opts["depth"]);
+	utils::search::parse(opts["depth"]);
 
 	if (statistic(opts["optimize"])) {
 		std::cout << "optimization: " << opts["optimize"] << std::endl << std::endl;
