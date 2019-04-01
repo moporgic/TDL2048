@@ -1520,7 +1520,7 @@ declare_specialization(7x6patt);
 declare_specialization(8x6patt);
 
 struct specialize {
-	specialize(utils::options& opts) : estim(utils::estimate), optim(utils::optimize) {
+	specialize(utils::options& opts, const std::string& type) : estim(utils::estimate), optim(utils::optimize) {
 		std::string spec = opts["options"].find("spec", "auto");
 		if (spec == "auto" || spec == "on") {
 			spec = opts["make"].value();
@@ -1816,24 +1816,22 @@ struct statistic {
 };
 
 statistic optimize(utils::options opts, const std::string& type) {
-	utils::options::option& args = opts[type];
-
 	std::vector<state> path;
 	statistic stats;
 	select best;
 	state last;
 
-	utils::estimator estim = utils::specialize(opts);
-	utils::optimizer optim = utils::specialize(opts);
+	utils::estimator estim = utils::specialize(opts, type);
+	utils::optimizer optim = utils::specialize(opts, type);
 	clip<feature> feats = feature::feats();
 	numeric alpha = state::alpha();
 	numeric lambda = state::lambda();
 	u32 step = state::step();
 
-	switch (to_hash(args["mode"])) {
+	switch (to_hash(opts[type]["mode"])) {
 	default:
 	case to_hash("forward"):
-		for (stats.init(args); stats; stats++) {
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -1860,7 +1858,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 		break;
 
 	case to_hash("backward"):
-		for (stats.init(args); stats; stats++) {
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -1882,7 +1880,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 		break;
 
 	case to_hash("forward-lambda"):
-		for (stats.init(args); stats; stats++) {
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -1936,7 +1934,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 
 	case to_hash("lambda"):
 	case to_hash("backward-lambda"):
-		for (stats.init(args); stats; stats++) {
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -1968,18 +1966,16 @@ statistic optimize(utils::options opts, const std::string& type) {
 }
 
 statistic evaluate(utils::options opts, const std::string& type) {
-	utils::options::option& args = opts[type];
-
 	statistic stats;
 	select best;
 
-	utils::estimator estim = utils::specialize(opts);
+	utils::estimator estim = utils::specialize(opts, type);
 	clip<feature> feats = feature::feats();
 
-	switch (to_hash(args["mode"])) {
+	switch (to_hash(opts[type]["mode"])) {
 	default:
 	case to_hash("best"):
-		for (stats.init(args); stats; stats++) {
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -1995,7 +1991,7 @@ statistic evaluate(utils::options opts, const std::string& type) {
 		break;
 
 	case to_hash("random"):
-		for (stats.init(args); stats; stats++) {
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
