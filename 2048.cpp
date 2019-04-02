@@ -300,31 +300,38 @@ public:
 		u64 sign;
 		f32 esti;
 		i16 depth;
-		u16 info;
+		u16 hits;
 		constexpr position(const position& e) = default;
-		constexpr position(u64 sign = 0) : sign(sign), esti(0), depth(-1), info(0) {}
+		constexpr position(u64 sign = 0) : sign(sign), esti(0), depth(-1), hits(0) {}
 
 		constexpr operator numeric() const { return esti; }
 		constexpr operator bool()    const { return sign; }
 		constexpr bool operator ==(u64 s) const { return sign == s; }
 		constexpr bool operator >=(i32 d) const { return depth >= d; }
-		declare_comparators(position, info, constexpr);
+		declare_comparators(position, hits, constexpr);
 
-		constexpr position& save(f32 e, i32 d) {
-			esti = e;
-			depth = d;
-			return *this;
-		}
-		constexpr position& operator()(u64 s) {
-			if (sign != s) {
-				sign = s;
-				esti = 0;
-				depth = -1;
-				info = 0;
-			} else {
-				info = std::min(info + 1, 65535);
+		struct result {
+			position& where;
+			u64 sign;
+
+			constexpr result& save(f32 esti, i32 depth) {
+				if (where.sign != sign) {
+					where.sign = sign;
+					where.esti = esti;
+					where.depth = depth;
+					where.hits = 0;
+				} else {
+					where.hits = std::min(where.hits + 1, 65535);
+				}
+				return *this;
 			}
-			return *this;
+
+			constexpr operator numeric() const { return where; }
+			constexpr operator bool() const { return where == sign; }
+			constexpr bool operator >=(i32 d) const { return where >= d; }
+		};
+		constexpr result operator()(u64 s) {
+			return { *this, s };
 		}
 	};
 
@@ -346,14 +353,14 @@ public:
 		return x;
 	}
 
-	inline position& operator[] (const board& b) {
+	inline position::result operator[] (const board& b) {
 		u64 x = min_isomorphic(b);
 		u64 hash = math::fmix64(x) & zmask;
 
 		position& data = cache[hash];
 		if (!data) return data(x);
 		if (!std::isnan(data.esti)) {
-			if (data == x || !data.info) return data(x);
+			if (data == x || !data.hits) return data(x);
 			position* list = mpool.allocate(2);
 			if (!list) return data(x);
 			list[0] = data;
@@ -372,10 +379,10 @@ public:
 		if (list[lim] == x) return list[lim](x);
 		if (size != (1u << math::ones16(lim))) return list[++lim](x);
 
-		u32 hits = 0, min = list[lim].info;
+		u32 hits = 0, min = list[lim].hits;
 		for (u32 i = 0; i < size; i++) {
-			hits += list[i].info;
-			list[i].info -= min;
+			hits += list[i].hits;
+			list[i].hits -= min;
 		}
 		u32 thres = hits / (size * 2);
 		if (min <= thres || size == 65536) return list[lim](x);
@@ -407,7 +414,7 @@ public:
 				if (!data.sign) continue;
 				write_cast<f32>(out, data.esti);
 				write_cast<i16>(out, data.depth);
-				write_cast<u16>(out, data.info);
+				write_cast<u16>(out, data.hits);
 				if (!std::isnan(data.esti)) continue;
 
 				auto size = u16(data.depth) + 1u;
@@ -417,7 +424,7 @@ public:
 					write_cast<u64>(out, it->sign);
 					write_cast<f32>(out, it->esti);
 					write_cast<i16>(out, it->depth);
-					write_cast<u16>(out, it->info);
+					write_cast<u16>(out, it->hits);
 				}
 			}
 			write_cast<u16>(out, 0); // reserved fields
@@ -446,7 +453,7 @@ public:
 				if (!data.sign) continue;
 				read_cast<f32>(in, data.esti);
 				read_cast<i16>(in, data.depth);
-				read_cast<u16>(in, data.info);
+				read_cast<u16>(in, data.hits);
 				if (!std::isnan(data.esti)) continue;
 
 				auto size = u16(data.depth) + 1u;
@@ -456,7 +463,7 @@ public:
 					read_cast<u64>(in, it->sign);
 					read_cast<f32>(in, it->esti);
 					read_cast<i16>(in, it->depth);
-					read_cast<u16>(in, it->info);
+					read_cast<u16>(in, it->hits);
 				}
 			}
 			while (read_cast<u16>(in, code) && code) {
@@ -524,8 +531,8 @@ public:
 		return instance().shape(std::max(len, size_t(1)), lim);
 	}
 	static inline transposition& instance() { static transposition tp; return tp; }
-	static inline position& find(const board& b) { return instance()[b]; }
-	static inline position& remove(const board& b) { return find(b)(0); }
+	static inline position::result find(const board& b) { return instance()[b]; }
+//	static inline position& remove(const board& b) { return find(b)(0); } // TODO
 
 private:
 	static inline position* alloc(size_t len) { return new position[len](); }
@@ -1889,8 +1896,8 @@ struct expectimax {
 	template<utils::estimator estim = utils::estimate>
 	static numeric search_expt(const board& after, i32 depth,
 			clip<feature> range = feature::feats()) {
-		auto& t = transposition::find(after);
-		if (t >= depth) return t;
+		auto t = transposition::find(after); // TODO: load TP policy
+		if (t && t >= depth) return t;
 
 		if (depth <= 0) return estim(after, range);
 		numeric expt = 0;
@@ -1903,13 +1910,13 @@ struct expectimax {
 			before.set(pos, 2);
 			expt += 0.1 * search_max<estim>(before, depth - 1, range);
 		}
-		numeric esti = expt / spaces.size();
-		return t.save(esti, depth);
+		expt /= spaces.size();
+		return t.save(expt, depth); // TODO: store TP policy
 	}
 
 	template<utils::estimator estim = utils::estimate>
 	static numeric search_max(const board& before, i32 depth,
-			clip<feature> range = feature::feats()) {
+			clip<feature> range = feature::feats()) { // TODO: depth policy?
 		numeric best = 0;
 		board after;
 		i32 reward;
@@ -1927,7 +1934,7 @@ struct expectimax {
 	template<utils::estimator estim = utils::estimate>
 	static numeric estimate(const board& after,
 			clip<feature> range = feature::feats()) {
-		i32 depth = expectimax::depth()[after.empty()];
+		i32 depth = expectimax::depth()[after.empty()]; // TODO: depth policy
 		return search_expt<estim>(after, depth - 1, range);
 	}
 };
@@ -2639,7 +2646,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
-	std::cout << "depth = " << opts["depth"] << std::endl;
+	std::cout << "depth = " << opts["depth"] << std::endl; // TODO: search = ?
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
