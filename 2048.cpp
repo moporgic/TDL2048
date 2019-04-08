@@ -292,54 +292,79 @@ private:
 	indexer map;
 };
 
-class transposition {
+class cache {
 public:
-	class position {
-	friend class transposition;
+	class block {
+	friend class cache;
 	public:
-		u64 sign;
-		f32 esti;
-		i16 depth;
-		u16 hits;
-		constexpr position(const position& e) = default;
-		constexpr position(u64 sign = 0) : sign(sign), esti(0), depth(-1), hits(0) {}
-
-		constexpr operator numeric() const { return esti; }
-		constexpr operator bool()    const { return sign; }
-		constexpr bool operator ==(u64 s) const { return sign == s; }
-		constexpr bool operator >=(i32 d) const { return depth >= d; }
-		declare_comparators(position, hits, constexpr);
-
-		struct result {
-			position& where;
-			u64 sign;
-
-			constexpr result& save(f32 esti, i32 depth) {
-				if (where.sign != sign) {
-					where.sign = sign;
-					where.esti = esti;
-					where.depth = depth;
-					where.hits = 0;
-				} else {
-					where.hits = std::min(where.hits + 1, 65535);
-				}
-				return *this;
+		class access {
+		public:
+			constexpr operator bool() const {
+				return blk.sign() == sign && blk.hold() >= hold;
+			}
+			constexpr numeric fetch() const {
+				u64 info = blk.info;
+				raw_cast<u16, 3>(info) = std::min(blk.hits() + 1, 65535);
+				u64 hash = sign ^ info;
+				blk.hash = hash;
+				blk.info = info;
+				return raw_cast<f32, 0>(info);
+			}
+			constexpr numeric store(numeric esti) const {
+				u64 info = 0;
+				raw_cast<f32, 0>(info) = esti;
+				raw_cast<u16, 2>(info) = hold;
+				raw_cast<u16, 3>(info) = blk.sign() == sign ? blk.hits() : 0;
+				u64 hash = sign ^ info;
+				blk.hash = hash;
+				blk.info = info;
+				return esti;
 			}
 
-			constexpr operator numeric() const { return where; }
-			constexpr operator bool() const { return where == sign; }
-			constexpr bool operator >=(i32 d) const { return where >= d; }
+			constexpr access(block& blk, u64 sign, u32 hold) : blk(blk), sign(sign), hold(hold) {}
+		private:
+			block& blk;
+			u64 sign;
+			u32 hold;
 		};
-		constexpr result operator()(u64 s) {
-			return { *this, s };
+
+		constexpr block(const block& e) = default;
+		constexpr block(u64 sign = 0, u64 info = 0) : hash(sign ^ info), info(info) {}
+		constexpr access operator()(u64 x, u32 n) { return access(*this, x, n); }
+		constexpr u64 sign() const { return hash ^ info; }
+		constexpr f32 esti() const { return raw_cast<f32, 0>(info); }
+		constexpr u16 hold() const { return raw_cast<u16, 2>(info); }
+		constexpr u16 hits() const { return raw_cast<u16, 3>(info); }
+		u64 sign(u64 sign) { return std::exchange(hash, sign ^ info) ^ info; }
+		f32 esti(f32 esti) { u64 sign = hash ^ info; esti = std::exchange(raw_cast<f32, 0>(info), esti); hash = sign ^ info; return esti; }
+		u16 hold(u16 hold) { u64 sign = hash ^ info; hold = std::exchange(raw_cast<u16, 2>(info), hold); hash = sign ^ info; return hold; }
+		u16 hits(u16 hits) { u64 sign = hash ^ info; hits = std::exchange(raw_cast<u16, 3>(info), hits); hash = sign ^ info; return hits; }
+
+	    friend std::ostream& operator <<(std::ostream& out, const block& blk) {
+	    	u64 sign = blk.hash ^ blk.info;
+	    	u64 info = blk.info;
+	    	write_cast<u64>(out, sign);
+	    	if (sign) write_cast<u64>(out, info);
+	    	return out;
+	    }
+		friend std::istream& operator >>(std::istream& in, block& blk) {
+			u64 sign = 0, info = 0;
+			read_cast<u64>(in, sign);
+			if (sign) read_cast<u64>(in, info);
+			blk.hash = sign ^ info;
+			blk.info = info;
+			return in;
 		}
+	private:
+		u64 hash;
+		u64 info; // f32 esti; u16 hold; u16 hits;
 	};
 
-	constexpr transposition() : cache(&initial), zsize(1), limit(0), zmask(0) {}
-	transposition(const transposition& tp) = default;
-	~transposition() {}
-	inline constexpr size_t length() const { return zsize; }
-	inline constexpr size_t size() const { return zsize + limit; }
+	constexpr cache() : cached(&initial), size_flat(1), size_extern(0), mask(0) {}
+	cache(const cache& tp) = default;
+	~cache() {}
+	inline constexpr size_t length() const { return size_flat; }
+	inline constexpr size_t size() const { return size_flat + size_extern; }
 
 	inline u64 min_isomorphic(board t) const {
 		u64 x = u64(t);
@@ -353,78 +378,68 @@ public:
 		return x;
 	}
 
-	inline position::result operator[] (const board& b) {
+	inline block::access operator() (const board& b, u32 n) {
 		u64 x = min_isomorphic(b);
-		u64 hash = math::fmix64(x) & zmask;
+		block& blk = cached[math::fmix64(x) & mask];
+		u64 sign = blk.sign();
+		f32 esti = blk.esti();
+		u32 hold = blk.hold();
+		u32 hits = blk.hits();
 
-		position& data = cache[hash];
-		if (!data) return data(x);
-		if (!std::isnan(data.esti)) {
-			if (data == x || !data.hits) return data(x);
-			position* list = mpool.allocate(2);
-			if (!list) return data(x);
-			list[0] = data;
-			data(cast<uintptr_t>(list)).save(0.0 / 0.0, 1);
-			return list[1](x);
+		if (!sign) return blk(x, n);
+		if (!std::isnan(esti)) {
+			if (sign == x || hits == 0) return blk(x, n);
+			block* ext = pool.allocate(2);
+			if (!ext) return blk(x, n);
+			ext[0] = blk;
+			blk(cast<uintptr_t>(ext), 1).store(0.0 / 0.0);
+			return ext[1](x, n);
 		}
 
-		position*& list = raw_cast<position*>(data.sign);
-		u16& lim = raw_cast<u16>(data.depth);
-		u32 size = lim + 1;
+		block* ext = cast<block*>(sign);
+		u32 size = hold + 1;
 
-		for (u32 i = 0; i < lim; i++) {
-			if (list[i] < list[i + 1]) std::swap(list[i], list[i + 1]);
-			if (list[i] == x) return list[i](x);
+		for (u32 i = 0; i < hold; i++) {
+			if (ext[i].hits() < ext[i + 1].hits()) std::swap(ext[i], ext[i + 1]);
+			if (ext[i].sign() == x) return ext[i](x, n);
 		}
-		if (list[lim] == x) return list[lim](x);
-		if (size != (1u << math::ones16(lim))) return list[++lim](x);
+		if (ext[hold].sign() == x) return ext[hold](x, n);
+		if (size != (1u << math::ones16(hold))) {
+			blk.hold(++hold);
+			return ext[hold](x, n);
+		}
 
-		u32 hits = 0, min = list[lim].hits;
+		u32 hsum = 0, hmin = ext[hold].hits();
 		for (u32 i = 0; i < size; i++) {
-			hits += list[i].hits;
-			list[i].hits -= min;
+			u32 hits = ext[i].hits();
+			hsum += ext[i].hits(hits - hmin);
 		}
-		u32 thres = hits / (size * 2);
-		if (min <= thres || size == 65536) return list[lim](x);
+		u32 hthr = hsum / (size * 2);
+		if (hmin <= hthr || size == 65536) return ext[hold](x, n);
 
-		position* temp = mpool.allocate(size + size);
-		if (!temp) return list[lim](x);
-		std::copy(list, list + size, temp);
-		mpool.deallocate(list, size);
-		return (list = temp)[++lim](x);
+		block* buf = pool.allocate(size * 2);
+		if (!buf) return ext[hold](x, n);
+		std::copy(ext, ext + size, buf);
+		pool.deallocate(ext, size);
+		blk(cast<uintptr_t>(ext = buf), ++hold).store(0.0 / 0.0);
+		return ext[hold](x, n);
 	}
 
-    friend std::ostream& operator <<(std::ostream& out, const transposition& tp) {
-    	auto& cache = tp.cache;
-    	auto& zsize = tp.zsize;
-    	auto& limit = tp.limit;
+    friend std::ostream& operator <<(std::ostream& out, const cache& tp) {
 		u32 code = 2;
 		write_cast<byte>(out, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial at transposition::>>" << std::endl;
-			std::cerr << "use default serial (" << code << ") instead" << std::endl;
-			// no break;
 		case 2:
-			write_cast<u64>(out, zsize);
-			write_cast<u64>(out, limit);
-			for (u64 i = 0; i < zsize; i++) {
-				auto& data = cache[i];
-				write_cast<u64>(out, data.sign);
-				if (!data.sign) continue;
-				write_cast<f32>(out, data.esti);
-				write_cast<i16>(out, data.depth);
-				write_cast<u16>(out, data.hits);
-				if (!std::isnan(data.esti)) continue;
-
-				auto size = u16(data.depth) + 1u;
-				auto list = cast<position*>(data.sign);
-				std::sort(list, list + size, std::greater<position>());
-				for (auto it = list; it != list + size; it++) {
-					write_cast<u64>(out, it->sign);
-					write_cast<f32>(out, it->esti);
-					write_cast<i16>(out, it->depth);
-					write_cast<u16>(out, it->hits);
+			write_cast<u64>(out, tp.size_flat);
+			write_cast<u64>(out, tp.size_extern);
+			for (u64 i = 0; i < tp.size_flat; i++) {
+				out << tp.cached[i];
+				if (std::isnan(tp.cached[i].esti())) {
+					u32 size = tp.cached[i].hold() + 1;
+					block* list = cast<block*>(tp.cached[i].sign());
+					std::sort(list, list + size, [](const block& lhs, const block& rhs) { return lhs.hits() > rhs.hits(); });
+					for (u32 i = 0; i < size; i++) out << list[i];
 				}
 			}
 			write_cast<u16>(out, 0); // reserved fields
@@ -432,47 +447,30 @@ public:
 		}
 		return out;
 	}
-	friend std::istream& operator >>(std::istream& in, transposition& tp) {
-    	auto& cache = tp.cache;
-    	auto& mpool = tp.mpool;
-    	auto& zsize = tp.zsize;
-    	auto& limit = tp.limit;
-    	auto& zmask = tp.zmask;
+	friend std::istream& operator >>(std::istream& in, cache& tp) {
 		u32 code = 0;
 		read_cast<byte>(in, code);
 		switch (code) {
+		default:
 		case 2:
-			read_cast<u64>(in, zsize);
-			read_cast<u64>(in, limit);
-			zmask = zsize - 1;
-			cache = alloc(zsize + limit);
-			mpool.deallocate(cache + zsize, limit);
-			for (u64 i = 0; i < zsize; i++) {
-				auto& data = cache[i];
-				read_cast<u64>(in, data.sign);
-				if (!data.sign) continue;
-				read_cast<f32>(in, data.esti);
-				read_cast<i16>(in, data.depth);
-				read_cast<u16>(in, data.hits);
-				if (!std::isnan(data.esti)) continue;
-
-				auto size = u16(data.depth) + 1u;
-				auto list = tp.mpool.allocate((2 << math::lg(size - 1)));
-				data.sign = cast<uintptr_t>(list);
-				for (auto it = list; it != list + size; it++) {
-					read_cast<u64>(in, it->sign);
-					read_cast<f32>(in, it->esti);
-					read_cast<i16>(in, it->depth);
-					read_cast<u16>(in, it->hits);
+			read_cast<u64>(in, tp.size_flat);
+			read_cast<u64>(in, tp.size_extern);
+			tp.mask = tp.size_flat - 1;
+			tp.cached = alloc(tp.size_flat + tp.size_extern);
+			tp.pool.deallocate(tp.cached + tp.size_flat, tp.size_extern);
+			for (u64 i = 0; i < tp.size_flat; i++) {
+				in >> tp.cached[i];
+				if (std::isnan(tp.cached[i].esti())) {
+					u32 size = tp.cached[i].hold() + 1;
+					block* list = tp.pool.allocate((2 << math::lg(size - 1)));
+					tp.cached[i].sign(cast<uintptr_t>(list));
+					for (u32 i = 0; i < size; i++) in >> list[i];
 				}
 			}
 			while (read_cast<u16>(in, code) && code) {
 				u64 skip; read_cast<u64>(in, skip);
 				in.ignore(code * skip);
 			}
-			break;
-		default:
-			std::cerr << "unknown serial at transposition::<<" << std::endl;
 			break;
 		}
 		return in;
@@ -483,8 +481,6 @@ public:
 		write_cast<byte>(out, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial at transposition::save" << std::endl;
-			// no break
 		case 0:
 			out << instance();
 			break;
@@ -496,8 +492,6 @@ public:
 		read_cast<byte>(in, code);
 		switch (code) {
 		default:
-			std::cerr << "unknown serial at transposition::load" << std::endl;
-			// no break
 		case 0:
 			in >> instance();
 			break;
@@ -506,14 +500,14 @@ public:
 
 	void summary() {
 		std::cout << std::endl << "summary" << std::endl;
-		if (zsize > 1) {
-			std::vector<u64> stat(65537);
-			for (size_t i = 0; i < zsize; i++) {
-				auto& h = cache[i];
-				if (std::isnan(h.esti)) {
-					stat[u16(h.depth) + 1]++;
+		if (size_flat > 1) {
+			std::vector<size_t> stat(65537);
+			for (size_t i = 0; i < size_flat; i++) {
+				auto& h = cached[i];
+				if (std::isnan(h.esti())) {
+					stat[h.hold() + 1]++;
 				} else {
-					stat[h.sign ? 1 : 0]++;
+					stat[h.sign() ? 1 : 0]++;
 				}
 			}
 			while (stat.back() == 0) stat.pop_back();
@@ -523,57 +517,48 @@ public:
 				std::cout << i << "\t" << stat[i] << std::endl;
 			}
 		} else {
-			std::cout << "no transposition" << std::endl;
+			std::cout << "no cache" << std::endl;
 		}
 	}
 
-	static transposition& make(size_t len, size_t lim = 0) {
+	static cache& make(size_t len, size_t lim = 0) {
 		return instance().shape(std::max(len, size_t(1)), lim);
 	}
-	static inline transposition& instance() { static transposition tp; return tp; }
-	static inline position::result find(const board& b) { return instance()[b]; }
-//	static inline position& remove(const board& b) { return find(b)(0); } // TODO
+	static inline cache& instance() { static cache tp; return tp; }
+	static inline block::access find(const board& b, u32 n) { return instance()(b, n); }
 
 private:
-	static inline position* alloc(size_t len) { return new position[len](); }
-	static inline void free(position* alloc) { delete[] alloc; }
+	static inline block* alloc(size_t len) { return new block[len](); }
+	static inline void free(block* alloc) { delete[] alloc; }
 
-	transposition& shape(size_t len, size_t lim = 0) {
-		if (math::ones64(len) != 1) {
-			std::cerr << "unsupported transposition size: " << len << ", ";
-			len = 1ull << (math::lg64(len));
-			std::cerr << "fit to " << len << std::endl;
-		}
+	cache& shape(size_t len, size_t lim = 0) {
+		lim += len - (1ull << (math::lg64(len)));
+		len = (1ull << (math::lg64(len)));
 
-		std::list<size_t> blocks;
-		if (cache && zsize > 1) {
-			if (zsize > len) std::cerr << "unsupported operation: shrink z-size" << std::endl;
-			if (zsize < len) std::cerr << "unsupported operation: enlarge z-size" << std::endl;
-			if (limit > lim) std::cerr << "unsupported operation: shrink m-pool" << std::endl;
-			if (limit < lim) {
-				blocks.push_back(lim - limit);
-				limit = lim;
+		std::list<size_t> ext_panding;
+		if (cached && size_flat > 1) {
+			if (size_extern < lim) {
+				ext_panding.push_back(lim - size_extern);
+				size_extern = lim;
 			}
 		} else {
-			zsize = len;
-			limit = lim;
-			zmask = len - 1;
-			if (cache != &initial) free(cache);
-			cache = alloc(zsize);
-			blocks.push_back(limit);
+			size_flat = len;
+			size_extern = lim;
+			mask = len - 1;
+			if (cached != &initial) free(cached);
+			cached = alloc(size_flat);
+			ext_panding.push_back(size_extern);
 		}
 
-		while (blocks.size()) {
-			auto block = blocks.front();
-			blocks.pop_front();
+		while (ext_panding.size()) {
+			size_t blk = ext_panding.front();
+			ext_panding.pop_front();
 			try {
-				mpool.deallocate(alloc(block), block);
+				pool.deallocate(alloc(blk), blk);
 			} catch (std::bad_alloc&) {
-				if (sizeof(position) * block >= (64ull << 20) /* 64 MB */ ) {
-					blocks.push_back(block >> 1); // try allocate smaller block size
-					blocks.push_back(block - blocks.back());
-				} else {
-					std::cerr << "insufficient memory for transposition block " << block << std::endl;
+				if (sizeof(block) * blk >= (64ull << 20) /* 64 MB */ ) {
+					ext_panding.push_back(blk >> 1); // try allocate smaller block size
+					ext_panding.push_back(blk - ext_panding.back());
 				}
 			}
 		}
@@ -581,12 +566,12 @@ private:
 	}
 
 private:
-	position* cache;
-	position initial;
-	segment<position> mpool;
-	size_t zsize;
-	size_t limit;
-	size_t zmask;
+	block* cached;
+	block initial;
+	segment<block> pool;
+	size_t size_flat;
+	size_t size_extern;
+	size_t mask;
 };
 
 namespace utils {
@@ -1817,9 +1802,9 @@ declare_specialization(6x6patt);
 declare_specialization(7x6patt);
 declare_specialization(8x6patt);
 
-void make_transposition(std::string res = "") {
+void make_cache(std::string res = "") {
 	std::string in(res);
-	if (in.empty() && transposition::instance().size() == 0) in = "default";
+	if (in.empty() && cache::instance().size() == 0) in = "default";
 	if (in == "default") in = "2G+2G";
 	if (in == "no" || in == "null") in = "0";
 
@@ -1838,37 +1823,37 @@ void make_transposition(std::string res = "") {
 			std::string il = in.substr(in.find('+') + 1);
 			if (!std::isdigit(il.back())) {
 				lim = std::stoll(il.substr(0, il.size() - 1));
-				lim = rebase(lim, il.back()) / sizeof(transposition::position);
+				lim = rebase(lim, il.back()) / sizeof(cache::block);
 			} else {
 				lim = std::stoll(il);
 			}
 		}
 		if (!std::isdigit(in.back())) {
 			len = std::stoll(in.substr(0, in.size() - 1));
-			len = rebase(len, in.back()) / sizeof(transposition::position);
+			len = rebase(len, in.back()) / sizeof(cache::block);
 		} else {
 			len = std::stoll(in);
 		}
-		transposition::make(len, lim);
+		cache::make(len, lim);
 	}
 }
-bool load_transposition(std::string path) {
+bool load_cache(std::string path) {
 	std::ifstream in;
 	char buf[1 << 20];
 	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
 	in.open(path, std::ios::in | std::ios::binary);
 	if (!in.is_open()) return false;
-	transposition::load(in);
+	cache::load(in);
 	in.close();
 	return true;
 }
-bool save_transposition(std::string path) {
+bool save_cache(std::string path) {
 	std::ofstream out;
 	char buf[1 << 20];
 	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
 	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!out.is_open()) return false;
-	transposition::save(out);
+	cache::save(out);
 	out.flush();
 	out.close();
 	return true;
@@ -1880,6 +1865,9 @@ struct expectimax {
 		return res;
 	}
 	static std::array<u32, 16>& depth(const std::array<u32, 16>& res) { return (depth() = res); }
+
+	static numeric& minima() { static numeric v = 0; return v; }
+	static numeric& minima(numeric v) { return minima() = v; }
 
 	static std::array<u32, 16>& depth(const std::string& res) {
 		std::array<u32, 16> depthres;
@@ -1893,16 +1881,20 @@ struct expectimax {
 		return depth(depthres);
 	}
 
-	template<utils::estimator estim = utils::estimate>
-	static numeric search_expt(const board& after, i32 depth,
+	static numeric search_illegal(const board& after, u32 depth,
 			clip<feature> range = feature::feats()) {
-		auto t = transposition::find(after); // TODO: load TP policy
-		if (t && t >= depth) return t;
+		return -std::numeric_limits<numeric>::max();
+	}
 
-		if (depth <= 0) return estim(after, range);
+	template<utils::estimator estim = utils::estimate> inline
+	static numeric search_expt(const board& after, u32 depth,
+			clip<feature> range = feature::feats()) {
+		cache::block::access lookup = cache::find(after, depth);
+		if (lookup) return lookup.fetch();
+		if (!depth) return lookup.store(estim(after, range));
 		numeric expt = 0;
 		hexa spaces = after.spaces();
-		for (size_t i = 0; i < spaces.size(); i++) {
+		for (u32 i = 0; i < spaces.size(); i++) {
 			board before = after;
 			u32 pos = spaces[i];
 			before.set(pos, 1);
@@ -1910,31 +1902,26 @@ struct expectimax {
 			before.set(pos, 2);
 			expt += 0.1 * search_max<estim>(before, depth - 1, range);
 		}
-		expt /= spaces.size();
-		return t.save(expt, depth); // TODO: store TP policy
+		return lookup.store(expt / spaces.size());
 	}
 
-	template<utils::estimator estim = utils::estimate>
-	static numeric search_max(const board& before, i32 depth,
-			clip<feature> range = feature::feats()) { // TODO: depth policy?
-		numeric best = 0;
-		board after;
-		i32 reward;
-		if ((reward = (after = before).operate(0)) != -1)
-			best = std::max(best, reward + search_expt<estim>(after, depth - 1, range));
-		if ((reward = (after = before).operate(1)) != -1)
-			best = std::max(best, reward + search_expt<estim>(after, depth - 1, range));
-		if ((reward = (after = before).operate(2)) != -1)
-			best = std::max(best, reward + search_expt<estim>(after, depth - 1, range));
-		if ((reward = (after = before).operate(3)) != -1)
-			best = std::max(best, reward + search_expt<estim>(after, depth - 1, range));
+	template<utils::estimator estim = utils::estimate> inline
+	static numeric search_max(const board& before, u32 depth,
+			clip<feature> range = feature::feats()) {
+		numeric best = minima();
+		for (u32 i = 0; i < 4; i++) {
+			board after = before;
+			auto reward = after.operate(i);
+			auto search = reward != -1 ? search_expt<estim> : search_illegal;
+			best = std::max(best, reward + search(after, depth - 1, range));
+		}
 		return best;
 	}
 
-	template<utils::estimator estim = utils::estimate>
+	template<utils::estimator estim = utils::estimate> inline
 	static numeric estimate(const board& after,
 			clip<feature> range = feature::feats()) {
-		i32 depth = expectimax::depth()[after.empty()]; // TODO: depth policy
+		u32 depth = expectimax::depth()[after.empty()];
 		return search_expt<estim>(after, depth - 1, range);
 	}
 };
@@ -2587,29 +2574,24 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("--depth"):
 			opts["depth"] = next_opts();
 			break;
-		case to_hash("-tp"):
+		case to_hash("-c"):
 		case to_hash("--cache"):
 		case to_hash("--cache-make"):
-		case to_hash("--transposition"):
-		case to_hash("--transposition-make"):
 			opts["cache-make"] = next_opt("");
 			break;
-		case to_hash("-tpio"):
+		case to_hash("-cio"):
 		case to_hash("--cache-input-output"):
-		case to_hash("--transposition-input-output"):
 			opts["cache-save"] = opts["cache-load"] = next_opt("2048.c");
 			break;
-		case to_hash("-tpi"):
+		case to_hash("-ci"):
 		case to_hash("--cache-input"):
-		case to_hash("--transposition-input"):
 			opts["cache-load"] = next_opt("2048.c");
 			break;
-		case to_hash("-tpo"):
+		case to_hash("-co"):
 		case to_hash("--cache-output"):
-		case to_hash("--transposition-output"):
 			opts["cache-save"] = next_opt("2048.c");
 			break;
-		case to_hash("-c"):
+		case to_hash("-!"):
 		case to_hash("--comment"):
 			opts["comment"] = next_opts();
 			break;
@@ -2646,7 +2628,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
-	std::cout << "depth = " << opts["depth"] << std::endl; // TODO: search = ?
+	std::cout << "depth = " << opts["depth"] << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
@@ -2669,17 +2651,17 @@ int main(int argc, const char* argv[]) {
 
 	utils::save_network(opts["save"]);
 
-	utils::load_transposition(opts["cache-load"]);
-	utils::make_transposition(opts["cache-make"]);
+	utils::load_cache(opts["cache-load"]);
+	utils::make_cache(opts["cache-make"]);
 
 	if (statistic(opts["evaluate"])) {
 		std::cout << "verification: " << opts["evaluate"] << std::endl << std::endl;
 		statistic stat = evaluate(opts, "evaluate");
 		if (opts["info"] != "none") stat.summary();
-		if (opts["info"] == "full") transposition::instance().summary();
+		if (opts["info"] == "full") cache::instance().summary();
 	}
 
-	utils::save_transposition(opts["cache-save"]);
+	utils::save_cache(opts["cache-save"]);
 
 	return 0;
 }
