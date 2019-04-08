@@ -391,8 +391,8 @@ public:
 			if (sign == x || hits == 0) return blk(x, n);
 			block* ext = pool.allocate(2);
 			if (!ext) return blk(x, n);
-			ext[0] = blk;
-			blk(cast<uintptr_t>(ext), 1).store(0.0 / 0.0);
+			ext[0] = blk; ext[1] = block();
+			blk(cast<uintptr_t>(ext), 1).store(0.0 / 0.0); // TODO
 			return ext[1](x, n);
 		}
 
@@ -417,9 +417,9 @@ public:
 		u32 hthr = hsum / (size * 2);
 		if (hmin <= hthr || size == 65536) return ext[hold](x, n);
 
-		block* buf = pool.allocate(size * 2);
+		block* buf = pool.allocate(size * 2); // TODO
 		if (!buf) return ext[hold](x, n);
-		std::copy(ext, ext + size, buf);
+		std::fill_n(std::copy_n(ext, size, buf), size, block());
 		pool.deallocate(ext, size);
 		blk(cast<uintptr_t>(ext = buf), ++hold).store(0.0 / 0.0);
 		return ext[hold](x, n);
