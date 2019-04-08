@@ -499,7 +499,7 @@ public:
 	}
 
 	void summary() {
-		std::cout << std::endl << "summary" << std::endl;
+		std::cout << "summary" << std::endl;
 		if (size_flat > 1) {
 			std::vector<size_t> stat(65537);
 			for (size_t i = 0; i < size_flat; i++) {
@@ -519,6 +519,7 @@ public:
 		} else {
 			std::cout << "no cache" << std::endl;
 		}
+		std::cout << std::endl;
 	}
 
 	static cache& make(size_t len, size_t lim = 0) {
