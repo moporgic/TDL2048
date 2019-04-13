@@ -1519,27 +1519,27 @@ declare_specialization(6x6patt);
 declare_specialization(7x6patt);
 declare_specialization(8x6patt);
 
-struct specialize {
-	specialize(utils::options& opts, const std::string& type) : estim(utils::estimate), optim(utils::optimize) {
-		std::string spec = opts["options"].find("spec", "auto");
-		if (spec == "auto" || spec == "on") {
-			spec = opts["make"].value();
-			spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
-		}
-		switch (to_hash(spec)) {
-		case to_hash("4x6patt"): estim = utils::estimate_4x6patt; optim = utils::optimize_4x6patt; break;
-		case to_hash("5x6patt"): estim = utils::estimate_5x6patt; optim = utils::optimize_5x6patt; break;
-		case to_hash("6x6patt"): estim = utils::estimate_6x6patt; optim = utils::optimize_6x6patt; break;
-		case to_hash("7x6patt"): estim = utils::estimate_7x6patt; optim = utils::optimize_7x6patt; break;
-		case to_hash("8x6patt"): estim = utils::estimate_8x6patt; optim = utils::optimize_8x6patt; break;
-		}
-	}
-	constexpr specialize(utils::estimator estim, utils::optimizer optim) : estim(estim), optim(optim) {}
-	constexpr operator utils::estimator() const { return estim; }
-	constexpr operator utils::optimizer() const { return optim; }
+struct specialization {
+	constexpr inline operator utils::estimator() const { return estim; }
+	constexpr inline operator utils::optimizer() const { return optim; }
 	utils::estimator estim;
 	utils::optimizer optim;
 };
+specialization specialize(utils::options& opts, const std::string& type) {
+	std::string spec = opts["options"].find("spec", "auto");
+	if (spec == "auto" || spec == "on") {
+		spec = opts["make"].value();
+		spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
+	}
+	switch (to_hash(spec)) {
+	default: return { utils::estimate, utils::optimize };
+	case to_hash("4x6patt"): return { utils::estimate_4x6patt, utils::optimize_4x6patt };
+	case to_hash("5x6patt"): return { utils::estimate_5x6patt, utils::optimize_5x6patt };
+	case to_hash("6x6patt"): return { utils::estimate_6x6patt, utils::optimize_6x6patt };
+	case to_hash("7x6patt"): return { utils::estimate_7x6patt, utils::optimize_7x6patt };
+	case to_hash("8x6patt"): return { utils::estimate_8x6patt, utils::optimize_8x6patt };
+	}
+}
 
 } // utils
 
