@@ -295,20 +295,26 @@ private:
 class cache {
 public:
 	class block {
-	friend class cache;
 	public:
 		class access {
 		public:
+			constexpr access(u64 sign, u32 hold, block& blk) : sign(sign), hold(hold), safe(-1u), blk(blk) {}
+			constexpr access(u64 sign, u32 hold) : access(sign, hold, raw_cast<block>(*this)) {}
+			constexpr access(access&& acc) : access(acc.sign, acc.hold, &(acc.blk) != &(raw_cast<block>(acc)) ? acc.blk : raw_cast<block>(*this)) {}
+			constexpr access(const access&) = delete;
+			constexpr access& operator =(const access&) = delete;
+
 			constexpr operator bool() const {
 				return blk.sign() == sign && blk.hold() >= hold;
 			}
 			constexpr numeric fetch() const {
 				u64 info = blk.info;
+				f32 esti = raw_cast<f32, 0>(info);
 				raw_cast<u16, 3>(info) = std::min(blk.hits() + 1, 65535);
 				u64 hash = sign ^ info;
 				blk.hash = hash;
 				blk.info = info;
-				return raw_cast<f32, 0>(info);
+				return esti;
 			}
 			constexpr numeric store(numeric esti) const {
 				u64 info = 0;
@@ -320,17 +326,16 @@ public:
 				blk.info = info;
 				return esti;
 			}
-
-			constexpr access(block& blk, u64 sign, u32 hold) : blk(blk), sign(sign), hold(hold) {}
 		private:
-			block& blk;
 			u64 sign;
 			u32 hold;
+			u32 safe;
+			block& blk;
 		};
 
 		constexpr block(const block& e) = default;
 		constexpr block(u64 sign = 0, u64 info = 0) : hash(sign ^ info), info(info) {}
-		constexpr access operator()(u64 x, u32 n) { return access(*this, x, n); }
+		constexpr access operator()(u64 x, u32 n) { return access(x, n, *this); }
 		constexpr u64 sign() const { return hash ^ info; }
 		constexpr f32 esti() const { return raw_cast<f32, 0>(info); }
 		constexpr u16 hold() const { return raw_cast<u16, 2>(info); }
@@ -424,9 +429,9 @@ public:
 		}
 	}
 
-	static cache& make(size_t len) { return instance().shape(std::max(len, size_t(1))); }
-	static inline cache& instance() { static cache tp; return tp; }
 	static inline block::access find(const board& b, u32 n) { return instance()(b, n); }
+	static inline cache& make(size_t len) { return instance().shape(std::max(len, size_t(1))); }
+	static inline cache& instance() { static cache tp; return tp; }
 
 private:
 	static inline block* alloc(size_t len) { return new block[len](); }
@@ -440,7 +445,7 @@ private:
 		return *this;
 	}
 
-	inline u64 min_isomorphic(board t) const {
+	constexpr inline u64 min_isomorphic(board t) const {
 		u64 x = u64(t);
 		t.mirror64();    x = std::min(x, u64(t));
 		t.transpose64(); x = std::min(x, u64(t));
@@ -1785,8 +1790,8 @@ struct expectimax {
 	template<utils::estimator estim = utils::estimate> inline
 	static numeric estimate(const board& after,
 			clip<feature> range = feature::feats()) {
-		u32 depth = expectimax::depth()[after.empty()];
-		return search_expt<estim>(after, depth - 1, range);
+		u32 depth = expectimax::depth()[after.empty()] - 1;
+		return search_expt<estim>(after, depth, range);
 	}
 };
 
