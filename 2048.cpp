@@ -341,18 +341,13 @@ public:
 		u16 hits(u16 hits) { u64 sign = hash ^ info; hits = std::exchange(raw_cast<u16, 3>(info), hits); hash = sign ^ info; return hits; }
 
 	    friend std::ostream& operator <<(std::ostream& out, const block& blk) {
-	    	u64 sign = blk.hash ^ blk.info;
-	    	u64 info = blk.info;
-	    	write_cast<u64>(out, sign);
-	    	if (sign) write_cast<u64>(out, info);
+	    	write_cast<u64>(out, blk.hash);
+	    	write_cast<u64>(out, blk.info);
 	    	return out;
 	    }
 		friend std::istream& operator >>(std::istream& in, block& blk) {
-			u64 sign = 0, info = 0;
-			read_cast<u64>(in, sign);
-			if (sign) read_cast<u64>(in, info);
-			blk.hash = sign ^ info;
-			blk.info = info;
+			read_cast<u64>(in, blk.hash);
+			read_cast<u64>(in, blk.info);
 			return in;
 		}
 	private:
@@ -360,117 +355,48 @@ public:
 		u64 info; // f32 esti; u16 hold; u16 hits;
 	};
 
-	constexpr cache() : cached(&initial), size_flat(1), size_extern(0), mask(0) {}
+	constexpr cache() : cached(&initial), length(1), mask(0) {}
 	cache(const cache& tp) = default;
 	~cache() {}
-	inline constexpr size_t length() const { return size_flat; }
-	inline constexpr size_t size() const { return size_flat + size_extern; }
-
-	inline u64 min_isomorphic(board t) const {
-		u64 x = u64(t);
-		t.mirror64();    x = std::min(x, u64(t));
-		t.transpose64(); x = std::min(x, u64(t));
-		t.mirror64();    x = std::min(x, u64(t));
-		t.transpose64(); x = std::min(x, u64(t));
-		t.mirror64();    x = std::min(x, u64(t));
-		t.transpose64(); x = std::min(x, u64(t));
-		t.mirror64();    x = std::min(x, u64(t));
-		return x;
-	}
-
+	inline size_t size() const { return length; }
+	inline block& operator[] (size_t i) { return cached[i]; }
+	inline const block& operator[] (size_t i) const { return cached[i]; }
 	inline block::access operator() (const board& b, u32 n) {
 		u64 x = min_isomorphic(b);
-		block& blk = cached[math::fmix64(x) & mask];
-		u64 sign = blk.sign();
-		f32 esti = blk.esti();
-		u32 hold = blk.hold();
-		u32 hits = blk.hits();
-
-		if (!sign) return blk(x, n);
-		if (!std::isnan(esti)) {
-			if (sign == x || hits == 0) return blk(x, n);
-			block* ext = pool.allocate(2);
-			if (!ext) return blk(x, n);
-			ext[0] = blk; ext[1] = block();
-			blk(cast<uintptr_t>(ext), 1).store(0.0 / 0.0); // TODO
-			return ext[1](x, n);
-		}
-
-		block* ext = cast<block*>(sign);
-		u32 size = hold + 1;
-
-		for (u32 i = 0; i < hold; i++) {
-			if (ext[i].hits() < ext[i + 1].hits()) std::swap(ext[i], ext[i + 1]);
-			if (ext[i].sign() == x) return ext[i](x, n);
-		}
-		if (ext[hold].sign() == x) return ext[hold](x, n);
-		if (size != (1u << math::ones16(hold))) {
-			blk.hold(++hold);
-			return ext[hold](x, n);
-		}
-
-		u32 hsum = 0, hmin = ext[hold].hits();
-		for (u32 i = 0; i < size; i++) {
-			u32 hits = ext[i].hits();
-			hsum += ext[i].hits(hits - hmin);
-		}
-		u32 hthr = hsum / (size * 2);
-		if (hmin <= hthr || size == 65536) return ext[hold](x, n);
-
-		block* buf = pool.allocate(size * 2); // TODO
-		if (!buf) return ext[hold](x, n);
-		std::fill_n(std::copy_n(ext, size, buf), size, block());
-		pool.deallocate(ext, size);
-		blk(cast<uintptr_t>(ext = buf), ++hold).store(0.0 / 0.0);
-		return ext[hold](x, n);
+		size_t i = math::fmix64(x) & mask;
+		block& blk = operator[](i);
+		return blk(x, n);
 	}
 
-    friend std::ostream& operator <<(std::ostream& out, const cache& tp) {
-		u32 code = 2;
+    friend std::ostream& operator <<(std::ostream& out, const cache& c) {
+		u32 code = 4;
 		write_cast<byte>(out, code);
 		switch (code) {
 		default:
-		case 2:
-			write_cast<u64>(out, tp.size_flat);
-			write_cast<u64>(out, tp.size_extern);
-			for (u64 i = 0; i < tp.size_flat; i++) {
-				out << tp.cached[i];
-				if (std::isnan(tp.cached[i].esti())) {
-					u32 size = tp.cached[i].hold() + 1;
-					block* list = cast<block*>(tp.cached[i].sign());
-					std::sort(list, list + size, [](const block& lhs, const block& rhs) { return lhs.hits() > rhs.hits(); });
-					for (u32 i = 0; i < size; i++) out << list[i];
-				}
-			}
-			write_cast<u16>(out, 0); // reserved fields
+		case 4:
+			write_cast<u16>(out, 0); // reserved for header
+			write_cast<u64>(out, 0);
+			write_cast<u16>(out, sizeof(cache::block));
+			write_cast<u64>(out, c.size());
+			for (size_t i = 0; i < c.size(); i++)
+				out << c[i];
+			write_cast<u16>(out, 0); // reserved for fields
 			break;
 		}
 		return out;
 	}
-	friend std::istream& operator >>(std::istream& in, cache& tp) {
+	friend std::istream& operator >>(std::istream& in, cache& c) {
 		u32 code = 0;
 		read_cast<byte>(in, code);
 		switch (code) {
 		default:
-		case 2:
-			read_cast<u64>(in, tp.size_flat);
-			read_cast<u64>(in, tp.size_extern);
-			tp.mask = tp.size_flat - 1;
-			tp.cached = alloc(tp.size_flat + tp.size_extern);
-			tp.pool.deallocate(tp.cached + tp.size_flat, tp.size_extern);
-			for (u64 i = 0; i < tp.size_flat; i++) {
-				in >> tp.cached[i];
-				if (std::isnan(tp.cached[i].esti())) {
-					u32 size = tp.cached[i].hold() + 1;
-					block* list = tp.pool.allocate((2 << math::lg(size - 1)));
-					tp.cached[i].sign(cast<uintptr_t>(list));
-					for (u32 i = 0; i < size; i++) in >> list[i];
-				}
-			}
-			while (read_cast<u16>(in, code) && code) {
-				u64 skip; read_cast<u64>(in, skip);
-				in.ignore(code * skip);
-			}
+		case 4:
+			in.ignore(read<u16>(in) * read<u64>(in));
+			c.shape(read<u64>(in.ignore(2)));
+			for (size_t i = 0; i < c.size(); i++)
+				in >> c[i];
+			while ((code = read<u16>(in)) != 0)
+				in.ignore(code * read<u64>(in));
 			break;
 		}
 		return in;
@@ -498,33 +424,7 @@ public:
 		}
 	}
 
-	void summary() {
-		std::cout << "summary" << std::endl;
-		if (size_flat > 1) {
-			std::vector<size_t> stat(65537);
-			for (size_t i = 0; i < size_flat; i++) {
-				auto& h = cached[i];
-				if (std::isnan(h.esti())) {
-					stat[h.hold() + 1]++;
-				} else {
-					stat[h.sign() ? 1 : 0]++;
-				}
-			}
-			while (stat.back() == 0) stat.pop_back();
-
-			std::cout << "block" "\t" "count" << std::endl;
-			for (size_t i = 0; i < stat.size(); i++) {
-				std::cout << i << "\t" << stat[i] << std::endl;
-			}
-		} else {
-			std::cout << "no cache" << std::endl;
-		}
-		std::cout << std::endl;
-	}
-
-	static cache& make(size_t len, size_t lim = 0) {
-		return instance().shape(std::max(len, size_t(1)), lim);
-	}
+	static cache& make(size_t len) { return instance().shape(std::max(len, size_t(1))); }
 	static inline cache& instance() { static cache tp; return tp; }
 	static inline block::access find(const board& b, u32 n) { return instance()(b, n); }
 
@@ -532,46 +432,30 @@ private:
 	static inline block* alloc(size_t len) { return new block[len](); }
 	static inline void free(block* alloc) { delete[] alloc; }
 
-	cache& shape(size_t len, size_t lim = 0) {
-		lim += len - (1ull << (math::lg64(len)));
-		len = (1ull << (math::lg64(len)));
-
-		std::list<size_t> ext_panding;
-		if (cached && size_flat > 1) {
-			if (size_extern < lim) {
-				ext_panding.push_back(lim - size_extern);
-				size_extern = lim;
-			}
-		} else {
-			size_flat = len;
-			size_extern = lim;
-			mask = len - 1;
-			if (cached != &initial) free(cached);
-			cached = alloc(size_flat);
-			ext_panding.push_back(size_extern);
-		}
-
-		while (ext_panding.size()) {
-			size_t blk = ext_panding.front();
-			ext_panding.pop_front();
-			try {
-				pool.deallocate(alloc(blk), blk);
-			} catch (std::bad_alloc&) {
-				if (sizeof(block) * blk >= (64ull << 20) /* 64 MB */ ) {
-					ext_panding.push_back(blk >> 1); // try allocate smaller block size
-					ext_panding.push_back(blk - ext_panding.back());
-				}
-			}
-		}
+	cache& shape(size_t len) {
+		length = (1ull << (math::lg64(len)));
+		mask = length - 1;
+		if (cached != &initial) free(cached);
+		cached = alloc(length);
 		return *this;
+	}
+
+	inline u64 min_isomorphic(board t) const {
+		u64 x = u64(t);
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		return x;
 	}
 
 private:
 	block* cached;
 	block initial;
-	segment<block> pool;
-	size_t size_flat;
-	size_t size_extern;
+	size_t length;
 	size_t mask;
 };
 
@@ -1805,43 +1689,22 @@ declare_specialization(8x6patt);
 
 void make_cache(std::string res = "") {
 	std::string in(res);
-	if (in.empty() && cache::instance().size() == 0) in = "default";
-	if (in == "default") in = "2G+2G";
-	if (in == "no" || in == "null") in = "0";
+	if (in == "default") in = "2G";
 
 	if (in.size()) {
-		u64 len = 0;
-		u64 lim = 0;
-		auto rebase = [](u64 v, char c) -> u64 {
-			switch (c) {
-			case 'K': v *= (1ULL << 10); break;
-			case 'M': v *= (1ULL << 20); break;
-			case 'G': v *= (1ULL << 30); break;
-			}
-			return v;
-		};
-		if (in.find('+') != std::string::npos) {
-			std::string il = in.substr(in.find('+') + 1);
-			if (!std::isdigit(il.back())) {
-				lim = std::stoll(il.substr(0, il.size() - 1));
-				lim = rebase(lim, il.back()) / sizeof(cache::block);
-			} else {
-				lim = std::stoll(il);
-			}
+		size_t unit = 1;
+		switch (in.back()) {
+		case 'k':
+		case 'K': unit = (1ULL << 10) / sizeof(cache::block); break;
+		case 'M': unit = (1ULL << 20) / sizeof(cache::block); break;
+		case 'G': unit = (1ULL << 30) / sizeof(cache::block); break;
 		}
-		if (!std::isdigit(in.back())) {
-			len = std::stoll(in.substr(0, in.size() - 1));
-			len = rebase(len, in.back()) / sizeof(cache::block);
-		} else {
-			len = std::stoll(in);
-		}
-		cache::make(len, lim);
+		size_t size = std::stoll(in) * unit;
+		cache::make(size);
 	}
 }
 bool load_cache(std::string path) {
 	std::ifstream in;
-	char buf[1 << 20];
-	in.rdbuf()->pubsetbuf(buf, sizeof(buf));
 	in.open(path, std::ios::in | std::ios::binary);
 	if (!in.is_open()) return false;
 	cache::load(in);
@@ -2659,7 +2522,6 @@ int main(int argc, const char* argv[]) {
 		std::cout << "verification: " << opts["evaluate"] << std::endl << std::endl;
 		statistic stat = evaluate(opts, "evaluate");
 		if (opts["info"] != "none") stat.summary();
-		if (opts["info"] == "full") cache::instance().summary();
 	}
 
 	utils::save_cache(opts["cache-save"]);
