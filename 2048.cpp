@@ -310,6 +310,7 @@ public:
 		std::string label() const { return token.substr(0, token.find('=')); }
 		std::string value() const { return token.find('=') != std::string::npos ? token.substr(token.find('=') + 1) : ""; }
 		std::string operator +(const std::string& val) { return value() + val; }
+		friend std::string operator +(const std::string& val, const opinion& opi) { return val + opi.value(); }
 		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
 		opinion& operator  =(const opinion& opi) { return operator =(opi.value()); }
 		opinion& operator  =(const numeric& val) { return operator =(ntos(val)); }
@@ -333,6 +334,7 @@ public:
 		operator numeric() const { return std::stod(value()); }
 		std::string value() const { return vtos(*this); }
 		std::string operator +(const std::string& val) { return value() + val; }
+		friend std::string operator +(const std::string& val, const option& opt) { return val + opt.value(); }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
 		option& operator  =(const numeric& val) { return operator =(ntos(val)); }
 		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
@@ -1651,7 +1653,8 @@ struct statistic {
 
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	statistic(const utils::options::option& opt) : statistic() { init(opt); }
-	statistic(const statistic& stat) = default;
+	statistic(const statistic&) = default;
+	statistic(statistic&&) = default;
 
 	bool init(const utils::options::option& opt = {}) {
 		loop = 1000;
@@ -1815,7 +1818,7 @@ struct statistic {
 	}
 };
 
-statistic optimize(utils::options opts, const std::string& type) {
+statistic run(utils::options opts, std::string type) {
 	std::vector<state> path;
 	statistic stats;
 	select best;
@@ -1828,9 +1831,10 @@ statistic optimize(utils::options opts, const std::string& type) {
 	numeric lambda = state::lambda();
 	u32 step = state::step();
 
-	switch (to_hash(opts[type]["mode"])) {
-	default:
-	case to_hash("forward"):
+	switch (to_hash(type + ":" + opts[type]["mode"])) {
+	case to_hash("optimize:"):
+	case to_hash("optimize:default"):
+	case to_hash("optimize:forward"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1857,7 +1861,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("backward"):
+	case to_hash("optimize:backward"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1879,7 +1883,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("forward-lambda"):
+	case to_hash("optimize:forward-lambda"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1932,8 +1936,8 @@ statistic optimize(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("lambda"):
-	case to_hash("backward-lambda"):
+	case to_hash("optimize:lambda"):
+	case to_hash("optimize:backward-lambda"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1960,21 +1964,10 @@ statistic optimize(utils::options opts, const std::string& type) {
 			stats.update(score, b.hash(), opers);
 		}
 		break;
-	}
 
-	return stats;
-}
-
-statistic evaluate(utils::options opts, const std::string& type) {
-	statistic stats;
-	select best;
-
-	utils::estimator estim = utils::specialize(opts, type);
-	clip<feature> feats = feature::feats();
-
-	switch (to_hash(opts[type]["mode"])) {
-	default:
-	case to_hash("best"):
+	case to_hash("evaluate:"):
+	case to_hash("evaluate:default"):
+	case to_hash("evaluate:best"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1990,7 +1983,7 @@ statistic evaluate(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("random"):
+	case to_hash("evaluate:random"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -2118,13 +2111,13 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-tm"):
 		case to_hash("--train-type"):
 		case to_hash("--train-mode"):
-			opts["optimize"]["mode"] = next_opt("bias");
+			opts["optimize"]["mode"] = next_opt("default");
 			break;
 		case to_hash("-et"):
 		case to_hash("-em"):
 		case to_hash("--test-type"):
 		case to_hash("--test-mode"):
-			opts["evaluate"]["mode"] = next_opt("bias");
+			opts["evaluate"]["mode"] = next_opt("default");
 			break;
 		case to_hash("-tc"):
 		case to_hash("-tu"):
@@ -2167,8 +2160,7 @@ utils::options parse(int argc, const char* argv[]) {
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts("optimize")) opts["optimize"] = opts("evaluate") ? 0 : 1000;
-	if (!opts("evaluate")) opts["evaluate"] = opts("optimize") ? 0 : 1000;
+	if (!opts("optimize") && !opts("evaluate")) opts["optimize"] = 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
@@ -2197,17 +2189,17 @@ int main(int argc, const char* argv[]) {
 	if (numeric(opts["lambda"]) && !opts("optimize", "mode")) opts["optimize"]["mode"] = "lambda";
 	state::step(opts["step"]);
 
-	if (statistic(opts["optimize"])) {
-		std::cout << "optimization: " << opts["optimize"] << std::endl << std::endl;
-		statistic stat = optimize(opts, "optimize");
+	if (opts("optimize")) {
+		std::cout << "optimize: " << opts["optimize"] << std::endl << std::endl;
+		statistic stat = run(opts, "optimize");
 		if (opts["info"] == "full") stat.summary();
 	}
 
 	utils::save_network(opts["save"]);
 
-	if (statistic(opts["evaluate"])) {
-		std::cout << "verification: " << opts["evaluate"] << std::endl << std::endl;
-		statistic stat = evaluate(opts, "evaluate");
+	if (opts("evaluate")) {
+		std::cout << "evaluate: " << opts["evaluate"] << std::endl << std::endl;
+		statistic stat = run(opts, "evaluate");
 		if (opts["info"] != "none") stat.summary();
 	}
 
