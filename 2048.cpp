@@ -1384,10 +1384,12 @@ void load_network(utils::options::option opt) {
 		feature::make(f.value().sign(), f.index().sign());
 }
 void save_network(utils::options::option opt) {
+	char buf[1 << 20];
 	for (std::string path : opt) {
 		char type = path[path.find_last_of(".") + 1];
 		if (type == 'x' || type == 'l') continue; // .x and .log are suffix for log files
 		std::ofstream out;
+		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
 		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) continue;
 		// for upward compatibility, we still store legacy binaries if suffix are traditional (.f or .w)
