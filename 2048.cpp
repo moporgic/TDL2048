@@ -2191,19 +2191,25 @@ int main(int argc, const char* argv[]) {
 	if (numeric(opts["lambda"]) && !opts("optimize", "mode")) opts["optimize"]["mode"] = "lambda";
 	state::step(opts["step"]);
 
-	if (opts("optimize")) {
-		std::cout << "optimize: " << opts["optimize"] << std::endl << std::endl;
-		statistic stat = run(opts, "optimize");
-		if (opts["info"] == "full") stat.summary();
+	for (std::string recipe : opts["recipes"]) {
+		std::cout << recipe << ": " << opts[recipe] << std::endl << std::endl;
+		statistic stat = run(opts, recipe);
+		if (opts[recipe]("info")) stat.summary();
 	}
+
+//	if (opts("optimize")) {
+//		std::cout << "optimize: " << opts["optimize"] << std::endl << std::endl;
+//		statistic stat = run(opts, "optimize");
+//		if (opts["info"] == "full") stat.summary();
+//	}
+//
+//	if (opts("evaluate")) {
+//		std::cout << "evaluate: " << opts["evaluate"] << std::endl << std::endl;
+//		statistic stat = run(opts, "evaluate");
+//		if (opts["info"] != "none") stat.summary();
+//	}
 
 	utils::save_network(opts["save"]);
-
-	if (opts("evaluate")) {
-		std::cout << "evaluate: " << opts["evaluate"] << std::endl << std::endl;
-		statistic stat = run(opts, "evaluate");
-		if (opts["info"] != "none") stat.summary();
-	}
 
 	return 0;
 }
