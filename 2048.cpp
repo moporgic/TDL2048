@@ -1550,26 +1550,26 @@ specialization specialize(utils::options& opts, const std::string& type) {
 
 struct state {
 	board move;
-	i32 score;
 	numeric esti;
-	inline state() : score(-1), esti(0) {}
+	inline state() : move(0ull, 0u, -1u), esti(0) {}
 	inline state(const state& s) = default;
 
-	inline operator bool() const { return score >= 0; }
-	inline operator board() const { return move; }
+	inline operator board&() { return move; }
+	inline operator const board&() const { return move; }
+	inline operator bool() const { return move.info() != -1u; }
 	declare_comparators(const state&, esti, inline);
 
-	inline numeric value() const { return esti - score; }
-	inline numeric reward() const { return score; }
+	inline numeric value() const { return esti - move.info(); }
+	inline i32 reward() const { return move.info(); }
 
 	inline void assign(const board& b, u32 op = -1) {
 		move = b;
-		score = move.operate(op);
+		move.info(move.operate(op));
 	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats(),
 			utils::estimator estim = utils::estimate) {
-		estim = score >= 0 ? estim : utils::illegal;
+		estim = move.info() != -1u ? estim : utils::illegal;
 		esti = state::reward() + estim(move, range);
 		return esti;
 	}
@@ -1607,10 +1607,10 @@ struct select {
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
-	inline void operator >>(board& b) const { b = best->move; }
+	inline void operator >>(board& b) const { b.set(best->move); }
 
 	inline operator bool() const { return score() != -1; }
-	inline i32 score() const { return best->score; }
+	inline i32 score() const { return best->move.info(); }
 	inline numeric esti() const { return best->esti; }
 	inline u32 opcode() const { return best - move; }
 

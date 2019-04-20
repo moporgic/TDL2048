@@ -189,6 +189,9 @@ public:
 		set4(i, t);
 		ext = (ext & ~(1U << (i + 16))) | ((t & 0x10) << (i + 12));
 	}
+	inline constexpr void set(u64 raw, u32 ext = 0) { this->raw = raw; this->ext = ext; }
+	inline constexpr void set(u64 raw, u16 ext) { set(raw, u32(ext) << 16); }
+	inline constexpr void set(const board& b) { set(b.raw, b.ext); }
 
 	inline constexpr void mirror() { mirror64(); }
 	inline constexpr void mirror64() {
