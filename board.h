@@ -66,21 +66,21 @@ public:
 	public:
 		class move {
 		public:
-			template<int i> inline void moveh64(u64& raw, u32& sc) const {
-				raw |= u64(rawh) << (i << 4);
-				sc += score;
+			template<int i> inline void moveh64(board& mv) const {
+				mv.raw |= u64(rawh) << (i << 4);
+				mv.inf += score;
 			}
-			template<int i> inline void moveh80(u64& raw, u32& ext, u32& sc) const {
-				moveh64<i>(raw, sc);
-				ext |= exth << (i << 2);
+			template<int i> inline void moveh80(board& mv) const {
+				moveh64<i>(mv);
+				mv.ext |= exth << (i << 2);
 			}
-			template<int i> inline void movev64(u64& raw, u32& sc) const {
-				raw |= rawv << (i << 2);
-				sc += score;
+			template<int i> inline void movev64(board& mv) const {
+				mv.raw |= rawv << (i << 2);
+				mv.inf += score;
 			}
-			template<int i> inline void movev80(u64& raw, u32& ext, u32& sc) const {
-				movev64<i>(raw, sc);
-				ext |= extv << i;
+			template<int i> inline void movev80(board& mv) const {
+				movev64<i>(mv);
+				mv.ext |= extv << i;
 			}
 
 		public:
@@ -138,21 +138,21 @@ public:
 			u16 mono; // monotonic decreasing value (12-bit)
 		};
 
-		template<int i> inline void moveh64(u64& lraw, u32& lsc, u64& rraw, u32& rsc) const {
-			left.moveh64<i>(lraw, lsc);
-			right.moveh64<i>(rraw, rsc);
+		template<int i> inline void moveh64(board& L, board& R) const {
+			left.moveh64<i>(L);
+			right.moveh64<i>(R);
 		}
-		template<int i> inline void moveh80(u64& lraw, u32& lext, u32& lsc, u64& rraw, u32& rext, u32& rsc) const {
-			left.moveh80<i>(lraw, lext, lsc);
-			right.moveh80<i>(rraw, lext, rsc);
+		template<int i> inline void moveh80(board& L, board& R) const {
+			left.moveh80<i>(L);
+			right.moveh80<i>(R);
 		}
-		template<int i> inline void movev64(u64& uraw, u32& usc, u64& draw, u32& dsc) const {
-			left.movev64<i>(uraw, usc);
-			right.movev64<i>(draw, dsc);
+		template<int i> inline void movev64(board& U, board& D) const {
+			left.movev64<i>(U);
+			right.movev64<i>(D);
 		}
-		template<int i> inline void movev80(u64& uraw, u32& uext, u32& usc, u64& draw, u32& dext, u32& dsc) const {
-			left.movev80<i>(uraw, uext, usc);
-			right.movev80<i>(draw, dext, dsc);
+		template<int i> inline void movev80(board& U, board& D) const {
+			left.movev80<i>(U);
+			right.movev80<i>(D);
 		}
 
 	public:
@@ -398,105 +398,89 @@ public:
 	inline i32 down()  { return down64(); }
 
 	inline i32 left64() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 score = 0;
-		query16(0).left.moveh64<0>(rawn, score);
-		query16(1).left.moveh64<1>(rawn, score);
-		query16(2).left.moveh64<2>(rawn, score);
-		query16(3).left.moveh64<3>(rawn, score);
-		register i32 moved = (rawp ^ rawn) ? 0 : -1;
-		raw = rawn;
-		return score | moved;
+		board move;
+		query16(0).left.moveh64<0>(move);
+		query16(1).left.moveh64<1>(move);
+		query16(2).left.moveh64<2>(move);
+		query16(3).left.moveh64<3>(move);
+		move.inf |= (move.raw ^ raw) ? 0 : -1;
+		set64(move);
+		return move.inf;
 	}
 	inline i32 right64() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 score = 0;
-		query16(0).right.moveh64<0>(rawn, score);
-		query16(1).right.moveh64<1>(rawn, score);
-		query16(2).right.moveh64<2>(rawn, score);
-		query16(3).right.moveh64<3>(rawn, score);
-		register i32 moved = (rawp ^ rawn) ? 0 : -1;
-		raw = rawn;
-		return score | moved;
+		board move;
+		query16(0).right.moveh64<0>(move);
+		query16(1).right.moveh64<1>(move);
+		query16(2).right.moveh64<2>(move);
+		query16(3).right.moveh64<3>(move);
+		move.inf |= (move.raw ^ raw) ? 0 : -1;
+		set64(move);
+		return move.inf;
 	}
 	inline i32 up64() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 score = 0;
-		transpose64();
-		query16(0).left.movev64<0>(rawn, score);
-		query16(1).left.movev64<1>(rawn, score);
-		query16(2).left.movev64<2>(rawn, score);
-		query16(3).left.movev64<3>(rawn, score);
-		register i32 moved = (rawp ^ rawn) ? 0 : -1;
-		raw = rawn;
-		return score | moved;
+		board move, look(*this);
+		look.transpose64();
+		look.query16(0).left.movev64<0>(move);
+		look.query16(1).left.movev64<1>(move);
+		look.query16(2).left.movev64<2>(move);
+		look.query16(3).left.movev64<3>(move);
+		move.inf |= (move.raw ^ raw) ? 0 : -1;
+		set64(move);
+		return move.inf;
 	}
 	inline i32 down64() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 score = 0;
-		transpose64();
-		query16(0).right.movev64<0>(rawn, score);
-		query16(1).right.movev64<1>(rawn, score);
-		query16(2).right.movev64<2>(rawn, score);
-		query16(3).right.movev64<3>(rawn, score);
-		register i32 moved = (rawp ^ rawn) ? 0 : -1;
-		raw = rawn;
-		return score | moved;
+		board move, look(*this);
+		look.transpose64();
+		look.query16(0).right.movev64<0>(move);
+		look.query16(1).right.movev64<1>(move);
+		look.query16(2).right.movev64<2>(move);
+		look.query16(3).right.movev64<3>(move);
+		move.inf |= (move.raw ^ raw) ? 0 : -1;
+		set64(move);
+		return move.inf;
 	}
 
 	inline i32 left80() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 extp = ext, extn = 0;
-		register u32 score = 0;
-		query20(0).left.moveh80<0>(rawn, extn, score);
-		query20(1).left.moveh80<1>(rawn, extn, score);
-		query20(2).left.moveh80<2>(rawn, extn, score);
-		query20(3).left.moveh80<3>(rawn, extn, score);
-		register i32 moved = (rawp ^ rawn) | (extp ^ extn) ? 0 : -1;
-		raw = rawn;
-		ext = extn;
-		return score | moved;
+		board move;
+		query20(0).left.moveh80<0>(move);
+		query20(1).left.moveh80<1>(move);
+		query20(2).left.moveh80<2>(move);
+		query20(3).left.moveh80<3>(move);
+		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
+		set80(move);
+		return move.inf;
 	}
 	inline i32 right80() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 extp = ext, extn = 0;
-		register u32 score = 0;
-		query20(0).right.moveh80<0>(rawn, extn, score);
-		query20(1).right.moveh80<1>(rawn, extn, score);
-		query20(2).right.moveh80<2>(rawn, extn, score);
-		query20(3).right.moveh80<3>(rawn, extn, score);
-		register i32 moved = (rawp ^ rawn) | (extp ^ extn) ? 0 : -1;
-		raw = rawn;
-		ext = extn;
-		return score | moved;
+		board move;
+		query20(0).right.moveh80<0>(move);
+		query20(1).right.moveh80<1>(move);
+		query20(2).right.moveh80<2>(move);
+		query20(3).right.moveh80<3>(move);
+		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
+		set80(move);
+		return move.inf;
 	}
 	inline i32 up80() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 extp = ext, extn = 0;
-		register u32 score = 0;
-		transpose80();
-		query20(0).left.movev80<0>(rawn, extn, score);
-		query20(1).left.movev80<1>(rawn, extn, score);
-		query20(2).left.movev80<2>(rawn, extn, score);
-		query20(3).left.movev80<3>(rawn, extn, score);
-		register i32 moved = (rawp ^ rawn) | (extp ^ extn) ? 0 : -1;
-		raw = rawn;
-		ext = extn;
-		return score | moved;
+		board move, look(*this);
+		look.transpose80();
+		look.query20(0).left.movev80<0>(move);
+		look.query20(1).left.movev80<1>(move);
+		look.query20(2).left.movev80<2>(move);
+		look.query20(3).left.movev80<3>(move);
+		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
+		set80(move);
+		return move.inf;
 	}
 	inline i32 down80() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 extp = ext, extn = 0;
-		register u32 score = 0;
-		transpose80();
-		query20(0).right.movev80<0>(rawn, extn, score);
-		query20(1).right.movev80<1>(rawn, extn, score);
-		query20(2).right.movev80<2>(rawn, extn, score);
-		query20(3).right.movev80<3>(rawn, extn, score);
-		register i32 moved = (rawp ^ rawn) | (extp ^ extn) ? 0 : -1;
-		raw = rawn;
-		ext = extn;
-		return score | moved;
+		board move, look(*this);
+		look.transpose80();
+		look.query20(0).right.movev80<0>(move);
+		look.query20(1).right.movev80<1>(move);
+		look.query20(2).right.movev80<2>(move);
+		look.query20(3).right.movev80<3>(move);
+		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
+		set80(move);
+		return move.inf;
 	}
 
 	inline void after(board& U, board& R, board& D, board& L) const {
@@ -506,18 +490,18 @@ public:
 		U = R = D = L = board();
 
 		board b(*this);
-		b.query16(0).moveh64<0>(L.raw, L.inf, R.raw, R.inf);
-		b.query16(1).moveh64<1>(L.raw, L.inf, R.raw, R.inf);
-		b.query16(2).moveh64<2>(L.raw, L.inf, R.raw, R.inf);
-		b.query16(3).moveh64<3>(L.raw, L.inf, R.raw, R.inf);
+		b.query16(0).moveh64<0>(L, R);
+		b.query16(1).moveh64<1>(L, R);
+		b.query16(2).moveh64<2>(L, R);
+		b.query16(3).moveh64<3>(L, R);
 		L.inf |= (L.raw ^ raw) ? 0 : -1;
 		R.inf |= (R.raw ^ raw) ? 0 : -1;
 
 		b.transpose64();
-		b.query16(0).movev64<0>(U.raw, U.inf, D.raw, D.inf);
-		b.query16(1).movev64<1>(U.raw, U.inf, D.raw, D.inf);
-		b.query16(2).movev64<2>(U.raw, U.inf, D.raw, D.inf);
-		b.query16(3).movev64<3>(U.raw, U.inf, D.raw, D.inf);
+		b.query16(0).movev64<0>(U, D);
+		b.query16(1).movev64<1>(U, D);
+		b.query16(2).movev64<2>(U, D);
+		b.query16(3).movev64<3>(U, D);
 		U.inf |= (U.raw ^ raw) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) ? 0 : -1;
 	}
@@ -525,18 +509,18 @@ public:
 		U = R = D = L = board();
 
 		board b(*this);
-		b.query20(0).moveh80<0>(L.raw, L.ext, L.inf, R.raw, R.ext, R.inf);
-		b.query20(1).moveh80<1>(L.raw, L.ext, L.inf, R.raw, R.ext, R.inf);
-		b.query20(2).moveh80<2>(L.raw, L.ext, L.inf, R.raw, R.ext, R.inf);
-		b.query20(3).moveh80<3>(L.raw, L.ext, L.inf, R.raw, R.ext, R.inf);
+		b.query20(0).moveh80<0>(L, R);
+		b.query20(1).moveh80<1>(L, R);
+		b.query20(2).moveh80<2>(L, R);
+		b.query20(3).moveh80<3>(L, R);
 		L.inf |= (L.raw ^ raw) | (L.ext ^ ext) ? 0 : -1;
 		R.inf |= (R.raw ^ raw) | (R.ext ^ ext) ? 0 : -1;
 
 		b.transpose80();
-		b.query20(0).movev80<0>(U.raw, U.ext, U.inf, D.raw, D.ext, D.inf);
-		b.query20(1).movev80<1>(U.raw, U.ext, U.inf, D.raw, D.ext, D.inf);
-		b.query20(2).movev80<2>(U.raw, U.ext, U.inf, D.raw, D.ext, D.inf);
-		b.query20(3).movev80<3>(U.raw, U.ext, U.inf, D.raw, D.ext, D.inf);
+		b.query20(0).movev80<0>(U, D);
+		b.query20(1).movev80<1>(U, D);
+		b.query20(2).movev80<2>(U, D);
+		b.query20(3).movev80<3>(U, D);
 		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
 	}
