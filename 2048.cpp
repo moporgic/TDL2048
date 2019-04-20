@@ -1593,10 +1593,7 @@ struct select {
 	state *best;
 	inline select() : best(move) {}
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), utils::estimator estim = utils::estimate) {
-		move[0].assign(b, 0);
-		move[1].assign(b, 1);
-		move[2].assign(b, 2);
-		move[3].assign(b, 3);
+		b.after(move[0], move[1], move[2], move[3]);
 		move[0].estimate(range, estim);
 		move[1].estimate(range, estim);
 		move[2].estimate(range, estim);

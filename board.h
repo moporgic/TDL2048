@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 4.0
+// Version     : 4.5
 // Description : bitboard of 2048
 //============================================================================
 
@@ -137,6 +137,23 @@ public:
 			u16 merge; // number of merged tiles
 			u16 mono; // monotonic decreasing value (12-bit)
 		};
+
+		template<int i> inline void moveh64(u64& lraw, u32& lsc, u64& rraw, u32& rsc) const {
+			left.moveh64<i>(lraw, lsc);
+			right.moveh64<i>(rraw, rsc);
+		}
+		template<int i> inline void moveh80(u64& lraw, u32& lext, u32& lsc, u64& rraw, u32& rext, u32& rsc) const {
+			left.moveh80<i>(lraw, lext, lsc);
+			right.moveh80<i>(rraw, lext, rsc);
+		}
+		template<int i> inline void movev64(u64& uraw, u32& usc, u64& draw, u32& dsc) const {
+			left.movev64<i>(uraw, usc);
+			right.movev64<i>(draw, dsc);
+		}
+		template<int i> inline void movev80(u64& uraw, u32& uext, u32& usc, u64& draw, u32& dext, u32& dsc) const {
+			left.movev80<i>(uraw, uext, usc);
+			right.movev80<i>(draw, dext, dsc);
+		}
 
 	public:
 		u32 raw; // base row (16-bit raw)
@@ -479,6 +496,48 @@ public:
 		raw = rawn;
 		ext = extn;
 		return score | moved;
+	}
+
+	inline void after(board& U, board& R, board& D, board& L) const {
+		return after64(U, R, D, L);
+	}
+	inline void after64(board& U, board& R, board& D, board& L) const {
+		U = R = D = L = board();
+
+		board b(*this);
+		b.query16(0).moveh64<0>(L.raw, L.inf, R.raw, R.inf);
+		b.query16(1).moveh64<1>(L.raw, L.inf, R.raw, R.inf);
+		b.query16(2).moveh64<2>(L.raw, L.inf, R.raw, R.inf);
+		b.query16(3).moveh64<3>(L.raw, L.inf, R.raw, R.inf);
+		L.inf |= (L.raw ^ raw) ? 0 : -1;
+		R.inf |= (R.raw ^ raw) ? 0 : -1;
+
+		b.transpose64();
+		b.query16(0).movev64<0>(U.raw, U.inf, D.raw, D.inf);
+		b.query16(1).movev64<1>(U.raw, U.inf, D.raw, D.inf);
+		b.query16(2).movev64<2>(U.raw, U.inf, D.raw, D.inf);
+		b.query16(3).movev64<3>(U.raw, U.inf, D.raw, D.inf);
+		U.inf |= (U.raw ^ raw) ? 0 : -1;
+		D.inf |= (D.raw ^ raw) ? 0 : -1;
+	}
+	inline void after80(board& U, board& R, board& D, board& L) const {
+		U = R = D = L = board();
+
+		board b(*this);
+		b.query20(0).moveh80<0>(L.raw, L.ext, L.inf, R.raw, R.ext, R.inf);
+		b.query20(1).moveh80<1>(L.raw, L.ext, L.inf, R.raw, R.ext, R.inf);
+		b.query20(2).moveh80<2>(L.raw, L.ext, L.inf, R.raw, R.ext, R.inf);
+		b.query20(3).moveh80<3>(L.raw, L.ext, L.inf, R.raw, R.ext, R.inf);
+		L.inf |= (L.raw ^ raw) | (L.ext ^ ext) ? 0 : -1;
+		R.inf |= (R.raw ^ raw) | (R.ext ^ ext) ? 0 : -1;
+
+		b.transpose80();
+		b.query20(0).movev80<0>(U.raw, U.ext, U.inf, D.raw, D.ext, D.inf);
+		b.query20(1).movev80<1>(U.raw, U.ext, U.inf, D.raw, D.ext, D.inf);
+		b.query20(2).movev80<2>(U.raw, U.ext, U.inf, D.raw, D.ext, D.inf);
+		b.query20(3).movev80<3>(U.raw, U.ext, U.inf, D.raw, D.ext, D.inf);
+		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
+		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
 	}
 
 	class action {
