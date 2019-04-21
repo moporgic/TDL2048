@@ -1833,7 +1833,7 @@ statistic run(utils::options opts, std::string type) {
 	numeric lambda = state::lambda();
 	u32 step = state::step();
 
-	switch (to_hash(type + ":" + opts[type]["mode"])) {
+	switch (to_hash(opts[type]["mode"])) {
 	case to_hash("optimize:"):
 	case to_hash("optimize:default"):
 	case to_hash("optimize:forward"):
@@ -2029,21 +2029,36 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["lambda"] = next_opt("0.5");
 			opts["step"] = next_opt(numeric(opts["lambda"]) ? "5" : "1");
 			break;
+		case to_hash("-r"):
+		case to_hash("--recipe"):
+			opts["recipe"] = next_opt("");
+			if (opts["recipe"] == "") break;
+			// no break: optimize and evaluate are also handled by the same recipe logic
 		case to_hash("-t"):
 		case to_hash("--train"):
 		case to_hash("--optimize"):
-			opts[""] = opts["optimize"];
-			opts["optimize"] = next_opt("1000");
-			opts["optimize"] += next_opts();
-			opts["optimize"] += opts[""];
-			break;
 		case to_hash("-e"):
 		case to_hash("--test"):
 		case to_hash("--evaluate"):
-			opts[""] = opts["evaluate"];
-			opts["evaluate"] = next_opt("1000");
-			opts["evaluate"] += next_opts();
-			opts["evaluate"] += opts[""];
+			opts["recipe"] = label.substr(label.find_first_not_of('-'));
+			if (opts["recipe"] == "t" || opts["recipe"] == "train") opts["recipe"] = "optimize";
+			if (opts["recipe"] == "e" || opts["recipe"] == "test")  opts["recipe"] = "evaluate";
+			opts[""] = opts[opts["recipe"]];
+			opts[opts["recipe"]] = next_opt("1000");
+			opts[opts["recipe"]] += next_opts();
+			opts[opts["recipe"]] += opts[""];
+			if (opts["recipe"] == "optimize" || opts["recipe"] == "evaluate")
+				if (opts[opts["recipe"]]["mode"].value().find(opts["recipe"].value()) != 0)
+					opts[opts["recipe"]]["mode"] = opts["recipe"] + ":" + opts[opts["recipe"]]["mode"];
+			if (opts("unit")) opts[opts["recipe"]]["unit"] = opts["unit"];
+			if (opts("win"))  opts[opts["recipe"]]["win"]  = opts["win"];
+			if (opts["recipe"]["mode"].value().find("evaluate") == 0) opts[opts["recipe"]]["info"] = "";
+			if (opts("info")) opts[opts["recipe"]]["info"] = opts["info"];
+			opts[opts["recipe"]].remove("info=none");
+			opts["recipes"] += opts["recipe"];
+			break;
+		case to_hash("--recipes"):
+			opts["recipes"] = next_opts();
 			break;
 		case to_hash("-s"):
 		case to_hash("--seed"):
@@ -2102,7 +2117,8 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-I"):
 		case to_hash("--info"):
 			opts["info"] = next_opt("full");
-			opts["info"] += next_opts();
+			for (auto recipe : opts["recipes"]) opts[recipe]["info"] = opts["info"];
+			for (auto recipe : opts["recipes"]) opts[recipe].remove("info=none");
 			break;
 		case to_hash("-x"):
 		case to_hash("--option"):
@@ -2113,35 +2129,41 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-tm"):
 		case to_hash("--train-type"):
 		case to_hash("--train-mode"):
-			opts["optimize"]["mode"] = next_opt("default");
+			opts[""] = next_opt("default");
+			if (opts("optimize")) opts["optimize"]["mode"] = opts[""];
 			break;
 		case to_hash("-et"):
 		case to_hash("-em"):
 		case to_hash("--test-type"):
 		case to_hash("--test-mode"):
-			opts["evaluate"]["mode"] = next_opt("default");
+			opts[""] = next_opt("default");
+			if (opts("evaluate")) opts["evaluate"]["mode"] = opts[""];
 			break;
 		case to_hash("-tc"):
 		case to_hash("-tu"):
 		case to_hash("--train-check"):
 		case to_hash("--train-unit"):
-			opts["optimize"]["unit"] = next_opt("1000");
+			opts[""] = next_opt("1000");
+			if (opts("optimize")) opts["optimize"]["unit"] = opts[""];
 			break;
 		case to_hash("-ec"):
 		case to_hash("-eu"):
 		case to_hash("--test-check"):
 		case to_hash("--test-unit"):
-			opts["evaluate"]["unit"] = next_opt("1000");
+			opts[""] = next_opt("1000");
+			if (opts("evaluate")) opts["evaluate"]["unit"] = opts[""];
 			break;
 		case to_hash("-u"):
 		case to_hash("--unit"):
 		case to_hash("-chk"):
 		case to_hash("--check"):
-			opts["optimize"]["unit"] = opts["evaluate"]["unit"] = next_opt("1000");
+			opts["unit"] = next_opt("1000");
+			for (auto recipe : opts["recipes"]) opts[recipe]["unit"] = opts["unit"];
 			break;
 		case to_hash("-v"):
 		case to_hash("--win"):
-			opts["optimize"]["win"] = opts["evaluate"]["win"] = next_opt("2048");
+			opts["win"] = next_opt("2048");
+			for (auto recipe : opts["recipes"]) opts[recipe]["win"] = opts["win"];
 			break;
 		case to_hash("-c"):
 		case to_hash("--comment"):
@@ -2162,7 +2184,7 @@ utils::options parse(int argc, const char* argv[]) {
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts("optimize") && !opts("evaluate")) opts["optimize"] = 1000;
+	if (!opts("optimize") && !opts("evaluate")) opts["optimize"] = 1000, opts["recipes"] += "optimize";
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
@@ -2188,7 +2210,8 @@ int main(int argc, const char* argv[]) {
 	state::alpha(std::stod(opts["alpha"]));
 	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
 	state::lambda(opts["lambda"]);
-	if (numeric(opts["lambda"]) && !opts("optimize", "mode")) opts["optimize"]["mode"] = "lambda";
+	if (numeric(opts["lambda"]) && opts("optimize") && !opts("optimize", "mode"))
+		opts["optimize"]["mode"] = "optimize:lambda";
 	state::step(opts["step"]);
 
 	for (std::string recipe : opts["recipes"]) {
@@ -2196,18 +2219,6 @@ int main(int argc, const char* argv[]) {
 		statistic stat = run(opts, recipe);
 		if (opts[recipe]("info")) stat.summary();
 	}
-
-//	if (opts("optimize")) {
-//		std::cout << "optimize: " << opts["optimize"] << std::endl << std::endl;
-//		statistic stat = run(opts, "optimize");
-//		if (opts["info"] == "full") stat.summary();
-//	}
-//
-//	if (opts("evaluate")) {
-//		std::cout << "evaluate: " << opts["evaluate"] << std::endl << std::endl;
-//		statistic stat = run(opts, "evaluate");
-//		if (opts["info"] != "none") stat.summary();
-//	}
 
 	utils::save_network(opts["save"]);
 
