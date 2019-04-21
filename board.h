@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 4.0
+// Version     : 4.5
 // Description : bitboard of 2048
 //============================================================================
 
@@ -71,21 +71,21 @@ public:
 	public:
 		class move {
 		public:
-			template<int i> inline void moveh64(u64& raw, u32& sc) const {
-				raw |= u64(rawh) << (i << 4);
-				sc += score;
+			template<int i> inline void moveh64(board& mv) const {
+				mv.raw |= u64(rawh) << (i << 4);
+				mv.inf += score;
 			}
-			template<int i> inline void moveh80(u64& raw, u32& ext, u32& sc) const {
-				moveh64<i>(raw, sc);
-				ext |= exth << (i << 2);
+			template<int i> inline void moveh80(board& mv) const {
+				moveh64<i>(mv);
+				mv.ext |= exth << (i << 2);
 			}
-			template<int i> inline void movev64(u64& raw, u32& sc) const {
-				raw |= rawv << (i << 2);
-				sc += score;
+			template<int i> inline void movev64(board& mv) const {
+				mv.raw |= rawv << (i << 2);
+				mv.inf += score;
 			}
-			template<int i> inline void movev80(u64& raw, u32& ext, u32& sc) const {
-				movev64<i>(raw, sc);
-				ext |= extv << i;
+			template<int i> inline void movev80(board& mv) const {
+				movev64<i>(mv);
+				mv.ext |= extv << i;
 			}
 
 		public:
@@ -95,86 +95,26 @@ public:
 				u32 row[] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
 							((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
 				if (reverse) std::reverse(row, row + 4);
-				u32 ori[4]; std::copy_n(row, 4, ori);
-				u32 bak[4]; std::copy_n(row, 4, bak);
-				{
-					u32 top = 0, hold = 0;
-					for (u32 i = 0; i < 4; i++) {
-						u32 tile = row[i];
-						if (tile == 0) continue;
-						row[i] = 0;
-						if (hold) {
-							if (tile == hold) {
-								row[top++] = ++tile;
-								score += (1 << tile);
-								merge++;
-								hold = 0;
-							} else {
-								row[top++] = hold;
-								hold = tile;
-							}
+				u32 top = 0, hold = 0;
+				for (u32 i = 0; i < 4; i++) {
+					u32 tile = row[i];
+					if (tile == 0) continue;
+					row[i] = 0;
+					if (hold) {
+						if (tile == hold) {
+							row[top++] = ++tile;
+							score += (1 << tile);
+							merge++;
+							hold = 0;
 						} else {
+							row[top++] = hold;
 							hold = tile;
 						}
+					} else {
+						hold = tile;
 					}
-					if (hold) row[top] = hold;
 				}
-				u32 xcore = 0, xerge = 0;
-				{
-					u32* row = bak;
-					u32& score = xcore;
-					u32& merge = xerge;
-
-					u32 fill, test;
-					fill = (row[0] != 0);
-					row[0] = fill ? row[0] : row[1];
-					row[1] = fill ? row[1] : 0;
-					fill = (row[1] != 0);
-					row[1] = fill ? row[1] : row[2];
-					row[2] = fill ? row[2] : 0;
-					fill = (row[2] != 0);
-					row[2] = fill ? row[2] : row[3];
-					row[3] = fill ? row[3] : 0;
-
-					fill = (row[0] != 0);
-					row[0] = fill ? row[0] : row[1];
-					row[1] = fill ? row[1] : 0;
-					fill = (row[1] != 0);
-					row[1] = fill ? row[1] : row[2];
-					row[2] = fill ? row[2] : 0;
-
-					fill = (row[0] != 0);
-					row[0] = fill ? row[0] : row[1];
-					row[1] = fill ? row[1] : 0;
-
-					test = (row[0] != 0) & (row[0] == row[1]);
-					row[0] = row[0] + test;
-					row[1] = test ? row[2] : row[1];
-					row[2] = test ? row[3] : row[2];
-					row[3] = test ? 0 : row[3];
-					merge += test;
-					score += test << row[0];
-
-					test = (row[1] != 0) & (row[1] == row[2]);
-					row[1] = row[1] + test;
-					row[2] = test ? row[3] : row[2];
-					row[3] = test ? 0 : row[3];
-					merge += test;
-					score += test << row[1];
-
-					test = (row[2] != 0) & (row[2] == row[3]);
-					row[2] = row[2] + test;
-					row[3] = test ? 0 : row[3];
-					merge += test;
-					score += test << row[2];
-				}
-				if (!std::equal(row, row + 4, bak) || (score != xcore) || (merge != xerge)) {
-					std::cout << ori[0] << " " << ori[1] << " " << ori[2] << " " << ori[3] << std::endl;
-					std::cout << row[0] << " " << row[1] << " " << row[2] << " " << row[3] << std::endl;
-					std::cout << bak[0] << " " << bak[1] << " " << bak[2] << " " << bak[3] << std::endl;
-					std::cout << score << " " << merge << " / " << xcore << " " << xerge << std::endl;
-					std::exit(0);
-				}
+				if (hold) row[top] = hold;
 				if (reverse) std::reverse(row, row + 4);
 
 				u32 lo[] = { (row[0] & 0x0f), (row[1] & 0x0f), (row[2] & 0x0f), (row[3] & 0x0f) };
@@ -202,6 +142,23 @@ public:
 			u16 merge; // number of merged tiles
 			u16 mono; // monotonic decreasing value (12-bit)
 		};
+
+		template<int i> inline void moveh64(board& L, board& R) const {
+			left.moveh64<i>(L);
+			right.moveh64<i>(R);
+		}
+		template<int i> inline void moveh80(board& L, board& R) const {
+			left.moveh80<i>(L);
+			right.moveh80<i>(R);
+		}
+		template<int i> inline void movev64(board& U, board& D) const {
+			left.movev64<i>(U);
+			right.movev64<i>(D);
+		}
+		template<int i> inline void movev80(board& U, board& D) const {
+			left.movev80<i>(U);
+			right.movev80<i>(D);
+		}
 
 	public:
 		u32 raw; // base row (16-bit raw)
@@ -254,6 +211,10 @@ public:
 		set4(i, t);
 		ext = (ext & ~(1U << (i + 16))) | ((t & 0x10) << (i + 12));
 	}
+
+	inline constexpr void set(const board& b) { set80(b); }
+	inline constexpr void set64(const board& b) { raw = b.raw; }
+	inline constexpr void set80(const board& b) { raw = b.raw; ext = b.ext; }
 
 	inline constexpr void mirror() { mirror64(); }
 	inline constexpr void mirror64() {
@@ -441,7 +402,279 @@ public:
 	inline i32 up()    { return up64(); }
 	inline i32 down()  { return down64(); }
 
-	inline void operate64x(board& bu, i32& ru, board& br, i32& rr, board& bd, i32& rd, board& bl, i32& rl) const {
+	inline i32 left64() {
+		board move;
+		query16(0).left.moveh64<0>(move);
+		query16(1).left.moveh64<1>(move);
+		query16(2).left.moveh64<2>(move);
+		query16(3).left.moveh64<3>(move);
+		move.inf |= (move.raw ^ raw) ? 0 : -1;
+		set64(move);
+		return move.inf;
+	}
+	inline i32 right64() {
+		board move;
+		query16(0).right.moveh64<0>(move);
+		query16(1).right.moveh64<1>(move);
+		query16(2).right.moveh64<2>(move);
+		query16(3).right.moveh64<3>(move);
+		move.inf |= (move.raw ^ raw) ? 0 : -1;
+		set64(move);
+		return move.inf;
+	}
+	inline i32 up64() {
+		board move, look(*this);
+		look.transpose64();
+		look.query16(0).left.movev64<0>(move);
+		look.query16(1).left.movev64<1>(move);
+		look.query16(2).left.movev64<2>(move);
+		look.query16(3).left.movev64<3>(move);
+		move.inf |= (move.raw ^ raw) ? 0 : -1;
+		set64(move);
+		return move.inf;
+	}
+	inline i32 down64() {
+		board move, look(*this);
+		look.transpose64();
+		look.query16(0).right.movev64<0>(move);
+		look.query16(1).right.movev64<1>(move);
+		look.query16(2).right.movev64<2>(move);
+		look.query16(3).right.movev64<3>(move);
+		move.inf |= (move.raw ^ raw) ? 0 : -1;
+		set64(move);
+		return move.inf;
+	}
+
+	inline i32 left80() {
+		board move;
+		query20(0).left.moveh80<0>(move);
+		query20(1).left.moveh80<1>(move);
+		query20(2).left.moveh80<2>(move);
+		query20(3).left.moveh80<3>(move);
+		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
+		set80(move);
+		return move.inf;
+	}
+	inline i32 right80() {
+		board move;
+		query20(0).right.moveh80<0>(move);
+		query20(1).right.moveh80<1>(move);
+		query20(2).right.moveh80<2>(move);
+		query20(3).right.moveh80<3>(move);
+		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
+		set80(move);
+		return move.inf;
+	}
+	inline i32 up80() {
+		board move, look(*this);
+		look.transpose80();
+		look.query20(0).left.movev80<0>(move);
+		look.query20(1).left.movev80<1>(move);
+		look.query20(2).left.movev80<2>(move);
+		look.query20(3).left.movev80<3>(move);
+		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
+		set80(move);
+		return move.inf;
+	}
+	inline i32 down80() {
+		board move, look(*this);
+		look.transpose80();
+		look.query20(0).right.movev80<0>(move);
+		look.query20(1).right.movev80<1>(move);
+		look.query20(2).right.movev80<2>(move);
+		look.query20(3).right.movev80<3>(move);
+		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
+		set80(move);
+		return move.inf;
+	}
+
+	inline i32 left64x() {
+		u64 rawp = raw;
+		__m64 rawn = _mm_cvtsi64_m64(rawp);
+
+		__m64 v_0x0000 = _mm_cvtsi64_m64(0x0000000000000000ull);
+		__m64 v_0x0001 = _mm_cvtsi64_m64(0x0001000100010001ull);
+		__m64 v_0x0010 = _mm_cvtsi64_m64(0x0010001000100010ull);
+		__m64 v_0x0100 = _mm_cvtsi64_m64(0x0100010001000100ull);
+		__m64 v_0x000f = _mm_cvtsi64_m64(0x000f000f000f000full);
+		__m64 v_0x00ff = _mm_cvtsi64_m64(0x00ff00ff00ff00ffull);
+		__m64 v_0x0fff = _mm_cvtsi64_m64(0x0fff0fff0fff0fffull);
+		__m64 v_0xfff0 = _mm_cvtsi64_m64(0xfff0fff0fff0fff0ull);
+		__m64 v_0xff00 = _mm_cvtsi64_m64(0xff00ff00ff00ff00ull);
+		__m64 v_0x0ff0 = _mm_cvtsi64_m64(0x0ff00ff00ff00ff0ull);
+		__m64 v_0x0f00 = _mm_cvtsi64_m64(0x0f000f000f000f00ull);
+
+		__m64 fill, tile, test;
+		__m128i testx[3], tilex[3];
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_srli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_srli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_srli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0x000f), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0xfff0))), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0x000f), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0xfff0))), _mm_andnot_si64(fill, rawn));
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0x00ff), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0xff00))), _mm_andnot_si64(fill, rawn));
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0001), v_0x000f), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0x0ff0)), test), _mm_andnot_si64(test, rawn));
+		testx[0] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
+		tilex[0] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0010), v_0x00ff), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0x0f00)), test), _mm_andnot_si64(test, rawn));
+		testx[1] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
+		tilex[1] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0100), v_0x0fff), test), _mm_andnot_si64(test, rawn));
+		testx[2] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
+		tilex[2] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
+
+		_mm256_zeroall();
+		testx[0] = _mm_sllv_epi32(testx[0], tilex[0]);
+		testx[1] = _mm_sllv_epi32(testx[1], tilex[1]);
+		testx[2] = _mm_sllv_epi32(testx[2], tilex[2]);
+		_mm256_zeroall();
+		__m128i merge = _mm_add_epi32(_mm_add_epi32(testx[0], testx[1]), testx[2]);
+		u64 stamp = _mm_extract_epi64(merge, 0) + _mm_extract_epi64(merge, 1);
+		u32 score = u32(stamp) + u32(stamp >> 32);
+
+		i32 moved = (rawp ^ _mm_cvtm64_si64(rawn)) ? 0 : -1;
+		raw = _mm_cvtm64_si64(rawn);
+		return score | moved;
+	}
+	inline i32 right64x() {
+		register u64 rawp = raw;
+		register __m64 rawn = _mm_cvtsi64_m64(rawp);
+
+		__m64 v_0x0001 = _mm_cvtsi64_m64(0x0001000100010001ull);
+		__m64 v_0x0000 = _mm_cvtsi64_m64(0x0000000000000000ull);
+		__m64 v_0x0010 = _mm_cvtsi64_m64(0x0010001000100010ull);
+		__m64 v_0x0100 = _mm_cvtsi64_m64(0x0100010001000100ull);
+		__m64 v_0x000f = _mm_cvtsi64_m64(0x000f000f000f000full);
+		__m64 v_0x00ff = _mm_cvtsi64_m64(0x00ff00ff00ff00ffull);
+		__m64 v_0x0fff = _mm_cvtsi64_m64(0x0fff0fff0fff0fffull);
+		__m64 v_0xfff0 = _mm_cvtsi64_m64(0xfff0fff0fff0fff0ull);
+		__m64 v_0xff00 = _mm_cvtsi64_m64(0xff00ff00ff00ff00ull);
+		__m64 v_0x0ff0 = _mm_cvtsi64_m64(0x0ff00ff00ff00ff0ull);
+		__m64 v_0xf000 = _mm_cvtsi64_m64(0xf000f000f000f000ull);
+		__m64 v_0x1000 = _mm_cvtsi64_m64(0x1000100010001000ull);
+		__m64 v_0x00f0 = _mm_cvtsi64_m64(0x00f000f000f000f0ull);
+
+		__m64 fill, tile, test;
+		__m128i testx[3], tilex[3];
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_slli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_slli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_slli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0xf000), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x0fff))), _mm_andnot_si64(fill, rawn));
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0xf000), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x0fff))), _mm_andnot_si64(fill, rawn));
+
+		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f), v_0x0000);
+		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0xff00), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x00ff))), _mm_andnot_si64(fill, rawn));
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x1000), v_0xf000), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x0ff0)), test), _mm_andnot_si64(test, rawn));
+		testx[0]= _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
+		tilex[0] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0100), v_0xff00), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x00f0)), test), _mm_andnot_si64(test, rawn));
+		testx[1] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
+		tilex[1] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
+
+		tile = _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f);
+		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f)));
+		rawn = _mm_or_si64(_mm_and_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0010), v_0xfff0), test), _mm_andnot_si64(test, rawn));
+		testx[2] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
+		tilex[2] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
+
+		_mm256_zeroall();
+		testx[0] = _mm_sllv_epi32(testx[0], tilex[0]);
+		testx[1] = _mm_sllv_epi32(testx[1], tilex[1]);
+		testx[2] = _mm_sllv_epi32(testx[2], tilex[2]);
+		_mm256_zeroall();
+		__m128i merge = _mm_add_epi32(_mm_add_epi32(testx[0], testx[1]), testx[2]);
+		u64 stamp = _mm_extract_epi64(merge, 0) + _mm_extract_epi64(merge, 1);
+		u32 score = u32(stamp) + u32(stamp >> 32);
+
+		i32 moved = (rawp ^ _mm_cvtm64_si64(rawn)) ? 0 : -1;
+		raw = _mm_cvtm64_si64(rawn);
+		return score | moved;
+	}
+	inline i32 up64x() {
+		transpose64();
+		i32 score = left64x();
+		transpose64();
+		return score;
+	}
+	inline i32 down64x() {
+		transpose64();
+		i32 score = right64x();
+		transpose64();
+		return score;
+	}
+
+	inline void after(board& U, board& R, board& D, board& L) const {
+		return after64(U, R, D, L);
+	}
+	inline void after64(board& U, board& R, board& D, board& L) const {
+		U = R = D = L = board();
+
+		board b(*this);
+		b.query16(0).moveh64<0>(L, R);
+		b.query16(1).moveh64<1>(L, R);
+		b.query16(2).moveh64<2>(L, R);
+		b.query16(3).moveh64<3>(L, R);
+		L.inf |= (L.raw ^ raw) ? 0 : -1;
+		R.inf |= (R.raw ^ raw) ? 0 : -1;
+
+		b.transpose64();
+		b.query16(0).movev64<0>(U, D);
+		b.query16(1).movev64<1>(U, D);
+		b.query16(2).movev64<2>(U, D);
+		b.query16(3).movev64<3>(U, D);
+		U.inf |= (U.raw ^ raw) ? 0 : -1;
+		D.inf |= (D.raw ^ raw) ? 0 : -1;
+	}
+	inline void after80(board& U, board& R, board& D, board& L) const {
+		U = R = D = L = board();
+
+		board b(*this);
+		b.query20(0).moveh80<0>(L, R);
+		b.query20(1).moveh80<1>(L, R);
+		b.query20(2).moveh80<2>(L, R);
+		b.query20(3).moveh80<3>(L, R);
+		L.inf |= (L.raw ^ raw) | (L.ext ^ ext) ? 0 : -1;
+		R.inf |= (R.raw ^ raw) | (R.ext ^ ext) ? 0 : -1;
+
+		b.transpose80();
+		b.query20(0).movev80<0>(U, D);
+		b.query20(1).movev80<1>(U, D);
+		b.query20(2).movev80<2>(U, D);
+		b.query20(3).movev80<3>(U, D);
+		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
+		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
+	}
+	inline void after64x(board& U, board& R, board& D, board& L) const {
 		__m256i dst = {}, rwd = {}, chk, rbf, buf;
 
 		// use left for all 4 directions, transpose and mirror first
@@ -515,350 +748,33 @@ public:
 
 		// mirror and transpose back to original direction
 		rbf = dst;
-		bl = _mm256_extract_epi64(rbf, 3); // L = left
+		L = _mm256_extract_epi64(rbf, 3); // L = left
 		buf = _mm256_slli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x000f)), 12);
 		buf = _mm256_or_si256(buf, _mm256_slli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x00f0)), 4));
 		buf = _mm256_or_si256(buf, _mm256_srli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x0f00)), 4));
 		rbf = _mm256_or_si256(buf, _mm256_srli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0xf000)), 12));
-		br = _mm256_extract_epi64(rbf, 1); // R = mirror left mirror
+		R = _mm256_extract_epi64(rbf, 1); // R = mirror left mirror
 
 		rbf = _mm256_insert_epi64(rbf, _mm256_extract_epi64(dst, 0), 0);
 		buf = _mm256_and_si256(_mm256_xor_si256(rbf, _mm256_srli_epi64(rbf, 12)), _mm256_set1_epi64x(0x0000f0f00000f0f0ull));
 		rbf = _mm256_xor_si256(rbf, _mm256_xor_si256(buf, _mm256_slli_epi64(buf, 12)));
 		buf = _mm256_and_si256(_mm256_xor_si256(rbf, _mm256_srli_epi64(rbf, 24)), _mm256_set1_epi64x(0x00000000ff00ff00ull));
 		rbf = _mm256_xor_si256(rbf, _mm256_xor_si256(buf, _mm256_slli_epi64(buf, 24)));
-		bu = _mm256_extract_epi64(rbf, 0); // U = transpose left transpose
-		bd = _mm256_extract_epi64(rbf, 2); // D = transpose mirror left mirror transpose
+		U = _mm256_extract_epi64(rbf, 0); // U = transpose left transpose
+		D = _mm256_extract_epi64(rbf, 2); // D = transpose mirror left mirror transpose
 
 		// sum the final reward and check moved or not
 		rwd = _mm256_add_epi64(rwd, _mm256_srli_si256(rwd, 8 /* bytes */));
 		rwd = _mm256_add_epi64(rwd, _mm256_srli_epi64(rwd, 32));
-		ru = _mm256_extract_epi32(rwd, 0);
-		rr = _mm256_extract_epi32(rwd, 4);
-		rwd = _mm256_set_epi64x(rr, ru, rr, ru);
-		chk = _mm256_cmpeq_epi64(_mm256_set_epi64x(bl, bd, br, bu), _mm256_set1_epi64x(raw));
+		U.inf = _mm256_extract_epi32(rwd, 0);
+		R.inf = _mm256_extract_epi32(rwd, 4);
+		rwd = _mm256_set_epi64x(R.inf, U.inf, R.inf, U.inf);
+		chk = _mm256_cmpeq_epi64(_mm256_set_epi64x(L, D, R, U), _mm256_set1_epi64x(raw));
 		rwd = _mm256_or_si256(rwd, chk);
-		ru = _mm256_extract_epi32(rwd, 0);
-		rr = _mm256_extract_epi32(rwd, 2);
-		rd = _mm256_extract_epi32(rwd, 4);
-		rl = _mm256_extract_epi32(rwd, 6);
-
-		// regression test
-//		board iso;
-//		iso = raw; if (iso.operate64(0) != ru || iso != bu) std::exit(0);
-//		iso = raw; if (iso.operate64(1) != rr || iso != br) std::exit(0);
-//		iso = raw; if (iso.operate64(2) != rd || iso != bd) std::exit(0);
-//		iso = raw; if (iso.operate64(3) != rl || iso != bl) std::exit(0);
-	}
-
-	inline i32 left64() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 score = 0;
-		query16(0).left.moveh64<0>(rawn, score);
-		query16(1).left.moveh64<1>(rawn, score);
-		query16(2).left.moveh64<2>(rawn, score);
-		query16(3).left.moveh64<3>(rawn, score);
-		register i32 moved = (rawp ^ rawn) ? 0 : -1;
-		raw = rawn;
-		return score | moved;
-	}
-	inline i32 left64x() {
-//		{
-//			u64 rawp = raw;
-//			__m128i rawn = _mm_cvtepu8_epi16(_mm_cvtsi64_si128(rawp));
-//
-//			__m128i v_0x0000 = _mm_set_epi64x(0x0000000000000000ull, 0x0000000000000000ull);
-//			__m128i v_0x0001 = _mm_set_epi64x(0x0000000100000001ull, 0x0000000100000001ull);
-//			__m128i v_0x0010 = _mm_set_epi64x(0x0000001000000010ull, 0x0000001000000010ull);
-//			__m128i v_0x0100 = _mm_set_epi64x(0x0000010000000100ull, 0x0000010000000100ull);
-//			__m128i v_0x000f = _mm_set_epi64x(0x0000000f0000000full, 0x0000000f0000000full);
-//			__m128i v_0x00ff = _mm_set_epi64x(0x000000ff000000ffull, 0x000000ff000000ffull);
-//			__m128i v_0x0fff = _mm_set_epi64x(0x00000fff00000fffull, 0x00000fff00000fffull);
-//			__m128i v_0xfff0 = _mm_set_epi64x(0x0000fff00000fff0ull, 0x0000fff00000fff0ull);
-//			__m128i v_0xff00 = _mm_set_epi64x(0x0000ff000000ff00ull, 0x0000ff000000ff00ull);
-//			__m128i v_0x0ff0 = _mm_set_epi64x(0x00000ff000000ff0ull, 0x00000ff000000ff0ull);
-//			__m128i v_0x0f00 = _mm_set_epi64x(0x00000f0000000f00ull, 0x00000f0000000f00ull);
-//
-//			__m128i fill, tile[3], test[3];
-//
-//			fill = _mm_cmpeq_epi32(_mm_and_si128(_mm_srli_epi32(rawn, 0 << 2), v_0x000f), v_0x0000);
-//			rawn = _mm_or_si128(_mm_and_si128(fill, _mm_srli_epi32(rawn, 4)), _mm_andnot_si128(fill, rawn));
-//			fill = _mm_cmpeq_epi32(_mm_and_si128(_mm_srli_epi32(rawn, 0 << 2), v_0x000f), v_0x0000);
-//			rawn = _mm_or_si128(_mm_and_si128(fill, _mm_srli_epi32(rawn, 4)), _mm_andnot_si128(fill, rawn));
-//			fill = _mm_cmpeq_epi32(_mm_and_si128(_mm_srli_epi32(rawn, 0 << 2), v_0x000f), v_0x0000);
-//			rawn = _mm_or_si128(_mm_and_si128(fill, _mm_srli_epi32(rawn, 4)), _mm_andnot_si128(fill, rawn));
-//
-//			fill = _mm_cmpeq_epi32(_mm_and_si128(_mm_srli_epi32(rawn, 1 << 2), v_0x000f), v_0x0000);
-//			rawn = _mm_or_si128(_mm_and_si128(fill, _mm_or_si128(_mm_and_si128(rawn, v_0x000f), _mm_and_si128(_mm_srli_epi32(rawn, 4), v_0xfff0))), _mm_andnot_si128(fill, rawn));
-//			fill = _mm_cmpeq_epi32(_mm_and_si128(_mm_srli_epi32(rawn, 1 << 2), v_0x000f), v_0x0000);
-//			rawn = _mm_or_si128(_mm_and_si128(fill, _mm_or_si128(_mm_and_si128(rawn, v_0x000f), _mm_and_si128(_mm_srli_epi32(rawn, 4), v_0xfff0))), _mm_andnot_si128(fill, rawn));
-//
-//			fill = _mm_cmpeq_epi32(_mm_and_si128(_mm_srli_epi32(rawn, 2 << 2), v_0x000f), v_0x0000);
-//			rawn = _mm_or_si128(_mm_and_si128(fill, _mm_or_si128(_mm_and_si128(rawn, v_0x00ff), _mm_and_si128(_mm_srli_epi32(rawn, 4), v_0xff00))), _mm_andnot_si128(fill, rawn));
-//
-//			tile[0] = _mm_and_si128(_mm_srli_epi32(rawn, 0 << 2), v_0x000f);
-//			test[0] = _mm_andnot_si128(_mm_cmpeq_epi32(tile[0], v_0x0000), _mm_cmpeq_epi32(tile[0], _mm_and_si128(_mm_srli_epi32(rawn, 1 << 2), v_0x000f)));
-//			rawn = _mm_or_si128(_mm_and_si128(_mm_or_si128(_mm_and_si128(_mm_add_epi32(rawn, v_0x0001), v_0x000f), _mm_and_si128(_mm_srli_epi32(rawn, 4), v_0x0ff0)), test[0]), _mm_andnot_si128(test[0], rawn));
-//			test[0] = _mm_and_si128(test[0], v_0x0001);
-//			tile[0] = _mm_add_epi32(tile[0], v_0x0001);
-//
-//			tile[1] = _mm_and_si128(_mm_srli_epi32(rawn, 1 << 2), v_0x000f);
-//			test[1] = _mm_andnot_si128(_mm_cmpeq_epi32(tile[1], v_0x0000), _mm_cmpeq_epi32(tile[1], _mm_and_si128(_mm_srli_epi32(rawn, 2 << 2), v_0x000f)));
-//			rawn = _mm_or_si128(_mm_and_si128(_mm_or_si128(_mm_and_si128(_mm_add_epi32(rawn, v_0x0010), v_0x00ff), _mm_and_si128(_mm_srli_epi32(rawn, 4), v_0x0f00)), test[1]), _mm_andnot_si128(test[1], rawn));
-//			test[1] = _mm_and_si128(test[1], v_0x0001);
-//			tile[1] = _mm_add_epi32(tile[1], v_0x0001);
-//
-//			tile[2] = _mm_and_si128(_mm_srli_epi32(rawn, 2 << 2), v_0x000f);
-//			test[2] = _mm_andnot_si128(_mm_cmpeq_epi32(tile[2], v_0x0000), _mm_cmpeq_epi32(tile[2], _mm_and_si128(_mm_srli_epi32(rawn, 3 << 2), v_0x000f)));
-//			rawn = _mm_or_si128(_mm_and_si128(_mm_and_si128(_mm_add_epi32(rawn, v_0x0100), v_0x0fff), test[2]), _mm_andnot_si128(test[2], rawn));
-//			test[2] = _mm_and_si128(test[2], v_0x0001);
-//			tile[2] = _mm_add_epi32(tile[2], v_0x0001);
-//
-//			__m128i merge;
-//			_mm256_zeroall();
-//			merge = _mm_sllv_epi32(test[0], tile[0]);
-//			merge = _mm_add_epi32(merge, _mm_sllv_epi32(test[1], tile[1]));
-//			merge = _mm_add_epi32(merge, _mm_sllv_epi32(test[2], tile[2]));
-//			_mm256_zeroall();
-//
-//			raw =
-//			register u32 score = _mm_extract_epi32(merge, 0) + _mm_extract_epi32(merge, 1) + _mm_extract_epi32(merge, 2) + _mm_extract_epi32(merge, 3);
-//			register i32 moved = (rawp ^ _mm_cvtm64_si64(rawn)) ? 0 : -1;
-//			raw = _mm_cvtm64_si64(rawn);
-//			return score | moved;
-//		}
-		u64 rawp = raw;
-		__m64 rawn = _mm_cvtsi64_m64(rawp);
-
-		__m64 v_0x0000 = _mm_cvtsi64_m64(0x0000000000000000ull);
-		__m64 v_0x0001 = _mm_cvtsi64_m64(0x0001000100010001ull);
-		__m64 v_0x0010 = _mm_cvtsi64_m64(0x0010001000100010ull);
-		__m64 v_0x0100 = _mm_cvtsi64_m64(0x0100010001000100ull);
-		__m64 v_0x000f = _mm_cvtsi64_m64(0x000f000f000f000full);
-		__m64 v_0x00ff = _mm_cvtsi64_m64(0x00ff00ff00ff00ffull);
-		__m64 v_0x0fff = _mm_cvtsi64_m64(0x0fff0fff0fff0fffull);
-		__m64 v_0xfff0 = _mm_cvtsi64_m64(0xfff0fff0fff0fff0ull);
-		__m64 v_0xff00 = _mm_cvtsi64_m64(0xff00ff00ff00ff00ull);
-		__m64 v_0x0ff0 = _mm_cvtsi64_m64(0x0ff00ff00ff00ff0ull);
-		__m64 v_0x0f00 = _mm_cvtsi64_m64(0x0f000f000f000f00ull);
-
-		__m64 fill, tile, test;
-		__m128i testx[3], tilex[3];
-
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_srli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_srli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_srli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
-
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0x000f), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0xfff0))), _mm_andnot_si64(fill, rawn));
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0x000f), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0xfff0))), _mm_andnot_si64(fill, rawn));
-
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0x00ff), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0xff00))), _mm_andnot_si64(fill, rawn));
-
-		tile = _mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f);
-		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f)));
-		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0001), v_0x000f), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0x0ff0)), test), _mm_andnot_si64(test, rawn));
-		testx[0] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
-		tilex[0] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
-
-		tile = _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f);
-		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f)));
-		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0010), v_0x00ff), _mm_and_si64(_mm_srli_pi16(rawn, 4), v_0x0f00)), test), _mm_andnot_si64(test, rawn));
-		testx[1] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
-		tilex[1] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
-
-		tile = _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f);
-		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f)));
-		rawn = _mm_or_si64(_mm_and_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0100), v_0x0fff), test), _mm_andnot_si64(test, rawn));
-		testx[2] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
-		tilex[2] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
-
-		_mm256_zeroall();
-		testx[0] = _mm_sllv_epi32(testx[0], tilex[0]);
-		testx[1] = _mm_sllv_epi32(testx[1], tilex[1]);
-		testx[2] = _mm_sllv_epi32(testx[2], tilex[2]);
-		_mm256_zeroall();
-		__m128i merge = _mm_add_epi32(_mm_add_epi32(testx[0], testx[1]), testx[2]);
-		u64 stamp = _mm_extract_epi64(merge, 0) + _mm_extract_epi64(merge, 1);
-		u32 score = u32(stamp) + u32(stamp >> 32);
-
-		i32 moved = (rawp ^ _mm_cvtm64_si64(rawn)) ? 0 : -1;
-		raw = _mm_cvtm64_si64(rawn);
-		return score | moved;
-	}
-	inline i32 right64() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 score = 0;
-		query16(0).right.moveh64<0>(rawn, score);
-		query16(1).right.moveh64<1>(rawn, score);
-		query16(2).right.moveh64<2>(rawn, score);
-		query16(3).right.moveh64<3>(rawn, score);
-		register i32 moved = (rawp ^ rawn) ? 0 : -1;
-		raw = rawn;
-		return score | moved;
-	}
-	inline i32 right64x() {
-		register u64 rawp = raw;
-		register __m64 rawn = _mm_cvtsi64_m64(rawp);
-
-		__m64 v_0x0001 = _mm_cvtsi64_m64(0x0001000100010001ull);
-		__m64 v_0x0000 = _mm_cvtsi64_m64(0x0000000000000000ull);
-		__m64 v_0x0010 = _mm_cvtsi64_m64(0x0010001000100010ull);
-		__m64 v_0x0100 = _mm_cvtsi64_m64(0x0100010001000100ull);
-		__m64 v_0x000f = _mm_cvtsi64_m64(0x000f000f000f000full);
-		__m64 v_0x00ff = _mm_cvtsi64_m64(0x00ff00ff00ff00ffull);
-		__m64 v_0x0fff = _mm_cvtsi64_m64(0x0fff0fff0fff0fffull);
-		__m64 v_0xfff0 = _mm_cvtsi64_m64(0xfff0fff0fff0fff0ull);
-		__m64 v_0xff00 = _mm_cvtsi64_m64(0xff00ff00ff00ff00ull);
-		__m64 v_0x0ff0 = _mm_cvtsi64_m64(0x0ff00ff00ff00ff0ull);
-		__m64 v_0xf000 = _mm_cvtsi64_m64(0xf000f000f000f000ull);
-		__m64 v_0x1000 = _mm_cvtsi64_m64(0x1000100010001000ull);
-		__m64 v_0x00f0 = _mm_cvtsi64_m64(0x00f000f000f000f0ull);
-
-		__m64 fill, tile, test;
-		__m128i testx[3], tilex[3];
-
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_slli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_slli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_slli_pi16(rawn, 4)), _mm_andnot_si64(fill, rawn));
-
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0xf000), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x0fff))), _mm_andnot_si64(fill, rawn));
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0xf000), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x0fff))), _mm_andnot_si64(fill, rawn));
-
-		fill = _mm_cmpeq_pi16(_mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f), v_0x0000);
-		rawn = _mm_or_si64(_mm_and_si64(fill, _mm_or_si64(_mm_and_si64(rawn, v_0xff00), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x00ff))), _mm_andnot_si64(fill, rawn));
-
-		tile = _mm_and_si64(_mm_srli_pi16(rawn, 3 << 2), v_0x000f);
-		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f)));
-		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x1000), v_0xf000), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x0ff0)), test), _mm_andnot_si64(test, rawn));
-		testx[0]= _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
-		tilex[0] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
-
-		tile = _mm_and_si64(_mm_srli_pi16(rawn, 2 << 2), v_0x000f);
-		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f)));
-		rawn = _mm_or_si64(_mm_and_si64(_mm_or_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0100), v_0xff00), _mm_and_si64(_mm_slli_pi16(rawn, 4), v_0x00f0)), test), _mm_andnot_si64(test, rawn));
-		testx[1] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
-		tilex[1] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
-
-		tile = _mm_and_si64(_mm_srli_pi16(rawn, 1 << 2), v_0x000f);
-		test = _mm_andnot_si64(_mm_cmpeq_pi16(tile, v_0x0000), _mm_cmpeq_pi16(tile, _mm_and_si64(_mm_srli_pi16(rawn, 0 << 2), v_0x000f)));
-		rawn = _mm_or_si64(_mm_and_si64(_mm_and_si64(_mm_add_pi16(rawn, v_0x0010), v_0xfff0), test), _mm_andnot_si64(test, rawn));
-		testx[2] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_and_si64(test, v_0x0001))));
-		tilex[2] = _mm_cvtepu16_epi32(_mm_cvtsi64_si128(_mm_cvtm64_si64(_mm_add_pi16(tile, v_0x0001))));
-
-		_mm256_zeroall();
-		testx[0] = _mm_sllv_epi32(testx[0], tilex[0]);
-		testx[1] = _mm_sllv_epi32(testx[1], tilex[1]);
-		testx[2] = _mm_sllv_epi32(testx[2], tilex[2]);
-		_mm256_zeroall();
-		__m128i merge = _mm_add_epi32(_mm_add_epi32(testx[0], testx[1]), testx[2]);
-		u64 stamp = _mm_extract_epi64(merge, 0) + _mm_extract_epi64(merge, 1);
-		u32 score = u32(stamp) + u32(stamp >> 32);
-
-		i32 moved = (rawp ^ _mm_cvtm64_si64(rawn)) ? 0 : -1;
-		raw = _mm_cvtm64_si64(rawn);
-		return score | moved;
-	}
-	inline i32 up64() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 score = 0;
-		transpose64();
-		query16(0).left.movev64<0>(rawn, score);
-		query16(1).left.movev64<1>(rawn, score);
-		query16(2).left.movev64<2>(rawn, score);
-		query16(3).left.movev64<3>(rawn, score);
-		register i32 moved = (rawp ^ rawn) ? 0 : -1;
-		raw = rawn;
-		return score | moved;
-	}
-	inline i32 up64x() {
-		transpose64();
-		i32 score = left64x();
-		transpose64();
-		return score;
-	}
-	inline i32 down64() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 score = 0;
-		transpose64();
-		query16(0).right.movev64<0>(rawn, score);
-		query16(1).right.movev64<1>(rawn, score);
-		query16(2).right.movev64<2>(rawn, score);
-		query16(3).right.movev64<3>(rawn, score);
-		register i32 moved = (rawp ^ rawn) ? 0 : -1;
-		raw = rawn;
-		return score | moved;
-	}
-	inline i32 down64x() {
-		transpose64();
-		i32 score = right64x();
-		transpose64();
-		return score;
-	}
-
-	inline i32 left80() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 extp = ext, extn = 0;
-		register u32 score = 0;
-		query20(0).left.moveh80<0>(rawn, extn, score);
-		query20(1).left.moveh80<1>(rawn, extn, score);
-		query20(2).left.moveh80<2>(rawn, extn, score);
-		query20(3).left.moveh80<3>(rawn, extn, score);
-		register i32 moved = (rawp ^ rawn) | (extp ^ extn) ? 0 : -1;
-		raw = rawn;
-		ext = extn;
-		return score | moved;
-	}
-	inline i32 right80() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 extp = ext, extn = 0;
-		register u32 score = 0;
-		query20(0).right.moveh80<0>(rawn, extn, score);
-		query20(1).right.moveh80<1>(rawn, extn, score);
-		query20(2).right.moveh80<2>(rawn, extn, score);
-		query20(3).right.moveh80<3>(rawn, extn, score);
-		register i32 moved = (rawp ^ rawn) | (extp ^ extn) ? 0 : -1;
-		raw = rawn;
-		ext = extn;
-		return score | moved;
-	}
-	inline i32 up80() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 extp = ext, extn = 0;
-		register u32 score = 0;
-		transpose80();
-		query20(0).left.movev80<0>(rawn, extn, score);
-		query20(1).left.movev80<1>(rawn, extn, score);
-		query20(2).left.movev80<2>(rawn, extn, score);
-		query20(3).left.movev80<3>(rawn, extn, score);
-		register i32 moved = (rawp ^ rawn) | (extp ^ extn) ? 0 : -1;
-		raw = rawn;
-		ext = extn;
-		return score | moved;
-	}
-	inline i32 down80() {
-		register u64 rawp = raw, rawn = 0;
-		register u32 extp = ext, extn = 0;
-		register u32 score = 0;
-		transpose80();
-		query20(0).right.movev80<0>(rawn, extn, score);
-		query20(1).right.movev80<1>(rawn, extn, score);
-		query20(2).right.movev80<2>(rawn, extn, score);
-		query20(3).right.movev80<3>(rawn, extn, score);
-		register i32 moved = (rawp ^ rawn) | (extp ^ extn) ? 0 : -1;
-		raw = rawn;
-		ext = extn;
-		return score | moved;
+		U.inf = _mm256_extract_epi32(rwd, 0);
+		R.inf = _mm256_extract_epi32(rwd, 2);
+		D.inf = _mm256_extract_epi32(rwd, 4);
+		L.inf = _mm256_extract_epi32(rwd, 6);
 	}
 
 	class action {
@@ -896,25 +812,6 @@ public:
 		if (op & action::x64) return operate64(op);
 		if (op & action::x80) return operate80(op);
 		return operate64(op);
-
-//		board o = *this;
-//		i32 score = operate64(op);
-//		board af[4]; i32 sc[4];
-//		o.operate64x(af[0], sc[0], af[1], sc[1], af[2], sc[2], af[3], sc[3]);
-//		if (af[op] == *this || score != sc[op]) {
-//			std::cout << o << op << std::endl;
-//			std::cout << *this << af[op] << score << " " << sc[op] << std::endl;
-//			std::exit(0);
-//		}
-//		return score;
-
-//		board test = raw;
-//		i32 score = operate64x(op);
-//		if (score != test.operate64(op) || raw != test.raw) {
-//			std::cout << *this << test << std::endl;
-//			std::exit(0);
-//		}
-//		return score;
 	}
 	inline i32 operate64(u32 op) {
 		switch (op & 0x0fu) {
@@ -922,17 +819,6 @@ public:
 		case action::right: return right64();
 		case action::down:  return down64();
 		case action::left:  return left64();
-		case action::next:  return popup64() ? 0 : -1;
-		case action::init:  return init(), 0;
-		default:            return -1;
-		}
-	}
-	inline i32 operate64x(u32 op) {
-		switch (op & 0x0fu) {
-		case action::up:    return up64x();
-		case action::right: return right64x();
-		case action::down:  return down64x();
-		case action::left:  return left64x();
 		case action::next:  return popup64() ? 0 : -1;
 		case action::init:  return init(), 0;
 		default:            return -1;
@@ -949,10 +835,22 @@ public:
 		default:            return -1;
 		}
 	}
+	inline i32 operate64x(u32 op) {
+		switch (op & 0x0fu) {
+		case action::up:    return up64x();
+		case action::right: return right64x();
+		case action::down:  return down64x();
+		case action::left:  return left64x();
+		case action::next:  return popup64() ? 0 : -1;
+		case action::init:  return init(), 0;
+		default:            return -1;
+		}
+	}
 
 	inline i32 move(u32 op)   { return operate(op); }
 	inline i32 move64(u32 op) { return operate64(op); }
 	inline i32 move80(u32 op) { return operate80(op); }
+	inline i32 move64x(u32 op){ return operate64x(op); }
 
 	inline constexpr u32 shift(u32 k = 0, u32 u = 0) { return shift64(k, u); }
 	inline constexpr u32 shift64(u32 k = 0, u32 u = 0) {

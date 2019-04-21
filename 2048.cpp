@@ -310,6 +310,7 @@ public:
 		std::string label() const { return token.substr(0, token.find('=')); }
 		std::string value() const { return token.find('=') != std::string::npos ? token.substr(token.find('=') + 1) : ""; }
 		std::string operator +(const std::string& val) { return value() + val; }
+		friend std::string operator +(const std::string& val, const opinion& opi) { return val + opi.value(); }
 		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
 		opinion& operator  =(const opinion& opi) { return operator =(opi.value()); }
 		opinion& operator  =(const numeric& val) { return operator =(ntos(val)); }
@@ -333,6 +334,7 @@ public:
 		operator numeric() const { return std::stod(value()); }
 		std::string value() const { return vtos(*this); }
 		std::string operator +(const std::string& val) { return value() + val; }
+		friend std::string operator +(const std::string& val, const option& opt) { return val + opt.value(); }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
 		option& operator  =(const numeric& val) { return operator =(ntos(val)); }
 		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
@@ -1382,10 +1384,12 @@ void load_network(utils::options::option opt) {
 		feature::make(f.value().sign(), f.index().sign());
 }
 void save_network(utils::options::option opt) {
+	char buf[1 << 20];
 	for (std::string path : opt) {
 		char type = path[path.find_last_of(".") + 1];
 		if (type == 'x' || type == 'l') continue; // .x and .log are suffix for log files
 		std::ofstream out;
+		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
 		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) continue;
 		// for upward compatibility, we still store legacy binaries if suffix are traditional (.f or .w)
@@ -1555,53 +1559,53 @@ declare_specialization(6x6patt);
 declare_specialization(7x6patt);
 declare_specialization(8x6patt);
 
-struct specialize {
-	specialize(utils::options& opts) : estim(utils::estimate), optim(utils::optimize) {
-		std::string spec = opts["options"].find("spec", "auto");
-		if (spec == "auto" || spec == "on") {
-			spec = opts["make"].value();
-			spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
-		}
-		switch (to_hash(spec)) {
-		case to_hash("4x6patt"): estim = utils::estimate_4x6patt; optim = utils::optimize_4x6patt; break;
-		case to_hash("5x6patt"): estim = utils::estimate_5x6patt; optim = utils::optimize_5x6patt; break;
-		case to_hash("6x6patt"): estim = utils::estimate_6x6patt; optim = utils::optimize_6x6patt; break;
-		case to_hash("7x6patt"): estim = utils::estimate_7x6patt; optim = utils::optimize_7x6patt; break;
-		case to_hash("8x6patt"): estim = utils::estimate_8x6patt; optim = utils::optimize_8x6patt; break;
-		}
-	}
-	constexpr specialize(utils::estimator estim, utils::optimizer optim) : estim(estim), optim(optim) {}
-	constexpr operator utils::estimator() const { return estim; }
-	constexpr operator utils::optimizer() const { return optim; }
+struct specialization {
+	constexpr inline operator utils::estimator() const { return estim; }
+	constexpr inline operator utils::optimizer() const { return optim; }
 	utils::estimator estim;
 	utils::optimizer optim;
 };
+specialization specialize(utils::options& opts, const std::string& type) {
+	std::string spec = opts["options"].find("spec", "auto");
+	if (spec == "auto" || spec == "on") {
+		spec = opts["make"].value();
+		spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
+	}
+	switch (to_hash(spec)) {
+	default: return { utils::estimate, utils::optimize };
+	case to_hash("4x6patt"): return { utils::estimate_4x6patt, utils::optimize_4x6patt };
+	case to_hash("5x6patt"): return { utils::estimate_5x6patt, utils::optimize_5x6patt };
+	case to_hash("6x6patt"): return { utils::estimate_6x6patt, utils::optimize_6x6patt };
+	case to_hash("7x6patt"): return { utils::estimate_7x6patt, utils::optimize_7x6patt };
+	case to_hash("8x6patt"): return { utils::estimate_8x6patt, utils::optimize_8x6patt };
+	}
+}
 
 } // utils
 
 
 struct state {
 	board move;
-	i32 score;
 	numeric esti;
-	inline state() : score(-1), esti(0) {}
+	inline state() : move(0ull, 0u, -1u), esti(0) {}
 	inline state(const state& s) = default;
 
-	inline operator bool() const { return score >= 0; }
-	inline operator board() const { return move; }
+	inline operator board&() { return move; }
+	inline operator const board&() const { return move; }
+	inline operator bool() const { return move.info() != -1u; }
 	declare_comparators(const state&, esti, inline);
 
-	inline numeric value() const { return esti - score; }
-	inline numeric reward() const { return score; }
+	inline numeric value() const { return esti - move.info(); }
+	inline i32 reward() const { return move.info(); }
 
 	inline void assign(const board& b, u32 op = -1) {
 		move = b;
-		score = move.operate(op);
+		move.info(move.operate(op));
 	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats(),
 			utils::estimator estim = utils::estimate) {
-		estim = score >= 0 ? estim : utils::illegal;
+		estim = move.info() != -1u ? estim : utils::illegal;
 		esti = state::reward() + estim(move, range);
 		return esti;
 	}
@@ -1625,11 +1629,7 @@ struct select {
 	state *best;
 	inline select() : best(move) {}
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), utils::estimator estim = utils::estimate) {
-//		move[0].assign(b, 0);
-//		move[1].assign(b, 1);
-//		move[2].assign(b, 2);
-//		move[3].assign(b, 3);
-		b.operate64x(move[0].move, move[0].score, move[1].move, move[1].score, move[2].move, move[2].score, move[3].move, move[3].score);
+		b.after64x(move[0], move[1], move[2], move[3]);
 		move[0].estimate(range, estim);
 		move[1].estimate(range, estim);
 		move[2].estimate(range, estim);
@@ -1640,10 +1640,10 @@ struct select {
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
-	inline void operator >>(board& b) const { b = best->move; }
+	inline void operator >>(board& b) const { b.set(best->move); }
 
 	inline operator bool() const { return score() != -1; }
-	inline i32 score() const { return best->score; }
+	inline i32 score() const { return best->move.info(); }
 	inline numeric esti() const { return best->esti; }
 	inline u32 opcode() const { return best - move; }
 
@@ -1688,7 +1688,8 @@ struct statistic {
 
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	statistic(const utils::options::option& opt) : statistic() { init(opt); }
-	statistic(const statistic& stat) = default;
+	statistic(const statistic&) = default;
+	statistic(statistic&&) = default;
 
 	bool init(const utils::options::option& opt = {}) {
 		loop = 1000;
@@ -1852,25 +1853,24 @@ struct statistic {
 	}
 };
 
-statistic optimize(utils::options opts, const std::string& type) {
-	utils::options::option& args = opts[type];
-
+statistic run(utils::options opts, std::string type) {
 	std::vector<state> path;
 	statistic stats;
 	select best;
 	state last;
 
-	utils::estimator estim = utils::specialize(opts);
-	utils::optimizer optim = utils::specialize(opts);
+	utils::estimator estim = utils::specialize(opts, type);
+	utils::optimizer optim = utils::specialize(opts, type);
 	clip<feature> feats = feature::feats();
 	numeric alpha = state::alpha();
 	numeric lambda = state::lambda();
 	u32 step = state::step();
 
-	switch (to_hash(args["mode"])) {
-	default:
-	case to_hash("forward"):
-		for (stats.init(args); stats; stats++) {
+	switch (to_hash(type + ":" + opts[type]["mode"])) {
+	case to_hash("optimize:"):
+	case to_hash("optimize:default"):
+	case to_hash("optimize:forward"):
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -1896,8 +1896,8 @@ statistic optimize(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("backward"):
-		for (stats.init(args); stats; stats++) {
+	case to_hash("optimize:backward"):
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -1918,8 +1918,8 @@ statistic optimize(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("forward-lambda"):
-		for (stats.init(args); stats; stats++) {
+	case to_hash("optimize:forward-lambda"):
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -1971,9 +1971,9 @@ statistic optimize(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("lambda"):
-	case to_hash("backward-lambda"):
-		for (stats.init(args); stats; stats++) {
+	case to_hash("optimize:lambda"):
+	case to_hash("optimize:backward-lambda"):
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -1999,24 +1999,11 @@ statistic optimize(utils::options opts, const std::string& type) {
 			stats.update(score, b.hash(), opers);
 		}
 		break;
-	}
 
-	return stats;
-}
-
-statistic evaluate(utils::options opts, const std::string& type) {
-	utils::options::option& args = opts[type];
-
-	statistic stats;
-	select best;
-
-	utils::estimator estim = utils::specialize(opts);
-	clip<feature> feats = feature::feats();
-
-	switch (to_hash(args["mode"])) {
-	default:
-	case to_hash("best"):
-		for (stats.init(args); stats; stats++) {
+	case to_hash("evaluate:"):
+	case to_hash("evaluate:default"):
+	case to_hash("evaluate:best"):
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2031,8 +2018,8 @@ statistic evaluate(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("random"):
-		for (stats.init(args); stats; stats++) {
+	case to_hash("evaluate:random"):
+		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2159,13 +2146,13 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-tm"):
 		case to_hash("--train-type"):
 		case to_hash("--train-mode"):
-			opts["optimize"]["mode"] = next_opt("bias");
+			opts["optimize"]["mode"] = next_opt("default");
 			break;
 		case to_hash("-et"):
 		case to_hash("-em"):
 		case to_hash("--test-type"):
 		case to_hash("--test-mode"):
-			opts["evaluate"]["mode"] = next_opt("bias");
+			opts["evaluate"]["mode"] = next_opt("default");
 			break;
 		case to_hash("-tc"):
 		case to_hash("-tu"):
@@ -2208,8 +2195,7 @@ utils::options parse(int argc, const char* argv[]) {
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts("optimize")) opts["optimize"] = opts("evaluate") ? 0 : 1000;
-	if (!opts("evaluate")) opts["evaluate"] = opts("optimize") ? 0 : 1000;
+	if (!opts("optimize") && !opts("evaluate")) opts["optimize"] = 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
@@ -2238,17 +2224,17 @@ int main(int argc, const char* argv[]) {
 	if (numeric(opts["lambda"]) && !opts("optimize", "mode")) opts["optimize"]["mode"] = "lambda";
 	state::step(opts["step"]);
 
-	if (statistic(opts["optimize"])) {
-		std::cout << "optimization: " << opts["optimize"] << std::endl << std::endl;
-		statistic stat = optimize(opts, "optimize");
+	if (opts("optimize")) {
+		std::cout << "optimize: " << opts["optimize"] << std::endl << std::endl;
+		statistic stat = run(opts, "optimize");
 		if (opts["info"] == "full") stat.summary();
 	}
 
 	utils::save_network(opts["save"]);
 
-	if (statistic(opts["evaluate"])) {
-		std::cout << "verification: " << opts["evaluate"] << std::endl << std::endl;
-		statistic stat = evaluate(opts, "evaluate");
+	if (opts("evaluate")) {
+		std::cout << "evaluate: " << opts["evaluate"] << std::endl << std::endl;
+		statistic stat = run(opts, "evaluate");
 		if (opts["info"] != "none") stat.summary();
 	}
 
