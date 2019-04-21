@@ -559,7 +559,7 @@ public:
 	inline i32 operate(u32 op) {
 		if (op & action::x64) return operate64(op);
 		if (op & action::x80) return operate80(op);
-        return operate64(op);
+		return operate64(op);
 	}
 	inline i32 operate64(u32 op) {
 		switch (op & 0x0fu) {
