@@ -2168,10 +2168,10 @@ int main(int argc, const char* argv[]) {
 	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
 	std::cout << "Develop" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
-	std::cout << " (" __DATE__ " " __TIME__ ")" << std::endl;
+	std::cout << " (" << __DATE_ISO__ << " " << __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
-	std::cout << "time = " << moporgic::millisec() << std::endl;
+	std::cout << "time = " << millisec() << " (" << moporgic::put_time(millisec()) << ")" << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
