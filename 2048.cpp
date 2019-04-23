@@ -1657,7 +1657,6 @@ struct statistic {
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	statistic(const utils::options::option& opt) : statistic() { init(opt); }
 	statistic(const statistic&) = default;
-	statistic(statistic&&) = default;
 
 	bool init(const utils::options::option& opt = {}) {
 		loop = 1000;
