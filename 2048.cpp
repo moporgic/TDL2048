@@ -1837,7 +1837,7 @@ statistic run(utils::options opts, std::string type) {
 	numeric lambda = state::lambda();
 	u32 step = state::step();
 
-	switch (to_hash(opts[type].find("mode", type))) {
+	switch (to_hash(opts[type]["mode"].value(type))) {
 	case to_hash("optimize"):
 	case to_hash("optimize:forward"):
 		for (stats.init(opts[type]); stats; stats++) {
@@ -2041,10 +2041,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["recipe"] = label.substr(label.find_first_not_of('-'));
 			if (opts["recipe"] == "t" || opts["recipe"] == "train") opts["recipe"] = "optimize";
 			if (opts["recipe"] == "e" || opts["recipe"] == "test")  opts["recipe"] = "evaluate";
-			opts[""] = opts[opts["recipe"]];
-			opts[opts["recipe"]] = next_opt("1000");
 			opts[opts["recipe"]] += next_opts();
-			opts[opts["recipe"]] += opts[""];
 			opts["recipes"] += opts["recipe"];
 			break;
 		case to_hash("--recipes"):
@@ -2111,14 +2108,13 @@ utils::options parse(int argc, const char* argv[]) {
 		}
 	}
 	for (auto recipe : opts["recipes"]) {
-		if (opts[recipe].find("mode", "").empty())
-			opts[recipe]["mode"] = opts("mode") ? opts["mode"] : recipe;
-		if ((recipe == "optimize" || recipe == "evaluate") && opts[recipe]["mode"].value().find(recipe) != 0)
-			opts[recipe]["mode"] = recipe + ":" + opts[recipe]["mode"];
-		for (auto item : {"unit", "win", "info"})
+		for (auto item : {"mode", "unit", "win", "info"})
 			if (!opts(recipe, item) && opts(item))
 				opts[recipe][item] = opts[item];
-		if (!opts(recipe, "info") && opts[recipe]["mode"].value().find("evaluate") == 0)
+		for (auto mode : {"optimize", "evaluate"})
+			if (recipe == mode && opts[recipe].find("mode", recipe).find(recipe) != 0)
+				opts[recipe]["mode"] = recipe + ":" + opts[recipe]["mode"];
+		if (!opts(recipe, "info") && opts[recipe].find("mode", recipe).find("evaluate") == 0)
 			opts[recipe]["info"] = "auto";
 		for (auto item : {"info=none", "info=off"})
 			opts[recipe].remove(item);
