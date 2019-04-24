@@ -2105,7 +2105,7 @@ utils::options parse(int argc, const char* argv[]) {
 		switch (to_hash(label)) {
 		case to_hash("-a"): case to_hash("--alpha"):
 			opts[""] = next_opts();
-			if (opts[""].empty()) (opts[""] += "0.1") += "norm";
+			if (opts[""].empty()) (opts[""] += "1.0") += "norm";
 			opts["alpha"] = opts[""];
 			break;
 		case to_hash("-l"): case to_hash("--lambda"):
@@ -2221,7 +2221,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << std::endl;
 	std::cout << "time = " << millisec() << " (" << moporgic::put_time(millisec()) << ")" << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
-	std::cout << "alpha = " << opts["alpha"] << ", coherence" << std::endl;
+	std::cout << "alpha = " << opts["alpha"] << " coherence" << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
 	std::cout << std::endl;
 
