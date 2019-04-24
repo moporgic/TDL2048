@@ -305,6 +305,7 @@ public:
 	constexpr list() noexcept : clip<type>() {}
 	list(const clip<type>& c) : list(c.begin(), c.end()) {}
 	list(const list<type>& l) : list(l.begin(), l.end()) {}
+	list(clip<type>&& c) noexcept : list() { clip<type>::swap(c); }
 	list(list<type>&& l) noexcept : list() { clip<type>::swap(l); }
 	template<typename iter, typename = enable_if_is_iterator_convertible<iter>>
 	list(iter first, iter last) : list() { insert(clip<type>::cend(), first, last); }
