@@ -1433,6 +1433,12 @@ void list_network() {
 
 typedef numeric(*estimator)(const board&, clip<feature>);
 typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
+struct handle {
+	constexpr inline operator utils::estimator() const { return estim; }
+	constexpr inline operator utils::optimizer() const { return optim; }
+	utils::estimator estim;
+	utils::optimizer optim;
+};
 
 inline numeric estimate(const board& state,
 		clip<feature> range = feature::feats()) {
@@ -1513,39 +1519,25 @@ iso.transpose();\
 invoke_##name(esti, range, iso, ##__VA_ARGS__);\
 iso.mirror();\
 invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-esti;})\
+esti;})
 
-#define declare_specialization(name)\
-inline numeric estimate_##name(const board& state, clip<feature> range = feature::feats()) {\
-	return invoke_specialized_features(name, state, range); }\
-inline numeric optimize_##name(const board& state, numeric updv, clip<feature> range = feature::feats()) {\
-	return invoke_specialized_features(name, state, range, += updv); }\
+#define make_specialization(name){\
+[](const board& state, clip<feature> range) { return invoke_specialized_features(name, state, range); }, \
+[](const board& state, numeric updv, clip<feature> range) { return invoke_specialized_features(name, state, range, += updv); }}
 
-declare_specialization(4x6patt);
-declare_specialization(5x6patt);
-declare_specialization(6x6patt);
-declare_specialization(7x6patt);
-declare_specialization(8x6patt);
-
-struct specialization {
-	constexpr inline operator utils::estimator() const { return estim; }
-	constexpr inline operator utils::optimizer() const { return optim; }
-	utils::estimator estim;
-	utils::optimizer optim;
-};
-specialization specialize(utils::options& opts, const std::string& type) {
+handle specialize(utils::options& opts, const std::string& type) {
 	std::string spec = opts["options"].find("spec", "auto");
 	if (spec == "auto" || spec == "on") {
-		spec = opts["make"].value();
-		spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
+		spec = opts["make"].value("4x6patt");
+		spec = spec.substr(0, spec.find_first_of("&|="));
 	}
 	switch (to_hash(spec)) {
 	default: return { utils::estimate, utils::optimize };
-	case to_hash("4x6patt"): return { utils::estimate_4x6patt, utils::optimize_4x6patt };
-	case to_hash("5x6patt"): return { utils::estimate_5x6patt, utils::optimize_5x6patt };
-	case to_hash("6x6patt"): return { utils::estimate_6x6patt, utils::optimize_6x6patt };
-	case to_hash("7x6patt"): return { utils::estimate_7x6patt, utils::optimize_7x6patt };
-	case to_hash("8x6patt"): return { utils::estimate_8x6patt, utils::optimize_8x6patt };
+	case to_hash("4x6patt"): return make_specialization(4x6patt);
+	case to_hash("5x6patt"): return make_specialization(5x6patt);
+	case to_hash("6x6patt"): return make_specialization(6x6patt);
+	case to_hash("7x6patt"): return make_specialization(7x6patt);
+	case to_hash("8x6patt"): return make_specialization(8x6patt);
 	}
 }
 
