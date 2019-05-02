@@ -128,7 +128,8 @@ static std::string put_time(std::time_t t) {
 	return buf.str();
 }
 
-#define __DATE_ISO__ ({ std::tm t; std::istringstream(__DATE__) >> std::get_time(&t, "%b %d %Y"); std::put_time(&t, "%Y-%m-%d");})
+#define __DATE_ISO__ ({ std::tm t = {}; std::string DATE(__DATE__); if (DATE[4] == ' ') DATE[4] = '0'; \
+std::istringstream(DATE) >> std::get_time(&t, "%b %d %Y"); std::put_time(&t, "%Y-%m-%d");})
 
 static inline constexpr
 uint32_t to_hash_tail(const char* str, const uint32_t& hash) noexcept {
