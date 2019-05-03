@@ -1764,17 +1764,17 @@ struct expectimax {
 			board before = after;
 			u32 pos = spaces[i];
 			before.set(pos, 1);
-			expt += 0.9 * search_max<estim>(before, depth - 1, range);
+			expt += 0.9 * search_best<estim>(before, depth - 1, range);
 			before.set(pos, 2);
-			expt += 0.1 * search_max<estim>(before, depth - 1, range);
+			expt += 0.1 * search_best<estim>(before, depth - 1, range);
 		}
 		return lookup.store(expt / spaces.size());
 	}
 
-	template<utils::estimator estim = utils::estimate, numeric minima = 0> inline
-	static numeric search_max(const board& before, u32 depth,
+	template<utils::estimator estim = utils::estimate> inline
+	static numeric search_best(const board& before, u32 depth,
 			clip<feature> range = feature::feats()) {
-		numeric best = minima;
+		numeric best = 0;
 		for (u32 i = 0; i < 4; i++) {
 			board after = before;
 			auto reward = after.operate(i);
