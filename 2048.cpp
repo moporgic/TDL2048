@@ -1757,7 +1757,7 @@ struct expectimax {
 			clip<feature> range = feature::feats()) {
 		cache::block::access lookup = cache::find(after, depth);
 		if (lookup) return lookup.fetch();
-		if (!depth) return lookup.store(estim(after, range));
+		if (!depth) return estim(after, range);
 		numeric expt = 0;
 		hexa spaces = after.spaces();
 		for (u32 i = 0; i < spaces.size(); i++) {
