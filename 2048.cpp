@@ -1735,9 +1735,6 @@ struct expectimax {
 	}
 	static std::array<u32, 16>& depth(const std::array<u32, 16>& res) { return (depth() = res); }
 
-	static numeric& minima() { static numeric v = 0; return v; }
-	static numeric& minima(numeric v) { return minima() = v; }
-
 	static std::array<u32, 16>& depth(const std::string& res) {
 		std::array<u32, 16> depthres;
 		std::string dyndepth(res);
@@ -1774,10 +1771,10 @@ struct expectimax {
 		return lookup.store(expt / spaces.size());
 	}
 
-	template<utils::estimator estim = utils::estimate> inline
+	template<utils::estimator estim = utils::estimate, numeric minima = 0> inline
 	static numeric search_max(const board& before, u32 depth,
 			clip<feature> range = feature::feats()) {
-		numeric best = minima();
+		numeric best = minima;
 		for (u32 i = 0; i < 4; i++) {
 			board after = before;
 			auto reward = after.operate(i);
