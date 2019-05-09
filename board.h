@@ -534,7 +534,8 @@ public:
 			down  = 0x02u,
 			left  = 0x03u,
 			next  = 0x0eu,
-			init  = 0x0fu,
+			init  = 0x0cu,
+			nop   = 0x0fu,
 
 			x64   = 0x40u,
 			x80   = 0x80u,
