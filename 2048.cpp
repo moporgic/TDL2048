@@ -1461,69 +1461,60 @@ inline constexpr numeric illegal(const board& state,
 	return -std::numeric_limits<numeric>::max();
 }
 
-#define invoke_4x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+template<indexer::mapper... indexes>
+struct specialization {
+	constexpr static indexer::mapper index[] = { indexes... };
+	constexpr static size_t N = sizeof...(indexes);
 
-#define invoke_5x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x8,0x9,0xa,0xb,0xc,0xd>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+	template<indexer::mapper index, indexer::mapper... follow> constexpr static
+	inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, clip<feature> f) {
+		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)]) + invoke<follow...>(iso, f);
+	}
+	template<indexer::mapper index, indexer::mapper... follow> constexpr static
+	inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, clip<feature> f) {
+		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)]);
+	}
 
-#define invoke_6x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+	template<indexer::mapper index, indexer::mapper... follow> constexpr static
+	inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
+		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)] += updv) + invoke<follow...>(iso, updv, f);
+	}
+	template<indexer::mapper index, indexer::mapper... follow> constexpr static
+	inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
+		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)] += updv);
+	}
 
-#define invoke_7x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
+	constexpr static
+	inline numeric estimate(const board& state, clip<feature> range) {
+		register numeric esti = 0;
+		register board iso;
+		esti += invoke<indexes...>(({ iso = state;     iso; }), range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+		return esti;
+	}
+	constexpr static
+	inline numeric optimize(const board& state, numeric updv, clip<feature> range) {
+		register numeric esti = 0;
+		register board iso;
+		esti += invoke<indexes...>(({ iso = state;     iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+		return esti;
+	}
 
-#define invoke_8x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[7 << 3][index6t<0x0,0x1,0x4,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
-
-#define invoke_specialized_features(name, state, range, ...)({\
-register numeric esti = 0;\
-register board iso = state;\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.transpose();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.transpose();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.transpose();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-esti;})
-
-#define make_specialization(name){\
-[](const board& state, clip<feature> range) { return invoke_specialized_features(name, state, range); }, \
-[](const board& state, numeric updv, clip<feature> range) { return invoke_specialized_features(name, state, range, += updv); }}
+	constexpr static handle specialized = { estimate, optimize };
+};
 
 handle specialize(utils::options& opts, const std::string& type) {
 	std::string spec = opts["options"].find("spec", "auto");
@@ -1532,12 +1523,42 @@ handle specialize(utils::options& opts, const std::string& type) {
 		spec = spec.substr(0, spec.find_first_of("&|="));
 	}
 	switch (to_hash(spec)) {
+	case to_hash("4x6patt"): return utils::specialization<
+		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+		index6t<0x4,0x5,0x6,0x8,0x9,0xa>>::specialized;
+	case to_hash("5x6patt"): return utils::specialization<
+		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+		index6t<0x8,0x9,0xa,0xb,0xc,0xd>,
+		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+		index6t<0x4,0x5,0x6,0x8,0x9,0xa>>::specialized;
+	case to_hash("6x6patt"): return utils::specialization<
+		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+		index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+		index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+		index6t<0x3,0x4,0x5,0x6,0x7,0x8>>::specialized;
+	case to_hash("7x6patt"): return utils::specialization<
+		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+		index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+		index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+		index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
+		index6t<0x1,0x3,0x4,0x5,0x6,0x7>>::specialized;
+	case to_hash("8x6patt"): return utils::specialization<
+		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+		index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+		index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+		index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
+		index6t<0x1,0x3,0x4,0x5,0x6,0x7>,
+		index6t<0x0,0x1,0x4,0x8,0x9,0xa>>::specialized;
 	default: return { utils::estimate, utils::optimize };
-	case to_hash("4x6patt"): return make_specialization(4x6patt);
-	case to_hash("5x6patt"): return make_specialization(5x6patt);
-	case to_hash("6x6patt"): return make_specialization(6x6patt);
-	case to_hash("7x6patt"): return make_specialization(7x6patt);
-	case to_hash("8x6patt"): return make_specialization(8x6patt);
 	}
 }
 
