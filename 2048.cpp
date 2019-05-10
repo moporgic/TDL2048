@@ -482,7 +482,10 @@ public:
 		operator numeric() const { return std::stod(value()); }
 		std::string label() const { return token.substr(0, token.find('=')); }
 		std::string value() const { return token.find('=') != std::string::npos ? token.substr(token.find('=') + 1) : ""; }
+		std::string value(const std::string& def) const { auto val = value(); return val.size() ? val : def; }
+		numeric value(numeric def) const { try { return numeric(*this); } catch (std::invalid_argument&) {} return def; }
 		std::string operator +(const std::string& val) { return value() + val; }
+		friend std::string operator +(const std::string& val, const opinion& opi) { return val + opi.value(); }
 		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
 		opinion& operator  =(const opinion& opi) { return operator =(opi.value()); }
 		opinion& operator  =(const numeric& val) { return operator =(ntos(val)); }
@@ -505,7 +508,10 @@ public:
 		operator std::string() const { return value(); }
 		operator numeric() const { return std::stod(value()); }
 		std::string value() const { return vtos(*this); }
+		std::string value(const std::string& def) const { auto val = value(); return val.size() ? val : def; }
+		numeric value(numeric def) const { try { return numeric(*this); } catch (std::invalid_argument&) {} return def; }
 		std::string operator +(const std::string& val) { return value() + val; }
+		friend std::string operator +(const std::string& val, const option& opt) { return val + opt.value(); }
 		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
 		option& operator  =(const numeric& val) { return operator =(ntos(val)); }
 		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
@@ -1555,10 +1561,12 @@ void load_network(utils::options::option opt) {
 		feature::make(f.value().sign(), f.index().sign());
 }
 void save_network(utils::options::option opt) {
+	char buf[1 << 20];
 	for (std::string path : opt) {
 		char type = path[path.find_last_of(".") + 1];
 		if (type == 'x' || type == 'l') continue; // .x and .log are suffix for log files
 		std::ofstream out;
+		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
 		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) continue;
 		// for upward compatibility, we still store legacy binaries if suffix are traditional (.f or .w)
@@ -1598,6 +1606,12 @@ void list_network() {
 
 typedef numeric(*estimator)(const board&, clip<feature>);
 typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
+struct handle {
+	constexpr inline operator utils::estimator() const { return estim; }
+	constexpr inline operator utils::optimizer() const { return optim; }
+	utils::estimator estim;
+	utils::optimizer optim;
+};
 
 inline numeric estimate(const board& state,
 		clip<feature> range = feature::feats()) {
@@ -1620,77 +1634,60 @@ inline constexpr numeric illegal(const board& state,
 	return -std::numeric_limits<numeric>::max();
 }
 
-#define invoke_4x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+template<indexer::mapper... indexes>
+struct specialization {
+	constexpr static indexer::mapper index[] = { indexes... };
+	constexpr static size_t N = sizeof...(indexes);
 
-#define invoke_5x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x8,0x9,0xa,0xb,0xc,0xd>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
+	template<indexer::mapper index, indexer::mapper... follow> constexpr static
+	inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, clip<feature> f) {
+		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)]) + invoke<follow...>(iso, f);
+	}
+	template<indexer::mapper index, indexer::mapper... follow> constexpr static
+	inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, clip<feature> f) {
+		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)]);
+	}
 
-#define invoke_6x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
+	template<indexer::mapper index, indexer::mapper... follow> constexpr static
+	inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
+		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)] += updv) + invoke<follow...>(iso, updv, f);
+	}
+	template<indexer::mapper index, indexer::mapper... follow> constexpr static
+	inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
+		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)] += updv);
+	}
 
-#define invoke_7x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
+	constexpr static
+	inline numeric estimate(const board& state, clip<feature> range) {
+		register numeric esti = 0;
+		register board iso;
+		esti += invoke<indexes...>(({ iso = state;     iso; }), range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+		return esti;
+	}
+	constexpr static
+	inline numeric optimize(const board& state, numeric updv, clip<feature> range) {
+		register numeric esti = 0;
+		register board iso;
+		esti += invoke<indexes...>(({ iso = state;     iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
+		esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+		return esti;
+	}
 
-#define invoke_8x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[7 << 3][index6t<0x0,0x1,0x4,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
-
-#define invoke_specialized_features(name, state, range, ...)({\
-register numeric esti = 0;\
-register board iso = state;\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.transpose();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.transpose();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.transpose();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-esti;})\
-
-#define declare_specialization(name)\
-inline numeric estimate_##name(const board& state, clip<feature> range = feature::feats()) {\
-	return invoke_specialized_features(name, state, range); }\
-inline numeric optimize_##name(const board& state, numeric updv, clip<feature> range = feature::feats()) {\
-	return invoke_specialized_features(name, state, range, += updv); }\
-
-declare_specialization(4x6patt);
-declare_specialization(5x6patt);
-declare_specialization(6x6patt);
-declare_specialization(7x6patt);
-declare_specialization(8x6patt);
+	constexpr static handle specialized = { estimate, optimize };
+};
 
 void make_cache(std::string res = "") {
 	std::string in(res);
@@ -1792,67 +1789,103 @@ struct expectimax {
 	}
 };
 
-struct specialize {
-	specialize(utils::options& opts, const std::string& type) : estim(utils::estimate), optim(utils::optimize) {
-		std::string spec = opts["options"].find("spec", "auto");
-		if (spec == "auto" || spec == "on") {
-			spec = opts["make"].value();
-			spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
-		}
-		switch (to_hash(spec)) {
-		case to_hash("4x6patt"): estim = utils::estimate_4x6patt; optim = utils::optimize_4x6patt; break;
-		case to_hash("5x6patt"): estim = utils::estimate_5x6patt; optim = utils::optimize_5x6patt; break;
-		case to_hash("6x6patt"): estim = utils::estimate_6x6patt; optim = utils::optimize_6x6patt; break;
-		case to_hash("7x6patt"): estim = utils::estimate_7x6patt; optim = utils::optimize_7x6patt; break;
-		case to_hash("8x6patt"): estim = utils::estimate_8x6patt; optim = utils::optimize_8x6patt; break;
-		}
-		if (opts[type]["mode"]("search") || opts[type]["mode"]("expectimax")) {
-			std::string mode = opts[type]["mode"];
-			auto it = std::min(mode.find("search"), mode.find("expectimax"));
-			if (it > 0 && mode[it - 1] == '-') it--;
-			opts[type]["mode"] = mode.substr(0, it);
-			switch (to_hash(spec)) {
-			default:                 estim = utils::expectimax::estimate<utils::estimate>; break;
-			case to_hash("4x6patt"): estim = utils::expectimax::estimate<utils::estimate_4x6patt>; break;
-			case to_hash("5x6patt"): estim = utils::expectimax::estimate<utils::estimate_5x6patt>; break;
-			case to_hash("6x6patt"): estim = utils::expectimax::estimate<utils::estimate_6x6patt>; break;
-			case to_hash("7x6patt"): estim = utils::expectimax::estimate<utils::estimate_7x6patt>; break;
-			case to_hash("8x6patt"): estim = utils::expectimax::estimate<utils::estimate_8x6patt>; break;
-			}
-		}
+handle specialize(utils::options& opts, const std::string& type) {
+//	std::string spec = opts["options"].find("spec", "auto");
+//	if (spec == "auto" || spec == "on") {
+//		spec = opts["make"].value();
+//		spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
+//	}
+//	switch (to_hash(spec)) {
+//	case to_hash("4x6patt"): estim = utils::estimate_4x6patt; optim = utils::optimize_4x6patt; break;
+//	case to_hash("5x6patt"): estim = utils::estimate_5x6patt; optim = utils::optimize_5x6patt; break;
+//	case to_hash("6x6patt"): estim = utils::estimate_6x6patt; optim = utils::optimize_6x6patt; break;
+//	case to_hash("7x6patt"): estim = utils::estimate_7x6patt; optim = utils::optimize_7x6patt; break;
+//	case to_hash("8x6patt"): estim = utils::estimate_8x6patt; optim = utils::optimize_8x6patt; break;
+//	}
+//	if (opts[type]["mode"]("search") || opts[type]["mode"]("expectimax")) {
+//		std::string mode = opts[type]["mode"];
+//		auto it = std::min(mode.find("search"), mode.find("expectimax"));
+//		if (it > 0 && mode[it - 1] == '-') it--;
+//		opts[type]["mode"] = mode.substr(0, it);
+//		switch (to_hash(spec)) {
+//		default:                 estim = utils::expectimax::estimate<utils::estimate>; break;
+//		case to_hash("4x6patt"): estim = utils::expectimax::estimate<utils::estimate_4x6patt>; break;
+//		case to_hash("5x6patt"): estim = utils::expectimax::estimate<utils::estimate_5x6patt>; break;
+//		case to_hash("6x6patt"): estim = utils::expectimax::estimate<utils::estimate_6x6patt>; break;
+//		case to_hash("7x6patt"): estim = utils::expectimax::estimate<utils::estimate_7x6patt>; break;
+//		case to_hash("8x6patt"): estim = utils::expectimax::estimate<utils::estimate_8x6patt>; break;
+//		}
+//	}
+	std::string spec = opts["options"].find("spec", "auto");
+	if (spec == "auto" || spec == "on") {
+		spec = opts["make"].value("4x6patt");
+		spec = spec.substr(0, spec.find_first_of("&|="));
 	}
-	constexpr specialize(utils::estimator estim, utils::optimizer optim) : estim(estim), optim(optim) {}
-	constexpr operator utils::estimator() const { return estim; }
-	constexpr operator utils::optimizer() const { return optim; }
-	utils::estimator estim;
-	utils::optimizer optim;
-};
+	switch (to_hash(spec)) {
+	case to_hash("4x6patt"): return utils::specialization<
+		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+		index6t<0x4,0x5,0x6,0x8,0x9,0xa>>::specialized;
+	case to_hash("5x6patt"): return utils::specialization<
+		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+		index6t<0x8,0x9,0xa,0xb,0xc,0xd>,
+		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+		index6t<0x4,0x5,0x6,0x8,0x9,0xa>>::specialized;
+	case to_hash("6x6patt"): return utils::specialization<
+		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+		index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+		index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+		index6t<0x3,0x4,0x5,0x6,0x7,0x8>>::specialized;
+	case to_hash("7x6patt"): return utils::specialization<
+		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+		index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+		index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+		index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
+		index6t<0x1,0x3,0x4,0x5,0x6,0x7>>::specialized;
+	case to_hash("8x6patt"): return utils::specialization<
+		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+		index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+		index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+		index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
+		index6t<0x1,0x3,0x4,0x5,0x6,0x7>,
+		index6t<0x0,0x1,0x4,0x8,0x9,0xa>>::specialized;
+	default: return { utils::estimate, utils::optimize };
+	}
+}
 
 } // utils
 
 
 struct state {
 	board move;
-	i32 score;
 	numeric esti;
-	inline state() : score(-1), esti(0) {}
+	inline state() : move(0ull, 0u, -1u), esti(0) {}
 	inline state(const state& s) = default;
 
-	inline operator bool() const { return score >= 0; }
-	inline operator board() const { return move; }
+	inline operator board&() { return move; }
+	inline operator const board&() const { return move; }
+	inline operator bool() const { return move.info() != -1u; }
 	declare_comparators(const state&, esti, inline);
 
-	inline numeric value() const { return esti - score; }
-	inline numeric reward() const { return score; }
+	inline numeric value() const { return esti - move.info(); }
+	inline i32 reward() const { return move.info(); }
 
 	inline void assign(const board& b, u32 op = -1) {
 		move = b;
-		score = move.operate(op);
+		move.info(move.operate(op));
 	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats(),
 			utils::estimator estim = utils::estimate) {
-		estim = score >= 0 ? estim : utils::illegal;
+		estim = move.info() != -1u ? estim : utils::illegal;
 		esti = state::reward() + estim(move, range);
 		return esti;
 	}
@@ -1876,10 +1909,7 @@ struct select {
 	state *best;
 	inline select() : best(move) {}
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), utils::estimator estim = utils::estimate) {
-		move[0].assign(b, 0);
-		move[1].assign(b, 1);
-		move[2].assign(b, 2);
-		move[3].assign(b, 3);
+		b.after(move[0], move[1], move[2], move[3]);
 		move[0].estimate(range, estim);
 		move[1].estimate(range, estim);
 		move[2].estimate(range, estim);
@@ -1890,10 +1920,10 @@ struct select {
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
-	inline void operator >>(board& b) const { b = best->move; }
+	inline void operator >>(board& b) const { b.set(best->move); }
 
 	inline operator bool() const { return score() != -1; }
-	inline i32 score() const { return best->score; }
+	inline i32 score() const { return best->move.info(); }
 	inline numeric esti() const { return best->esti; }
 	inline numeric estimate() const { return best->estimate(); }
 	inline u32 opcode() const { return best - move; }
@@ -1939,7 +1969,7 @@ struct statistic {
 
 	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
 	statistic(const utils::options::option& opt) : statistic() { init(opt); }
-	statistic(const statistic& stat) = default;
+	statistic(const statistic&) = default;
 
 	bool init(const utils::options::option& opt = {}) {
 		loop = 1000;
@@ -2103,7 +2133,7 @@ struct statistic {
 	}
 };
 
-statistic optimize(utils::options opts, const std::string& type) {
+statistic run(utils::options opts, std::string type) {
 	std::vector<state> path;
 	statistic stats;
 	select best;
@@ -2116,9 +2146,9 @@ statistic optimize(utils::options opts, const std::string& type) {
 	numeric lambda = state::lambda();
 	u32 step = state::step();
 
-	switch (to_hash(opts[type]["mode"])) {
-	default:
-	case to_hash("forward"):
+	switch (to_hash(opts[type]["mode"].value(type))) {
+	case to_hash("optimize"):
+	case to_hash("optimize:forward"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -2145,7 +2175,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("backward"):
+	case to_hash("optimize:backward"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -2167,7 +2197,7 @@ statistic optimize(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("forward-lambda"):
+	case to_hash("optimize:forward-lambda"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -2220,8 +2250,8 @@ statistic optimize(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("lambda"):
-	case to_hash("backward-lambda"):
+	case to_hash("optimize:lambda"):
+	case to_hash("optimize:backward-lambda"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -2248,21 +2278,9 @@ statistic optimize(utils::options opts, const std::string& type) {
 			stats.update(score, b.hash(), opers);
 		}
 		break;
-	}
 
-	return stats;
-}
-
-statistic evaluate(utils::options opts, const std::string& type) {
-	statistic stats;
-	select best;
-
-	utils::estimator estim = utils::specialize(opts, type);
-	clip<feature> feats = feature::feats();
-
-	switch (to_hash(opts[type]["mode"])) {
-	default:
-	case to_hash("best"):
+	case to_hash("evaluate"):
+	case to_hash("evaluate:best"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -2278,7 +2296,7 @@ statistic evaluate(utils::options opts, const std::string& type) {
 		}
 		break;
 
-	case to_hash("random"):
+	case to_hash("evaluate:random"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -2311,159 +2329,100 @@ utils::options parse(int argc, const char* argv[]) {
 			return args;
 		};
 		switch (to_hash(label)) {
-		case to_hash("-a"):
-		case to_hash("--alpha"):
+		case to_hash("-a"): case to_hash("--alpha"):
 			opts[""] = next_opts();
 			if (opts[""].empty()) (opts[""] += "0.1") += "norm";
 			opts["alpha"] = opts[""];
 			break;
-		case to_hash("-l"):
-		case to_hash("--lambda"):
+		case to_hash("-l"): case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
 			opts["step"] = next_opt(numeric(opts["lambda"]) ? "5" : "1");
 			break;
-		case to_hash("-t"):
-		case to_hash("--train"):
-		case to_hash("--optimize"):
-			opts[""] = opts["optimize"];
-			opts["optimize"] = next_opt("1000");
-			opts["optimize"] += next_opts();
-			opts["optimize"] += opts[""];
-			break;
-		case to_hash("-e"):
-		case to_hash("--test"):
-		case to_hash("--evaluate"):
-			opts[""] = opts["evaluate"];
-			opts["evaluate"] = next_opt("1000");
-			opts["evaluate"] += next_opts();
-			opts["evaluate"] += opts[""];
-			break;
-		case to_hash("-s"):
-		case to_hash("--seed"):
+		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
 			break;
-		case to_hash("-io"):
-		case to_hash("--input-output"):
-		case to_hash("-nio"):
-		case to_hash("--network-input-output"):
-		case to_hash("-wio"):
-		case to_hash("--weight-input-output"):
-		case to_hash("-fio"):
-		case to_hash("--feature-input-output"):
+		case to_hash("-r"): case to_hash("--recipe"):
+			opts["recipe"] = next_opt("");
+			if (opts["recipe"] == "") break;
+			// no break: optimize and evaluate are also handled by the same recipe logic
+		case to_hash("-t"): case to_hash("--train"): case to_hash("--optimize"):
+		case to_hash("-e"): case to_hash("--test"):  case to_hash("--evaluate"):
+			opts["recipe"] = label.substr(label.find_first_not_of('-'));
+			if (opts["recipe"] == "t" || opts["recipe"] == "train") opts["recipe"] = "optimize";
+			if (opts["recipe"] == "e" || opts["recipe"] == "test")  opts["recipe"] = "evaluate";
+			opts[opts["recipe"]] += next_opts();
+			opts["recipes"] += opts["recipe"];
+			break;
+		case to_hash("--recipes"):
+			opts["recipes"] = next_opts();
+			break;
+		case to_hash("-io"):  case to_hash("--input-output"):
+		case to_hash("-nio"): case to_hash("--network-input-output"):
+		case to_hash("-wio"): case to_hash("--weight-input-output"):
+		case to_hash("-fio"): case to_hash("--feature-input-output"):
+		case to_hash("-i"):   case to_hash("--input"):
+		case to_hash("-wi"):  case to_hash("--weight-input"):
+		case to_hash("-fi"):  case to_hash("--feature-input"):
+		case to_hash("-ni"):  case to_hash("--network-input"):
+		case to_hash("-o"):   case to_hash("--output"):
+		case to_hash("-wo"):  case to_hash("--weight-output"):
+		case to_hash("-fo"):  case to_hash("--feature-output"):
+		case to_hash("-no"):  case to_hash("--network-output"):
 			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			opts[""] += next_opts();
-			opts["load"] += opts[""];
-			opts["save"] += opts[""];
+			if (label.find(label[1] != '-' ? "i" : "input")  != std::string::npos) opts["load"] += opts[""];
+			if (label.find(label[1] != '-' ? "o" : "output") != std::string::npos) opts["save"] += opts[""];
 			break;
-		case to_hash("-i"):
-		case to_hash("--input"):
-		case to_hash("-wi"):
-		case to_hash("--weight-input"):
-		case to_hash("-fi"):
-		case to_hash("--feature-input"):
-		case to_hash("-ni"):
-		case to_hash("--network-input"):
-			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
-			opts[""] += next_opts();
-			opts["load"] += opts[""];
-			break;
-		case to_hash("-o"):
-		case to_hash("--output"):
-		case to_hash("-wo"):
-		case to_hash("--weight-output"):
-		case to_hash("-fo"):
-		case to_hash("--feature-output"):
-		case to_hash("-no"):
-		case to_hash("--network-output"):
-			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
-			opts[""] += next_opts();
-			opts["save"] += opts[""];
-			break;
-		case to_hash("-w"):
-		case to_hash("--weight"):
-		case to_hash("-f"):
-		case to_hash("--feature"):
-		case to_hash("-n"):
-		case to_hash("--network"):
-		case to_hash("-wf"):
-		case to_hash("-fw"):
+		case to_hash("-w"):  case to_hash("--weight"):
+		case to_hash("-f"):  case to_hash("--feature"):
+		case to_hash("-n"):  case to_hash("--network"):
+		case to_hash("-wf"): case to_hash("--weight-feature"):
+		case to_hash("-fw"): case to_hash("--feature-weight"):
 			opts[""] = next_opt("default");
 			opts[""] += next_opts();
 			opts["make"] += opts[""];
 			break;
-		case to_hash("-%"):
-		case to_hash("-I"):
-		case to_hash("--info"):
-			opts["info"] = next_opt("full");
-			opts["info"] += next_opts();
+		case to_hash("-m"): case to_hash("--mode"):
+			opts["mode"] = next_opt("bias");
 			break;
-		case to_hash("-x"):
-		case to_hash("--option"):
-		case to_hash("--options"):
+		case to_hash("-tt"): case to_hash("--train-type"): case to_hash("--optimize-type"):
+		case to_hash("-tm"): case to_hash("--train-mode"): case to_hash("--optimize-mode"):
+			opts["optimize"]["mode"] = next_opt("optimize");
+			break;
+		case to_hash("-et"): case to_hash("--test-type"): case to_hash("--evaluate-type"):
+		case to_hash("-em"): case to_hash("--test-mode"): case to_hash("--evaluate-mode"):
+			opts["evaluate"]["mode"] = next_opt("evaluate");
+			break;
+		case to_hash("-u"): case to_hash("--unit"):
+			opts["unit"] = next_opt("1000");
+			break;
+		case to_hash("-v"): case to_hash("--win"):
+			opts["win"] = next_opt("2048");
+			break;
+		case to_hash("-%"): case to_hash("-I"): case to_hash("--info"):
+			opts["info"] = next_opt("full");
+			break;
+		case to_hash("-x"): case to_hash("-opt"): case to_hash("--options"):
 			opts["options"] += next_opts();
 			break;
-		case to_hash("-tt"):
-		case to_hash("-tm"):
-		case to_hash("--train-type"):
-		case to_hash("--train-mode"):
-			opts["optimize"]["mode"] = next_opt("bias");
-			break;
-		case to_hash("-et"):
-		case to_hash("-em"):
-		case to_hash("--test-type"):
-		case to_hash("--test-mode"):
-			opts["evaluate"]["mode"] = next_opt("bias");
-			break;
-		case to_hash("-tc"):
-		case to_hash("-tu"):
-		case to_hash("--train-check"):
-		case to_hash("--train-unit"):
-			opts["optimize"]["unit"] = next_opt("1000");
-			break;
-		case to_hash("-ec"):
-		case to_hash("-eu"):
-		case to_hash("--test-check"):
-		case to_hash("--test-unit"):
-			opts["evaluate"]["unit"] = next_opt("1000");
-			break;
-		case to_hash("-u"):
-		case to_hash("--unit"):
-		case to_hash("-chk"):
-		case to_hash("--check"):
-			opts["optimize"]["unit"] = opts["evaluate"]["unit"] = next_opt("1000");
-			break;
-		case to_hash("-v"):
-		case to_hash("--win"):
-			opts["optimize"]["win"] = opts["evaluate"]["win"] = next_opt("2048");
-			break;
-		case to_hash("-d"):
-		case to_hash("--depth"):
+		case to_hash("-d"): case to_hash("--depth"):
 			opts["depth"] = next_opts();
 			break;
-		case to_hash("-c"):
-		case to_hash("--cache"):
-		case to_hash("--cache-make"):
+		case to_hash("-c"): case to_hash("--cache"): case to_hash("--cache-make"):
 			opts["cache-make"] = next_opt("");
 			break;
-		case to_hash("-cio"):
-		case to_hash("--cache-input-output"):
-			opts["cache-save"] = opts["cache-load"] = next_opt("2048.c");
+		case to_hash("-cio"): case to_hash("--cache-input-output"):
+		case to_hash("-ci"):  case to_hash("--cache-input"):
+		case to_hash("-co"):  case to_hash("--cache-output"):
+			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
+			opts[""] += next_opts();
+			if (label.find(label[1] != '-' ? "i" : "input")  != std::string::npos) opts["cache-load"] += opts[""];
+			if (label.find(label[1] != '-' ? "o" : "output") != std::string::npos) opts["cache-save"] += opts[""];
 			break;
-		case to_hash("-ci"):
-		case to_hash("--cache-input"):
-			opts["cache-load"] = next_opt("2048.c");
-			break;
-		case to_hash("-co"):
-		case to_hash("--cache-output"):
-			opts["cache-save"] = next_opt("2048.c");
-			break;
-		case to_hash("-!"):
-		case to_hash("--comment"):
+		case to_hash("-#"): case to_hash("--comment"):
 			opts["comment"] = next_opts();
 			break;
-		case to_hash("-"):
 		case to_hash("-|"):
-		case to_hash("--|"):
 			opts = {};
 			break;
 		default:
@@ -2471,13 +2430,24 @@ utils::options parse(int argc, const char* argv[]) {
 			break;
 		}
 	}
+	for (auto recipe : opts["recipes"]) {
+		for (auto item : {"mode", "unit", "win", "info"})
+			if (!opts(recipe, item) && opts(item))
+				opts[recipe][item] = opts[item];
+		for (auto mode : {"optimize", "evaluate"})
+			if (recipe == mode && opts[recipe].find("mode", recipe).find(recipe) != 0)
+				opts[recipe]["mode"] = recipe + ":" + opts[recipe]["mode"];
+		if (!opts(recipe, "info") && opts[recipe].find("mode", recipe).find("evaluate") == 0)
+			opts[recipe]["info"] = "auto";
+		for (auto item : {"info=none", "info=off"})
+			opts[recipe].remove(item);
+	}
 	return opts;
 }
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts("optimize")) opts["optimize"] = opts("evaluate") ? 0 : 1000;
-	if (!opts("evaluate")) opts["evaluate"] = opts("optimize") ? 0 : 1000;
+	if (!opts["recipes"].size()) opts["recipes"] += "optimize", opts["optimize"] = 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
@@ -2487,10 +2457,10 @@ int main(int argc, const char* argv[]) {
 	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
 	std::cout << "Develop-Search" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
-	std::cout << " (" __DATE__ " " __TIME__ ")" << std::endl;
+	std::cout << " (" << __DATE_ISO__ << " " << __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
-	std::cout << "time = " << moporgic::millisec() << std::endl;
+	std::cout << "time = " << millisec() << " (" << moporgic::put_time(millisec()) << ")" << std::endl;
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
@@ -2501,31 +2471,22 @@ int main(int argc, const char* argv[]) {
 	utils::make_network(opts["make"]);
 	utils::list_network();
 
-	moporgic::srand(moporgic::to_hash(opts["seed"]));
-	state::alpha(std::stod(opts["alpha"]));
-	if (opts("alpha", "norm")) state::alpha(state::alpha() / feature::feats().size());
+	moporgic::srand(to_hash(opts["seed"]));
+	state::alpha(opts["alpha"] / (opts("alpha", "norm") ? opts["alpha"]["norm"].value(feature::feats().size()) : 1));
 	state::lambda(opts["lambda"]);
-	if (numeric(opts["lambda"]) && !opts("optimize", "mode")) opts["optimize"]["mode"] = "lambda";
 	state::step(opts["step"]);
 	utils::expectimax::depth(opts["depth"]);
-
-	if (statistic(opts["optimize"])) {
-		std::cout << "optimization: " << opts["optimize"] << std::endl << std::endl;
-		statistic stat = optimize(opts, "optimize");
-		if (opts["info"] == "full") stat.summary();
-	}
-
-	utils::save_network(opts["save"]);
 
 	utils::load_cache(opts["cache-load"]);
 	utils::make_cache(opts["cache-make"]);
 
-	if (statistic(opts["evaluate"])) {
-		std::cout << "verification: " << opts["evaluate"] << std::endl << std::endl;
-		statistic stat = evaluate(opts, "evaluate");
-		if (opts["info"] != "none") stat.summary();
+	for (std::string recipe : opts["recipes"]) {
+		std::cout << recipe << ": " << opts[recipe] << std::endl << std::endl;
+		statistic stat = run(opts, recipe);
+		if (opts[recipe]("info")) stat.summary();
 	}
 
+	utils::save_network(opts["save"]);
 	utils::save_cache(opts["cache-save"]);
 
 	return 0;

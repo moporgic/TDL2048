@@ -8,11 +8,13 @@
  */
 
 #include <cstdint>
-#include <chrono>
-#include <string>
 #include <cstdio>
+#include <cstdlib>
+#include <string>
 #include <iostream>
+#include <iomanip>
 #include <sstream>
+#include <chrono>
 #include <random>
 #include <utility>
 
@@ -115,6 +117,19 @@ static inline uint64_t microsec() {
 	auto us = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());
 	return us.count();
 }
+static std::string put_time(std::time_t t) {
+	std::stringstream buf;
+	if (t >= std::time_t(253402300799000ull)) { // is microseconds
+		buf << "YYYY-MM-DD HH:MM:SS." << std::setfill('0') << std::setw(6) << (std::exchange(t, t / 1000000) % 1000000);
+	} else if (t >= std::time_t(253402300799ull)) { // is milliseconds
+		buf << "YYYY-MM-DD HH:MM:SS." << std::setfill('0') << std::setw(3) << (std::exchange(t, t / 1000) % 1000);
+	} // else is seconds, do nothing
+	buf.seekp(0) << std::put_time(std::localtime(&t), "%Y-%m-%d %H:%M:%S");
+	return buf.str();
+}
+
+#define __DATE_ISO__ ({ std::tm t = {}; std::string DATE(__DATE__); if (DATE[4] == ' ') DATE[4] = '0'; \
+std::istringstream(DATE) >> std::get_time(&t, "%b %d %Y"); std::put_time(&t, "%Y-%m-%d");})
 
 static inline constexpr
 uint32_t to_hash_tail(const char* str, const uint32_t& hash) noexcept {
