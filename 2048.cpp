@@ -1749,8 +1749,8 @@ struct expectimax {
 		return -std::numeric_limits<numeric>::max();
 	}
 
-	template<utils::estimator estim = utils::estimate> inline
-	static numeric search_expt(const board& after, u32 depth,
+	template<utils::estimator estim = utils::estimate>
+	inline static numeric search_expt(const board& after, u32 depth,
 			clip<feature> range = feature::feats()) {
 		cache::block::access lookup = cache::find(after, depth);
 		if (lookup) return lookup.fetch();
@@ -1768,8 +1768,8 @@ struct expectimax {
 		return lookup.store(expt / spaces.size());
 	}
 
-	template<utils::estimator estim = utils::estimate> inline
-	static numeric search_best(const board& before, u32 depth,
+	template<utils::estimator estim = utils::estimate>
+	inline static numeric search_best(const board& before, u32 depth,
 			clip<feature> range = feature::feats()) {
 		numeric best = 0;
 		for (u32 i = 0; i < 4; i++) {
@@ -1781,8 +1781,8 @@ struct expectimax {
 		return best;
 	}
 
-	template<utils::estimator estim = utils::estimate> inline
-	static numeric estimate(const board& after,
+	template<utils::estimator estim = utils::estimate>
+	inline static numeric estimate(const board& after,
 			clip<feature> range = feature::feats()) {
 		u32 depth = expectimax::depth()[after.empty()] - 1;
 		return search_expt<estim>(after, depth, range);
@@ -1790,36 +1790,55 @@ struct expectimax {
 };
 
 handle specialize(utils::options& opts, const std::string& type) {
-//	std::string spec = opts["options"].find("spec", "auto");
-//	if (spec == "auto" || spec == "on") {
-//		spec = opts["make"].value();
-//		spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
-//	}
-//	switch (to_hash(spec)) {
-//	case to_hash("4x6patt"): estim = utils::estimate_4x6patt; optim = utils::optimize_4x6patt; break;
-//	case to_hash("5x6patt"): estim = utils::estimate_5x6patt; optim = utils::optimize_5x6patt; break;
-//	case to_hash("6x6patt"): estim = utils::estimate_6x6patt; optim = utils::optimize_6x6patt; break;
-//	case to_hash("7x6patt"): estim = utils::estimate_7x6patt; optim = utils::optimize_7x6patt; break;
-//	case to_hash("8x6patt"): estim = utils::estimate_8x6patt; optim = utils::optimize_8x6patt; break;
-//	}
-//	if (opts[type]["mode"]("search") || opts[type]["mode"]("expectimax")) {
-//		std::string mode = opts[type]["mode"];
-//		auto it = std::min(mode.find("search"), mode.find("expectimax"));
-//		if (it > 0 && mode[it - 1] == '-') it--;
-//		opts[type]["mode"] = mode.substr(0, it);
-//		switch (to_hash(spec)) {
-//		default:                 estim = utils::expectimax::estimate<utils::estimate>; break;
-//		case to_hash("4x6patt"): estim = utils::expectimax::estimate<utils::estimate_4x6patt>; break;
-//		case to_hash("5x6patt"): estim = utils::expectimax::estimate<utils::estimate_5x6patt>; break;
-//		case to_hash("6x6patt"): estim = utils::expectimax::estimate<utils::estimate_6x6patt>; break;
-//		case to_hash("7x6patt"): estim = utils::expectimax::estimate<utils::estimate_7x6patt>; break;
-//		case to_hash("8x6patt"): estim = utils::expectimax::estimate<utils::estimate_8x6patt>; break;
-//		}
-//	}
 	std::string spec = opts["options"].find("spec", "auto");
 	if (spec == "auto" || spec == "on") {
 		spec = opts["make"].value("4x6patt");
 		spec = spec.substr(0, spec.find_first_of("&|="));
+	}
+	if (opts[type]["mode"]("search") || opts[type]["mode"]("expectimax")) {
+		std::string mode = opts[type]["mode"];
+		auto it = std::min(mode.find("search"), mode.find("expectimax"));
+		if (it > 0 && mode[it - 1] == '-') it--;
+		opts[type]["mode"] = mode.substr(0, it);
+		utils::optimizer optim = specialize(opts, type);
+		switch (to_hash(spec)) {
+		case to_hash("4x6patt"): return { utils::expectimax::estimate<utils::specialization<
+			index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index6t<0x4,0x5,0x6,0x8,0x9,0xa>>::estimate>, optim };
+		case to_hash("5x6patt"): return { utils::expectimax::estimate<utils::specialization<
+			index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index6t<0x8,0x9,0xa,0xb,0xc,0xd>,
+			index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index6t<0x4,0x5,0x6,0x8,0x9,0xa>>::estimate>, optim };
+		case to_hash("6x6patt"): return { utils::expectimax::estimate<utils::specialization<
+			index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+			index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+			index6t<0x3,0x4,0x5,0x6,0x7,0x8>>::estimate>, optim };
+		case to_hash("7x6patt"): return { utils::expectimax::estimate<utils::specialization<
+			index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+			index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+			index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
+			index6t<0x1,0x3,0x4,0x5,0x6,0x7>>::estimate>, optim };
+		case to_hash("8x6patt"): return { utils::expectimax::estimate<utils::specialization<
+			index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+			index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+			index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
+			index6t<0x1,0x3,0x4,0x5,0x6,0x7>,
+			index6t<0x0,0x1,0x4,0x8,0x9,0xa>>::estimate>, optim };
+		default: return { utils::expectimax::estimate<utils::estimate>, optim };
+		}
 	}
 	switch (to_hash(spec)) {
 	case to_hash("4x6patt"): return utils::specialization<
