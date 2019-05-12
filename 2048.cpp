@@ -1798,7 +1798,7 @@ handle specialize(utils::options& opts, const std::string& type) {
 	if (opts[type]["mode"]("search") || opts[type]["mode"]("expectimax")) {
 		std::string mode = opts[type]["mode"];
 		auto it = std::min(mode.find("search"), mode.find("expectimax"));
-		if (it > 0 && mode[it - 1] == '-') it--;
+		if (it > 0 && (mode[it - 1] == '-' || mode[it - 1] == ':')) it--;
 		opts[type]["mode"] = mode.substr(0, it);
 		utils::optimizer optim = specialize(opts, type);
 		switch (to_hash(spec)) {
