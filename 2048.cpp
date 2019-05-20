@@ -1755,7 +1755,7 @@ bool save_cache(std::string path) {
 
 struct expectimax {
 	static std::array<u32, 16>& depth() {
-		static std::array<u32, 16> res = { 7, 7, 7, 7, 5, 5, 5, 5, 3, 3, 3, 3, 1, 1, 1, 1 };
+		static std::array<u32, 16> res = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 		return res;
 	}
 	static std::array<u32, 16>& depth(const std::array<u32, 16>& res) { return (depth() = res); }
@@ -2499,7 +2499,7 @@ int main(int argc, const char* argv[]) {
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
 	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
-	if (!opts("depth")) opts["depth"] = "7 7 7 7 5 5 5 5 3 3 3 3 1 1 1 1";
+	if (!opts("depth")) opts["depth"] = 1;
 
 	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
