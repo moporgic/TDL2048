@@ -360,7 +360,7 @@ public:
 		u64 info; // f32 esti; u16 hold; u16 hits;
 	};
 
-	constexpr cache() : cached(&initial), length(1), mask(0) {}
+	constexpr cache() : cached(&initial), length(1), mask(0), nmap{} {}
 	cache(const cache& tp) = default;
 	~cache() {}
 	inline size_t size() const { return length; }
@@ -368,13 +368,13 @@ public:
 	inline const block& operator[] (size_t i) const { return cached[i]; }
 	inline block::access operator() (const board& b, u32 n) {
 		u64 x = min_isomorphic(b);
-		size_t i = math::fmix64(x) & mask;
+		size_t i = (math::fmix64(x) ^ nmap[n >> 1]) & mask;
 		block& blk = operator[](i);
 		return blk(x, n);
 	}
 
     friend std::ostream& operator <<(std::ostream& out, const cache& c) {
-		u32 code = 4;
+		u32 code = 5;
 		write_cast<byte>(out, code);
 		switch (code) {
 		default:
@@ -385,6 +385,18 @@ public:
 			write_cast<u64>(out, c.size());
 			for (size_t i = 0; i < c.size(); i++)
 				out << c[i];
+			write_cast<u16>(out, 0); // reserved for fields
+			break;
+		case 5:
+			write_cast<u16>(out, 0); // reserved for header
+			write_cast<u64>(out, 0);
+			write_cast<u16>(out, sizeof(cache::block));
+			write_cast<u64>(out, c.size());
+			for (size_t i = 0; i < c.size(); i++)
+				out << c[i];
+			write_cast<u16>(out, sizeof(size_t));
+			write_cast<u64>(out, c.nmap.size());
+			write_cast<u64>(out, c.nmap.begin(), c.nmap.end());
 			write_cast<u16>(out, 0); // reserved for fields
 			break;
 		}
@@ -400,6 +412,17 @@ public:
 			c.shape(read<u64>(in.ignore(2)));
 			for (size_t i = 0; i < c.size(); i++)
 				in >> c[i];
+			while ((code = read<u16>(in)) != 0)
+				in.ignore(code * read<u64>(in));
+			break;
+		case 5:
+			in.ignore(read<u16>(in) * read<u64>(in));
+			c.shape(read<u64>(in.ignore(2)));
+			for (size_t i = 0; i < c.size(); i++)
+				in >> c[i];
+			in.ignore(2); // sizeof(size_t)
+			read_cast<u64>(in, c.nmap.begin(),
+				c.nmap.begin() + std::min(c.nmap.size(), read<u64>(in)));
 			while ((code = read<u16>(in)) != 0)
 				in.ignore(code * read<u64>(in));
 			break;
@@ -430,18 +453,21 @@ public:
 	}
 
 	static inline block::access find(const board& b, u32 n) { return instance()(b, n); }
-	static inline cache& make(size_t len) { return instance().shape(std::max(len, size_t(1))); }
+	static inline cache& make(size_t len, bool peek = false) { return instance().shape(std::max(len, size_t(1)), peek); }
 	static inline cache& instance() { static cache tp; return tp; }
 
 private:
 	static inline block* alloc(size_t len) { return new block[len](); }
 	static inline void free(block* alloc) { delete[] alloc; }
 
-	cache& shape(size_t len) {
+	cache& shape(size_t len, bool peek = false) {
 		length = (1ull << (math::lg64(len)));
 		mask = length - 1;
 		if (cached != &initial) free(cached);
 		cached = alloc(length);
+		for (size_t i = 0; i < nmap.size(); i++)
+			nmap[i] = math::fmix64(i);
+		if (peek) nmap.fill(0);
 		return *this;
 	}
 
@@ -462,6 +488,7 @@ private:
 	block initial;
 	size_t length;
 	size_t mask;
+	std::array<size_t, 16> nmap;
 };
 
 namespace utils {
@@ -1694,15 +1721,16 @@ void make_cache(std::string res = "") {
 	if (in == "default") in = "2G";
 
 	if (in.size()) {
-		size_t unit = 1;
-		switch (in.back()) {
-		case 'k':
-		case 'K': unit = (1ULL << 10) / sizeof(cache::block); break;
-		case 'M': unit = (1ULL << 20) / sizeof(cache::block); break;
-		case 'G': unit = (1ULL << 30) / sizeof(cache::block); break;
-		}
-		size_t size = std::stoll(in) * unit;
-		cache::make(size);
+		size_t unit = 0, size = std::stoull(in, &unit);
+		if (unit < in.size())
+			switch (in[unit]) {
+			case 'k':
+			case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
+			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
+			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
+			}
+		bool peek = (in.find("+peek") != std::string::npos);
+		cache::make(size, peek);
 	}
 }
 bool load_cache(std::string path) {
