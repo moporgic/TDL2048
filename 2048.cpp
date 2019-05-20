@@ -1631,6 +1631,41 @@ void list_network() {
 	std::cout << std::endl;
 }
 
+void make_cache(std::string res = "") {
+	std::string in(res);
+	if (in == "default") in = "2G";
+
+	if (in.size()) {
+		size_t unit = 0, size = std::stoull(in, &unit);
+		if (unit < in.size())
+			switch (in[unit]) {
+			case 'k':
+			case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
+			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
+			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
+			}
+		bool peek = (in.find("+peek") != std::string::npos);
+		cache::make(size, peek);
+	}
+}
+void load_cache(std::string path) {
+	std::ifstream in;
+	in.open(path, std::ios::in | std::ios::binary);
+	if (!in.is_open()) return;
+	cache::load(in);
+	in.close();
+}
+void save_cache(std::string path) {
+	std::ofstream out;
+	char buf[1 << 20];
+	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out.is_open()) return;
+	cache::save(out);
+	out.flush();
+	out.close();
+}
+
 typedef numeric(*estimator)(const board&, clip<feature>);
 typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
 struct handle {
@@ -1715,43 +1750,6 @@ struct specialization {
 
 	constexpr static handle specialized = { estimate, optimize };
 };
-
-void make_cache(std::string res = "") {
-	std::string in(res);
-	if (in == "default") in = "2G";
-
-	if (in.size()) {
-		size_t unit = 0, size = std::stoull(in, &unit);
-		if (unit < in.size())
-			switch (in[unit]) {
-			case 'k':
-			case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
-			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
-			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
-			}
-		bool peek = (in.find("+peek") != std::string::npos);
-		cache::make(size, peek);
-	}
-}
-bool load_cache(std::string path) {
-	std::ifstream in;
-	in.open(path, std::ios::in | std::ios::binary);
-	if (!in.is_open()) return false;
-	cache::load(in);
-	in.close();
-	return true;
-}
-bool save_cache(std::string path) {
-	std::ofstream out;
-	char buf[1 << 20];
-	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
-	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-	if (!out.is_open()) return false;
-	cache::save(out);
-	out.flush();
-	out.close();
-	return true;
-}
 
 struct expectimax {
 	static std::array<u32, 16>& depth() {
