@@ -18,17 +18,6 @@
 #include <random>
 #include <utility>
 
-#ifndef DEBUG
-#define DLOG(msg,...)
-#else /* DEBUG */
-#define DLOG(msg,...) printf(msg, ##__VA_ARGS__)
-#endif /* DEBUG */
-
-#if !defined(__cplusplus) || __cplusplus < 201103L
-#define constexpr
-#define noexcept
-#endif
-
 #if defined(__GNUC__)
 #define inline_always inline __attribute__((always_inline))
 #elif defined(_MSC_VER)
@@ -117,7 +106,7 @@ static inline uint64_t microsec() {
 	auto us = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());
 	return us.count();
 }
-static std::string put_time(std::time_t t) {
+static __attribute__((unused)) std::string put_time(std::time_t t) {
 	std::stringstream buf;
 	if (t >= std::time_t(253402300799000ull)) { // is microseconds
 		buf << "YYYY-MM-DD HH:MM:SS." << std::setfill('0') << std::setw(6) << (std::exchange(t, t / 1000000) % 1000000);

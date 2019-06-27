@@ -16,11 +16,6 @@
 #include <iterator>
 #include <algorithm>
 
-#if !defined(__cplusplus) || __cplusplus < 201103L
-#define constexpr
-#define noexcept
-#endif
-
 namespace moporgic {
 
 namespace math {
