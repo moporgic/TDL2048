@@ -1200,12 +1200,13 @@ std::map<std::string, std::string> aliases() {
 	alias["5x4patt/4-22"] = alias["2x4patt/4"] + "0145:0145! 1256:1256! 569a:569a! ";
 	alias["2x8patt/44"] = "01234567:01234567! 456789ab:456789ab! ";
 	alias["3x8patt/44-4211"] = alias["2x8patt/44"] + "0123458c:0123458c! ";
-//	alias["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! 01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
 	alias["4x6patt/k.matsuzaki"] = "012456:012456! 456789:456789! 012345:012345! 234569:234569! ";
 	alias["5x6patt/k.matsuzaki"] = alias["4x6patt/k.matsuzaki"] + "01259a:01259a! ";
 	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678:345678! ";
 	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567:134567! ";
 	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a:01489a! ";
+	alias["4x6patt/redundant"] = alias["4x6patt/khyeh"] + "01234:01234! 45678:45678! 01245:01245! 45689:45689! "
+	                             "0124:0124! 1235:1235! 4568:4568! 5679:5679! " + alias["5x4patt/4-22"];
 	alias["k.matsuzaki"] = alias["8x6patt/k.matsuzaki"];
 	alias["monotonic"] = "fd012301[^24]:fd012301,fd37bf01,fdfedc01,fdc84001,fd321001,fdfb7301,fdcdef01,fd048c01 "
 	                     "fd456701[^24]:fd456701,fd26ae01,fdba9801,fdd95101,fd765401,fdea6201,fd89ab01,fd159d01 ";
