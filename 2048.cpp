@@ -86,6 +86,8 @@ public:
 				ss.str();
 			});
 			read_cast<u64>(in, w.length);
+			if (w.length == (1ull << math::lg64(w.length)))
+				w.name = w.name.substr(8 - (math::lg64(w.length) >> 2));
 			w.raw = weight::alloc(w.length);
 			switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
@@ -95,12 +97,14 @@ public:
 		default:
 		case 4:
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
-			w.name = raw_cast<u16>(w.name[6]) ? w.name.substr(0, w.name.find(' ')) : ({
+			w.name = raw_cast<u16>(w.name[6]) == 0 ? ({
 				std::stringstream ss;
-				ss << std::setw((raw_cast<u16>(w.name[4]) + 7) % 8 + 1);
-				ss << std::setfill('0') << std::hex << raw_cast<u32>(w.name[0]);
+				ss << std::setw(raw_cast<u16>(w.name[4]) ? raw_cast<u16>(w.name[4]) : ({
+					read_cast<u64>(in.ignore(2), w.length).seekg(-10, std::ios::cur);
+					(w.length == (1ull << math::lg64(w.length))) ? (math::lg64(w.length) >> 2) : 8;
+				})) << std::setfill('0') << std::hex << raw_cast<u32>(w.name[0]);
 				ss.str();
-			});
+			}) : w.name.substr(0, w.name.find(' '));
 			read_cast<u16>(in, code);
 			read_cast<u64>(in, w.length);
 			w.raw = weight::alloc(w.length);
