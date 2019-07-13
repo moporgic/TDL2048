@@ -58,7 +58,13 @@ public:
 		switch (code) {
 		default:
 		case 4:
-			out.write(w.sign().append(8, ' ').c_str(), 8);
+			try {
+				write_cast<u32>(out, std::stoul(w.sign(), nullptr, 16));
+				write_cast<u16>(out, w.sign().size());
+				write_cast<u16>(out, 0);
+			} catch (std::invalid_argument&) {
+				out.write(w.sign().append(8, ' ').c_str(), 8);
+			}
 			write_cast<u16>(out, sizeof(weight::numeric));
 			write_cast<u64>(out, w.size());
 			write_cast<numeric>(out, w.value().begin(), w.value().end());
@@ -76,7 +82,7 @@ public:
 		case 2:
 			w.name = ({
 				std::stringstream ss;
-				ss << std::hex << std::setfill('0') << std::setw(8) << read<u32>(in);
+				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
 				ss.str();
 			});
 			read_cast<u64>(in, w.length);
@@ -89,9 +95,10 @@ public:
 		default:
 		case 4:
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
-			w.name = raw_cast<u32>(w.name[4]) ? w.name.substr(0, w.name.find(' ')) : ({
+			w.name = raw_cast<u16>(w.name[6]) ? w.name.substr(0, w.name.find(' ')) : ({
 				std::stringstream ss;
-				ss << std::hex << std::setfill('0') << std::setw(8) << raw_cast<u32>(w.name[0]);
+				ss << std::setw((raw_cast<u16>(w.name[4]) + 7) % 8 + 1);
+				ss << std::setfill('0') << std::hex << raw_cast<u32>(w.name[0]);
 				ss.str();
 			});
 			read_cast<u16>(in, code);
@@ -225,9 +232,8 @@ public:
 		switch (code) {
 		default:
 		case 0:
-//			TODO
-//			write_cast<u32>(out, u32(f.sign()));
-//			write_cast<u32>(out, u32(f.sign() >> 32));
+			write_cast<u32>(out, std::stoul(f.index().sign(), nullptr, 16));
+			write_cast<u32>(out, std::stoul(f.value().sign(), nullptr, 16));
 			break;
 		}
 		return out;
@@ -238,12 +244,17 @@ public:
 		switch (code) {
 		default:
 		case 0:
-//			read_cast<u32>(in, code);
-//			f.map = indexer(code);
-//			f.id = u64(code);
-//			read_cast<u32>(in, code);
-//			f.raw = weight(code);
-//			f.id |= u64(code) << 32;
+			f.map = indexer(({
+				std::stringstream ss;
+				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
+				ss.str();
+			}));
+			f.raw = weight(({
+				std::stringstream ss;
+				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
+				ss.str();
+			}));
+			f.name = f.raw.sign() + ':' + f.map.sign();
 			break;
 		}
 		return in;
