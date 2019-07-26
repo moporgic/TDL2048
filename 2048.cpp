@@ -1488,6 +1488,11 @@ void make_network(utils::options::option opt) {
 			}
 			if (weight(sign) && weight(sign).size() != size)
 				weight::erase(sign);
+			if (!weight(sign) && size) { // weight id matching: 012345 <--> 00012345
+				weight test(std::string(std::max(8 - sign.size(), size_t(8)), '0') + sign);
+				while (!test && (test.sign() + ' ')[0] == '0') test = weight(test.sign().substr(1));
+				if (test.size() == size) raw_cast<std::string>(weight::wghts().at(test.sign())) = sign; // unsafe!
+			}
 			if (!weight(sign) && size) {
 				weight dst = weight::make(sign, size);
 				if (init.find_first_of("{}") != npos && init != "{}") {
