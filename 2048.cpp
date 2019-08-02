@@ -448,6 +448,27 @@ inline std::string hashpatt(u32 hash, size_t n = 0) {
 	return std::string(std::max(n, patt.size()) - patt.size(), '0') + patt;
 }
 
+template<u32 p0, u32 p1, u32 p2, u32 p3>
+u64 index4t(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	return index;
+}
+
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4>
+u64 index5t(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	return index;
+}
+
 template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5>
 u64 index6t(const board& b) {
 	register u64 index = 0;
@@ -459,91 +480,20 @@ u64 index6t(const board& b) {
 	index += b.at(p5) << 20;
 	return index;
 }
-template<>
-u64 index6t<0x0,0x1,0x2,0x3,0x4,0x5>(const board& b) {
-	return (u32(u64(b)) & 0xffffff);
-}
-template<>
-u64 index6t<0x4,0x5,0x6,0x7,0x8,0x9>(const board& b) {
-	return (u32(u64(b) >> 16) & 0xffffff);
-}
-template<>
-u64 index6t<0x8,0x9,0xa,0xb,0xc,0xd>(const board& b) {
-	return (u32(u64(b) >> 32) & 0xffffff);
-}
-template<>
-u64 index6t<0x0,0x1,0x2,0x4,0x5,0x6>(const board& b) {
-	return (u32(u64(b)) & 0x000fff) | ((u32(u64(b)) >> 4) & 0xfff000);
-}
-template<>
-u64 index6t<0x4,0x5,0x6,0x8,0x9,0xa>(const board& b) {
-	return (u32(u64(b) >> 16) & 0x000fff) | (u32(u64(b) >> 20) & 0xfff000);
-}
-template<>
-u64 index6t<0x2,0x3,0x4,0x5,0x6,0x9>(const board& b) {
-	return (u32(u64(b) >> 8) & 0x0fffff) | (u32(u64(b) >> 16) & 0xf00000);
-}
-template<>
-u64 index6t<0x0,0x1,0x2,0x5,0x9,0xa>(const board& b) {
-	return (u32(u64(b)) & 0x000fff) | (u32(u64(b) >> 8) & 0x00f000) | (u32(u64(b) >> 20) & 0xff0000);
-}
-template<>
-u64 index6t<0x3,0x4,0x5,0x6,0x7,0x8>(const board& b) {
-	return (u32(u64(b) >> 12) & 0xffffff);
-}
-template<>
-u64 index6t<0x1,0x3,0x4,0x5,0x6,0x7>(const board& b) {
-	return (u32(u64(b) >> 4) & 0x00000f) | (u32(u64(b) >> 8) & 0xfffff0);
-}
-template<>
-u64 index6t<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) {
-	return (u32(u64(b)) & 0x0000ff) | (u32(u64(b) >> 8) & 0x000f00) | (u32(u64(b) >> 20) & 0xfff000);
-}
-template<u32 p0, u32 p1, u32 p2, u32 p3>
-u64 index4t(const board& b) {
+
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6>
+u64 index7t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
 	index += b.at(p1) <<  4;
 	index += b.at(p2) <<  8;
 	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	index += b.at(p5) << 20;
+	index += b.at(p6) << 24;
 	return index;
 }
-template<>
-u64 index4t<0x0,0x1,0x2,0x3>(const board& b) {
-	return (u32(u64(b)) & 0xffff);
-}
-template<>
-u64 index4t<0x4,0x5,0x6,0x7>(const board& b) {
-	return (u32(u64(b) >> 16) & 0xffff);
-}
-template<>
-u64 index4t<0x0,0x1,0x4,0x5>(const board& b) {
-	return (u32(u64(b)) & 0x00ff) | (u32(u64(b) >> 8) & 0xff00);
-}
-template<>
-u64 index4t<0x1,0x2,0x5,0x6>(const board& b) {
-	return (u32(u64(b) >> 4) & 0x00ff) | (u32(u64(b) >> 12) & 0xff00);
-}
-template<>
-u64 index4t<0x5,0x6,0x9,0xa>(const board& b) {
-	return (u32(u64(b) >> 20) & 0x00ff) | (u32(u64(b) >> 28) & 0xff00);
-}
-template<>
-u64 index4t<0x0,0x1,0x2,0x4>(const board& b) {
-	return (u32(u64(b)) & 0x0fff) | (u32(u64(b) >> 4) & 0xf000);
-}
-template<>
-u64 index4t<0x1,0x2,0x3,0x5>(const board& b) {
-	return (u32(u64(b) >> 4) & 0x0fff) | (u32(u64(b) >> 8) & 0xf000);
-}
-template<>
-u64 index4t<0x4,0x5,0x6,0x8>(const board& b) {
-	return (u32(u64(b) >> 16) & 0x0fff) | (u32(u64(b) >> 20) & 0xf000);
-}
-template<>
-u64 index4t<0x5,0x6,0x7,0x9>(const board& b) {
-	return (u32(u64(b) >> 20) & 0x0fff) | (u32(u64(b) >> 24) & 0xf000);
-}
+
 template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7>
 u64 index8t(const board& b) {
 	register u64 index = 0;
@@ -557,64 +507,39 @@ u64 index8t(const board& b) {
 	index += b.at(p7) << 28;
 	return index;
 }
-template<>
-u64 index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>(const board& b) {
-	return (u32(u64(b)));
-}
-template<>
-u64 index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>(const board& b) {
-	return (u32(u64(b) >> 16));
-}
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6>
-u64 index7t(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	index += b.at(p6) << 24;
-	return index;
-}
-template<>
-u64 index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>(const board& b) {
-	return (u32(u64(b)) & 0xfffffff);
-}
-template<>
-u64 index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>(const board& b) {
-	return (u32(u64(b) >> 16) & 0xfffffff);
-}
-template<>
-u64 index7t<0x0,0x1,0x2,0x3,0x4,0x8,0xc>(const board& b) {
-	return (u32(u64(b)) & 0x00fffff) | (u32(u64(b) >> 12) & 0x0f00000) | (u32(u64(b) >> 24) & 0xf000000);
-}
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4>
-u64 index5t(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	return index;
-}
-template<>
-u64 index5t<0x0,0x1,0x2,0x3,0x4>(const board& b) {
-	return (u32(u64(b)) & 0xfffff);
-}
-template<>
-u64 index5t<0x4,0x5,0x6,0x7,0x8>(const board& b) {
-	return (u32(u64(b) >> 16) & 0xfffff);
-}
-template<>
-u64 index5t<0x0,0x1,0x2,0x4,0x5>(const board& b) {
-	return (u32(u64(b)) & 0x00fff) | ((u32(u64(b)) >> 4) & 0xff000);
-}
-template<>
-u64 index5t<0x4,0x5,0x6,0x8,0x9>(const board& b) {
-	return (u32(u64(b) >> 16) & 0x00fff) | (u32(u64(b) >> 20) & 0xff000);
-}
+
+template<> u64 index4t<0x0,0x1,0x2,0x3>(const board& b) { return (u32(u64(b)) & 0xffff); }
+template<> u64 index4t<0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b) >> 16) & 0xffff); }
+template<> u64 index4t<0x0,0x1,0x4,0x5>(const board& b) { return (u32(u64(b)) & 0x00ff) | (u32(u64(b) >> 8) & 0xff00); }
+template<> u64 index4t<0x1,0x2,0x5,0x6>(const board& b) { return (u32(u64(b) >> 4) & 0x00ff) | (u32(u64(b) >> 12) & 0xff00); }
+template<> u64 index4t<0x5,0x6,0x9,0xa>(const board& b) { return (u32(u64(b) >> 20) & 0x00ff) | (u32(u64(b) >> 28) & 0xff00); }
+template<> u64 index4t<0x0,0x1,0x2,0x4>(const board& b) { return (u32(u64(b)) & 0x0fff) | (u32(u64(b) >> 4) & 0xf000); }
+template<> u64 index4t<0x1,0x2,0x3,0x5>(const board& b) { return (u32(u64(b) >> 4) & 0x0fff) | (u32(u64(b) >> 8) & 0xf000); }
+template<> u64 index4t<0x4,0x5,0x6,0x8>(const board& b) { return (u32(u64(b) >> 16) & 0x0fff) | (u32(u64(b) >> 20) & 0xf000); }
+template<> u64 index4t<0x5,0x6,0x7,0x9>(const board& b) { return (u32(u64(b) >> 20) & 0x0fff) | (u32(u64(b) >> 24) & 0xf000); }
+template<> u64 index4t<0x0,0x1,0x2,0x5>(const board& b) { return (u32(u64(b)) & 0x0fff) | (u32(u64(b) >> 8) & 0xf000); }
+template<> u64 index4t<0x4,0x5,0x6,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0x0fff) | (u32(u64(b) >> 24) & 0xf000); }
+template<> u64 index5t<0x0,0x1,0x2,0x3,0x4>(const board& b) { return (u32(u64(b)) & 0xfffff); }
+template<> u64 index5t<0x4,0x5,0x6,0x7,0x8>(const board& b) { return (u32(u64(b) >> 16) & 0xfffff); }
+template<> u64 index5t<0x0,0x1,0x2,0x4,0x5>(const board& b) { return (u32(u64(b)) & 0x00fff) | ((u32(u64(b)) >> 4) & 0xff000); }
+template<> u64 index5t<0x4,0x5,0x6,0x8,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0x00fff) | (u32(u64(b) >> 20) & 0xff000); }
+template<> u64 index5t<0x0,0x1,0x2,0x3,0x5>(const board& b) { return (u32(u64(b)) & 0x0ffff) | (u32(u64(b) >> 4) & 0xf0000); }
+template<> u64 index5t<0x4,0x5,0x6,0x7,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0x0ffff) | (u32(u64(b) >> 20) & 0xf0000); }
+template<> u64 index6t<0x0,0x1,0x2,0x3,0x4,0x5>(const board& b) { return (u32(u64(b)) & 0xffffff); }
+template<> u64 index6t<0x4,0x5,0x6,0x7,0x8,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0xffffff); }
+template<> u64 index6t<0x8,0x9,0xa,0xb,0xc,0xd>(const board& b) { return (u32(u64(b) >> 32) & 0xffffff); }
+template<> u64 index6t<0x0,0x1,0x2,0x4,0x5,0x6>(const board& b) { return (u32(u64(b)) & 0x000fff) | ((u32(u64(b)) >> 4) & 0xfff000); }
+template<> u64 index6t<0x4,0x5,0x6,0x8,0x9,0xa>(const board& b) { return (u32(u64(b) >> 16) & 0x000fff) | (u32(u64(b) >> 20) & 0xfff000); }
+template<> u64 index6t<0x2,0x3,0x4,0x5,0x6,0x9>(const board& b) { return (u32(u64(b) >> 8) & 0x0fffff) | (u32(u64(b) >> 16) & 0xf00000); }
+template<> u64 index6t<0x0,0x1,0x2,0x5,0x9,0xa>(const board& b) { return (u32(u64(b)) & 0x000fff) | (u32(u64(b) >> 8) & 0x00f000) | (u32(u64(b) >> 20) & 0xff0000); }
+template<> u64 index6t<0x3,0x4,0x5,0x6,0x7,0x8>(const board& b) { return (u32(u64(b) >> 12) & 0xffffff); }
+template<> u64 index6t<0x1,0x3,0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b) >> 4) & 0x00000f) | (u32(u64(b) >> 8) & 0xfffff0); }
+template<> u64 index6t<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) { return (u32(u64(b)) & 0x0000ff) | (u32(u64(b) >> 8) & 0x000f00) | (u32(u64(b) >> 20) & 0xfff000); }
+template<> u64 index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>(const board& b) { return (u32(u64(b)) & 0xfffffff); }
+template<> u64 index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>(const board& b) { return (u32(u64(b) >> 16) & 0xfffffff); }
+template<> u64 index7t<0x0,0x1,0x2,0x3,0x4,0x8,0xc>(const board& b) { return (u32(u64(b)) & 0x00fffff) | (u32(u64(b) >> 12) & 0x0f00000) | (u32(u64(b) >> 24) & 0xf000000); }
+template<> u64 index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b))); }
+template<> u64 index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>(const board& b) { return (u32(u64(b) >> 16)); }
 
 u64 indexnta(const board& b, const std::vector<u32>& p) {
 	register u64 index = 0;
