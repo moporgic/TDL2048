@@ -45,7 +45,7 @@ public:
 	typedef weight::numeric segment;
 
 	inline sign_t sign() const { return name; }
-	constexpr inline size_t size() const { return length; }
+	inline size_t size() const { return length; }
 	constexpr inline segment& operator [](u64 i) { return raw[i]; }
 	constexpr inline segment* data(u64 i = 0) { return raw + i; }
 	constexpr inline clip<numeric> value() const { return { raw, raw + length }; }
@@ -1590,33 +1590,32 @@ void list_network() {
 
 typedef numeric(*estimator)(const board&, clip<feature>);
 typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
+
 struct method {
-	constexpr inline operator utils::estimator() const { return estim; }
-	constexpr inline operator utils::optimizer() const { return optim; }
 	utils::estimator estim;
 	utils::optimizer optim;
+	constexpr inline operator utils::estimator() const { return estim; }
+	constexpr inline operator utils::optimizer() const { return optim; }
+
+	constexpr static inline numeric estimate(const board& state,
+			clip<feature> range = feature::feats()) {
+		register numeric esti = 0;
+		for (register feature& feat : range)
+			esti += feat[state];
+		return esti;
+	}
+	constexpr static inline numeric optimize(const board& state, numeric error,
+			clip<feature> range = feature::feats()) {
+		register numeric esti = 0;
+		for (register feature& feat : range)
+			esti += (feat[state] += error);
+		return esti;
+	}
+	constexpr static inline numeric illegal(const board& state,
+			clip<feature> range = feature::feats()) {
+		return -std::numeric_limits<numeric>::max();
+	}
 };
-
-constexpr inline numeric estimate(const board& state,
-		clip<feature> range = feature::feats()) {
-	register numeric esti = 0;
-	for (register feature& feat : range)
-		esti += feat[state];
-	return esti;
-}
-
-constexpr inline numeric optimize(const board& state, numeric error,
-		clip<feature> range = feature::feats()) {
-	register numeric esti = 0;
-	for (register feature& feat : range)
-		esti += (feat[state] += error);
-	return esti;
-}
-
-constexpr inline numeric illegal(const board& state,
-		clip<feature> range = feature::feats()) {
-	return -std::numeric_limits<numeric>::max();
-}
 
 template<indexer::mapper... indexes>
 struct isomorphism : method {
@@ -1711,7 +1710,7 @@ method specialize(utils::options& opts, const std::string& type) {
 		index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
 		index6t<0x1,0x3,0x4,0x5,0x6,0x7>,
 		index6t<0x0,0x1,0x4,0x8,0x9,0xa>>();
-	default: return utils::method{ utils::estimate, utils::optimize };
+	default: return utils::method();
 	}
 }
 
@@ -1738,14 +1737,14 @@ struct state {
 	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats(),
-			utils::estimator estim = utils::estimate) {
-		estim = move.info() != -1u ? estim : utils::illegal;
+			utils::estimator estim = utils::method::estimate) {
+		estim = move.info() != -1u ? estim : utils::method::illegal;
 		esti = state::reward() + estim(move, range);
 		return esti;
 	}
 	inline numeric optimize(numeric exact, numeric alpha = state::alpha(),
 			clip<feature> range = feature::feats(),
-			utils::optimizer optim = utils::optimize) {
+			utils::optimizer optim = utils::method::optimize) {
 		numeric update = (exact - state::value()) * alpha;
 		esti = state::reward() + optim(move, update, range);
 		return esti;
@@ -1762,7 +1761,7 @@ struct select {
 	state move[4];
 	state *best;
 	inline select() : best(move) {}
-	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), utils::estimator estim = utils::estimate) {
+	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), utils::estimator estim = utils::method::estimate) {
 		b.after(move[0], move[1], move[2], move[3]);
 		move[0].estimate(range, estim);
 		move[1].estimate(range, estim);
