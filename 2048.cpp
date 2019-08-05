@@ -45,10 +45,10 @@ public:
 	typedef weight::numeric segment;
 
 	inline sign_t sign() const { return name; }
-	inline size_t size() const { return length; }
-	inline segment& operator [](u64 i) { return raw[i]; }
-	inline segment* data(u64 i = 0) { return raw + i; }
-	inline clip<numeric> value() const { return { raw, raw + length }; }
+	constexpr inline size_t size() const { return length; }
+	constexpr inline segment& operator [](u64 i) { return raw[i]; }
+	constexpr inline segment* data(u64 i = 0) { return raw + i; }
+	constexpr inline clip<numeric> value() const { return { raw, raw + length }; }
 	inline operator bool() const { return raw; }
 	declare_comparators(const weight&, sign(), inline);
 
@@ -182,8 +182,8 @@ public:
 	typedef u64(*mapper)(const board&);
 
 	inline sign_t sign() const { return name; }
-	inline mapper index() const { return map; }
-	inline u64 operator ()(const board& b) const { return (*map)(b); }
+	constexpr inline mapper index() const { return map; }
+	constexpr inline u64 operator ()(const board& b) const { return (*map)(b); }
 	inline operator bool() const { return map; }
 	declare_comparators(const indexer&, sign(), inline);
 
@@ -221,9 +221,9 @@ public:
 	typedef std::string sign_t;
 
 	inline sign_t sign() const { return name; }
-	inline weight::segment& operator [](const board& b) { return raw[map(b)]; }
-	inline weight::segment& operator [](u64 idx) { return raw[idx]; }
-	inline u64 operator ()(const board& b) const { return map(b); }
+	constexpr inline weight::segment& operator [](const board& b) { return raw[map(b)]; }
+	constexpr inline weight::segment& operator [](u64 idx) { return raw[idx]; }
+	constexpr inline u64 operator ()(const board& b) const { return map(b); }
 
 	inline indexer index() const { return map; }
 	inline weight  value() const { return raw; }
@@ -1597,7 +1597,7 @@ struct method {
 	utils::optimizer optim;
 };
 
-inline numeric estimate(const board& state,
+constexpr inline numeric estimate(const board& state,
 		clip<feature> range = feature::feats()) {
 	register numeric esti = 0;
 	for (register feature& feat : range)
@@ -1605,7 +1605,7 @@ inline numeric estimate(const board& state,
 	return esti;
 }
 
-inline numeric optimize(const board& state, numeric error,
+constexpr inline numeric optimize(const board& state, numeric error,
 		clip<feature> range = feature::feats()) {
 	register numeric esti = 0;
 	for (register feature& feat : range)
@@ -1613,7 +1613,7 @@ inline numeric optimize(const board& state, numeric error,
 	return esti;
 }
 
-inline constexpr numeric illegal(const board& state,
+constexpr inline numeric illegal(const board& state,
 		clip<feature> range = feature::feats()) {
 	return -std::numeric_limits<numeric>::max();
 }
