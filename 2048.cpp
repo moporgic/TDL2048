@@ -1590,7 +1590,7 @@ void list_network() {
 
 typedef numeric(*estimator)(const board&, clip<feature>);
 typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
-struct handle {
+struct method {
 	constexpr inline operator utils::estimator() const { return estim; }
 	constexpr inline operator utils::optimizer() const { return optim; }
 	utils::estimator estim;
@@ -1619,30 +1619,29 @@ inline constexpr numeric illegal(const board& state,
 }
 
 template<indexer::mapper... indexes>
-struct specialization {
-	constexpr static indexer::mapper index[] = { indexes... };
-	constexpr static size_t N = sizeof...(indexes);
+struct isomorphism : method {
+	constexpr static std::array<indexer::mapper, sizeof...(indexes)> index = { indexes... };
+	constexpr isomorphism() : method{ isomorphism<indexes...>::estimate, isomorphism<indexes...>::optimize } {}
 
 	template<indexer::mapper index, indexer::mapper... follow> constexpr static
 	inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, clip<feature> f) {
-		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)]) + invoke<follow...>(iso, f);
+		return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)]) + invoke<follow...>(iso, f);
 	}
 	template<indexer::mapper index, indexer::mapper... follow> constexpr static
 	inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, clip<feature> f) {
-		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)]);
+		return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)]);
 	}
 
 	template<indexer::mapper index, indexer::mapper... follow> constexpr static
 	inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
-		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)] += updv) + invoke<follow...>(iso, updv, f);
+		return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv) + invoke<follow...>(iso, updv, f);
 	}
 	template<indexer::mapper index, indexer::mapper... follow> constexpr static
 	inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
-		return (f[(N - sizeof...(follow) - 1) << 3][index(iso)] += updv);
+		return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv);
 	}
 
-	constexpr static
-	inline numeric estimate(const board& state, clip<feature> range) {
+	constexpr static inline numeric estimate(const board& state, clip<feature> range) {
 		register numeric esti = 0;
 		register board iso;
 		esti += invoke<indexes...>(({ iso = state;     iso; }), range);
@@ -1655,8 +1654,7 @@ struct specialization {
 		esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
 		return esti;
 	}
-	constexpr static
-	inline numeric optimize(const board& state, numeric updv, clip<feature> range) {
+	constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range) {
 		register numeric esti = 0;
 		register board iso;
 		esti += invoke<indexes...>(({ iso = state;     iso; }), updv, range);
@@ -1669,44 +1667,42 @@ struct specialization {
 		esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
 		return esti;
 	}
-
-	constexpr static handle specialized = { estimate, optimize };
 };
 
-handle specialize(utils::options& opts, const std::string& type) {
+method specialize(utils::options& opts, const std::string& type) {
 	std::string spec = opts["options"].find("spec", "auto");
 	if (spec == "auto" || spec == "on") {
 		spec = opts["make"].value("4x6patt");
 		spec = spec.substr(0, spec.find_first_of("&|="));
 	}
 	switch (to_hash(spec)) {
-	case to_hash("4x6patt"): return utils::specialization<
+	case to_hash("4x6patt"): return utils::isomorphism<
 		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
 		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
 		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
-		index6t<0x4,0x5,0x6,0x8,0x9,0xa>>::specialized;
-	case to_hash("5x6patt"): return utils::specialization<
+		index6t<0x4,0x5,0x6,0x8,0x9,0xa>>();
+	case to_hash("5x6patt"): return utils::isomorphism<
 		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
 		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
 		index6t<0x8,0x9,0xa,0xb,0xc,0xd>,
 		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
-		index6t<0x4,0x5,0x6,0x8,0x9,0xa>>::specialized;
-	case to_hash("6x6patt"): return utils::specialization<
+		index6t<0x4,0x5,0x6,0x8,0x9,0xa>>();
+	case to_hash("6x6patt"): return utils::isomorphism<
 		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
 		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
 		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
 		index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
 		index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
-		index6t<0x3,0x4,0x5,0x6,0x7,0x8>>::specialized;
-	case to_hash("7x6patt"): return utils::specialization<
+		index6t<0x3,0x4,0x5,0x6,0x7,0x8>>();
+	case to_hash("7x6patt"): return utils::isomorphism<
 		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
 		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
 		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
 		index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
 		index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
 		index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
-		index6t<0x1,0x3,0x4,0x5,0x6,0x7>>::specialized;
-	case to_hash("8x6patt"): return utils::specialization<
+		index6t<0x1,0x3,0x4,0x5,0x6,0x7>>();
+	case to_hash("8x6patt"): return utils::isomorphism<
 		index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
 		index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
 		index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
@@ -1714,8 +1710,8 @@ handle specialize(utils::options& opts, const std::string& type) {
 		index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
 		index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
 		index6t<0x1,0x3,0x4,0x5,0x6,0x7>,
-		index6t<0x0,0x1,0x4,0x8,0x9,0xa>>::specialized;
-	default: return { utils::estimate, utils::optimize };
+		index6t<0x0,0x1,0x4,0x8,0x9,0xa>>();
+	default: return utils::method{ utils::estimate, utils::optimize };
 	}
 }
 
