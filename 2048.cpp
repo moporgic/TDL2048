@@ -1393,15 +1393,6 @@ void make_network(utils::options::option opt) {
 		}
 	}
 
-	auto vtou = [](std::vector<u32> patt) -> u32 {
-		u32 hash = 0;
-		for (auto tile : patt) hash = (hash << 4) | tile;
-		return hash;
-	};
-	auto utos = [](u32 hash, size_t n = 0) -> std::string {
-		std::string patt = ({ std::stringstream ss; ss << std::hex << hash; ss.str(); });
-		return std::string(std::max(n, patt.size()) - patt.size(), '0') + patt;
-	};
 	auto stov = [](std::string hash, u32 iso = 0) -> std::vector<u32> {
 		std::vector<u32> patt;
 		board x(0xfedcba9876543210ull); x.isomorphic(-iso);
