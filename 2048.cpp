@@ -1991,8 +1991,7 @@ statistic run(utils::options opts, std::string type) {
 	select best;
 	state last;
 
-	utils::estimator estim = utils::specialize(opts, type);
-	utils::optimizer optim = utils::specialize(opts, type);
+	utils::method spec = utils::specialize(opts, type);
 	clip<feature> feats = feature::feats();
 	numeric alpha = state::alpha();
 	numeric lambda = state::lambda();
@@ -2007,21 +2006,21 @@ statistic run(utils::options opts, std::string type) {
 			u32 opers = 0;
 
 			b.init();
-			best(b, feats, estim);
+			best(b, feats, spec);
 			score += best.score();
 			opers += 1;
 			best >> last;
 			best >> b;
 			b.next();
-			while (best(b, feats, estim)) {
-				last.optimize(best.esti(), alpha, feats, optim);
+			while (best(b, feats, spec)) {
+				last.optimize(best.esti(), alpha, feats, spec);
 				score += best.score();
 				opers += 1;
 				best >> last;
 				best >> b;
 				b.next();
 			}
-			last.optimize(0, alpha, feats, optim);
+			last.optimize(0, alpha, feats, spec);
 
 			stats.update(score, b.hash(), opers);
 		}
@@ -2033,7 +2032,7 @@ statistic run(utils::options opts, std::string type) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best(b, feats, estim); b.next()) {
+			for (b.init(); best(b, feats, spec); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -2041,8 +2040,8 @@ statistic run(utils::options opts, std::string type) {
 			}
 
 			for (numeric esti = 0; path.size(); path.pop_back()) {
-				path.back().estimate(feats, estim);
-				esti = path.back().optimize(esti, alpha, feats, optim);
+				path.back().estimate(feats, spec);
+				esti = path.back().optimize(esti, alpha, feats, spec);
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -2056,26 +2055,26 @@ statistic run(utils::options opts, std::string type) {
 			u32 opers = 0;
 
 			b.init();
-			for (u32 i = 0; i < step && best(b, feats, estim); i++) {
+			for (u32 i = 0; i < step && best(b, feats, spec); i++) {
 				score += best.score();
 				opers += 1;
 				best >> path;
 				best >> b;
 				b.next();
 			}
-			while (best(b, feats, estim)) {
+			while (best(b, feats, spec)) {
 				numeric z = best.esti();
 				numeric retain = 1 - lambda;
 				for (u32 k = 1; k < step; k++) {
 					state& source = path[opers - k];
-					source.estimate(feats, estim);
+					source.estimate(feats, spec);
 					numeric r = source.reward();
 					numeric v = source.value();
 					z = r + (lambda * z + retain * v);
 				}
 				state& update = path[opers - step];
-				update.estimate(feats, estim);
-				update.optimize(z, alpha, feats, optim);
+				update.estimate(feats, spec);
+				update.optimize(z, alpha, feats, spec);
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -2087,14 +2086,14 @@ statistic run(utils::options opts, std::string type) {
 				numeric retain = 1 - lambda;
 				for (u32 k = i + 1; k < tail; k++) {
 					state& source = path[opers + i - k];
-					source.estimate(feats, estim);
+					source.estimate(feats, spec);
 					numeric r = source.reward();
 					numeric v = source.value();
 					z = r + (lambda * z + retain * v);
 				}
 				state& update = path[opers + i - tail];
-				update.estimate(feats, estim);
-				update.optimize(z, alpha, feats, optim);
+				update.estimate(feats, spec);
+				update.optimize(z, alpha, feats, spec);
 			}
 			path.clear();
 
@@ -2109,7 +2108,7 @@ statistic run(utils::options opts, std::string type) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best(b, feats, estim); b.next()) {
+			for (b.init(); best(b, feats, spec); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -2118,13 +2117,13 @@ statistic run(utils::options opts, std::string type) {
 
 			numeric z = 0;
 			numeric r = path.back().reward();
-			numeric v = path.back().optimize(0, alpha, feats, optim) - r;
+			numeric v = path.back().optimize(0, alpha, feats, spec) - r;
 			numeric retain = 1 - lambda;
 			for (path.pop_back(); path.size(); path.pop_back()) {
-				path.back().estimate(feats, estim);
+				path.back().estimate(feats, spec);
 				z = r + (lambda * z + retain * v);
 				r = path.back().reward();
-				v = path.back().optimize(z, alpha, feats, optim) - r;
+				v = path.back().optimize(z, alpha, feats, spec) - r;
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -2138,7 +2137,7 @@ statistic run(utils::options opts, std::string type) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best(b, feats, estim); b.next()) {
+			for (b.init(); best(b, feats, spec); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> b;
