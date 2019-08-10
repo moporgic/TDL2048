@@ -425,29 +425,6 @@ private:
 	}
 };
 
-inline u32 hashpatt(const std::vector<u32>& patt) {
-	u32 hash = 0;
-	for (auto tile : patt) hash = (hash << 4) | tile;
-	return hash;
-}
-inline std::vector<u32> hashpatt(const std::string& hashs, int iso = 0) {
-	u32 hash; std::stringstream(hashs) >> std::hex >> hash;
-	std::vector<u32> patt(hashs.size());
-	for (auto it = patt.rbegin(); it != patt.rend(); it++, hash >>= 4)
-		(*it) = hash & 0x0f;
-	std::transform(patt.begin(), patt.end(), patt.begin(), [=](u32 v) {
-		board x(0xfedcba9876543210ull);
-		x.isomorphic(-iso);
-		return x.at(v);
-	});
-	return patt;
-}
-inline std::string hashpatt(u32 hash, size_t n = 0) {
-	std::stringstream ss; ss << std::hex << hash;
-	std::string patt = ss.str();
-	return std::string(std::max(n, patt.size()) - patt.size(), '0') + patt;
-}
-
 template<u32 p0, u32 p1, u32 p2, u32 p3>
 u64 index4t(const board& b) {
 	register u64 index = 0;
@@ -1416,6 +1393,27 @@ void make_network(utils::options::option opt) {
 		}
 	}
 
+	auto vtou = [](std::vector<u32> patt) -> u32 {
+		u32 hash = 0;
+		for (auto tile : patt) hash = (hash << 4) | tile;
+		return hash;
+	};
+	auto utos = [](u32 hash, size_t n = 0) -> std::string {
+		std::string patt = ({ std::stringstream ss; ss << std::hex << hash; ss.str(); });
+		return std::string(std::max(n, patt.size()) - patt.size(), '0') + patt;
+	};
+	auto stov = [](std::string hash, u32 iso = 0) -> std::vector<u32> {
+		std::vector<u32> patt;
+		board x(0xfedcba9876543210ull); x.isomorphic(-iso);
+		for (char tile : hash) patt.push_back(x.at((tile & 15) + (tile & 64 ? 9 : 0)));
+		return patt;
+	};
+	auto vtos = [](std::vector<u32> patt) -> std::string {
+		std::string hash;
+		for (u32 tile : patt) hash.push_back(tile <= 9 ? tile + '0' : tile - 10 + 'a');
+		return hash;
+	};
+
 	std::stringstream unisomorphic(tokens); tokens.clear();
 	for (std::string token; unisomorphic >> token; tokens += (token + ' ')) {
 		if (token.find('!') == npos) continue;
@@ -1426,13 +1424,13 @@ void make_network(utils::options::option opt) {
 			std::string lval = lvals.back(); lvals.clear();
 			std::string hash = lval.substr(0, lval.find('!'));
 			std::string tail = lval.substr(lval.find('!') + 1);
-			for (u32 iso = 0; iso < 8; iso++) lvals.push_back(hashpatt(hashpatt(hashpatt(hash, iso)), hash.size()) + tail);
+			for (u32 iso = 0; iso < 8; iso++) lvals.push_back(vtos(stov(hash, iso)) + tail);
 		}
 		if (rvals.back().find('!') != npos) {
 			std::string rval = rvals.back(); rvals.clear();
 			std::string hash = rval.substr(0, rval.find('!')).substr(1);
 			std::string tail = rval.substr(rval.find('!') + 1);
-			for (u32 iso = 0; iso < 8; iso++) rvals.push_back(':' + hashpatt(hashpatt(hashpatt(hash, iso)), hash.size()) + tail);
+			for (u32 iso = 0; iso < 8; iso++) rvals.push_back(':' + vtos(stov(hash, iso)) + tail);
 		}
 		lvals.resize(8, lvals.back().substr(0, lvals.back().find('=')));
 		rvals.resize(8, rvals.front());
@@ -1517,7 +1515,7 @@ void make_network(utils::options::option opt) {
 			});
 			if (!indexer(sign)) {
 				indexer::mapper index = indexer(name).index();
-				if (!index) index = utils::indexhdr(std::bind(utils::indexnta, std::placeholders::_1, utils::hashpatt(name)));
+				if (!index) index = utils::indexhdr(std::bind(utils::indexnta, std::placeholders::_1, stov(name)));
 				indexer::make(sign, index);
 			}
 			idxr = indexer(sign).sign();
