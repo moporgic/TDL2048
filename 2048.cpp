@@ -1696,9 +1696,9 @@ struct method {
 			index::index6t<0x1,0x3,0x4,0x5,0x6,0x7>,
 			index::index6t<0x0,0x1,0x4,0x8,0x9,0xa>> isomorphic8x6patt;
 
-	static method parse(utils::options& opts, std::string type) {
+	static method parse(utils::options opts, std::string type) {
 		std::string spec = opts["options"].find("spec", "auto");
-		if (spec == "auto" || spec == "on") {
+		if (spec == "auto" || spec == "default" || spec == "on") {
 			spec = opts["make"].value("4x6patt");
 			spec = spec.substr(0, spec.find_first_of("&|="));
 		}
