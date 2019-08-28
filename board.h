@@ -862,6 +862,7 @@ public:
 		inline constexpr u32 where() const { return i; }
 		inline constexpr operator u32() const { return at(is(style::extend), is(style::exact)); }
 		inline constexpr tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
+		inline constexpr tile& operator =(const tile& t) { return operator =(u32(t)); }
 	public:
 		inline static constexpr u32 itov(u32 i) { return (1u << i) & 0xfffffffeu; }
 		inline static constexpr u32 vtoi(u32 v) { return math::log2(v); }
