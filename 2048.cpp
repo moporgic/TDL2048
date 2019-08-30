@@ -1825,22 +1825,19 @@ struct method {
 	constexpr inline operator estimator() const { return estim; }
 	constexpr inline operator optimizer() const { return optim; }
 
-	constexpr static inline numeric estimate(const board& state,
-			clip<feature> range = feature::feats()) {
+	constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
 		register numeric esti = 0;
 		for (register feature& feat : range)
 			esti += feat[state];
 		return esti;
 	}
-	constexpr static inline numeric optimize(const board& state, numeric error,
-			clip<feature> range = feature::feats()) {
+	constexpr static inline numeric optimize(const board& state, numeric error, clip<feature> range = feature::feats()) {
 		register numeric esti = 0;
 		for (register feature& feat : range)
 			esti += (feat[state] += error);
 		return esti;
 	}
-	constexpr static inline numeric illegal(const board& state,
-			clip<feature> range = feature::feats()) {
+	constexpr static inline numeric illegal(const board& state, clip<feature> range = feature::feats()) {
 		return -std::numeric_limits<numeric>::max();
 	}
 
@@ -1867,7 +1864,7 @@ struct method {
 			return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv);
 		}
 
-		constexpr static inline numeric estimate(const board& state, clip<feature> range) {
+		constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
 			register numeric esti = 0;
 			register board iso;
 			esti += invoke<indexes...>(({ iso = state;     iso; }), range);
@@ -1880,7 +1877,7 @@ struct method {
 			esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
 			return esti;
 		}
-		constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range) {
+		constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
 			register numeric esti = 0;
 			register board iso;
 			esti += invoke<indexes...>(({ iso = state;     iso; }), updv, range);
@@ -1895,68 +1892,53 @@ struct method {
 		}
 	};
 
+	template<typename source = method>
 	struct expectimax {
-		static std::array<u32, 16>& depth() {
-			static std::array<u32, 16> res = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
-			return res;
-		}
-		static std::array<u32, 16>& depth(const std::array<u32, 16>& res) { return (depth() = res); }
+		constexpr expectimax(u32 depth = 1) { expectimax<source>::depth() = depth; }
+		constexpr operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
 
-		static std::array<u32, 16>& depth(const std::string& res) {
-			std::array<u32, 16> depthres;
-			std::string dyndepth(res);
-			for (u32 d = 0, e = 0; e < 16; depthres[e++] = d) {
-				if (dyndepth.empty()) continue;
-				auto it = dyndepth.find_first_of(", ");
-				d = std::stol(dyndepth.substr(0, it));
-				dyndepth = dyndepth.substr(it + 1);
-			}
-			return depth(depthres);
-		}
-
-		static numeric search_illegal(const board& after, u32 depth,
-				clip<feature> range = feature::feats()) {
-			return -std::numeric_limits<numeric>::max();
-		}
-
-		template<method::estimator estim = method::estimate>
-		inline static numeric search_expt(const board& after, u32 depth,
-				clip<feature> range = feature::feats()) {
+		inline static numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
 			cache::block::access lookup = cache::find(after, depth);
 			if (lookup) return lookup.fetch();
-			if (!depth) return estim(after, range);
+			if (!depth) return source::estimate(after, range);
 			numeric expt = 0;
 			hexa spaces = after.spaces();
 			for (u32 i = 0; i < spaces.size(); i++) {
 				board before = after;
 				u32 pos = spaces[i];
 				before.set(pos, 1);
-				expt += 0.9 * search_best<estim>(before, depth - 1, range);
+				expt += 0.9 * search_best(before, depth - 1, range);
 				before.set(pos, 2);
-				expt += 0.1 * search_best<estim>(before, depth - 1, range);
+				expt += 0.1 * search_best(before, depth - 1, range);
 			}
 			return lookup.store(expt / spaces.size());
 		}
 
-		template<method::estimator estim = method::estimate>
-		inline static numeric search_best(const board& before, u32 depth,
-				clip<feature> range = feature::feats()) {
+		inline static numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
 			numeric best = 0;
 			for (u32 i = 0; i < 4; i++) {
 				board after = before;
 				auto reward = after.operate(i);
-				auto search = reward != -1 ? search_expt<estim> : search_illegal;
+				auto search = reward != -1 ? search_expt : search_illegal;
 				best = std::max(best, reward + search(after, depth - 1, range));
 			}
 			return best;
 		}
 
-		template<method::estimator estim = method::estimate, bool fixed = true>
-		inline static numeric estimate(const board& after,
-				clip<feature> range = feature::feats()) {
-			u32 depth = expectimax::depth()[fixed ? 0 : after.empty()] - 1;
-			return search_expt<estim>(after, depth, range);
+		inline static numeric search_illegal(const board& after, u32 depth, clip<feature> range = feature::feats()) {
+			return -std::numeric_limits<numeric>::max();
 		}
+
+		inline static numeric estimate(const board& after, clip<feature> range = feature::feats()) {
+			u32 depth = expectimax<source>::depth() - 1;
+			return search_expt(after, depth, range);
+		}
+
+		inline static numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
+			return source::optimize(state, updv, range);
+		}
+
+		inline static u32& depth() { static u32 depth = 1; return depth; }
 	};
 
 	typedef isomorphism<
@@ -2002,38 +1984,24 @@ struct method {
 			spec = spec.substr(0, spec.find_first_of("&|="));
 		}
 
-		if (opts[type]["mode"]("search") || opts[type]["mode"]("expectimax")) {
-			std::string mode = opts[type]["mode"];
-			auto it = std::min(mode.find("search"), mode.find("expectimax"));
-			if (it > 0 && (mode[it - 1] == '-' || mode[it - 1] == ':')) it--;
-			opts[type]["mode"] = mode.substr(0, it);
-			if (({ bool fixed = true; for (auto n : expectimax::depth()) fixed &= (n == (expectimax::depth()[0])); fixed; }))
-				switch (to_hash(spec)) {
-				case to_hash("4x6patt"): return { method::expectimax::estimate<isomorphic4x6patt::estimate, true>, isomorphic4x6patt::optimize };
-				case to_hash("5x6patt"): return { method::expectimax::estimate<isomorphic5x6patt::estimate, true>, isomorphic5x6patt::optimize };
-				case to_hash("6x6patt"): return { method::expectimax::estimate<isomorphic6x6patt::estimate, true>, isomorphic6x6patt::optimize };
-				case to_hash("7x6patt"): return { method::expectimax::estimate<isomorphic7x6patt::estimate, true>, isomorphic7x6patt::optimize };
-				case to_hash("8x6patt"): return { method::expectimax::estimate<isomorphic8x6patt::estimate, true>, isomorphic8x6patt::optimize };
-				default: return { method::expectimax::estimate<method::estimate>, method::optimize };
-				}
-			else
-				switch (to_hash(spec)) {
-				case to_hash("4x6patt"): return { method::expectimax::estimate<isomorphic4x6patt::estimate, false>, isomorphic4x6patt::optimize };
-				case to_hash("5x6patt"): return { method::expectimax::estimate<isomorphic5x6patt::estimate, false>, isomorphic5x6patt::optimize };
-				case to_hash("6x6patt"): return { method::expectimax::estimate<isomorphic6x6patt::estimate, false>, isomorphic6x6patt::optimize };
-				case to_hash("7x6patt"): return { method::expectimax::estimate<isomorphic7x6patt::estimate, false>, isomorphic7x6patt::optimize };
-				case to_hash("8x6patt"): return { method::expectimax::estimate<isomorphic8x6patt::estimate, false>, isomorphic8x6patt::optimize };
-				default: return { method::expectimax::estimate<method::estimate>, method::optimize };
-				}
+		if (opts["depth"].value(1) > 1) {
+			switch (to_hash(spec)) {
+			default: return method::expectimax<method>(opts["depth"]);
+			case to_hash("4x6patt"): return method::expectimax<method::isomorphic4x6patt>(opts["depth"]);
+			case to_hash("5x6patt"): return method::expectimax<method::isomorphic5x6patt>(opts["depth"]);
+			case to_hash("6x6patt"): return method::expectimax<method::isomorphic6x6patt>(opts["depth"]);
+			case to_hash("7x6patt"): return method::expectimax<method::isomorphic7x6patt>(opts["depth"]);
+			case to_hash("8x6patt"): return method::expectimax<method::isomorphic8x6patt>(opts["depth"]);
+			}
 		}
 
 		switch (to_hash(spec)) {
+		default: return method();
 		case to_hash("4x6patt"): return method::isomorphic4x6patt();
 		case to_hash("5x6patt"): return method::isomorphic5x6patt();
 		case to_hash("6x6patt"): return method::isomorphic6x6patt();
 		case to_hash("7x6patt"): return method::isomorphic7x6patt();
 		case to_hash("8x6patt"): return method::isomorphic8x6patt();
-		default: return method();
 		}
 	}
 };
@@ -2647,7 +2615,6 @@ int main(int argc, const char* argv[]) {
 	state::alpha(opts["alpha"] / (opts("alpha", "norm") ? opts["alpha"]["norm"].value(feature::feats().size()) : 1));
 	state::lambda(opts["lambda"]);
 	state::step(opts["step"]);
-	method::expectimax::depth(opts["depth"]);
 
 	utils::load_cache(opts["cache-load"]);
 	utils::make_cache(opts["cache-make"]);
