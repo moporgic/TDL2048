@@ -29,6 +29,7 @@
 #include <sstream>
 #include <iomanip>
 #include <list>
+#include <random>
 
 namespace moporgic {
 
@@ -316,6 +317,205 @@ private:
 	sign_t name;
 	weight raw;
 	indexer map;
+};
+
+class cache {
+public:
+	class block {
+	public:
+		class access {
+		public:
+			constexpr access(u64 sign, u32 hold, block& blk) : sign(sign), hold(hold), safe(-1u), blk(blk) {}
+			constexpr access(u64 sign, u32 hold) : access(sign, hold, raw_cast<block>(*this)) {}
+			constexpr access(access&& acc) : access(acc.sign, acc.hold, &(acc.blk) != &(raw_cast<block>(acc)) ? acc.blk : raw_cast<block>(*this)) {}
+			constexpr access(const access&) = delete;
+			constexpr access& operator =(const access&) = delete;
+
+			constexpr operator bool() const {
+				return blk.sign() == sign && blk.hold() >= hold;
+			}
+			constexpr numeric fetch() const {
+				u64 info = blk.info;
+				f32 esti = raw_cast<f32, 0>(info);
+				raw_cast<u16, 3>(info) = std::min(blk.hits() + 1, 65535);
+				u64 hash = sign ^ info;
+				blk.hash = hash;
+				blk.info = info;
+				return esti;
+			}
+			constexpr numeric store(numeric esti) const {
+				u64 info = 0;
+				raw_cast<f32, 0>(info) = esti;
+				raw_cast<u16, 2>(info) = hold;
+				raw_cast<u16, 3>(info) = blk.sign() == sign ? blk.hits() : 0;
+				u64 hash = sign ^ info;
+				blk.hash = hash;
+				blk.info = info;
+				return esti;
+			}
+		private:
+			u64 sign;
+			u32 hold;
+			u32 safe;
+			block& blk;
+		};
+
+		constexpr block(const block& e) = default;
+		constexpr block(u64 sign = 0, u64 info = 0) : hash(sign ^ info), info(info) {}
+		constexpr access operator()(u64 x, u32 n) { return access(x, n, *this); }
+		constexpr u64 sign() const { return hash ^ info; }
+		constexpr f32 esti() const { return raw_cast<f32, 0>(info); }
+		constexpr u16 hold() const { return raw_cast<u16, 2>(info); }
+		constexpr u16 hits() const { return raw_cast<u16, 3>(info); }
+		u64 sign(u64 sign) { return std::exchange(hash, sign ^ info) ^ info; }
+		f32 esti(f32 esti) { u64 sign = hash ^ info; esti = std::exchange(raw_cast<f32, 0>(info), esti); hash = sign ^ info; return esti; }
+		u16 hold(u16 hold) { u64 sign = hash ^ info; hold = std::exchange(raw_cast<u16, 2>(info), hold); hash = sign ^ info; return hold; }
+		u16 hits(u16 hits) { u64 sign = hash ^ info; hits = std::exchange(raw_cast<u16, 3>(info), hits); hash = sign ^ info; return hits; }
+
+	    friend std::ostream& operator <<(std::ostream& out, const block& blk) {
+	    	write_cast<u64>(out, blk.hash);
+	    	write_cast<u64>(out, blk.info);
+	    	return out;
+	    }
+		friend std::istream& operator >>(std::istream& in, block& blk) {
+			read_cast<u64>(in, blk.hash);
+			read_cast<u64>(in, blk.info);
+			return in;
+		}
+	private:
+		u64 hash;
+		u64 info; // f32 esti; u16 hold; u16 hits;
+	};
+
+	constexpr cache() : cached(&initial), length(1), mask(0), nmap{} {}
+	cache(const cache& tp) = default;
+	~cache() {}
+	inline size_t size() const { return length; }
+	inline block& operator[] (size_t i) { return cached[i]; }
+	inline const block& operator[] (size_t i) const { return cached[i]; }
+	inline block::access operator() (const board& b, u32 n) {
+		u64 x = min_isomorphic(b);
+		size_t i = (math::fmix64(x) ^ nmap[n >> 1]) & mask;
+		block& blk = operator[](i);
+		return blk(x, n);
+	}
+
+    friend std::ostream& operator <<(std::ostream& out, const cache& c) {
+		u32 code = 5;
+		write_cast<byte>(out, code);
+		switch (code) {
+		default:
+		case 4:
+			write_cast<u16>(out, 0); // reserved for header
+			write_cast<u64>(out, 0);
+			write_cast<u16>(out, sizeof(cache::block));
+			write_cast<u64>(out, c.size());
+			for (size_t i = 0; i < c.size(); i++)
+				out << c[i];
+			write_cast<u16>(out, 0); // reserved for fields
+			break;
+		case 5:
+			write_cast<u16>(out, 0); // reserved for header
+			write_cast<u64>(out, 0);
+			write_cast<u16>(out, sizeof(cache::block));
+			write_cast<u64>(out, c.size());
+			for (size_t i = 0; i < c.size(); i++)
+				out << c[i];
+			write_cast<u16>(out, sizeof(size_t));
+			write_cast<u64>(out, c.nmap.size());
+			write_cast<u64>(out, c.nmap.begin(), c.nmap.end());
+			write_cast<u16>(out, 0); // reserved for fields
+			break;
+		}
+		return out;
+	}
+	friend std::istream& operator >>(std::istream& in, cache& c) {
+		u32 code = 0;
+		read_cast<byte>(in, code);
+		switch (code) {
+		default:
+		case 4:
+			in.ignore(read<u16>(in) * read<u64>(in));
+			c.shape(read<u64>(in.ignore(2)));
+			for (size_t i = 0; i < c.size(); i++)
+				in >> c[i];
+			while ((code = read<u16>(in)) != 0)
+				in.ignore(code * read<u64>(in));
+			break;
+		case 5:
+			in.ignore(read<u16>(in) * read<u64>(in));
+			c.shape(read<u64>(in.ignore(2)));
+			for (size_t i = 0; i < c.size(); i++)
+				in >> c[i];
+			in.ignore(2); // sizeof(size_t)
+			read_cast<u64>(in, c.nmap.begin(),
+				c.nmap.begin() + std::min(c.nmap.size(), read<u64>(in)));
+			while ((code = read<u16>(in)) != 0)
+				in.ignore(code * read<u64>(in));
+			break;
+		}
+		return in;
+	}
+
+	static void save(std::ostream& out) {
+		u32 code = 0;
+		write_cast<byte>(out, code);
+		switch (code) {
+		default:
+		case 0:
+			out << instance();
+			break;
+		}
+		out.flush();
+	}
+	static void load(std::istream& in) {
+		u32 code;
+		read_cast<byte>(in, code);
+		switch (code) {
+		default:
+		case 0:
+			in >> instance();
+			break;
+		}
+	}
+
+	static inline block::access find(const board& b, u32 n) { return instance()(b, n); }
+	static inline cache& make(size_t len, bool peek = false) { return instance().shape(std::max(len, size_t(1)), peek); }
+	static inline cache& instance() { static cache tp; return tp; }
+
+private:
+	static inline block* alloc(size_t len) { return new block[len](); }
+	static inline void free(block* alloc) { delete[] alloc; }
+
+	cache& shape(size_t len, bool peek = false) {
+		length = (1ull << (math::lg64(len)));
+		mask = length - 1;
+		if (cached != &initial) free(cached);
+		cached = alloc(length);
+		for (size_t i = 0; i < nmap.size(); i++)
+			nmap[i] = math::fmix64(i);
+		if (peek) nmap.fill(0);
+		return *this;
+	}
+
+	constexpr inline u64 min_isomorphic(board t) const {
+		u64 x = u64(t);
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		return x;
+	}
+
+private:
+	block* cached;
+	block initial;
+	size_t length;
+	size_t mask;
+	std::array<size_t, 16> nmap;
 };
 
 namespace index {
@@ -1577,6 +1777,41 @@ void list_network() {
 	std::cout << std::endl;
 }
 
+void make_cache(std::string res = "") {
+	std::string in(res);
+	if (in == "default") in = "2G";
+
+	if (in.size()) {
+		size_t unit = 0, size = std::stoull(in, &unit);
+		if (unit < in.size())
+			switch (in[unit]) {
+			case 'k':
+			case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
+			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
+			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
+			}
+		bool peek = (in.find("+peek") != std::string::npos);
+		cache::make(size, peek);
+	}
+}
+void load_cache(std::string path) {
+	std::ifstream in;
+	in.open(path, std::ios::in | std::ios::binary);
+	if (!in.is_open()) return;
+	cache::load(in);
+	in.close();
+}
+void save_cache(std::string path) {
+	std::ofstream out;
+	char buf[1 << 20];
+	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
+	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!out.is_open()) return;
+	cache::save(out);
+	out.flush();
+	out.close();
+}
+
 } // utils
 
 
@@ -1657,6 +1892,55 @@ struct method {
 		}
 	};
 
+	template<typename source = method>
+	struct expectimax {
+		constexpr expectimax(u32 depth = 1) { expectimax<source>::depth() = depth; }
+		constexpr operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
+
+		inline static numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
+			cache::block::access lookup = cache::find(after, depth);
+			if (lookup) return lookup.fetch();
+			if (!depth) return source::estimate(after, range);
+			numeric expt = 0;
+			hexa spaces = after.spaces();
+			for (u32 i = 0; i < spaces.size(); i++) {
+				board before = after;
+				u32 pos = spaces[i];
+				before.set(pos, 1);
+				expt += 0.9 * search_best(before, depth - 1, range);
+				before.set(pos, 2);
+				expt += 0.1 * search_best(before, depth - 1, range);
+			}
+			return lookup.store(expt / spaces.size());
+		}
+
+		inline static numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
+			numeric best = 0;
+			for (u32 i = 0; i < 4; i++) {
+				board after = before;
+				auto reward = after.operate(i);
+				auto search = reward != -1 ? search_expt : search_illegal;
+				best = std::max(best, reward + search(after, depth - 1, range));
+			}
+			return best;
+		}
+
+		inline static numeric search_illegal(const board& after, u32 depth, clip<feature> range = feature::feats()) {
+			return -std::numeric_limits<numeric>::max();
+		}
+
+		inline static numeric estimate(const board& after, clip<feature> range = feature::feats()) {
+			u32 depth = expectimax<source>::depth() - 1;
+			return search_expt(after, depth, range);
+		}
+
+		inline static numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
+			return source::optimize(state, updv, range);
+		}
+
+		inline static u32& depth() { static u32 depth = 1; return depth; }
+	};
+
 	typedef isomorphism<
 			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
 			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
@@ -1699,6 +1983,18 @@ struct method {
 			spec = opts["make"].value("4x6patt");
 			spec = spec.substr(0, spec.find_first_of("&|="));
 		}
+
+		if (opts["depth"].value(1) > 1) {
+			switch (to_hash(spec)) {
+			default: return method::expectimax<method>(opts["depth"]);
+			case to_hash("4x6patt"): return method::expectimax<method::isomorphic4x6patt>(opts["depth"]);
+			case to_hash("5x6patt"): return method::expectimax<method::isomorphic5x6patt>(opts["depth"]);
+			case to_hash("6x6patt"): return method::expectimax<method::isomorphic6x6patt>(opts["depth"]);
+			case to_hash("7x6patt"): return method::expectimax<method::isomorphic7x6patt>(opts["depth"]);
+			case to_hash("8x6patt"): return method::expectimax<method::isomorphic8x6patt>(opts["depth"]);
+			}
+		}
+
 		switch (to_hash(spec)) {
 		default: return method();
 		case to_hash("4x6patt"): return method::isomorphic4x6patt();
@@ -2249,6 +2545,20 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-x"): case to_hash("-opt"): case to_hash("--options"):
 			opts["options"] += next_opts();
 			break;
+		case to_hash("-d"): case to_hash("--depth"):
+			opts["depth"] = next_opts();
+			break;
+		case to_hash("-c"): case to_hash("--cache"): case to_hash("--cache-make"):
+			opts["cache-make"] = next_opt("");
+			break;
+		case to_hash("-cio"): case to_hash("--cache-input-output"):
+		case to_hash("-ci"):  case to_hash("--cache-input"):
+		case to_hash("-co"):  case to_hash("--cache-output"):
+			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
+			opts[""] += next_opts();
+			if (label.find(label[1] != '-' ? "i" : "input")  != std::string::npos) opts["cache-load"] += opts[""];
+			if (label.find(label[1] != '-' ? "o" : "output") != std::string::npos) opts["cache-save"] += opts[""];
+			break;
 		case to_hash("-#"): case to_hash("--comment"):
 			opts["comment"] = next_opts();
 			break;
@@ -2282,6 +2592,7 @@ int main(int argc, const char* argv[]) {
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
 	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
+	if (!opts("depth")) opts["depth"] = 1;
 
 	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
@@ -2293,6 +2604,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
+	std::cout << "depth = " << opts["depth"] << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
@@ -2304,6 +2616,9 @@ int main(int argc, const char* argv[]) {
 	state::lambda(opts["lambda"]);
 	state::step(opts["step"]);
 
+	utils::load_cache(opts["cache-load"]);
+	utils::make_cache(opts["cache-make"]);
+
 	for (std::string recipe : opts["recipes"]) {
 		std::cout << recipe << ": " << opts[recipe] << std::endl << std::endl;
 		statistic stat = run(opts, recipe);
@@ -2311,6 +2626,7 @@ int main(int argc, const char* argv[]) {
 	}
 
 	utils::save_network(opts["save"]);
+	utils::save_cache(opts["cache-save"]);
 
 	return 0;
 }
