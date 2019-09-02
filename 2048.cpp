@@ -2004,6 +2004,13 @@ struct method {
 		case to_hash("8x6patt"): return method::isomorphic8x6patt();
 		}
 	}
+
+	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
+	inline static numeric& alpha(numeric a) { return (method::alpha() = a); }
+	inline static numeric& lambda() { static numeric l = 0.5; return l; }
+	inline static numeric& lambda(numeric l) { return (method::lambda() = l); }
+	inline static u32& step() { static u32 n = 5; return n; }
+	inline static u32& step(u32 n) { return (method::step() = n); }
 };
 
 struct state {
@@ -2031,20 +2038,13 @@ struct state {
 		esti = state::reward() + estim(move, range);
 		return esti;
 	}
-	inline numeric optimize(numeric exact, numeric alpha = state::alpha(),
+	inline numeric optimize(numeric exact, numeric alpha = method::alpha(),
 			clip<feature> range = feature::feats(),
 			method::optimizer optim = method::optimize) {
 		numeric update = (exact - state::value()) * alpha;
 		esti = state::reward() + optim(move, update, range);
 		return esti;
 	}
-
-	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
-	inline static numeric& alpha(numeric a) { return (state::alpha() = a); }
-	inline static numeric& lambda() { static numeric l = 0.5; return l; }
-	inline static numeric& lambda(numeric l) { return (state::lambda() = l); }
-	inline static u32& step() { static u32 n = 5; return n; }
-	inline static u32& step(u32 n) { return (state::step() = n); }
 };
 struct select {
 	state move[4];
@@ -2282,9 +2282,9 @@ statistic run(utils::options opts, std::string type) {
 
 	method spec = method::parse(opts, type);
 	clip<feature> feats = feature::feats();
-	numeric alpha = state::alpha();
-	numeric lambda = state::lambda();
-	u32 step = state::step();
+	numeric alpha = method::alpha();
+	numeric lambda = method::lambda();
+	u32 step = method::step();
 
 	switch (to_hash(opts[type]["mode"].value(type))) {
 	case to_hash("optimize"):
@@ -2612,9 +2612,9 @@ int main(int argc, const char* argv[]) {
 	utils::list_network();
 
 	moporgic::srand(to_hash(opts["seed"]));
-	state::alpha(opts["alpha"] / (opts("alpha", "norm") ? opts["alpha"]["norm"].value(feature::feats().size()) : 1));
-	state::lambda(opts["lambda"]);
-	state::step(opts["step"]);
+	method::alpha(opts["alpha"] / (opts("alpha", "norm") ? opts["alpha"]["norm"].value(feature::feats().size()) : 1));
+	method::lambda(opts["lambda"]);
+	method::step(opts["step"]);
 
 	utils::load_cache(opts["cache-load"]);
 	utils::make_cache(opts["cache-make"]);
