@@ -1590,22 +1590,19 @@ struct method {
 	constexpr inline operator estimator() const { return estim; }
 	constexpr inline operator optimizer() const { return optim; }
 
-	constexpr static inline numeric estimate(const board& state,
-			clip<feature> range = feature::feats()) {
+	constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
 		register numeric esti = 0;
 		for (register feature& feat : range)
 			esti += feat[state];
 		return esti;
 	}
-	constexpr static inline numeric optimize(const board& state, numeric error,
-			clip<feature> range = feature::feats()) {
+	constexpr static inline numeric optimize(const board& state, numeric error, clip<feature> range = feature::feats()) {
 		register numeric esti = 0;
 		for (register feature& feat : range)
 			esti += (feat[state] += error);
 		return esti;
 	}
-	constexpr static inline numeric illegal(const board& state,
-			clip<feature> range = feature::feats()) {
+	constexpr static inline numeric illegal(const board& state, clip<feature> range = feature::feats()) {
 		return -std::numeric_limits<numeric>::max();
 	}
 
@@ -1632,7 +1629,7 @@ struct method {
 			return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv);
 		}
 
-		constexpr static inline numeric estimate(const board& state, clip<feature> range) {
+		constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
 			register numeric esti = 0;
 			register board iso;
 			esti += invoke<indexes...>(({ iso = state;     iso; }), range);
@@ -1645,7 +1642,7 @@ struct method {
 			esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
 			return esti;
 		}
-		constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range) {
+		constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
 			register numeric esti = 0;
 			register board iso;
 			esti += invoke<indexes...>(({ iso = state;     iso; }), updv, range);
@@ -1703,12 +1700,12 @@ struct method {
 			spec = spec.substr(0, spec.find_first_of("&|="));
 		}
 		switch (to_hash(spec)) {
+		default: return method();
 		case to_hash("4x6patt"): return method::isomorphic4x6patt();
 		case to_hash("5x6patt"): return method::isomorphic5x6patt();
 		case to_hash("6x6patt"): return method::isomorphic6x6patt();
 		case to_hash("7x6patt"): return method::isomorphic7x6patt();
 		case to_hash("8x6patt"): return method::isomorphic8x6patt();
-		default: return method();
 		}
 	}
 };
