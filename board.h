@@ -521,6 +521,19 @@ public:
 		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
 	}
+	inline std::array<board, 4> after() const {
+		return after64();
+	}
+	inline std::array<board, 4> after64() const {
+		std::array<board, 4> move;
+		after64(move[0], move[1], move[2], move[3]);
+		return move;
+	}
+	inline std::array<board, 4> after80() const {
+		std::array<board, 4> move;
+		after80(move[0], move[1], move[2], move[3]);
+		return move;
+	}
 
 	class action {
 	public:
