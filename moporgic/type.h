@@ -9,8 +9,10 @@
 
 #include "unit.h"
 #include <type_traits>
-#include <iostream>
 #include <iterator>
+#include <vector>
+#include <array>
+#include <iostream>
 #include <algorithm>
 #include <utility>
 

@@ -9,9 +9,6 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
-#include <algorithm>
-#include <iostream>
-#include <cstdio>
 
 namespace moporgic {
 
