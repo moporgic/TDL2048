@@ -1894,7 +1894,7 @@ struct method {
 
 	template<typename source = method>
 	struct expectimax {
-		constexpr expectimax(u32 depth = 1) { expectimax<source>::depth() = depth; }
+		constexpr expectimax(u32 depth = 1) { expectimax<source>::depth(depth); }
 		constexpr operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
 
 		inline static numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
@@ -1939,6 +1939,7 @@ struct method {
 		}
 
 		inline static u32& depth() { static u32 depth = 1; return depth; }
+		inline static u32& depth(u32 n) { return (expectimax<source>::depth() = n); }
 	};
 
 	typedef isomorphism<
