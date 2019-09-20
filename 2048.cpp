@@ -1916,7 +1916,9 @@ struct method {
 
 		inline static numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
 			numeric best = 0;
-			for (const board& after : before.after()) {
+			board moves[4];
+			before.moves(moves);
+			for (const board& after : moves) {
 				auto search = after.info() != -1u ? search_expt : search_illegal;
 				best = std::max(best, after.info() + search(after, depth - 1, range));
 			}
@@ -2050,7 +2052,7 @@ struct select {
 	state *best;
 	inline select() : best(move) {}
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
-		b.after(move[0], move[1], move[2], move[3]);
+		b.moves(move[0], move[1], move[2], move[3]);
 		move[0].estimate(range, estim);
 		move[1].estimate(range, estim);
 		move[2].estimate(range, estim);

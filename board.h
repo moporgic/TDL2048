@@ -480,10 +480,10 @@ public:
 		return move.inf;
 	}
 
-	inline void after(board& U, board& R, board& D, board& L) const {
-		return after64(U, R, D, L);
+	inline void moves(board& U, board& R, board& D, board& L) const {
+		return moves64(U, R, D, L);
 	}
-	inline void after64(board& U, board& R, board& D, board& L) const {
+	inline void moves64(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
 
 		board b(*this);
@@ -502,7 +502,7 @@ public:
 		U.inf |= (U.raw ^ raw) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) ? 0 : -1;
 	}
-	inline void after80(board& U, board& R, board& D, board& L) const {
+	inline void moves80(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
 
 		board b(*this);
@@ -521,18 +521,23 @@ public:
 		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
 	}
-	inline std::array<board, 4> after() const {
-		return after64();
+
+	inline void moves(board move[]) const { return moves64(move); }
+	inline void moves64(board move[]) const { moves64(move[0], move[1], move[2], move[3]); }
+	inline void moves80(board move[]) const { moves80(move[0], move[1], move[2], move[3]); }
+
+	inline std::array<board, 4> afters() const {
+		return afters64();
 	}
-	inline std::array<board, 4> after64() const {
-		std::array<board, 4> move;
-		after64(move[0], move[1], move[2], move[3]);
-		return move;
+	inline std::array<board, 4> afters64() const {
+		std::array<board, 4> after;
+		moves64(after.data());
+		return after;
 	}
-	inline std::array<board, 4> after80() const {
-		std::array<board, 4> move;
-		after80(move[0], move[1], move[2], move[3]);
-		return move;
+	inline std::array<board, 4> afters80() const {
+		std::array<board, 4> after;
+		moves80(after.data());
+		return after;
 	}
 
 	class action {
