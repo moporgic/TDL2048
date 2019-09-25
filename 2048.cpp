@@ -1916,9 +1916,7 @@ struct method {
 
 		inline static numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
 			numeric best = 0;
-			board moves[4];
-			before.moves(moves);
-			for (const board& after : moves) {
+			for (const board& after : before.afters()) {
 				auto search = after.info() != -1u ? search_expt : search_illegal;
 				best = std::max(best, after.info() + search(after, depth - 1, range));
 			}
