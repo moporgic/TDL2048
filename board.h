@@ -522,9 +522,12 @@ public:
 		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
 	}
 
-	inline void moves(board move[]) const { return moves64(move); }
-	inline void moves64(board move[]) const { moves64(move[0], move[1], move[2], move[3]); }
-	inline void moves80(board move[]) const { moves80(move[0], move[1], move[2], move[3]); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline void moves(btype move[]) const { return moves64(move); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline void moves64(btype move[]) const { moves64(move[0], move[1], move[2], move[3]); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline void moves80(btype move[]) const { moves80(move[0], move[1], move[2], move[3]); }
 
 	inline std::array<board, 4> afters() const {
 		return afters64();
