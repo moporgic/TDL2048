@@ -2014,36 +2014,33 @@ struct method {
 	inline static u32& step(u32 n) { return (method::step() = n); }
 };
 
-struct state {
-	board move;
+struct state : board {
 	numeric esti;
-	inline state() : move(0ull, 0u, -1u), esti(0) {}
+	inline state() : board(0ull, 0u, -1u), esti(0) {}
 	inline state(const state& s) = default;
 
-	inline operator board&() { return move; }
-	inline operator const board&() const { return move; }
-	inline operator bool() const { return move.info() != -1u; }
+	inline operator bool() const { return info() != -1u; }
 	declare_comparators(const state&, esti, inline);
 
-	inline numeric value() const { return esti - move.info(); }
-	inline i32 reward() const { return move.info(); }
+	inline numeric value() const { return esti - info(); }
+	inline i32 reward() const { return info(); }
 
 	inline void assign(const board& b, u32 op = -1) {
-		move = b;
-		move.info(move.operate(op));
+		set(b);
+		info(move(op));
 	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats(),
 			method::estimator estim = method::estimate) {
-		estim = move.info() != -1u ? estim : method::illegal;
-		esti = state::reward() + estim(move, range);
+		estim = info() != -1u ? estim : method::illegal;
+		esti = state::reward() + estim(*this, range);
 		return esti;
 	}
 	inline numeric optimize(numeric exact, numeric alpha = method::alpha(),
 			clip<feature> range = feature::feats(),
 			method::optimizer optim = method::optimize) {
 		numeric update = (exact - state::value()) * alpha;
-		esti = state::reward() + optim(move, update, range);
+		esti = state::reward() + optim(*this, update, range);
 		return esti;
 	}
 };
@@ -2063,10 +2060,10 @@ struct select {
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
-	inline void operator >>(board& b) const { b.set(best->move); }
+	inline void operator >>(board& b) const { b.set(*best); }
 
 	inline operator bool() const { return score() != -1; }
-	inline i32 score() const { return best->move.info(); }
+	inline i32 score() const { return best->info(); }
 	inline numeric esti() const { return best->esti; }
 	inline u32 opcode() const { return best - move; }
 
