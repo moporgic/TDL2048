@@ -56,6 +56,12 @@ declare_enable_if_with(is_convertible, is_iterator_convertible, typename std::it
 #define declare_trait(trait, detail...)\
 template<> struct std::trait<detail> : public std::true_type {};
 
+template<typename base, typename test> using enable_if_is_base_of = typename std::enable_if<std::is_base_of<base, test>::value>::type;
+template<typename base, typename test> using enable_if_not_is_base_of = typename std::enable_if<not std::is_base_of<base, test>::value>::type;
+
+template<typename from, typename to> using enable_if_is_convertible = typename std::enable_if<std::is_convertible<from, to>::value>::type;
+template<typename from, typename to> using enable_if_not_is_convertible = typename std::enable_if<not std::is_convertible<from, to>::value>::type;
+
 } /* namespace moporgic */
 
 declare_trait(is_integral, moporgic::hexadeca);
