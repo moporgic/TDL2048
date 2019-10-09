@@ -1679,16 +1679,22 @@ void make_network(utils::options::option opt) {
 				while (!test && (test.sign() + ' ')[0] == '0') test = weight(test.sign().substr(1));
 				if (test.size() == size) raw_cast<std::string>(weight::wghts().at(test.sign())) = sign; // unsafe!
 			}
-			if (!weight(sign) && size) {
+			if (!weight(sign) && size) { // create new weight table
 				weight dst = weight::make(sign, size);
 				if (init.find_first_of("{}") != npos && init != "{}") {
 					weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
 					for (size_t n = 0; n < dst.size(); n += src.size()) {
 						std::copy_n(src.data(), src.size(), dst.data() + n);
 					}
-				} else if (init.find_first_of("0123456789.-") == 0) {
+				} else if (init.find_first_of("0123456789.+-") == 0) {
 					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
 					std::fill_n(dst.data(), dst.size(), val);
+				}
+			} else if (weight(sign) && size) { // table already exists
+				weight dst = weight(sign);
+				if (init.find_first_of("+-") == 0) {
+					numeric off = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
+					std::transform(dst.data(), dst.data() + dst.size(), dst.data(), [=](numeric val) { return val += off; });
 				}
 			}
 			wght = weight(sign).sign();
