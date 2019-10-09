@@ -1900,15 +1900,30 @@ struct method {
 
 	template<typename source = method>
 	struct expectimax {
-		constexpr expectimax(u32 depth = 1) { expectimax<source>::depth(depth); }
+		constexpr expectimax(utils::options::option depth) {
+			u32 n = expectimax<source>::depth(depth);
+			std::stringstream in(({
+				std::string limit = depth.find("limit", depth.value());
+				while (limit.find(',') != std::string::npos) limit[limit.find(',')] = ' ';
+				limit;
+			}));
+			for (u32& lim : expectimax<source>::limit()) {
+				in >> n;
+				lim = n & -2u;
+			}
+		}
 		constexpr operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
 
 		inline static numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
+			hexa spaces;
+			if (depth) {
+				const std::array<u32, 17>& limit = expectimax<source>::limit();
+				depth = std::min(depth, limit[(spaces = after.spaces()).size()]);
+			}
 			cache::block::access lookup = cache::find(after, depth);
 			if (lookup) return lookup.fetch();
 			if (!depth) return source::estimate(after, range);
 			numeric expt = 0;
-			hexa spaces = after.spaces();
 			for (u32 i = 0; i < spaces.size(); i++) {
 				board before = after;
 				u32 pos = spaces[i];
@@ -1944,6 +1959,7 @@ struct method {
 
 		inline static u32& depth() { static u32 depth = 1; return depth; }
 		inline static u32& depth(u32 n) { return (expectimax<source>::depth() = n); }
+		inline static std::array<u32, 17>& limit() { static std::array<u32, 17> limit = {}; return limit; }
 	};
 
 	typedef isomorphism<
