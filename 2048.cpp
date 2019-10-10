@@ -1924,13 +1924,10 @@ struct method {
 			if (lookup) return lookup.fetch();
 			if (!depth) return source::estimate(after, range);
 			numeric expt = 0;
-			for (u32 i = 0; i < spaces.size(); i++) {
+			for (u32 pos : spaces) {
 				board before = after;
-				u32 pos = spaces[i];
-				before.set(pos, 1);
-				expt += 0.9 * search_best(before, depth - 1, range);
-				before.set(pos, 2);
-				expt += 0.1 * search_best(before, depth - 1, range);
+				expt += 0.9 * search_best(({ before.set(pos, 1); before; }), depth - 1, range);
+				expt += 0.1 * search_best(({ before.set(pos, 2); before; }), depth - 1, range);
 			}
 			return lookup.store(expt / spaces.size());
 		}
