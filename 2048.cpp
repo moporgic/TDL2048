@@ -1915,21 +1915,19 @@ struct method {
 		constexpr operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
 
 		inline static numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
+			numeric expt = 0;
 			hexa spaces;
-			if (depth) {
-				const std::array<u32, 17>& limit = expectimax<source>::limit();
-				depth = std::min(depth, limit[(spaces = after.spaces()).size()]);
-			}
+			if (depth) depth = std::min(depth, limit((spaces = after.spaces()).size()));
 			cache::block::access lookup = cache::find(after, depth);
 			if (lookup) return lookup.fetch();
 			if (!depth) return source::estimate(after, range);
-			numeric expt = 0;
 			for (u32 pos : spaces) {
 				board before = after;
 				expt += 0.9 * search_best(({ before.set(pos, 1); before; }), depth - 1, range);
 				expt += 0.1 * search_best(({ before.set(pos, 2); before; }), depth - 1, range);
 			}
-			return lookup.store(expt / spaces.size());
+			expt = lookup.store(expt / spaces.size());
+			return expt;
 		}
 
 		inline static numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
@@ -1946,8 +1944,7 @@ struct method {
 		}
 
 		inline static numeric estimate(const board& after, clip<feature> range = feature::feats()) {
-			u32 depth = expectimax<source>::depth() - 1;
-			return search_expt(after, depth, range);
+			return search_expt(after, depth() - 1, range);
 		}
 
 		inline static numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
@@ -1957,6 +1954,7 @@ struct method {
 		inline static u32& depth() { static u32 depth = 1; return depth; }
 		inline static u32& depth(u32 n) { return (expectimax<source>::depth() = n); }
 		inline static std::array<u32, 17>& limit() { static std::array<u32, 17> limit = {}; return limit; }
+		inline static u32& limit(u32 e) { return limit()[e]; }
 	};
 
 	typedef isomorphism<
