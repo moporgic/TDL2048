@@ -2283,9 +2283,9 @@ statistic run(utils::options opts, std::string type) {
 
 	method spec = method::parse(opts, type);
 	clip<feature> feats = feature::feats();
-	numeric alpha = method::alpha();
-	numeric lambda = method::lambda();
-	u32 step = method::step();
+	numeric alpha = method::alpha(opts["alpha"] / (opts("alpha", "norm") ? opts["alpha"]["norm"].value(feats.size()) : 1));
+	numeric lambda = method::lambda(opts["lambda"]);
+	u32 step = method::step(opts["step"]);
 
 	switch (to_hash(opts[type]["mode"].value(type))) {
 	case to_hash("optimize"):
@@ -2600,16 +2600,12 @@ int main(int argc, const char* argv[]) {
 	std::cout << "depth = " << opts["depth"] << ", cache = " << opts["cache"].value("none") << std::endl;
 	std::cout << std::endl;
 
+	moporgic::srand(to_hash(opts["seed"]));
+	utils::init_cache(opts["cache"]);
+
 	utils::load_network(opts["load"]);
 	utils::make_network(opts["make"]);
 	utils::list_network();
-
-	moporgic::srand(to_hash(opts["seed"]));
-	method::alpha(opts["alpha"] / (opts("alpha", "norm") ? opts["alpha"]["norm"].value(feature::feats().size()) : 1));
-	method::lambda(opts["lambda"]);
-	method::step(opts["step"]);
-
-	utils::init_cache(opts["cache"]);
 
 	for (std::string recipe : opts["recipes"]) {
 		std::cout << recipe << ": " << opts[recipe] << std::endl << std::endl;
