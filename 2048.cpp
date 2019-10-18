@@ -1734,11 +1734,13 @@ void load_network(utils::options::option opt) {
 			}
 			if (type == 'w')  weight::load(in);
 			if (type == 'f') feature::load(in);
+			if (type == 'c')   cache::load(in);
 		}
 		in.close();
 	}
-	for (feature f : list<feature>(std::move(feature::feats())))
+	for (feature f : list<feature>(std::move(feature::feats()))) {
 		feature::make(f.value().sign(), f.index().sign());
+	}
 }
 void save_network(utils::options::option opt) {
 	char buf[1 << 20];
@@ -1749,9 +1751,13 @@ void save_network(utils::options::option opt) {
 		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
 		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) continue;
-		// for upward compatibility, we still store legacy binaries if suffix are traditional (.f or .w)
-		if (type != 'f')  weight::save(type != 'w' ? out.write("w", 1) : out);
-		if (type != 'w') feature::save(type != 'f' ? out.write("f", 1) : out);
+		// for upward compatibility, we still write legacy binaries for traditional suffixes
+		if (type != 'c') {
+			if (type != 'f')  weight::save(type != 'w' ? out.write("w", 1) : out);
+			if (type != 'w') feature::save(type != 'f' ? out.write("f", 1) : out);
+		} else { // .c is reserved for cache binary
+			cache::save(type != 'c' ? out.write("c", 1) : out);
+		}
 		out.flush();
 		out.close();
 	}
@@ -1783,15 +1789,14 @@ void list_network() {
 	std::cout << std::endl;
 }
 
-void make_cache(std::string res = "") {
+void init_cache(std::string res = "") {
 	std::string in(res);
 	if (in == "default") in = "2G";
 
 	if (in.size()) {
 		size_t unit = 0, size = std::stoull(in, &unit);
 		if (unit < in.size())
-			switch (in[unit]) {
-			case 'k':
+			switch (std::toupper(in[unit])) {
 			case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
 			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
 			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
@@ -1799,23 +1804,6 @@ void make_cache(std::string res = "") {
 		bool peek = (in.find("+peek") != std::string::npos);
 		cache::make(size, peek);
 	}
-}
-void load_cache(std::string path) {
-	std::ifstream in;
-	in.open(path, std::ios::in | std::ios::binary);
-	if (!in.is_open()) return;
-	cache::load(in);
-	in.close();
-}
-void save_cache(std::string path) {
-	std::ofstream out;
-	char buf[1 << 20];
-	out.rdbuf()->pubsetbuf(buf, sizeof(buf));
-	out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-	if (!out.is_open()) return;
-	cache::save(out);
-	out.flush();
-	out.close();
 }
 
 } // utils
@@ -2561,16 +2549,8 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-d"): case to_hash("--depth"):
 			opts["depth"] = next_opts();
 			break;
-		case to_hash("-c"): case to_hash("--cache"): case to_hash("--cache-make"):
-			opts["cache-make"] = next_opt("");
-			break;
-		case to_hash("-cio"): case to_hash("--cache-input-output"):
-		case to_hash("-ci"):  case to_hash("--cache-input"):
-		case to_hash("-co"):  case to_hash("--cache-output"):
-			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
-			opts[""] += next_opts();
-			if (label.find(label[1] != '-' ? "i" : "input")  != std::string::npos) opts["cache-load"] += opts[""];
-			if (label.find(label[1] != '-' ? "o" : "output") != std::string::npos) opts["cache-save"] += opts[""];
+		case to_hash("-c"): case to_hash("--cache"):
+			opts["cache"] = next_opt("default");
 			break;
 		case to_hash("-#"): case to_hash("--comment"):
 			opts["comment"] = next_opts();
@@ -2617,7 +2597,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
-	std::cout << "depth = " << opts["depth"] << std::endl;
+	std::cout << "depth = " << opts["depth"] << ", cache = " << opts["cache"].value("none") << std::endl;
 	std::cout << std::endl;
 
 	utils::load_network(opts["load"]);
@@ -2629,8 +2609,7 @@ int main(int argc, const char* argv[]) {
 	method::lambda(opts["lambda"]);
 	method::step(opts["step"]);
 
-	utils::load_cache(opts["cache-load"]);
-	utils::make_cache(opts["cache-make"]);
+	utils::init_cache(opts["cache"]);
 
 	for (std::string recipe : opts["recipes"]) {
 		std::cout << recipe << ": " << opts[recipe] << std::endl << std::endl;
@@ -2639,7 +2618,6 @@ int main(int argc, const char* argv[]) {
 	}
 
 	utils::save_network(opts["save"]);
-	utils::save_cache(opts["cache-save"]);
 
 	return 0;
 }
