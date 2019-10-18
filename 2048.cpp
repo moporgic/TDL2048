@@ -2452,6 +2452,24 @@ statistic run(utils::options opts, std::string type) {
 			stats.update(score, b.hash(), opers);
 		}
 		break;
+
+	case to_hash("evaluate:greedy"):
+		for (stats.init(opts[type]); stats; stats++) {
+			board b;
+			struct state : board {
+				declare_comparators_with(const state&, int(info()), int(v.info()), inline constexpr)
+			} moves[4];
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); ({ b.moves(moves); (b = *std::max_element(moves, moves + 4)).info() != -1u; }); b.next()) {
+				score += b.info();
+				opers += 1;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
 	}
 
 	return stats;
