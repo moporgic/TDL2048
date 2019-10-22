@@ -2443,10 +2443,12 @@ statistic run(utils::options opts, std::string type) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
+			u64 rbuf;
 			hex a;
 
 			for (b.init(); (a = b.actions()).size(); b.next()) {
-				score += b.operate(a[moporgic::rand() % a.size()]);
+				if (opers % 8 == 0) rbuf = moporgic::rand64();
+				score += b.operate(a[raw_cast<u8>(rbuf, opers % 8) % a.size()]);
 				opers += 1;
 			}
 
