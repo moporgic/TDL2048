@@ -325,38 +325,36 @@ public:
 	public:
 		class access {
 		public:
-			constexpr access(u64 sign, u32 hold, block& blk) : sign(sign), hold(hold), safe(-1u), blk(blk) {}
+			constexpr access(u64 sign, u32 hold, block& blk) : hash(blk.hash), info(blk.info), sign(sign), hold(hold), blk(blk) {}
 			constexpr access(u64 sign, u32 hold) : access(sign, hold, raw_cast<block>(*this)) {}
 			constexpr access(access&& acc) : access(acc.sign, acc.hold, &(acc.blk) != &(raw_cast<block>(acc)) ? acc.blk : raw_cast<block>(*this)) {}
 			constexpr access(const access&) = delete;
 			constexpr access& operator =(const access&) = delete;
 
 			constexpr operator bool() const {
-				return blk.sign() == sign && blk.hold() >= hold;
+				return ((hash ^ info) == sign) & (raw_cast<u16, 2>(info) >= hold);
 			}
-			constexpr numeric fetch() const {
-				u64 info = blk.info;
-				f32 esti = raw_cast<f32, 0>(info);
-				raw_cast<u16, 3>(info) = std::min(blk.hits() + 1, 65535);
-				u64 hash = sign ^ info;
-				blk.hash = hash;
-				blk.info = info;
+			constexpr numeric fetch() {
+				numeric esti = raw_cast<f32, 0>(info);
+				u64 sign = hash ^ info;
+				raw_cast<u16, 3>(info) = std::min(raw_cast<u16, 3>(info) + 1, 65535);
+				hash = sign ^ info;
+				blk = raw_cast<block>(*this);
 				return esti;
 			}
-			constexpr numeric store(numeric esti) const {
-				u64 info = 0;
+			constexpr numeric store(numeric esti) {
 				raw_cast<f32, 0>(info) = esti;
 				raw_cast<u16, 2>(info) = hold;
-				raw_cast<u16, 3>(info) = blk.sign() == sign ? blk.hits() : 0;
-				u64 hash = sign ^ info;
-				blk.hash = hash;
-				blk.info = info;
+				raw_cast<u16, 3>(info) = (hash ^ info) == sign ? raw_cast<u16, 3>(info) : 0;
+				hash = sign ^ info;
+				blk = raw_cast<block>(*this);
 				return esti;
 			}
 		private:
+			u64 hash;
+			u64 info; // f32 esti; u16 hold; u16 hits;
 			u64 sign;
 			u32 hold;
-			u32 safe;
 			block& blk;
 		};
 
@@ -367,10 +365,6 @@ public:
 		constexpr f32 esti() const { return raw_cast<f32, 0>(info); }
 		constexpr u16 hold() const { return raw_cast<u16, 2>(info); }
 		constexpr u16 hits() const { return raw_cast<u16, 3>(info); }
-		u64 sign(u64 sign) { return std::exchange(hash, sign ^ info) ^ info; }
-		f32 esti(f32 esti) { u64 sign = hash ^ info; esti = std::exchange(raw_cast<f32, 0>(info), esti); hash = sign ^ info; return esti; }
-		u16 hold(u16 hold) { u64 sign = hash ^ info; hold = std::exchange(raw_cast<u16, 2>(info), hold); hash = sign ^ info; return hold; }
-		u16 hits(u16 hits) { u64 sign = hash ^ info; hits = std::exchange(raw_cast<u16, 3>(info), hits); hash = sign ^ info; return hits; }
 
 	    friend std::ostream& operator <<(std::ostream& out, const block& blk) {
 	    	write_cast<u64>(out, blk.hash);
