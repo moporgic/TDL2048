@@ -7,40 +7,14 @@
  *      Author: moporgic
  */
 
-#include <cstddef>
-#include <cstdint>
-#include <cinttypes>
+#include "unit.h"
 #include <type_traits>
-
-typedef int64_t  ll;
-typedef uint64_t ull;
-
-typedef int64_t  i64;
-typedef uint64_t u64;
-typedef int32_t  i32;
-typedef uint32_t u32;
-typedef int16_t  i16;
-typedef uint16_t u16;
-typedef int8_t   i8;
-typedef uint8_t  u8;
-
-typedef __int128          i128;
-typedef unsigned __int128 u128;
-typedef unsigned char     uchar;
-typedef unsigned long int ulint;
-
-typedef long  art;  // art is long
-typedef short life; // life is short
-
-typedef long double llf;
-typedef long double quadruple;
-typedef long double quadra;
-typedef long double f128;
-typedef double f64;
-typedef float  f32;
-
-typedef intptr_t  iptr;
-typedef uintptr_t uptr;
+#include <iterator>
+#include <vector>
+#include <array>
+#include <iostream>
+#include <algorithm>
+#include <utility>
 
 namespace moporgic {
 class byte;
@@ -52,29 +26,6 @@ typedef bihexadeca hexa;
 }
 typedef moporgic::byte byte;
 typedef moporgic::half f16;
-
-
-#if !defined(__cplusplus) || __cplusplus < 201103L
-#define constexpr
-#define noexcept
-#endif
-
-template<typename dst, typename src> static inline constexpr
-dst  cast(src ptr) noexcept { return (dst) ptr; /*return reinterpret_cast<dst>(p);*/ }
-
-template<typename dst, typename src> static inline constexpr
-dst* pointer_cast(src* ptr) noexcept { return cast<dst*>(ptr); }
-
-template<typename dst, typename src> static inline constexpr
-dst& reference_cast(src& ref) noexcept { return *(pointer_cast<dst>(&ref)); }
-
-template<typename dst, int off = 0, typename src> static inline constexpr
-dst& raw_cast(src& ref, int sh = 0) noexcept { return *(pointer_cast<dst>(&ref) + off + sh); }
-
-#include <iostream>
-#include <iterator>
-#include <algorithm>
-#include <utility>
 
 namespace moporgic {
 
@@ -104,6 +55,12 @@ declare_enable_if_with(is_convertible, is_iterator_convertible, typename std::it
 
 #define declare_trait(trait, detail...)\
 template<> struct std::trait<detail> : public std::true_type {};
+
+template<typename base, typename test> using enable_if_is_base_of = typename std::enable_if<std::is_base_of<base, test>::value>::type;
+template<typename base, typename test> using enable_if_not_is_base_of = typename std::enable_if<not std::is_base_of<base, test>::value>::type;
+
+template<typename from, typename to> using enable_if_is_convertible = typename std::enable_if<std::is_convertible<from, to>::value>::type;
+template<typename from, typename to> using enable_if_not_is_convertible = typename std::enable_if<not std::is_convertible<from, to>::value>::type;
 
 } /* namespace moporgic */
 
@@ -229,7 +186,7 @@ public:
 public:
 	static constexpr half& as(const u16& raw) noexcept { return raw_cast<half>(raw); }
 	friend std::ostream& operator <<(std::ostream& os, const half& hf) { return os << f32(hf); }
-	friend std::istream& operator >>(std::istream& is, half& hf) { f32 k; is >> k; hf = k; return is; }
+	friend std::istream& operator >>(std::istream& is, half& hf) { f32 k; if (is >> k) hf = k; return is; }
 private:
 	u16 hf;
 };
@@ -373,7 +330,7 @@ protected:
 
 namespace moporgic {
 
-class hexadeca { // iter?
+class hexadeca {
 public:
 	constexpr hexadeca(u64 hex = 0) noexcept : hex(hex) {}
 	constexpr operator u64&() noexcept { return hex; }
