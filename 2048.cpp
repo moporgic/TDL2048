@@ -219,6 +219,8 @@ public:
 			}
 			while (read_cast<u16>(in, code) && code)
 				in.ignore(code * read<u64>(in));
+			std::fill(w.accum().begin(), w.accum().end(), numeric(0));
+			std::fill(w.updvu().begin(), w.updvu().end(), numeric(0));
 			break;
 		}
 		return in;
