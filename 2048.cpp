@@ -491,8 +491,13 @@ public:
 	static inline cache& instance() { static cache tp; return tp; }
 
 private:
+#if !defined(__linux__) || defined(NOSHM)
 	static inline block* alloc(size_t len) { return new block[len](); }
 	static inline void free(block* alloc) { delete[] alloc; }
+#else
+	static inline block* alloc(size_t len) { return shm::alloc<block>(len); }
+	static inline void free(block* alloc) { shm::free(alloc); }
+#endif
 
 	cache& shape(size_t len, bool peek = false) {
 		length = (1ull << (math::lg64(len)));
