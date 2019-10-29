@@ -2158,7 +2158,7 @@ struct statistic {
 		every = {};
 		total = {};
 		local = {};
-		for (u32 i = 0; i <= info.thdid; i++) moporgic::rand();
+		for (u32 i = 0; i < info.thdid; i++) moporgic::rand();
 		local.time = moporgic::millisec();
 		loop = 1;
 
