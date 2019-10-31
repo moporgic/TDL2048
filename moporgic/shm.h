@@ -63,7 +63,10 @@ public:
 		info().clear();
 	}
 
-	static void interrupt_handler(int i) { std::exit(i); }
+	static void interrupt_handler(int i) {
+		clear();
+		std::quick_exit(i);
+	}
 
 private:
 	static std::map<void*, int>& info() {
