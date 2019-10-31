@@ -1498,6 +1498,26 @@ void init_logging(utils::options::option opt) {
 	static moporgic::redirector redirect(tee, std::cout);
 }
 
+template<typename statistic>
+statistic invoke(statistic(*run)(utils::options,std::string), utils::options& opts, std::string type) {
+#if !defined(__linux__) || defined(NOSHM)
+	std::list<std::future<statistic>> thdpool;
+	u32 thdid = std::stol(opts[type]["thread"] = opts["thread"]);
+	while (std::stol(opts[type]["thread#"] = (--thdid)))
+		thdpool.push_back(std::async(std::launch::async, run, opts, type));
+	statistic stat = run(opts, type);
+	for (std::future<statistic>& thd : thdpool) stat += thd.get();
+#else
+	u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"]), thdid = thdnum;
+	statistic* stats = shm::alloc<statistic>(thdnum);
+	while (std::stol(opts[type]["thread#"] = --thdid) && fork());
+	statistic& stat = stats[thdid] = run(opts, type);
+	if (thdid == 0) while (wait(nullptr) > 0); else std::exit(0);
+	for (u32 i = 1; i < thdnum; i++) stat += stats[i];
+#endif
+	return stat;
+}
+
 std::map<std::string, std::string> aliases() {
 	std::map<std::string, std::string> alias;
 	alias["4x6patt/khyeh"] = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
@@ -2629,21 +2649,7 @@ int main(int argc, const char* argv[]) {
 
 	for (std::string recipe : opts["recipes"]) {
 		std::cout << recipe << ": " << opts[recipe] << std::endl << std::endl;
-#if !defined(__linux__) || defined(NOSHM)
-		std::list<std::future<statistic>> thdpool;
-		u32 thdid = std::stol(opts[recipe]["thread"] = opts["thread"]);
-		while (std::stol(opts[recipe]["thread#"] = (--thdid)))
-			thdpool.push_back(std::async(std::launch::async, run, opts, recipe));
-		statistic stat = run(opts, recipe);
-		for (std::future<statistic>& thd : thdpool) stat += thd.get();
-#else
-		u32 thdnum = std::stol(opts[recipe]["thread"] = opts["thread"]), thdid = thdnum;
-		statistic* stats = shm::alloc<statistic>(thdnum);
-		while (std::stol(opts[recipe]["thread#"] = --thdid) && fork());
-		statistic& stat = stats[thdid] = run(opts, recipe);
-		if (thdid == 0) while (wait(nullptr) > 0); else return 0;
-		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
-#endif
+		statistic stat = utils::invoke(run, opts, recipe);
 		if (opts[recipe]("info")) stat.summary();
 	}
 
