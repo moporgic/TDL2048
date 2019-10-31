@@ -1502,13 +1502,13 @@ template<typename statistic>
 statistic invoke(statistic(*run)(utils::options,std::string), utils::options& opts, std::string type) {
 #if !defined(__linux__) || defined(NOSHM)
 	std::list<std::future<statistic>> thdpool;
-	u32 thdid = std::stol(opts[type]["thread"] = opts["thread"]);
+	u32 thdid = std::stol(opts[type]["thread"] = opts["thread"].value(1));
 	while (std::stol(opts[type]["thread#"] = (--thdid)))
 		thdpool.push_back(std::async(std::launch::async, run, opts, type));
 	statistic stat = run(opts, type);
 	for (std::future<statistic>& thd : thdpool) stat += thd.get();
 #else
-	u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"]), thdid = thdnum;
+	u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"].value(1)), thdid = thdnum;
 	statistic* stats = shm::alloc<statistic>(thdnum);
 	while (std::stol(opts[type]["thread#"] = --thdid) && fork());
 	statistic& stat = stats[thdid] = run(opts, type);
