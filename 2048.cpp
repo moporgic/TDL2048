@@ -12,6 +12,7 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
+#include "moporgic/shm.h"
 #include "board.h"
 #include <vector>
 #include <functional>
@@ -22,7 +23,6 @@
 #include <tuple>
 #include <string>
 #include <numeric>
-#include <thread>
 #include <limits>
 #include <cctype>
 #include <iterator>
@@ -30,6 +30,12 @@
 #include <iomanip>
 #include <list>
 #include <random>
+#include <thread>
+#include <future>
+#if defined(__linux__)
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 
 namespace moporgic {
 
@@ -165,8 +171,8 @@ public:
 private:
 	inline weight(sign_t sign, size_t size) : name(sign), length(size), raw(alloc(size)) {}
 
-	static inline segment* alloc(size_t size) { return new segment[size](); }
-	static inline void free(segment* v) { delete[] v; }
+	static inline segment* alloc(size_t size) { return shm::enable() ? shm::alloc<segment>(size) : new segment[size](); }
+	static inline void free(segment* v) { shm::enable() ? shm::free(v) : delete[] v; }
 
 	sign_t name;
 	size_t length;
@@ -455,8 +461,8 @@ public:
 	static inline cache& instance() { static cache tp; return tp; }
 
 private:
-	static inline block* alloc(size_t len) { return new block[len](); }
-	static inline void free(block* alloc) { delete[] alloc; }
+	static inline block* alloc(size_t len) { return shm::enable() ? shm::alloc<block>(len) : new block[len](); }
+	static inline void free(block* alloc) { shm::enable() ? shm::free(alloc) : delete[] alloc; }
 
 	cache& shape(size_t len) {
 		length = (1ull << (math::lg64(len)));
@@ -1481,6 +1487,28 @@ void init_logging(utils::options::option opt) {
 	static moporgic::redirector redirect(tee, std::cout);
 }
 
+template<typename statistic>
+statistic invoke(statistic(*run)(utils::options,std::string), utils::options& opts, std::string type) {
+#if defined(__linux__)
+	if (shm::enable()) {
+		u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"].value(1)), thdid = thdnum;
+		statistic* stats = shm::alloc<statistic>(thdnum);
+		while (std::stol(opts[type]["thread#"] = --thdid) && fork());
+		statistic& stat = stats[thdid] = run(opts, type);
+		if (thdid == 0) while (wait(nullptr) > 0); else std::exit(0);
+		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
+		return stat;
+	}
+#endif
+	std::list<std::future<statistic>> thdpool;
+	u32 thdid = std::stol(opts[type]["thread"] = opts["thread"].value(1));
+	while (std::stol(opts[type]["thread#"] = (--thdid)))
+		thdpool.push_back(std::async(std::launch::async, run, opts, type));
+	statistic stat = run(opts, type);
+	for (std::future<statistic>& thd : thdpool) stat += thd.get();
+	return stat;
+}
+
 std::map<std::string, std::string> aliases() {
 	std::map<std::string, std::string> alias;
 	alias["4x6patt/khyeh"] = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
@@ -2076,7 +2104,12 @@ struct statistic {
 		}
 	} every;
 
-	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
+	struct execinfo {
+		u32 thdid;
+		u32 thdnum;
+	} info;
+
+	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}), info({0, 1}) {}
 	statistic(const utils::options::option& opt) : statistic() { init(opt); }
 	statistic(const statistic&) = default;
 
@@ -2098,12 +2131,16 @@ struct statistic {
 		unit = std::stol(opt.find("unit", std::to_string(unit)));
 		winv = std::stol(opt.find("win",  std::to_string(winv)));
 
+		info.thdid = std::stol(opt.find("thread#", "0"));
+		info.thdnum = std::stol(opt.find("thread", "1"));
+		loop = loop / info.thdnum + (loop % info.thdnum && info.thdid < (loop % info.thdnum) ? 1 : 0);
 		limit = loop * unit;
-		format();
+		format(0, (info.thdnum > 1) ? (" [" + std::to_string(info.thdid) + "]") : "");
 
 		every = {};
 		total = {};
 		local = {};
+		for (u32 i = 0; i < info.thdid; i++) moporgic::rand();
 		local.time = moporgic::millisec();
 		loop = 1;
 
@@ -2194,8 +2231,8 @@ struct statistic {
 		u32 size = 0;
 
 		size += snprintf(buf + size, sizeof(buf) - size, summaf, // "summary %llums %.2fops",
-				total.time,
-				total.opers * 1000.0 / total.time);
+				total.time / info.thdnum,
+				total.opers * 1000.0 * info.thdnum / total.time);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / limit,
@@ -2237,7 +2274,8 @@ struct statistic {
 		total += stat.total;
 		local += stat.local;
 		every += stat.every;
-		format();
+		u32 dec = (std::string(summaf).find('%') - std::string(summaf).find('y') + 5) / 2;
+		format(dec, (info.thdnum > 1) ? (" (" + std::to_string(info.thdnum) + "x)") : "");
 		return *this;
 	}
 };
@@ -2542,6 +2580,10 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-#"): case to_hash("--comment"):
 			opts["comment"] = next_opts();
 			break;
+		case to_hash("-p"):   case to_hash("--parallel"):
+		case to_hash("-thd"): case to_hash("--thread"):
+			opts["thread"] = next_opt(std::to_string(std::thread::hardware_concurrency()));
+			break;
 		case to_hash("-|"):
 			opts = {};
 			break;
@@ -2573,10 +2615,12 @@ int main(int argc, const char* argv[]) {
 	if (!opts("lambda")) opts["lambda"] = 0;
 	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
 	if (!opts("depth")) opts["depth"] = 1;
+	if (!opts("thread")) opts["thread"] = 1;
 
 	utils::init_logging(opts["save"]);
+	shm::enable(shm::support() && !opts["options"]("noshm") && (opts["options"]("shm") || opts["thread"].value(1) > 1));
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "Develop" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
+	std::cout << "Develop-Parallel" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" << __DATE_ISO__ << " " << __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
@@ -2585,6 +2629,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
 	std::cout << "depth = " << opts["depth"] << ", cache = " << opts["cache"].value("none") << std::endl;
+	std::cout << "agent = " << opts["thread"] << "x" << std::endl;
 	std::cout << std::endl;
 
 	moporgic::srand(to_hash(opts["seed"]));
@@ -2596,7 +2641,7 @@ int main(int argc, const char* argv[]) {
 
 	for (std::string recipe : opts["recipes"]) {
 		std::cout << recipe << ": " << opts[recipe] << std::endl << std::endl;
-		statistic stat = run(opts, recipe);
+		statistic stat = utils::invoke(run, opts, recipe);
 		if (opts[recipe]("info")) stat.summary();
 	}
 
