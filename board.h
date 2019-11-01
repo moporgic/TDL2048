@@ -9,7 +9,6 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
-
 #include <mmintrin.h>
 #include <emmintrin.h>
 #include <immintrin.h>
@@ -631,7 +630,7 @@ public:
 	}
 
 	inline void moves(board& U, board& R, board& D, board& L) const {
-		return moves64(U, R, D, L);
+		return moves64x(U, R, D, L); /* use AVX2 instead of lookup */
 	}
 	inline void moves64(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
@@ -777,11 +776,9 @@ public:
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves(btype move[]) const { return moves64(move); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline void moves64(btype move[]) const { moves64(move[0], move[1], move[2], move[3]); }
+	inline void moves64(btype move[]) const { moves64x(move[0], move[1], move[2], move[3]); /* use AVX2 instead of lookup */ }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves80(btype move[]) const { moves80(move[0], move[1], move[2], move[3]); }
-	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline void moves64x(btype move[]) const { moves64x(move[0], move[1], move[2], move[3]); }
 
 	inline std::array<board, 4> afters() const {
 		return afters64();
@@ -869,9 +866,8 @@ public:
 	}
 
 	inline i32 move(u32 op)   { return operate(op); }
-	inline i32 move64(u32 op) { return operate64(op); }
+	inline i32 move64(u32 op) { return operate64x(op); /* use AVX2 instead of lookup */ }
 	inline i32 move80(u32 op) { return operate80(op); }
-	inline i32 move64x(u32 op){ return operate64x(op); }
 
 	inline constexpr u32 shift(u32 k = 0, u32 u = 0) { return shift64(k, u); }
 	inline constexpr u32 shift64(u32 k = 0, u32 u = 0) {

@@ -1826,40 +1826,6 @@ struct method {
 			esti += (feat[state] += error);
 		return esti;
 	}
-
-	static inline numeric estimate_32f_avx2(const board& state, clip<feature> range = feature::feats()) {
-		float buf[32];
-		for (u32 i = 0; i < 32; i++) buf[i] = range[i][state];
-		__m256 c1 = _mm256_loadu_ps(buf + 0);
-		__m256 c2 = _mm256_add_ps(c1, _mm256_loadu_ps(buf + 8));
-		__m256 c3 = _mm256_add_ps(c2, _mm256_loadu_ps(buf + 16));
-		__m256 c4 = _mm256_add_ps(c3, _mm256_loadu_ps(buf + 24));
-
-		__m256 t1 = _mm256_hadd_ps(c4, c4);
-		__m256 t2 = _mm256_hadd_ps(t1, t1);
-		__m128 t3 = _mm256_extractf128_ps(t2, 1);
-		__m128 t4 = _mm_add_ss(_mm256_castps256_ps128(t2), t3);
-		return _mm_cvtss_f32(t4);
-	}
-	static inline numeric estimate_64f_avx2(const board& state, clip<feature> range = feature::feats()) {
-		float buf[64];
-		for (u32 i = 0; i < 64; i++) buf[i] = range[i][state];
-		__m256 c1 = _mm256_loadu_ps(buf + 0);
-		__m256 c2 = _mm256_add_ps(c1, _mm256_loadu_ps(buf + 8));
-		__m256 c3 = _mm256_add_ps(c2, _mm256_loadu_ps(buf + 16));
-		__m256 c4 = _mm256_add_ps(c3, _mm256_loadu_ps(buf + 24));
-		__m256 c5 = _mm256_add_ps(c4, _mm256_loadu_ps(buf + 32));
-		__m256 c6 = _mm256_add_ps(c5, _mm256_loadu_ps(buf + 40));
-		__m256 c7 = _mm256_add_ps(c6, _mm256_loadu_ps(buf + 48));
-		__m256 c8 = _mm256_add_ps(c7, _mm256_loadu_ps(buf + 56));
-
-		__m256 t1 = _mm256_hadd_ps(c8, c8);
-		__m256 t2 = _mm256_hadd_ps(t1, t1);
-		__m128 t3 = _mm256_extractf128_ps(t2, 1);
-		__m128 t4 = _mm_add_ss(_mm256_castps256_ps128(t2), t3);
-		return _mm_cvtss_f32(t4);
-	}
-
 	constexpr static inline numeric illegal(const board& state, clip<feature> range = feature::feats()) {
 		return -std::numeric_limits<numeric>::max();
 	}
@@ -2081,7 +2047,7 @@ struct select {
 	state *best;
 	inline select() : best(move) {}
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
-		b.moves64x(move[0], move[1], move[2], move[3]);
+		b.moves(move[0], move[1], move[2], move[3]);
 		move[0].estimate(range, estim);
 		move[1].estimate(range, estim);
 		move[2].estimate(range, estim);
@@ -2654,7 +2620,7 @@ int main(int argc, const char* argv[]) {
 	utils::init_logging(opts["save"]);
 	shm::enable(shm::support() && !opts["options"]("noshm") && (opts["options"]("shm") || opts["thread"].value(1) > 1));
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "Develop-SIMD" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
+	std::cout << "Develop" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" << __DATE_ISO__ << " " << __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
