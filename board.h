@@ -9,9 +9,6 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
-#include <algorithm>
-#include <iostream>
-#include <cstdio>
 
 #include <mmintrin.h>
 #include <emmintrin.h>
@@ -633,10 +630,10 @@ public:
 		return score;
 	}
 
-	inline void after(board& U, board& R, board& D, board& L) const {
-		return after64(U, R, D, L);
+	inline void moves(board& U, board& R, board& D, board& L) const {
+		return moves64(U, R, D, L);
 	}
-	inline void after64(board& U, board& R, board& D, board& L) const {
+	inline void moves64(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
 
 		board b(*this);
@@ -655,7 +652,7 @@ public:
 		U.inf |= (U.raw ^ raw) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) ? 0 : -1;
 	}
-	inline void after80(board& U, board& R, board& D, board& L) const {
+	inline void moves80(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
 
 		board b(*this);
@@ -674,7 +671,7 @@ public:
 		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
 	}
-	inline void after64x(board& U, board& R, board& D, board& L) const {
+	inline void moves64x(board& U, board& R, board& D, board& L) const {
 		__m256i dst = {}, rwd = {}, chk, rbf, buf;
 
 		// use left for all 4 directions, transpose and mirror first
@@ -777,6 +774,29 @@ public:
 		L.inf = _mm256_extract_epi32(rwd, 6);
 	}
 
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline void moves(btype move[]) const { return moves64(move); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline void moves64(btype move[]) const { moves64(move[0], move[1], move[2], move[3]); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline void moves80(btype move[]) const { moves80(move[0], move[1], move[2], move[3]); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline void moves64x(btype move[]) const { moves64x(move[0], move[1], move[2], move[3]); }
+
+	inline std::array<board, 4> afters() const {
+		return afters64();
+	}
+	inline std::array<board, 4> afters64() const {
+		std::array<board, 4> after;
+		moves64(after.data());
+		return after;
+	}
+	inline std::array<board, 4> afters80() const {
+		std::array<board, 4> after;
+		moves80(after.data());
+		return after;
+	}
+
 	class action {
 	public:
 		action() = delete;
@@ -786,7 +806,8 @@ public:
 			down  = 0x02u,
 			left  = 0x03u,
 			next  = 0x0eu,
-			init  = 0x0fu,
+			init  = 0x0cu,
+			nop   = 0x0fu,
 
 			x64   = 0x40u,
 			x80   = 0x80u,
@@ -1125,6 +1146,7 @@ public:
 		inline constexpr u32 where() const { return i; }
 		inline constexpr operator u32() const { return at(is(style::extend), is(style::exact)); }
 		inline constexpr tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
+		inline constexpr tile& operator =(const tile& t) { return operator =(u32(t)); }
 	public:
 		inline static constexpr u32 itov(u32 i) { return (1u << i) & 0xfffffffeu; }
 		inline static constexpr u32 vtoi(u32 v) { return math::log2(v); }

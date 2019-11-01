@@ -50,6 +50,11 @@
 #include <regex>
 #include <atomic>
 
+#include <mmintrin.h>
+#include <emmintrin.h>
+#include <immintrin.h>
+#include <smmintrin.h>
+
 #ifdef __linux__
 #include <sys/types.h>
 #include <sys/wait.h>

@@ -46,12 +46,8 @@
 #define HALF_H
 #define MOPORGIC_HALF_H_
 
-#if !defined(__cplusplus) || __cplusplus < 201103L
-#define constexpr
-#define noexcept
-#endif
-
 #include <stdint.h>
+#include "unit.h"
 
 static inline constexpr
 uint32_t half_to_float( uint16_t h ) noexcept;
@@ -76,14 +72,14 @@ namespace half_float {
 static inline constexpr
 float& _float_cast( const uint32_t& f ) noexcept
 {
-  return (*(float*)(&f));
+  return reference_cast<float>(f);
 }
 
 // In-place Cast
 static inline constexpr
 uint32_t& _uint32_cast( const float& f ) noexcept
 {
-  return (*(uint32_t*)(&f));
+  return reference_cast<uint32_t>(f);
 }
 
 // Load immediate

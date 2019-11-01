@@ -12,6 +12,7 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
+#include "moporgic/shm.h"
 #include "board.h"
 #include <vector>
 #include <functional>
@@ -22,13 +23,19 @@
 #include <tuple>
 #include <string>
 #include <numeric>
-#include <thread>
 #include <limits>
 #include <cctype>
 #include <iterator>
 #include <sstream>
 #include <iomanip>
 #include <list>
+#include <random>
+#include <thread>
+#include <future>
+#if defined(__linux__)
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 
 namespace moporgic {
 
@@ -36,18 +43,19 @@ typedef float numeric;
 
 class weight {
 public:
-	inline weight() : id(0), length(0), raw(nullptr) {}
+	inline weight() : name(), length(0), raw(nullptr) {}
 	inline weight(const weight& w) = default;
 	inline ~weight() {}
 
+	typedef std::string sign_t;
 	typedef moporgic::numeric numeric;
 	typedef weight::numeric segment;
 
-	inline u64 sign() const { return id; }
+	inline sign_t sign() const { return name; }
 	inline size_t size() const { return length; }
-	inline segment& operator [](u64 i) { return raw[i]; }
-	inline segment* data(u64 i = 0) { return raw + i; }
-	inline clip<numeric> value() const { return { raw, raw + length }; }
+	constexpr inline segment& operator [](u64 i) { return raw[i]; }
+	constexpr inline segment* data(u64 i = 0) { return raw + i; }
+	constexpr inline clip<numeric> value() const { return { raw, raw + length }; }
 	inline operator bool() const { return raw; }
 	declare_comparators(const weight&, sign(), inline);
 
@@ -57,8 +65,13 @@ public:
 		switch (code) {
 		default:
 		case 4:
-			write_cast<u32>(out, w.sign());
-			write_cast<u32>(out, 0);
+			try {
+				write_cast<u32>(out, std::stoul(w.sign(), nullptr, 16));
+				write_cast<u16>(out, w.sign().size());
+				write_cast<u16>(out, 0);
+			} catch (std::invalid_argument&) {
+				out.write(w.sign().append(8, ' ').c_str(), 8);
+			}
 			write_cast<u16>(out, sizeof(weight::numeric));
 			write_cast<u64>(out, w.size());
 			write_cast<numeric>(out, w.value().begin(), w.value().end());
@@ -74,8 +87,14 @@ public:
 		case 0:
 		case 1:
 		case 2:
-			read_cast<u32>(in, w.id);
+			w.name = ({
+				std::stringstream ss;
+				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
+				ss.str();
+			});
 			read_cast<u64>(in, w.length);
+			if (w.length == (1ull << math::lg64(w.length)))
+				w.name = w.name.substr(8 - (math::lg64(w.length) >> 2));
 			w.raw = weight::alloc(w.length);
 			switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
@@ -84,8 +103,15 @@ public:
 			break;
 		default:
 		case 4:
-			read_cast<u32>(in, w.id);
-			read_cast<u32>(in, code);
+			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
+			w.name = raw_cast<u16>(w.name[6]) == 0 ? ({
+				std::stringstream ss;
+				ss << std::setw(raw_cast<u16>(w.name[4]) ? raw_cast<u16>(w.name[4]) : ({
+					read_cast<u64>(in.ignore(2), w.length).seekg(-10, std::ios::cur);
+					(w.length == (1ull << math::lg64(w.length))) ? (math::lg64(w.length) >> 2) : 8;
+				})) << std::setfill('0') << std::hex << raw_cast<u32>(w.name[0]);
+				ss.str();
+			}) : w.name.substr(0, w.name.find(' '));
 			read_cast<u16>(in, code);
 			read_cast<u64>(in, w.length);
 			w.raw = weight::alloc(w.length);
@@ -129,41 +155,42 @@ public:
 		constexpr container() noexcept : clip<weight>() {}
 		constexpr container(const clip<weight>& w) : clip<weight>(w) {}
 	public:
-		weight& make(u64 sign, size_t size) { return list<weight>::as(*this).emplace_back(weight(sign, size)); }
-		weight erase(u64 sign) { auto it = find(sign); auto w = *it; free(it->data()); list<weight>::as(*this).erase(it); return w; }
-		weight* find(u64 sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
-		weight& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
-		weight& operator[](u64 sign) const { return (*find(sign)); }
-		weight operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ weight w; w.id = sign; w; }); }
+		weight& make(sign_t sign, size_t size) { return list<weight>::as(*this).emplace_back(weight(sign, size)); }
+		weight erase(sign_t sign) { auto it = find(sign); auto w = *it; free(it->data()); list<weight>::as(*this).erase(it); return w; }
+		weight* find(sign_t sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
+		weight& at(sign_t sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
+		weight& operator[](sign_t sign) const { return (*find(sign)); }
+		weight operator()(sign_t sign) const { auto it = find(sign); return it != end() ? *it : ({ weight w; w.name = sign; w; }); }
 	};
 
 	static inline weight::container& wghts() { static container w; return w; }
-	static inline weight& make(u64 sign, size_t size, container& src = wghts()) { return src.make(sign, size); }
-	static inline size_t erase(u64 sign, container& src = wghts()) { return src.erase(sign); }
-	inline weight(u64 sign, const container& src = wghts()) : weight(src(sign)) {}
+	static inline weight& make(sign_t sign, size_t size, container& src = wghts()) { return src.make(sign, size); }
+	static inline size_t erase(sign_t sign, container& src = wghts()) { return src.erase(sign); }
+	inline weight(sign_t sign, const container& src = wghts()) : weight(src(sign)) {}
 
 private:
-	inline weight(u64 sign, size_t size) : id(sign), length(size), raw(alloc(size)) {}
+	inline weight(sign_t sign, size_t size) : name(sign), length(size), raw(alloc(size)) {}
 
-	static inline segment* alloc(size_t size) { return new segment[size](); }
-	static inline void free(segment* v) { delete[] v; }
+	static inline segment* alloc(size_t size) { return shm::enable() ? shm::alloc<segment>(size) : new segment[size](); }
+	static inline void free(segment* v) { shm::enable() ? shm::free(v) : delete[] v; }
 
-	u64 id;
+	sign_t name;
 	size_t length;
 	segment* raw;
 };
 
 class indexer {
 public:
-	inline indexer() : id(0), map(nullptr) {}
+	inline indexer() : name(), map(nullptr) {}
 	inline indexer(const indexer& i) = default;
 	inline ~indexer() {}
 
+	typedef std::string sign_t;
 	typedef u64(*mapper)(const board&);
 
-	inline u64 sign() const { return id; }
-	inline mapper index() const { return map; }
-	inline u64 operator ()(const board& b) const { return (*map)(b); }
+	inline sign_t sign() const { return name; }
+	constexpr inline mapper index() const { return map; }
+	constexpr inline u64 operator ()(const board& b) const { return (*map)(b); }
 	inline operator bool() const { return map; }
 	declare_comparators(const indexer&, sign(), inline);
 
@@ -172,36 +199,38 @@ public:
 		constexpr container() noexcept : clip<indexer>() {}
 		constexpr container(const clip<indexer>& i) : clip<indexer>(i) {}
 	public:
-		indexer& make(u64 sign, mapper map) { return list<indexer>::as(*this).emplace_back(indexer(sign, map)); }
-		indexer erase(u64 sign) { auto it = find(sign); auto x = *it; list<indexer>::as(*this).erase(it); return x; }
-		indexer* find(u64 sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
-		indexer& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
-		indexer& operator[](u64 sign) const { return (*find(sign)); }
-		indexer operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ indexer x; x.id = sign; x; }); }
+		indexer& make(sign_t sign, mapper map) { return list<indexer>::as(*this).emplace_back(indexer(sign, map)); }
+		indexer erase(sign_t sign) { auto it = find(sign); auto x = *it; list<indexer>::as(*this).erase(it); return x; }
+		indexer* find(sign_t sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
+		indexer& at(sign_t sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
+		indexer& operator[](sign_t sign) const { return (*find(sign)); }
+		indexer operator()(sign_t sign) const { auto it = find(sign); return it != end() ? *it : ({ indexer x; x.name = sign; x; }); }
 	};
 
 	static inline indexer::container& idxrs() { static container i; return i; }
-	static inline indexer& make(u64 sign, mapper map, container& src = idxrs()) { return src.make(sign, map); }
-	static inline size_t erase(u64 sign, container& src = idxrs()) { return src.erase(sign); }
-	inline indexer(u64 sign, const container& src = idxrs()) : indexer(src(sign)) {}
+	static inline indexer& make(sign_t sign, mapper map, container& src = idxrs()) { return src.make(sign, map); }
+	static inline size_t erase(sign_t sign, container& src = idxrs()) { return src.erase(sign); }
+	inline indexer(sign_t sign, const container& src = idxrs()) : indexer(src(sign)) {}
 
 private:
-	inline indexer(u64 sign, mapper map) : id(sign), map(map) {}
+	inline indexer(sign_t sign, mapper map) : name(sign), map(map) {}
 
-	u64 id;
+	sign_t name;
 	mapper map;
 };
 
 class feature {
 public:
-	inline feature() : id(0), raw(), map() {}
+	inline feature() : name(), raw(), map() {}
 	inline feature(const feature& t) = default;
 	inline ~feature() {}
 
-	inline u64 sign() const { return id; }
-	inline weight::segment& operator [](const board& b) { return raw[map(b)]; }
-	inline weight::segment& operator [](u64 idx) { return raw[idx]; }
-	inline u64 operator ()(const board& b) const { return map(b); }
+	typedef std::string sign_t;
+
+	inline sign_t sign() const { return name; }
+	constexpr inline weight::segment& operator [](const board& b) { return raw[map(b)]; }
+	constexpr inline weight::segment& operator [](u64 idx) { return raw[idx]; }
+	constexpr inline u64 operator ()(const board& b) const { return map(b); }
 
 	inline indexer index() const { return map; }
 	inline weight  value() const { return raw; }
@@ -214,8 +243,8 @@ public:
 		switch (code) {
 		default:
 		case 0:
-			write_cast<u32>(out, u32(f.sign()));
-			write_cast<u32>(out, u32(f.sign() >> 32));
+			write_cast<u32>(out, std::stoul(f.index().sign(), nullptr, 16));
+			write_cast<u32>(out, std::stoul(f.value().sign(), nullptr, 16));
 			break;
 		}
 		return out;
@@ -226,12 +255,17 @@ public:
 		switch (code) {
 		default:
 		case 0:
-			read_cast<u32>(in, code);
-			f.map = indexer(code);
-			f.id = u64(code);
-			read_cast<u32>(in, code);
-			f.raw = weight(code);
-			f.id |= u64(code) << 32;
+			f.map = indexer(({
+				std::stringstream ss;
+				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
+				ss.str();
+			}));
+			f.raw = weight(({
+				std::stringstream ss;
+				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
+				ss.str();
+			}));
+			f.name = f.raw.sign() + ':' + f.map.sign();
 			break;
 		}
 		return in;
@@ -265,160 +299,219 @@ public:
 		constexpr container() noexcept : clip<feature>() {}
 		constexpr container(const clip<feature>& f) : clip<feature>(f) {}
 	public:
-		feature& make(u64 wgt, u64 idx) { return list<feature>::as(*this).emplace_back(feature(weight(wgt), indexer(idx))); }
-		feature& make(u64 sign) { return make(u32(sign >> 32), u32(sign)); }
-		feature erase(u64 wgt, u64 idx) { return erase((wgt << 32) | idx); }
-		feature erase(u64 sign) { auto it = find(sign); auto f = *it; list<feature>::as(*this).erase(it); return f; }
-		feature* find(u64 wgt, u64 idx) const { return find((wgt << 32) | idx); }
-		feature* find(u64 sign) const { return std::find_if(begin(), end(), [=](const feature& f) { return f.sign() == sign; }); }
-		feature& at(u64 wgt, u64 idx) const { return at((wgt << 32) | idx); }
-		feature& at(u64 sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("feature::at"); }
-		feature& operator[](u64 sign) const { return (*find(sign)); }
-		feature operator()(u64 wgt, u64 idx) const { return operator()((wgt << 32) | idx); }
-		feature operator()(u64 sign) const { auto it = find(sign); return it != end() ? *it : ({ feature f; f.id = sign; f; }); }
+		feature& make(sign_t wgt, sign_t idx) { return list<feature>::as(*this).emplace_back(feature(weight(wgt), indexer(idx))); }
+		feature& make(sign_t sign) { return make(sign.substr(0, sign.find(':')), sign.substr(sign.find(':') + 1)); }
+		feature erase(sign_t wgt, sign_t idx) { return erase(wgt + ':' + idx); }
+		feature erase(sign_t sign) { auto it = find(sign); auto f = *it; list<feature>::as(*this).erase(it); return f; }
+		feature* find(sign_t wgt, sign_t idx) const { return find(wgt + ':' + idx); }
+		feature* find(sign_t sign) const { return std::find_if(begin(), end(), [=](const feature& f) { return f.sign() == sign; }); }
+		feature& at(sign_t wgt, sign_t idx) const { return at(wgt + ':' + idx); }
+		feature& at(sign_t sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("feature::at"); }
+		feature& operator[](sign_t sign) const { return (*find(sign)); }
+		feature operator()(sign_t wgt, sign_t idx) const { return operator()(wgt + ':' + idx); }
+		feature operator()(sign_t sign) const { auto it = find(sign); return it != end() ? *it : ({ feature f; f.name = sign; f; }); }
 	};
 
 	static inline feature::container& feats() { static container f; return f; }
-	static inline feature& make(u64 wgt, u64 idx, container& src = feats()) { return src.make(wgt, idx); }
-	static inline size_t erase(u64 wgt, u64 idx, container& src = feats()) { return src.erase(wgt, idx); }
-	inline feature(u64 wgt, u64 idx, const container& src = feats()) : feature(src(wgt, idx)) {}
+	static inline feature& make(sign_t wgt, sign_t idx, container& src = feats()) { return src.make(wgt, idx); }
+	static inline size_t erase(sign_t wgt, sign_t idx, container& src = feats()) { return src.erase(wgt, idx); }
+	inline feature(sign_t wgt, sign_t idx, const container& src = feats()) : feature(src(wgt, idx)) {}
 
 private:
-	inline feature(const weight& value, const indexer& index) : id((value.sign() << 32) | index.sign()), raw(value), map(index) {}
+	inline feature(const weight& value, const indexer& index) : name(value.sign() + ':' + index.sign()), raw(value), map(index) {}
 
-	u64 id;
+	sign_t name;
 	weight raw;
 	indexer map;
 };
 
-namespace utils {
-
-class options {
+class cache {
 public:
-	options() {}
-	options(const options& opts) : opts(opts.opts) {}
-	typedef std::list<std::string> list;
-
-	class opinion {
-		friend class option;
+	class block {
 	public:
-		opinion() = delete;
-		opinion(const opinion& i) = default;
-		opinion(std::string& token) : token(token) {}
-		operator std::string() const { return value(); }
-		operator numeric() const { return std::stod(value()); }
-		std::string label() const { return token.substr(0, token.find('=')); }
-		std::string value() const { return token.find('=') != std::string::npos ? token.substr(token.find('=') + 1) : ""; }
-		std::string value(const std::string& def) const { auto val = value(); return val.size() ? val : def; }
-		numeric value(numeric def) const { try { return numeric(*this); } catch (std::invalid_argument&) {} return def; }
-		std::string operator +(const std::string& val) { return value() + val; }
-		friend std::string operator +(const std::string& val, const opinion& opi) { return val + opi.value(); }
-		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
-		opinion& operator  =(const opinion& opi) { return operator =(opi.value()); }
-		opinion& operator  =(const numeric& val) { return operator =(ntos(val)); }
-		opinion& operator  =(const std::string& val) { token = label() + (val.size() ? ("=" + val) : ""); return (*this); }
-		opinion& operator +=(const std::string& val) { return operator =(value() + val); }
-		opinion& operator  =(const list& vec) { return operator =(vtos(vec)); }
-		opinion& operator +=(const list& vec) { return operator =(value() + vtos(vec)); }
-		bool operator ==(const std::string& val) const { return value() == val; }
-		bool operator !=(const std::string& val) const { return value() != val; }
-		bool operator ()(const std::string& val) const { return value().find(val) != std::string::npos; }
-		static bool comp(std::string token, std::string label) { return opinion(token).label() == label; }
+		class access {
+		public:
+			constexpr access(u64 sign, u32 hold, block& blk) : hash(blk.hash), info(blk.info), sign(sign), hold(hold), blk(blk) {}
+			constexpr access(u64 sign, u32 hold) : access(sign, hold, raw_cast<block>(*this)) {}
+			constexpr access(access&& acc) : access(acc.sign, acc.hold, &(acc.blk) != &(raw_cast<block>(acc)) ? acc.blk : raw_cast<block>(*this)) {}
+			constexpr access(const access&) = delete;
+			constexpr access& operator =(const access&) = delete;
+
+			constexpr operator bool() const {
+				return ((hash ^ info) == sign) & (raw_cast<u16, 2>(info) >= hold);
+			}
+			constexpr numeric fetch() {
+				numeric esti = raw_cast<f32, 0>(info);
+				u64 sign = hash ^ info;
+				raw_cast<u16, 3>(info) = std::min(raw_cast<u16, 3>(info) + 1, 65535);
+				hash = sign ^ info;
+				blk = raw_cast<block>(*this);
+				return esti;
+			}
+			constexpr numeric store(numeric esti) {
+				raw_cast<f32, 0>(info) = esti;
+				raw_cast<u16, 2>(info) = hold;
+				raw_cast<u16, 3>(info) = (hash ^ info) == sign ? raw_cast<u16, 3>(info) : 0;
+				hash = sign ^ info;
+				blk = raw_cast<block>(*this);
+				return esti;
+			}
+		private:
+			u64 hash;
+			u64 info; // f32 esti; u16 hold; u16 hits;
+			u64 sign;
+			u32 hold;
+			block& blk;
+		};
+
+		constexpr block(const block& e) = default;
+		constexpr block(u64 sign = 0, u64 info = 0) : hash(sign ^ info), info(info) {}
+		constexpr access operator()(u64 x, u32 n) { return access(x, n, *this); }
+		constexpr u64 sign() const { return hash ^ info; }
+		constexpr f32 esti() const { return raw_cast<f32, 0>(info); }
+		constexpr u16 hold() const { return raw_cast<u16, 2>(info); }
+		constexpr u16 hits() const { return raw_cast<u16, 3>(info); }
+
+	    friend std::ostream& operator <<(std::ostream& out, const block& blk) {
+	    	write_cast<u64>(out, blk.hash);
+	    	write_cast<u64>(out, blk.info);
+	    	return out;
+	    }
+		friend std::istream& operator >>(std::istream& in, block& blk) {
+			read_cast<u64>(in, blk.hash);
+			read_cast<u64>(in, blk.info);
+			return in;
+		}
 	private:
-		std::string& token;
+		u64 hash;
+		u64 info; // f32 esti; u16 hold; u16 hits;
 	};
 
-	class option : public list {
-		friend class options;
-	public:
-		option(const list& opt = {}) : list(opt) {}
-		operator std::string() const { return value(); }
-		operator numeric() const { return std::stod(value()); }
-		std::string value() const { return vtos(*this); }
-		std::string value(const std::string& def) const { auto val = value(); return val.size() ? val : def; }
-		numeric value(numeric def) const { try { return numeric(*this); } catch (std::invalid_argument&) {} return def; }
-		std::string operator +(const std::string& val) { return value() + val; }
-		friend std::string operator +(const std::string& val, const option& opt) { return val + opt.value(); }
-		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
-		option& operator  =(const numeric& val) { return operator =(ntos(val)); }
-		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
-		option& operator +=(const std::string& val) { push_back(val); return *this; }
-		option& operator  =(const list& vec) { clear(); return operator +=(vec); }
-		option& operator +=(const list& vec) { insert(end(), vec.begin(), vec.end()); return *this; }
-		bool operator ==(const std::string& val) const { return value() == val; }
-		bool operator !=(const std::string& val) const { return value() != val; }
-		bool operator ()(const std::string& ext) const {
-			return std::find_if(cbegin(), cend(), std::bind(opinion::comp, std::placeholders::_1, ext)) != cend();
-		}
-		bool operator ()(const std::string& ext, const std::string& val) const {
-			return operator ()(ext) && const_cast<option&>(*this)[ext](val);
-		}
-		opinion operator [](const std::string& ext) {
-			auto pos = std::find_if(begin(), end(), std::bind(opinion::comp, std::placeholders::_1, ext));
-			return (pos != end()) ? opinion(*pos) : operator +=(ext)[ext];
-		}
-		std::string find(const std::string& ext, const std::string& val = {}) const {
-			return operator() (ext) ? const_cast<option&>(*this)[ext] : val;
-		}
-	};
+	constexpr cache() : cached(&initial), length(1), mask(0) {}
+	cache(const cache& tp) = default;
+	~cache() {}
+	inline size_t size() const { return length; }
+	inline block& operator[] (size_t i) { return cached[i]; }
+	inline const block& operator[] (size_t i) const { return cached[i]; }
+	inline block::access operator() (const board& b, u32 n) {
+		u64 x = min_isomorphic(b);
+		size_t i = math::fmix64(x) & mask;
+		block& blk = operator[](i);
+		return blk(x, n);
+	}
 
-	bool operator ()(const std::string& opt) const {
-		return opts.find(opt) != opts.end();
+    friend std::ostream& operator <<(std::ostream& out, const cache& c) {
+		u32 code = 4;
+		write_cast<byte>(out, code);
+		switch (code) {
+		default:
+		case 4:
+			write_cast<u16>(out, 0); // reserved for header
+			write_cast<u64>(out, 0);
+			write_cast<u16>(out, sizeof(cache::block));
+			write_cast<u64>(out, c.size());
+			for (size_t i = 0; i < c.size(); i++)
+				out << c[i];
+			write_cast<u16>(out, 0); // reserved for fields
+			break;
+		}
+		return out;
 	}
-	bool operator ()(const std::string& opt, const std::string& ext) const {
-		return operator ()(opt) && const_cast<options&>(*this)[opt](ext);
+	friend std::istream& operator >>(std::istream& in, cache& c) {
+		u32 code = 0;
+		read_cast<byte>(in, code);
+		switch (code) {
+		default:
+		case 4:
+			in.ignore(read<u16>(in) * read<u64>(in));
+			c.shape(read<u64>(in.ignore(2)));
+			for (size_t i = 0; i < c.size(); i++)
+				in >> c[i];
+			while ((code = read<u16>(in)) != 0)
+				in.ignore(code * read<u64>(in));
+			break;
+		}
+		return in;
 	}
-	bool operator ()(const std::string& opt, const std::string& ext, const std::string& val) const {
-		return operator ()(opt, ext) && const_cast<options&>(*this)[opt][ext](val);
+
+	static void save(std::ostream& out) {
+		u32 code = 0;
+		write_cast<byte>(out, code);
+		switch (code) {
+		default:
+		case 0:
+			out << instance();
+			break;
+		}
+		out.flush();
 	}
-	option& operator [](const std::string& opt) {
-		if (opts.find(opt) == opts.end()) opts[opt] = option();
-		return opts[opt];
+	static void load(std::istream& in) {
+		u32 code;
+		read_cast<byte>(in, code);
+		switch (code) {
+		default:
+		case 0:
+			in >> instance();
+			break;
+		}
 	}
-	std::string find(const std::string& opt, const std::string& val = {}) const {
-		return operator()(opt) ? const_cast<options&>(*this)[opt] : val;
+
+	static inline block::access find(const board& b, u32 n) { return instance()(b, n); }
+	static inline cache& make(size_t len) { return instance().shape(std::max(len, size_t(1))); }
+	static inline cache& instance() { static cache tp; return tp; }
+
+private:
+	static inline block* alloc(size_t len) { return shm::enable() ? shm::alloc<block>(len) : new block[len](); }
+	static inline void free(block* alloc) { shm::enable() ? shm::free(alloc) : delete[] alloc; }
+
+	cache& shape(size_t len) {
+		length = (1ull << (math::lg64(len)));
+		mask = length - 1;
+		if (cached != &initial) free(cached);
+		cached = alloc(length);
+		return *this;
+	}
+
+	constexpr inline u64 min_isomorphic(board t) const {
+		u64 x = u64(t);
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		t.transpose64(); x = std::min(x, u64(t));
+		t.mirror64();    x = std::min(x, u64(t));
+		return x;
 	}
 
 private:
-	std::map<std::string, option> opts;
-
-	static std::string vtos(const list& vec) {
-		std::string str = std::accumulate(vec.cbegin(), vec.cend(), std::string(),
-		    [](std::string& r, const std::string& v){ return std::move(r) + v + " "; });
-		if (str.size()) str.pop_back();
-		return str;
-	}
-	static std::string ntos(const numeric& num) {
-		std::string val = std::to_string(num);
-		if (val.find('.') != std::string::npos) {
-			while (val.back() == '0') val.pop_back();
-			if (val.back() == '.') val.pop_back();
-		}
-		return val;
-	}
+	block* cached;
+	block initial;
+	size_t length;
+	size_t mask;
 };
 
-inline u32 hashpatt(const std::vector<u32>& patt) {
-	u32 hash = 0;
-	for (auto tile : patt) hash = (hash << 4) | tile;
-	return hash;
+namespace index {
+
+template<u32 p0, u32 p1, u32 p2, u32 p3>
+u64 index4t(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	return index;
 }
-inline std::vector<u32> hashpatt(const std::string& hashs, int iso = 0) {
-	u32 hash; std::stringstream(hashs) >> std::hex >> hash;
-	std::vector<u32> patt(hashs.size());
-	for (auto it = patt.rbegin(); it != patt.rend(); it++, hash >>= 4)
-		(*it) = hash & 0x0f;
-	std::transform(patt.begin(), patt.end(), patt.begin(), [=](u32 v) {
-		board x(0xfedcba9876543210ull);
-		x.isomorphic(-iso);
-		return x.at(v);
-	});
-	return patt;
-}
-inline std::string hashpatt(u32 hash, size_t n = 0) {
-	std::stringstream ss; ss << std::hex << hash;
-	std::string patt = ss.str();
-	return std::string(std::max(n, patt.size()) - patt.size(), '0') + patt;
+
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4>
+u64 index5t(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	return index;
 }
 
 template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5>
@@ -432,55 +525,20 @@ u64 index6t(const board& b) {
 	index += b.at(p5) << 20;
 	return index;
 }
-template<>
-u64 index6t<0x0,0x1,0x2,0x3,0x4,0x5>(const board& b) {
-	return (u32(u64(b)) & 0xffffff);
-}
-template<>
-u64 index6t<0x4,0x5,0x6,0x7,0x8,0x9>(const board& b) {
-	return (u32(u64(b) >> 16) & 0xffffff);
-}
-template<>
-u64 index6t<0x8,0x9,0xa,0xb,0xc,0xd>(const board& b) {
-	return (u32(u64(b) >> 32) & 0xffffff);
-}
-template<>
-u64 index6t<0x0,0x1,0x2,0x4,0x5,0x6>(const board& b) {
-	return (u32(u64(b)) & 0x000fff) | ((u32(u64(b)) >> 4) & 0xfff000);
-}
-template<>
-u64 index6t<0x4,0x5,0x6,0x8,0x9,0xa>(const board& b) {
-	return (u32(u64(b) >> 16) & 0x000fff) | (u32(u64(b) >> 20) & 0xfff000);
-}
-template<>
-u64 index6t<0x2,0x3,0x4,0x5,0x6,0x9>(const board& b) {
-	return (u32(u64(b) >> 8) & 0x0fffff) | (u32(u64(b) >> 16) & 0xf00000);
-}
-template<>
-u64 index6t<0x0,0x1,0x2,0x5,0x9,0xa>(const board& b) {
-	return (u32(u64(b)) & 0x000fff) | (u32(u64(b) >> 8) & 0x00f000) | (u32(u64(b) >> 20) & 0xff0000);
-}
-template<>
-u64 index6t<0x3,0x4,0x5,0x6,0x7,0x8>(const board& b) {
-	return (u32(u64(b) >> 12) & 0xffffff);
-}
-template<>
-u64 index6t<0x1,0x3,0x4,0x5,0x6,0x7>(const board& b) {
-	return (u32(u64(b) >> 4) & 0x00000f) | (u32(u64(b) >> 8) & 0xfffff0);
-}
-template<>
-u64 index6t<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) {
-	return (u32(u64(b)) & 0x0000ff) | (u32(u64(b) >> 8) & 0x000f00) | (u32(u64(b) >> 20) & 0xfff000);
-}
-template<u32 p0, u32 p1, u32 p2, u32 p3>
-u64 index4t(const board& b) {
+
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6>
+u64 index7t(const board& b) {
 	register u64 index = 0;
 	index += b.at(p0) <<  0;
 	index += b.at(p1) <<  4;
 	index += b.at(p2) <<  8;
 	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	index += b.at(p5) << 20;
+	index += b.at(p6) << 24;
 	return index;
 }
+
 template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7>
 u64 index8t(const board& b) {
 	register u64 index = 0;
@@ -494,28 +552,40 @@ u64 index8t(const board& b) {
 	index += b.at(p7) << 28;
 	return index;
 }
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6>
-u64 index7t(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	index += b.at(p6) << 24;
-	return index;
-}
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4>
-u64 index5t(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	return index;
-}
+
+template<> u64 index4t<0x0,0x1,0x2,0x3>(const board& b) { return (u32(u64(b)) & 0xffff); }
+template<> u64 index4t<0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b) >> 16) & 0xffff); }
+template<> u64 index4t<0x0,0x1,0x4,0x5>(const board& b) { return (u32(u64(b)) & 0x00ff) | (u32(u64(b) >> 8) & 0xff00); }
+template<> u64 index4t<0x1,0x2,0x5,0x6>(const board& b) { return (u32(u64(b) >> 4) & 0x00ff) | (u32(u64(b) >> 12) & 0xff00); }
+template<> u64 index4t<0x5,0x6,0x9,0xa>(const board& b) { return (u32(u64(b) >> 20) & 0x00ff) | (u32(u64(b) >> 28) & 0xff00); }
+template<> u64 index4t<0x0,0x1,0x2,0x4>(const board& b) { return (u32(u64(b)) & 0x0fff) | (u32(u64(b) >> 4) & 0xf000); }
+template<> u64 index4t<0x1,0x2,0x3,0x5>(const board& b) { return (u32(u64(b) >> 4) & 0x0fff) | (u32(u64(b) >> 8) & 0xf000); }
+template<> u64 index4t<0x4,0x5,0x6,0x8>(const board& b) { return (u32(u64(b) >> 16) & 0x0fff) | (u32(u64(b) >> 20) & 0xf000); }
+template<> u64 index4t<0x5,0x6,0x7,0x9>(const board& b) { return (u32(u64(b) >> 20) & 0x0fff) | (u32(u64(b) >> 24) & 0xf000); }
+template<> u64 index4t<0x0,0x1,0x2,0x5>(const board& b) { return (u32(u64(b)) & 0x0fff) | (u32(u64(b) >> 8) & 0xf000); }
+template<> u64 index4t<0x4,0x5,0x6,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0x0fff) | (u32(u64(b) >> 24) & 0xf000); }
+template<> u64 index5t<0x0,0x1,0x2,0x3,0x4>(const board& b) { return (u32(u64(b)) & 0xfffff); }
+template<> u64 index5t<0x4,0x5,0x6,0x7,0x8>(const board& b) { return (u32(u64(b) >> 16) & 0xfffff); }
+template<> u64 index5t<0x0,0x1,0x2,0x4,0x5>(const board& b) { return (u32(u64(b)) & 0x00fff) | ((u32(u64(b)) >> 4) & 0xff000); }
+template<> u64 index5t<0x4,0x5,0x6,0x8,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0x00fff) | (u32(u64(b) >> 20) & 0xff000); }
+template<> u64 index5t<0x0,0x1,0x2,0x3,0x5>(const board& b) { return (u32(u64(b)) & 0x0ffff) | (u32(u64(b) >> 4) & 0xf0000); }
+template<> u64 index5t<0x4,0x5,0x6,0x7,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0x0ffff) | (u32(u64(b) >> 20) & 0xf0000); }
+template<> u64 index6t<0x0,0x1,0x2,0x3,0x4,0x5>(const board& b) { return (u32(u64(b)) & 0xffffff); }
+template<> u64 index6t<0x4,0x5,0x6,0x7,0x8,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0xffffff); }
+template<> u64 index6t<0x8,0x9,0xa,0xb,0xc,0xd>(const board& b) { return (u32(u64(b) >> 32) & 0xffffff); }
+template<> u64 index6t<0x0,0x1,0x2,0x4,0x5,0x6>(const board& b) { return (u32(u64(b)) & 0x000fff) | ((u32(u64(b)) >> 4) & 0xfff000); }
+template<> u64 index6t<0x4,0x5,0x6,0x8,0x9,0xa>(const board& b) { return (u32(u64(b) >> 16) & 0x000fff) | (u32(u64(b) >> 20) & 0xfff000); }
+template<> u64 index6t<0x2,0x3,0x4,0x5,0x6,0x9>(const board& b) { return (u32(u64(b) >> 8) & 0x0fffff) | (u32(u64(b) >> 16) & 0xf00000); }
+template<> u64 index6t<0x0,0x1,0x2,0x5,0x9,0xa>(const board& b) { return (u32(u64(b)) & 0x000fff) | (u32(u64(b) >> 8) & 0x00f000) | (u32(u64(b) >> 20) & 0xff0000); }
+template<> u64 index6t<0x3,0x4,0x5,0x6,0x7,0x8>(const board& b) { return (u32(u64(b) >> 12) & 0xffffff); }
+template<> u64 index6t<0x1,0x3,0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b) >> 4) & 0x00000f) | (u32(u64(b) >> 8) & 0xfffff0); }
+template<> u64 index6t<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) { return (u32(u64(b)) & 0x0000ff) | (u32(u64(b) >> 8) & 0x000f00) | (u32(u64(b) >> 20) & 0xfff000); }
+template<> u64 index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>(const board& b) { return (u32(u64(b)) & 0xfffffff); }
+template<> u64 index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>(const board& b) { return (u32(u64(b) >> 16) & 0xfffffff); }
+template<> u64 index7t<0x0,0x1,0x2,0x3,0x4,0x8,0xc>(const board& b) { return (u32(u64(b)) & 0x00fffff) | (u32(u64(b) >> 12) & 0x0f00000) | (u32(u64(b) >> 24) & 0xf000000); }
+template<> u64 index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b))); }
+template<> u64 index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>(const board& b) { return (u32(u64(b) >> 16)); }
+template<> u64 index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x8,0xc>(const board& b) { return (u32(u64(b)) & 0x00ffffff) | (u32(u64(b) >> 8) & 0x0f000000) | (u32(u64(b) >> 20) & 0xf0000000); }
 
 u64 indexnta(const board& b, const std::vector<u32>& p) {
 	register u64 index = 0;
@@ -719,17 +789,13 @@ u64 indexmax(const board& b) { // 16-bit
 	return k.mask(k.max());
 }
 
-struct indexhdr {
-	typedef indexer::mapper wrapper;
-	typedef std::function<u64(const board&)> handler;
-	typedef moporgic::list<wrapper> wrapper_list;
-	typedef moporgic::list<handler> handler_list;
-	static wrapper_list& wlist() { static wrapper_list w; return w; }
-	static handler_list& hlist() { static handler_list h; return h; }
+struct indexapt {
+	static inline auto& wlist() { static moporgic::list<indexer::mapper> w; return w; }
+	static inline auto& hlist() { static moporgic::list<std::function<u64(const board&)>> h; return h; }
 
-	operator wrapper() const { return wlist().front(); }
-	indexhdr(handler hdr) { hlist().push_back(hdr); }
-	~indexhdr() { wlist().pop_front(); }
+	inline operator indexer::mapper() const { return wlist().front(); }
+	indexapt(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
+	~indexapt() { wlist().pop_front(); }
 
 	template<u32 idx>
 	static u64 adapt(const board& b) { return hlist()[idx](b); }
@@ -739,443 +805,673 @@ struct indexhdr {
 
 	template<u32 idx, u32 lim>
 	struct make_wrappers {
-		make_wrappers() { wlist().push_back(indexhdr::adapt<idx>); }
+		make_wrappers() { wlist().push_back(indexapt::adapt<idx>); }
 		~make_wrappers() { make_wrappers<idx + 1, lim>(); }
 	};
 	template<u32 idx>
 	struct make_wrappers<idx, idx> {};
+};
 
-	static __attribute__((constructor)) void init() {
-		auto make = [&](u64 sign, indexer::mapper func) {
-			if (!indexer(sign)) indexer::make(sign, func);
-		};
-		make(0x00012367, utils::index6t<0x0,0x1,0x2,0x3,0x6,0x7>);
-		make(0x0037bfae, utils::index6t<0x3,0x7,0xb,0xf,0xa,0xe>);
-		make(0x00fedc98, utils::index6t<0xf,0xe,0xd,0xc,0x9,0x8>);
-		make(0x00c84051, utils::index6t<0xc,0x8,0x4,0x0,0x5,0x1>);
-		make(0x00fb7362, utils::index6t<0xf,0xb,0x7,0x3,0x6,0x2>);
-		make(0x00cdefab, utils::index6t<0xc,0xd,0xe,0xf,0xa,0xb>);
-		make(0x00048c9d, utils::index6t<0x0,0x4,0x8,0xc,0x9,0xd>);
-		make(0x00321054, utils::index6t<0x3,0x2,0x1,0x0,0x5,0x4>);
-		make(0x004567ab, utils::index6t<0x4,0x5,0x6,0x7,0xa,0xb>);
-		make(0x0026ae9d, utils::index6t<0x2,0x6,0xa,0xe,0x9,0xd>);
-		make(0x00ba9854, utils::index6t<0xb,0xa,0x9,0x8,0x5,0x4>);
-		make(0x00d95162, utils::index6t<0xd,0x9,0x5,0x1,0x6,0x2>);
-		make(0x00ea6251, utils::index6t<0xe,0xa,0x6,0x2,0x5,0x1>);
-		make(0x0089ab67, utils::index6t<0x8,0x9,0xa,0xb,0x6,0x7>);
-		make(0x00159dae, utils::index6t<0x1,0x5,0x9,0xd,0xa,0xe>);
-		make(0x00765498, utils::index6t<0x7,0x6,0x5,0x4,0x9,0x8>);
-		make(0x00012345, utils::index6t<0x0,0x1,0x2,0x3,0x4,0x5>);
-		make(0x0037bf26, utils::index6t<0x3,0x7,0xb,0xf,0x2,0x6>);
-		make(0x00fedcba, utils::index6t<0xf,0xe,0xd,0xc,0xb,0xa>);
-		make(0x00c840d9, utils::index6t<0xc,0x8,0x4,0x0,0xd,0x9>);
-		make(0x00321076, utils::index6t<0x3,0x2,0x1,0x0,0x7,0x6>);
-		make(0x00fb73ea, utils::index6t<0xf,0xb,0x7,0x3,0xe,0xa>);
-		make(0x00cdef89, utils::index6t<0xc,0xd,0xe,0xf,0x8,0x9>);
-		make(0x00048c15, utils::index6t<0x0,0x4,0x8,0xc,0x1,0x5>);
-		make(0x00456789, utils::index6t<0x4,0x5,0x6,0x7,0x8,0x9>);
-		make(0x0026ae15, utils::index6t<0x2,0x6,0xa,0xe,0x1,0x5>);
-		make(0x00ba9876, utils::index6t<0xb,0xa,0x9,0x8,0x7,0x6>);
-		make(0x00d951ea, utils::index6t<0xd,0x9,0x5,0x1,0xe,0xa>);
-		make(0x007654ba, utils::index6t<0x7,0x6,0x5,0x4,0xb,0xa>);
-		make(0x00ea62d9, utils::index6t<0xe,0xa,0x6,0x2,0xd,0x9>);
-		make(0x0089ab45, utils::index6t<0x8,0x9,0xa,0xb,0x4,0x5>);
-		make(0x00159d26, utils::index6t<0x1,0x5,0x9,0xd,0x2,0x6>);
-		make(0x00012456, utils::index6t<0x0,0x1,0x2,0x4,0x5,0x6>);
-		make(0x0037b26a, utils::index6t<0x3,0x7,0xb,0x2,0x6,0xa>);
-		make(0x00fedba9, utils::index6t<0xf,0xe,0xd,0xb,0xa,0x9>);
-		make(0x00c84d95, utils::index6t<0xc,0x8,0x4,0xd,0x9,0x5>);
-		make(0x00fb7ea6, utils::index6t<0xf,0xb,0x7,0xe,0xa,0x6>);
-		make(0x00cde89a, utils::index6t<0xc,0xd,0xe,0x8,0x9,0xa>);
-		make(0x00048159, utils::index6t<0x0,0x4,0x8,0x1,0x5,0x9>);
-		make(0x00321765, utils::index6t<0x3,0x2,0x1,0x7,0x6,0x5>);
-		make(0x0045689a, utils::index6t<0x4,0x5,0x6,0x8,0x9,0xa>);
-		make(0x0026a159, utils::index6t<0x2,0x6,0xa,0x1,0x5,0x9>);
-		make(0x00ba9765, utils::index6t<0xb,0xa,0x9,0x7,0x6,0x5>);
-		make(0x00d95ea6, utils::index6t<0xd,0x9,0x5,0xe,0xa,0x6>);
-		make(0x00ea6d95, utils::index6t<0xe,0xa,0x6,0xd,0x9,0x5>);
-		make(0x0089a456, utils::index6t<0x8,0x9,0xa,0x4,0x5,0x6>);
-		make(0x0015926a, utils::index6t<0x1,0x5,0x9,0x2,0x6,0xa>);
-		make(0x00765ba9, utils::index6t<0x7,0x6,0x5,0xb,0xa,0x9>);
-		make(0x00123567, utils::index6t<0x1,0x2,0x3,0x5,0x6,0x7>);
-		make(0x007bf6ae, utils::index6t<0x7,0xb,0xf,0x6,0xa,0xe>);
-		make(0x00edca98, utils::index6t<0xe,0xd,0xc,0xa,0x9,0x8>);
-		make(0x00840951, utils::index6t<0x8,0x4,0x0,0x9,0x5,0x1>);
-		make(0x00210654, utils::index6t<0x2,0x1,0x0,0x6,0x5,0x4>);
-		make(0x00b73a62, utils::index6t<0xb,0x7,0x3,0xa,0x6,0x2>);
-		make(0x00def9ab, utils::index6t<0xd,0xe,0xf,0x9,0xa,0xb>);
-		make(0x0048c59d, utils::index6t<0x4,0x8,0xc,0x5,0x9,0xd>);
-		make(0x005679ab, utils::index6t<0x5,0x6,0x7,0x9,0xa,0xb>);
-		make(0x006ae59d, utils::index6t<0x6,0xa,0xe,0x5,0x9,0xd>);
-		make(0x00a98654, utils::index6t<0xa,0x9,0x8,0x6,0x5,0x4>);
-		make(0x00951a62, utils::index6t<0x9,0x5,0x1,0xa,0x6,0x2>);
-		make(0x00654a98, utils::index6t<0x6,0x5,0x4,0xa,0x9,0x8>);
-		make(0x00a62951, utils::index6t<0xa,0x6,0x2,0x9,0x5,0x1>);
-		make(0x009ab567, utils::index6t<0x9,0xa,0xb,0x5,0x6,0x7>);
-		make(0x0059d6ae, utils::index6t<0x5,0x9,0xd,0x6,0xa,0xe>);
-		make(0x0001237b, utils::index6t<0x0,0x1,0x2,0x3,0x7,0xb>);
-		make(0x0037bfed, utils::index6t<0x3,0x7,0xb,0xf,0xe,0xd>);
-		make(0x00fedc84, utils::index6t<0xf,0xe,0xd,0xc,0x8,0x4>);
-		make(0x00c84012, utils::index6t<0xc,0x8,0x4,0x0,0x1,0x2>);
-		make(0x00321048, utils::index6t<0x3,0x2,0x1,0x0,0x4,0x8>);
-		make(0x00fb7321, utils::index6t<0xf,0xb,0x7,0x3,0x2,0x1>);
-		make(0x00cdefb7, utils::index6t<0xc,0xd,0xe,0xf,0xb,0x7>);
-		make(0x00048cde, utils::index6t<0x0,0x4,0x8,0xc,0xd,0xe>);
-		make(0x00012348, utils::index6t<0x0,0x1,0x2,0x3,0x4,0x8>);
-		make(0x0037bf21, utils::index6t<0x3,0x7,0xb,0xf,0x2,0x1>);
-		make(0x00fedcb7, utils::index6t<0xf,0xe,0xd,0xc,0xb,0x7>);
-		make(0x00c840de, utils::index6t<0xc,0x8,0x4,0x0,0xd,0xe>);
-		make(0x0032107b, utils::index6t<0x3,0x2,0x1,0x0,0x7,0xb>);
-		make(0x00fb73ed, utils::index6t<0xf,0xb,0x7,0x3,0xe,0xd>);
-		make(0x00cdef84, utils::index6t<0xc,0xd,0xe,0xf,0x8,0x4>);
-		make(0x00048c12, utils::index6t<0x0,0x4,0x8,0xc,0x1,0x2>);
-		make(0x0089abcd, utils::index6t<0x8,0x9,0xa,0xb,0xc,0xd>);
-		make(0x00159d04, utils::index6t<0x1,0x5,0x9,0xd,0x0,0x4>);
-		make(0x00765432, utils::index6t<0x7,0x6,0x5,0x4,0x3,0x2>);
-		make(0x00ea62fb, utils::index6t<0xe,0xa,0x6,0x2,0xf,0xb>);
-		make(0x00ba98fe, utils::index6t<0xb,0xa,0x9,0x8,0xf,0xe>);
-		make(0x00d951c8, utils::index6t<0xd,0x9,0x5,0x1,0xc,0x8>);
-		make(0x00456701, utils::index6t<0x4,0x5,0x6,0x7,0x0,0x1>);
-		make(0x0026ae37, utils::index6t<0x2,0x6,0xa,0xe,0x3,0x7>);
+__attribute__((constructor)) void init() {
+	auto make = [&](indexer::sign_t sign, indexer::mapper func) {
+		if (!indexer(sign)) indexer::make(sign, func);
+		else if (indexer(sign).index() != func) std::exit(127);
+	};
+	make("012345", index6t<0x0,0x1,0x2,0x3,0x4,0x5>);
+	make("37bf26", index6t<0x3,0x7,0xb,0xf,0x2,0x6>);
+	make("fedcba", index6t<0xf,0xe,0xd,0xc,0xb,0xa>);
+	make("c840d9", index6t<0xc,0x8,0x4,0x0,0xd,0x9>);
+	make("321076", index6t<0x3,0x2,0x1,0x0,0x7,0x6>);
+	make("048c15", index6t<0x0,0x4,0x8,0xc,0x1,0x5>);
+	make("cdef89", index6t<0xc,0xd,0xe,0xf,0x8,0x9>);
+	make("fb73ea", index6t<0xf,0xb,0x7,0x3,0xe,0xa>);
+	make("456789", index6t<0x4,0x5,0x6,0x7,0x8,0x9>);
+	make("26ae15", index6t<0x2,0x6,0xa,0xe,0x1,0x5>);
+	make("ba9876", index6t<0xb,0xa,0x9,0x8,0x7,0x6>);
+	make("d951ea", index6t<0xd,0x9,0x5,0x1,0xe,0xa>);
+	make("7654ba", index6t<0x7,0x6,0x5,0x4,0xb,0xa>);
+	make("159d26", index6t<0x1,0x5,0x9,0xd,0x2,0x6>);
+	make("89ab45", index6t<0x8,0x9,0xa,0xb,0x4,0x5>);
+	make("ea62d9", index6t<0xe,0xa,0x6,0x2,0xd,0x9>);
+	make("012456", index6t<0x0,0x1,0x2,0x4,0x5,0x6>);
+	make("37b26a", index6t<0x3,0x7,0xb,0x2,0x6,0xa>);
+	make("fedba9", index6t<0xf,0xe,0xd,0xb,0xa,0x9>);
+	make("c84d95", index6t<0xc,0x8,0x4,0xd,0x9,0x5>);
+	make("321765", index6t<0x3,0x2,0x1,0x7,0x6,0x5>);
+	make("048159", index6t<0x0,0x4,0x8,0x1,0x5,0x9>);
+	make("cde89a", index6t<0xc,0xd,0xe,0x8,0x9,0xa>);
+	make("fb7ea6", index6t<0xf,0xb,0x7,0xe,0xa,0x6>);
+	make("45689a", index6t<0x4,0x5,0x6,0x8,0x9,0xa>);
+	make("26a159", index6t<0x2,0x6,0xa,0x1,0x5,0x9>);
+	make("ba9765", index6t<0xb,0xa,0x9,0x7,0x6,0x5>);
+	make("d95ea6", index6t<0xd,0x9,0x5,0xe,0xa,0x6>);
+	make("765ba9", index6t<0x7,0x6,0x5,0xb,0xa,0x9>);
+	make("15926a", index6t<0x1,0x5,0x9,0x2,0x6,0xa>);
+	make("89a456", index6t<0x8,0x9,0xa,0x4,0x5,0x6>);
+	make("ea6d95", index6t<0xe,0xa,0x6,0xd,0x9,0x5>);
+	make("89abcd", index6t<0x8,0x9,0xa,0xb,0xc,0xd>);
+	make("159d04", index6t<0x1,0x5,0x9,0xd,0x0,0x4>);
+	make("765432", index6t<0x7,0x6,0x5,0x4,0x3,0x2>);
+	make("ea62fb", index6t<0xe,0xa,0x6,0x2,0xf,0xb>);
+	make("ba98fe", index6t<0xb,0xa,0x9,0x8,0xf,0xe>);
+	make("26ae37", index6t<0x2,0x6,0xa,0xe,0x3,0x7>);
+	make("456701", index6t<0x4,0x5,0x6,0x7,0x0,0x1>);
+	make("d951c8", index6t<0xd,0x9,0x5,0x1,0xc,0x8>);
+	make("012458", index6t<0x0,0x1,0x2,0x4,0x5,0x8>);
+	make("c84d9e", index6t<0xc,0x8,0x4,0xd,0x9,0xe>);
+	make("fedba7", index6t<0xf,0xe,0xd,0xb,0xa,0x7>);
+	make("37b261", index6t<0x3,0x7,0xb,0x2,0x6,0x1>);
+	make("32176b", index6t<0x3,0x2,0x1,0x7,0x6,0xb>);
+	make("fb7ead", index6t<0xf,0xb,0x7,0xe,0xa,0xd>);
+	make("cde894", index6t<0xc,0xd,0xe,0x8,0x9,0x4>);
+	make("048152", index6t<0x0,0x4,0x8,0x1,0x5,0x2>);
+	make("123569", index6t<0x1,0x2,0x3,0x5,0x6,0x9>);
+	make("84095a", index6t<0x8,0x4,0x0,0x9,0x5,0xa>);
+	make("edca96", index6t<0xe,0xd,0xc,0xa,0x9,0x6>);
+	make("7bf6a5", index6t<0x7,0xb,0xf,0x6,0xa,0x5>);
+	make("21065a", index6t<0x2,0x1,0x0,0x6,0x5,0xa>);
+	make("b73a69", index6t<0xb,0x7,0x3,0xa,0x6,0x9>);
+	make("def9a5", index6t<0xd,0xe,0xf,0x9,0xa,0x5>);
+	make("48c596", index6t<0x4,0x8,0xc,0x5,0x9,0x6>);
+	make("45689c", index6t<0x4,0x5,0x6,0x8,0x9,0xc>);
+	make("d95eaf", index6t<0xd,0x9,0x5,0xe,0xa,0xf>);
+	make("ba9763", index6t<0xb,0xa,0x9,0x7,0x6,0x3>);
+	make("26a150", index6t<0x2,0x6,0xa,0x1,0x5,0x0>);
+	make("765baf", index6t<0x7,0x6,0x5,0xb,0xa,0xf>);
+	make("ea6d9c", index6t<0xe,0xa,0x6,0xd,0x9,0xc>);
+	make("89a450", index6t<0x8,0x9,0xa,0x4,0x5,0x0>);
+	make("159263", index6t<0x1,0x5,0x9,0x2,0x6,0x3>);
+	make("5679ad", index6t<0x5,0x6,0x7,0x9,0xa,0xd>);
+	make("951a6b", index6t<0x9,0x5,0x1,0xa,0x6,0xb>);
+	make("a98652", index6t<0xa,0x9,0x8,0x6,0x5,0x2>);
+	make("6ae594", index6t<0x6,0xa,0xe,0x5,0x9,0x4>);
+	make("654a9e", index6t<0x6,0x5,0x4,0xa,0x9,0xe>);
+	make("a62958", index6t<0xa,0x6,0x2,0x9,0x5,0x8>);
+	make("9ab561", index6t<0x9,0xa,0xb,0x5,0x6,0x1>);
+	make("59d6a7", index6t<0x5,0x9,0xd,0x6,0xa,0x7>);
+	make("012348", index6t<0x0,0x1,0x2,0x3,0x4,0x8>);
+	make("c840de", index6t<0xc,0x8,0x4,0x0,0xd,0xe>);
+	make("fedcb7", index6t<0xf,0xe,0xd,0xc,0xb,0x7>);
+	make("37bf21", index6t<0x3,0x7,0xb,0xf,0x2,0x1>);
+	make("32107b", index6t<0x3,0x2,0x1,0x0,0x7,0xb>);
+	make("fb73ed", index6t<0xf,0xb,0x7,0x3,0xe,0xd>);
+	make("cdef84", index6t<0xc,0xd,0xe,0xf,0x8,0x4>);
+	make("048c12", index6t<0x0,0x4,0x8,0xc,0x1,0x2>);
+	make("45678c", index6t<0x4,0x5,0x6,0x7,0x8,0xc>);
+	make("d951ef", index6t<0xd,0x9,0x5,0x1,0xe,0xf>);
+	make("ba9873", index6t<0xb,0xa,0x9,0x8,0x7,0x3>);
+	make("26ae10", index6t<0x2,0x6,0xa,0xe,0x1,0x0>);
+	make("7654bf", index6t<0x7,0x6,0x5,0x4,0xb,0xf>);
+	make("ea62dc", index6t<0xe,0xa,0x6,0x2,0xd,0xc>);
+	make("89ab40", index6t<0x8,0x9,0xa,0xb,0x4,0x0>);
+	make("159d23", index6t<0x1,0x5,0x9,0xd,0x2,0x3>);
 
-		// k.matsuzaki
-		make(0x00012456, utils::index6t<0x0,0x1,0x2,0x4,0x5,0x6>);
-		make(0x00c84d95, utils::index6t<0xc,0x8,0x4,0xd,0x9,0x5>);
-		make(0x00fedba9, utils::index6t<0xf,0xe,0xd,0xb,0xa,0x9>);
-		make(0x0037b26a, utils::index6t<0x3,0x7,0xb,0x2,0x6,0xa>);
-		make(0x00321765, utils::index6t<0x3,0x2,0x1,0x7,0x6,0x5>);
-		make(0x00fb7ea6, utils::index6t<0xf,0xb,0x7,0xe,0xa,0x6>);
-		make(0x00cde89a, utils::index6t<0xc,0xd,0xe,0x8,0x9,0xa>);
-		make(0x00048159, utils::index6t<0x0,0x4,0x8,0x1,0x5,0x9>);
-		make(0x0012569d, utils::index6t<0x1,0x2,0x5,0x6,0x9,0xd>);
-		make(0x008495ab, utils::index6t<0x8,0x4,0x9,0x5,0xa,0xb>);
-		make(0x00eda962, utils::index6t<0xe,0xd,0xa,0x9,0x6,0x2>);
-		make(0x007b6a54, utils::index6t<0x7,0xb,0x6,0xa,0x5,0x4>);
-		make(0x002165ae, utils::index6t<0x2,0x1,0x6,0x5,0xa,0xe>);
-		make(0x00b7a698, utils::index6t<0xb,0x7,0xa,0x6,0x9,0x8>);
-		make(0x00de9a51, utils::index6t<0xd,0xe,0x9,0xa,0x5,0x1>);
-		make(0x00485967, utils::index6t<0x4,0x8,0x5,0x9,0x6,0x7>);
-		make(0x00012345, utils::index6t<0x0,0x1,0x2,0x3,0x4,0x5>);
-		make(0x00c840d9, utils::index6t<0xc,0x8,0x4,0x0,0xd,0x9>);
-		make(0x00fedcba, utils::index6t<0xf,0xe,0xd,0xc,0xb,0xa>);
-		make(0x0037bf26, utils::index6t<0x3,0x7,0xb,0xf,0x2,0x6>);
-		make(0x00321076, utils::index6t<0x3,0x2,0x1,0x0,0x7,0x6>);
-		make(0x00fb73ea, utils::index6t<0xf,0xb,0x7,0x3,0xe,0xa>);
-		make(0x00cdef89, utils::index6t<0xc,0xd,0xe,0xf,0x8,0x9>);
-		make(0x00048c15, utils::index6t<0x0,0x4,0x8,0xc,0x1,0x5>);
-		make(0x0001567a, utils::index6t<0x0,0x1,0x5,0x6,0x7,0xa>);
-		make(0x00c89516, utils::index6t<0xc,0x8,0x9,0x5,0x1,0x6>);
-		make(0x00fea985, utils::index6t<0xf,0xe,0xa,0x9,0x8,0x5>);
-		make(0x00376ae9, utils::index6t<0x3,0x7,0x6,0xa,0xe,0x9>);
-		make(0x00326549, utils::index6t<0x3,0x2,0x6,0x5,0x4,0x9>);
-		make(0x00fba625, utils::index6t<0xf,0xb,0xa,0x6,0x2,0x5>);
-		make(0x00cd9ab6, utils::index6t<0xc,0xd,0x9,0xa,0xb,0x6>);
-		make(0x000459da, utils::index6t<0x0,0x4,0x5,0x9,0xd,0xa>);
-		make(0x0001259a, utils::index6t<0x0,0x1,0x2,0x5,0x9,0xa>);
-		make(0x00c849a6, utils::index6t<0xc,0x8,0x4,0x9,0xa,0x6>);
-		make(0x00feda65, utils::index6t<0xf,0xe,0xd,0xa,0x6,0x5>);
-		make(0x0037b659, utils::index6t<0x3,0x7,0xb,0x6,0x5,0x9>);
-		make(0x003216a9, utils::index6t<0x3,0x2,0x1,0x6,0xa,0x9>);
-		make(0x00fb7a95, utils::index6t<0xf,0xb,0x7,0xa,0x9,0x5>);
-		make(0x00cde956, utils::index6t<0xc,0xd,0xe,0x9,0x5,0x6>);
-		make(0x0004856a, utils::index6t<0x0,0x4,0x8,0x5,0x6,0xa>);
-		make(0x000159de, utils::index6t<0x0,0x1,0x5,0x9,0xd,0xe>);
-		make(0x00c89ab7, utils::index6t<0xc,0x8,0x9,0xa,0xb,0x7>);
-		make(0x00fea621, utils::index6t<0xf,0xe,0xa,0x6,0x2,0x1>);
-		make(0x00376548, utils::index6t<0x3,0x7,0x6,0x5,0x4,0x8>);
-		make(0x00326aed, utils::index6t<0x3,0x2,0x6,0xa,0xe,0xd>);
-		make(0x00fba984, utils::index6t<0xf,0xb,0xa,0x9,0x8,0x4>);
-		make(0x00cd9512, utils::index6t<0xc,0xd,0x9,0x5,0x1,0x2>);
-		make(0x0004567b, utils::index6t<0x0,0x4,0x5,0x6,0x7,0xb>);
-		make(0x0001589d, utils::index6t<0x0,0x1,0x5,0x8,0x9,0xd>);
-		make(0x00c89eab, utils::index6t<0xc,0x8,0x9,0xe,0xa,0xb>);
-		make(0x00fea762, utils::index6t<0xf,0xe,0xa,0x7,0x6,0x2>);
-		make(0x00376154, utils::index6t<0x3,0x7,0x6,0x1,0x5,0x4>);
-		make(0x00326bae, utils::index6t<0x3,0x2,0x6,0xb,0xa,0xe>);
-		make(0x00fbad98, utils::index6t<0xf,0xb,0xa,0xd,0x9,0x8>);
-		make(0x00cd9451, utils::index6t<0xc,0xd,0x9,0x4,0x5,0x1>);
-		make(0x00045267, utils::index6t<0x0,0x4,0x5,0x2,0x6,0x7>);
-		make(0x0001246a, utils::index6t<0x0,0x1,0x2,0x4,0x6,0xa>);
-		make(0x00c84d56, utils::index6t<0xc,0x8,0x4,0xd,0x5,0x6>);
-		make(0x00fedb95, utils::index6t<0xf,0xe,0xd,0xb,0x9,0x5>);
-		make(0x0037b2a9, utils::index6t<0x3,0x7,0xb,0x2,0xa,0x9>);
-		make(0x00321759, utils::index6t<0x3,0x2,0x1,0x7,0x5,0x9>);
-		make(0x00fb7e65, utils::index6t<0xf,0xb,0x7,0xe,0x6,0x5>);
-		make(0x00cde8a6, utils::index6t<0xc,0xd,0xe,0x8,0xa,0x6>);
-		make(0x0004819a, utils::index6t<0x0,0x4,0x8,0x1,0x9,0xa>);
-		make(0x00456789, utils::index6t<0x4,0x5,0x6,0x7,0x8,0x9>);
-		make(0x00d951ea, utils::index6t<0xd,0x9,0x5,0x1,0xe,0xa>);
-		make(0x00ba9876, utils::index6t<0xb,0xa,0x9,0x8,0x7,0x6>);
-		make(0x0026ae15, utils::index6t<0x2,0x6,0xa,0xe,0x1,0x5>);
-		make(0x007654ba, utils::index6t<0x7,0x6,0x5,0x4,0xb,0xa>);
-		make(0x00ea62d9, utils::index6t<0xe,0xa,0x6,0x2,0xd,0x9>);
-		make(0x0089ab45, utils::index6t<0x8,0x9,0xa,0xb,0x4,0x5>);
-		make(0x00159d26, utils::index6t<0x1,0x5,0x9,0xd,0x2,0x6>);
-		make(0x00234569, utils::index6t<0x2,0x3,0x4,0x5,0x6,0x9>);
-		make(0x0040d95a, utils::index6t<0x4,0x0,0xd,0x9,0x5,0xa>);
-		make(0x00dcba96, utils::index6t<0xd,0xc,0xb,0xa,0x9,0x6>);
-		make(0x00bf26a5, utils::index6t<0xb,0xf,0x2,0x6,0xa,0x5>);
-		make(0x0010765a, utils::index6t<0x1,0x0,0x7,0x6,0x5,0xa>);
-		make(0x0073ea69, utils::index6t<0x7,0x3,0xe,0xa,0x6,0x9>);
-		make(0x00ef89a5, utils::index6t<0xe,0xf,0x8,0x9,0xa,0x5>);
-		make(0x008c1596, utils::index6t<0x8,0xc,0x1,0x5,0x9,0x6>);
-		make(0x00345678, utils::index6t<0x3,0x4,0x5,0x6,0x7,0x8>);
-		make(0x000d951e, utils::index6t<0x0,0xd,0x9,0x5,0x1,0xe>);
-		make(0x00cba987, utils::index6t<0xc,0xb,0xa,0x9,0x8,0x7>);
-		make(0x00f26ae1, utils::index6t<0xf,0x2,0x6,0xa,0xe,0x1>);
-		make(0x0007654b, utils::index6t<0x0,0x7,0x6,0x5,0x4,0xb>);
-		make(0x003ea62d, utils::index6t<0x3,0xe,0xa,0x6,0x2,0xd>);
-		make(0x00f89ab4, utils::index6t<0xf,0x8,0x9,0xa,0xb,0x4>);
-		make(0x00c159d2, utils::index6t<0xc,0x1,0x5,0x9,0xd,0x2>);
-		make(0x00134567, utils::index6t<0x1,0x3,0x4,0x5,0x6,0x7>);
-		make(0x0080d951, utils::index6t<0x8,0x0,0xd,0x9,0x5,0x1>);
-		make(0x00ecba98, utils::index6t<0xe,0xc,0xb,0xa,0x9,0x8>);
-		make(0x007f26ae, utils::index6t<0x7,0xf,0x2,0x6,0xa,0xe>);
-		make(0x00207654, utils::index6t<0x2,0x0,0x7,0x6,0x5,0x4>);
-		make(0x00b3ea62, utils::index6t<0xb,0x3,0xe,0xa,0x6,0x2>);
-		make(0x00df89ab, utils::index6t<0xd,0xf,0x8,0x9,0xa,0xb>);
-		make(0x004c159d, utils::index6t<0x4,0xc,0x1,0x5,0x9,0xd>);
-		make(0x0001489a, utils::index6t<0x0,0x1,0x4,0x8,0x9,0xa>);
-		make(0x00c8dea6, utils::index6t<0xc,0x8,0xd,0xe,0xa,0x6>);
-		make(0x00feb765, utils::index6t<0xf,0xe,0xb,0x7,0x6,0x5>);
-		make(0x00372159, utils::index6t<0x3,0x7,0x2,0x1,0x5,0x9>);
-		make(0x00327ba9, utils::index6t<0x3,0x2,0x7,0xb,0xa,0x9>);
-		make(0x00fbed95, utils::index6t<0xf,0xb,0xe,0xd,0x9,0x5>);
-		make(0x00cd8456, utils::index6t<0xc,0xd,0x8,0x4,0x5,0x6>);
-		make(0x0004126a, utils::index6t<0x0,0x4,0x1,0x2,0x6,0xa>);
+	// k.matsuzaki
+	make("012456", index6t<0x0,0x1,0x2,0x4,0x5,0x6>);
+	make("37b26a", index6t<0x3,0x7,0xb,0x2,0x6,0xa>);
+	make("fedba9", index6t<0xf,0xe,0xd,0xb,0xa,0x9>);
+	make("c84d95", index6t<0xc,0x8,0x4,0xd,0x9,0x5>);
+	make("321765", index6t<0x3,0x2,0x1,0x7,0x6,0x5>);
+	make("048159", index6t<0x0,0x4,0x8,0x1,0x5,0x9>);
+	make("cde89a", index6t<0xc,0xd,0xe,0x8,0x9,0xa>);
+	make("fb7ea6", index6t<0xf,0xb,0x7,0xe,0xa,0x6>);
+	make("456789", index6t<0x4,0x5,0x6,0x7,0x8,0x9>);
+	make("26ae15", index6t<0x2,0x6,0xa,0xe,0x1,0x5>);
+	make("ba9876", index6t<0xb,0xa,0x9,0x8,0x7,0x6>);
+	make("d951ea", index6t<0xd,0x9,0x5,0x1,0xe,0xa>);
+	make("7654ba", index6t<0x7,0x6,0x5,0x4,0xb,0xa>);
+	make("159d26", index6t<0x1,0x5,0x9,0xd,0x2,0x6>);
+	make("89ab45", index6t<0x8,0x9,0xa,0xb,0x4,0x5>);
+	make("ea62d9", index6t<0xe,0xa,0x6,0x2,0xd,0x9>);
+	make("012345", index6t<0x0,0x1,0x2,0x3,0x4,0x5>);
+	make("37bf26", index6t<0x3,0x7,0xb,0xf,0x2,0x6>);
+	make("fedcba", index6t<0xf,0xe,0xd,0xc,0xb,0xa>);
+	make("c840d9", index6t<0xc,0x8,0x4,0x0,0xd,0x9>);
+	make("321076", index6t<0x3,0x2,0x1,0x0,0x7,0x6>);
+	make("048c15", index6t<0x0,0x4,0x8,0xc,0x1,0x5>);
+	make("cdef89", index6t<0xc,0xd,0xe,0xf,0x8,0x9>);
+	make("fb73ea", index6t<0xf,0xb,0x7,0x3,0xe,0xa>);
+	make("234569", index6t<0x2,0x3,0x4,0x5,0x6,0x9>);
+	make("bf26a5", index6t<0xb,0xf,0x2,0x6,0xa,0x5>);
+	make("dcba96", index6t<0xd,0xc,0xb,0xa,0x9,0x6>);
+	make("40d95a", index6t<0x4,0x0,0xd,0x9,0x5,0xa>);
+	make("10765a", index6t<0x1,0x0,0x7,0x6,0x5,0xa>);
+	make("8c1596", index6t<0x8,0xc,0x1,0x5,0x9,0x6>);
+	make("ef89a5", index6t<0xe,0xf,0x8,0x9,0xa,0x5>);
+	make("73ea69", index6t<0x7,0x3,0xe,0xa,0x6,0x9>);
+	make("01259a", index6t<0x0,0x1,0x2,0x5,0x9,0xa>);
+	make("37b659", index6t<0x3,0x7,0xb,0x6,0x5,0x9>);
+	make("feda65", index6t<0xf,0xe,0xd,0xa,0x6,0x5>);
+	make("c849a6", index6t<0xc,0x8,0x4,0x9,0xa,0x6>);
+	make("3216a9", index6t<0x3,0x2,0x1,0x6,0xa,0x9>);
+	make("04856a", index6t<0x0,0x4,0x8,0x5,0x6,0xa>);
+	make("cde956", index6t<0xc,0xd,0xe,0x9,0x5,0x6>);
+	make("fb7a95", index6t<0xf,0xb,0x7,0xa,0x9,0x5>);
+	make("345678", index6t<0x3,0x4,0x5,0x6,0x7,0x8>);
+	make("f26ae1", index6t<0xf,0x2,0x6,0xa,0xe,0x1>);
+	make("cba987", index6t<0xc,0xb,0xa,0x9,0x8,0x7>);
+	make("0d951e", index6t<0x0,0xd,0x9,0x5,0x1,0xe>);
+	make("07654b", index6t<0x0,0x7,0x6,0x5,0x4,0xb>);
+	make("c159d2", index6t<0xc,0x1,0x5,0x9,0xd,0x2>);
+	make("f89ab4", index6t<0xf,0x8,0x9,0xa,0xb,0x4>);
+	make("3ea62d", index6t<0x3,0xe,0xa,0x6,0x2,0xd>);
+	make("134567", index6t<0x1,0x3,0x4,0x5,0x6,0x7>);
+	make("7f26ae", index6t<0x7,0xf,0x2,0x6,0xa,0xe>);
+	make("ecba98", index6t<0xe,0xc,0xb,0xa,0x9,0x8>);
+	make("80d951", index6t<0x8,0x0,0xd,0x9,0x5,0x1>);
+	make("207654", index6t<0x2,0x0,0x7,0x6,0x5,0x4>);
+	make("4c159d", index6t<0x4,0xc,0x1,0x5,0x9,0xd>);
+	make("df89ab", index6t<0xd,0xf,0x8,0x9,0xa,0xb>);
+	make("b3ea62", index6t<0xb,0x3,0xe,0xa,0x6,0x2>);
+	make("01489a", index6t<0x0,0x1,0x4,0x8,0x9,0xa>);
+	make("372159", index6t<0x3,0x7,0x2,0x1,0x5,0x9>);
+	make("feb765", index6t<0xf,0xe,0xb,0x7,0x6,0x5>);
+	make("c8dea6", index6t<0xc,0x8,0xd,0xe,0xa,0x6>);
+	make("327ba9", index6t<0x3,0x2,0x7,0xb,0xa,0x9>);
+	make("04126a", index6t<0x0,0x4,0x1,0x2,0x6,0xa>);
+	make("cd8456", index6t<0xc,0xd,0x8,0x4,0x5,0x6>);
+	make("fbed95", index6t<0xf,0xb,0xe,0xd,0x9,0x5>);
 
-		make(0x00000123, utils::index4t<0x0,0x1,0x2,0x3>);
-		make(0x00004567, utils::index4t<0x4,0x5,0x6,0x7>);
-		make(0x000089ab, utils::index4t<0x8,0x9,0xa,0xb>);
-		make(0x0000cdef, utils::index4t<0xc,0xd,0xe,0xf>);
-		make(0x000037bf, utils::index4t<0x3,0x7,0xb,0xf>);
-		make(0x000026ae, utils::index4t<0x2,0x6,0xa,0xe>);
-		make(0x0000159d, utils::index4t<0x1,0x5,0x9,0xd>);
-		make(0x0000048c, utils::index4t<0x0,0x4,0x8,0xc>);
-		make(0x0000fedc, utils::index4t<0xf,0xe,0xd,0xc>);
-		make(0x0000ba98, utils::index4t<0xb,0xa,0x9,0x8>);
-		make(0x00007654, utils::index4t<0x7,0x6,0x5,0x4>);
-		make(0x00003210, utils::index4t<0x3,0x2,0x1,0x0>);
-		make(0x0000c840, utils::index4t<0xc,0x8,0x4,0x0>);
-		make(0x0000d951, utils::index4t<0xd,0x9,0x5,0x1>);
-		make(0x0000ea62, utils::index4t<0xe,0xa,0x6,0x2>);
-		make(0x0000fb73, utils::index4t<0xf,0xb,0x7,0x3>);
-		make(0x00000145, utils::index4t<0x0,0x1,0x4,0x5>);
-		make(0x00001256, utils::index4t<0x1,0x2,0x5,0x6>);
-		make(0x00002367, utils::index4t<0x2,0x3,0x6,0x7>);
-		make(0x00004589, utils::index4t<0x4,0x5,0x8,0x9>);
-		make(0x0000569a, utils::index4t<0x5,0x6,0x9,0xa>);
-		make(0x000067ab, utils::index4t<0x6,0x7,0xa,0xb>);
-		make(0x000089cd, utils::index4t<0x8,0x9,0xc,0xd>);
-		make(0x00009ade, utils::index4t<0x9,0xa,0xd,0xe>);
-		make(0x0000abef, utils::index4t<0xa,0xb,0xe,0xf>);
-		make(0x00003726, utils::index4t<0x3,0x7,0x2,0x6>);
-		make(0x00007b6a, utils::index4t<0x7,0xb,0x6,0xa>);
-		make(0x0000bfae, utils::index4t<0xb,0xf,0xa,0xe>);
-		make(0x00002615, utils::index4t<0x2,0x6,0x1,0x5>);
-		make(0x00006a59, utils::index4t<0x6,0xa,0x5,0x9>);
-		make(0x0000ae9d, utils::index4t<0xa,0xe,0x9,0xd>);
-		make(0x00001504, utils::index4t<0x1,0x5,0x0,0x4>);
-		make(0x00005948, utils::index4t<0x5,0x9,0x4,0x8>);
-		make(0x00009d8c, utils::index4t<0x9,0xd,0x8,0xc>);
-		make(0x0000feba, utils::index4t<0xf,0xe,0xb,0xa>);
-		make(0x0000eda9, utils::index4t<0xe,0xd,0xa,0x9>);
-		make(0x0000dc98, utils::index4t<0xd,0xc,0x9,0x8>);
-		make(0x0000ba76, utils::index4t<0xb,0xa,0x7,0x6>);
-		make(0x0000a965, utils::index4t<0xa,0x9,0x6,0x5>);
-		make(0x00009854, utils::index4t<0x9,0x8,0x5,0x4>);
-		make(0x00007632, utils::index4t<0x7,0x6,0x3,0x2>);
-		make(0x00006521, utils::index4t<0x6,0x5,0x2,0x1>);
-		make(0x00005410, utils::index4t<0x5,0x4,0x1,0x0>);
-		make(0x0000c8d9, utils::index4t<0xc,0x8,0xd,0x9>);
-		make(0x00008495, utils::index4t<0x8,0x4,0x9,0x5>);
-		make(0x00004051, utils::index4t<0x4,0x0,0x5,0x1>);
-		make(0x0000d9ea, utils::index4t<0xd,0x9,0xe,0xa>);
-		make(0x000095a6, utils::index4t<0x9,0x5,0xa,0x6>);
-		make(0x00005162, utils::index4t<0x5,0x1,0x6,0x2>);
-		make(0x0000eafb, utils::index4t<0xe,0xa,0xf,0xb>);
-		make(0x0000a6b7, utils::index4t<0xa,0x6,0xb,0x7>);
-		make(0x00006273, utils::index4t<0x6,0x2,0x7,0x3>);
-		make(0x00003276, utils::index4t<0x3,0x2,0x7,0x6>);
-		make(0x00002165, utils::index4t<0x2,0x1,0x6,0x5>);
-		make(0x00001054, utils::index4t<0x1,0x0,0x5,0x4>);
-		make(0x000076ba, utils::index4t<0x7,0x6,0xb,0xa>);
-		make(0x000065a9, utils::index4t<0x6,0x5,0xa,0x9>);
-		make(0x00005498, utils::index4t<0x5,0x4,0x9,0x8>);
-		make(0x0000bafe, utils::index4t<0xb,0xa,0xf,0xe>);
-		make(0x0000a9ed, utils::index4t<0xa,0x9,0xe,0xd>);
-		make(0x000098dc, utils::index4t<0x9,0x8,0xd,0xc>);
-		make(0x0000fbea, utils::index4t<0xf,0xb,0xe,0xa>);
-		make(0x0000b7a6, utils::index4t<0xb,0x7,0xa,0x6>);
-		make(0x00007362, utils::index4t<0x7,0x3,0x6,0x2>);
-		make(0x0000ead9, utils::index4t<0xe,0xa,0xd,0x9>);
-		make(0x0000a695, utils::index4t<0xa,0x6,0x9,0x5>);
-		make(0x00006251, utils::index4t<0x6,0x2,0x5,0x1>);
-		make(0x0000d9c8, utils::index4t<0xd,0x9,0xc,0x8>);
-		make(0x00009584, utils::index4t<0x9,0x5,0x8,0x4>);
-		make(0x00005140, utils::index4t<0x5,0x1,0x4,0x0>);
-		make(0x0000cd89, utils::index4t<0xc,0xd,0x8,0x9>);
-		make(0x0000de9a, utils::index4t<0xd,0xe,0x9,0xa>);
-		make(0x0000efab, utils::index4t<0xe,0xf,0xa,0xb>);
-		make(0x00008945, utils::index4t<0x8,0x9,0x4,0x5>);
-		make(0x00009a56, utils::index4t<0x9,0xa,0x5,0x6>);
-		make(0x0000ab67, utils::index4t<0xa,0xb,0x6,0x7>);
-		make(0x00004501, utils::index4t<0x4,0x5,0x0,0x1>);
-		make(0x00005612, utils::index4t<0x5,0x6,0x1,0x2>);
-		make(0x00006723, utils::index4t<0x6,0x7,0x2,0x3>);
-		make(0x00000415, utils::index4t<0x0,0x4,0x1,0x5>);
-		make(0x00004859, utils::index4t<0x4,0x8,0x5,0x9>);
-		make(0x00008c9d, utils::index4t<0x8,0xc,0x9,0xd>);
-		make(0x00001526, utils::index4t<0x1,0x5,0x2,0x6>);
-		make(0x0000596a, utils::index4t<0x5,0x9,0x6,0xa>);
-		make(0x00009dae, utils::index4t<0x9,0xd,0xa,0xe>);
-		make(0x00002637, utils::index4t<0x2,0x6,0x3,0x7>);
-		make(0x00006a7b, utils::index4t<0x6,0xa,0x7,0xb>);
-		make(0x0000aebf, utils::index4t<0xa,0xe,0xb,0xf>);
-		make(0x01234567, utils::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
-		make(0x456789ab, utils::index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
-		make(0x37bf26ae, utils::index8t<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
-		make(0x26ae159d, utils::index8t<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
-		make(0xfedcba98, utils::index8t<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
-		make(0xba987654, utils::index8t<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
-		make(0xc840d951, utils::index8t<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
-		make(0xd951ea62, utils::index8t<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
-		make(0x32107654, utils::index8t<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
-		make(0x7654ba98, utils::index8t<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
-		make(0xfb73ea62, utils::index8t<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
-		make(0xea62d951, utils::index8t<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
-		make(0xcdef89ab, utils::index8t<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
-		make(0x89ab4567, utils::index8t<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
-		make(0x048c159d, utils::index8t<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
-		make(0x159d26ae, utils::index8t<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
-		make(0x0123458c, utils::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x8,0xc>);
-		make(0xc840d9ef, utils::index8t<0xc,0x8,0x4,0x0,0xd,0x9,0xe,0xf>);
-		make(0xfedcba73, utils::index8t<0xf,0xe,0xd,0xc,0xb,0xa,0x7,0x3>);
-		make(0x37bf2610, utils::index8t<0x3,0x7,0xb,0xf,0x2,0x6,0x1,0x0>);
-		make(0x321076bf, utils::index8t<0x3,0x2,0x1,0x0,0x7,0x6,0xb,0xf>);
-		make(0xfb73eadc, utils::index8t<0xf,0xb,0x7,0x3,0xe,0xa,0xd,0xc>);
-		make(0xcdef8940, utils::index8t<0xc,0xd,0xe,0xf,0x8,0x9,0x4,0x0>);
-		make(0x048c1523, utils::index8t<0x0,0x4,0x8,0xc,0x1,0x5,0x2,0x3>);
-		make(0x00123456, utils::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>);
-		make(0x037bf26a, utils::index7t<0x3,0x7,0xb,0xf,0x2,0x6,0xa>);
-		make(0x0fedcba9, utils::index7t<0xf,0xe,0xd,0xc,0xb,0xa,0x9>);
-		make(0x0c840d95, utils::index7t<0xc,0x8,0x4,0x0,0xd,0x9,0x5>);
-		make(0x03210765, utils::index7t<0x3,0x2,0x1,0x0,0x7,0x6,0x5>);
-		make(0x0fb73ea6, utils::index7t<0xf,0xb,0x7,0x3,0xe,0xa,0x6>);
-		make(0x0cdef89a, utils::index7t<0xc,0xd,0xe,0xf,0x8,0x9,0xa>);
-		make(0x0048c159, utils::index7t<0x0,0x4,0x8,0xc,0x1,0x5,0x9>);
-		make(0x0456789a, utils::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>);
-		make(0x026ae159, utils::index7t<0x2,0x6,0xa,0xe,0x1,0x5,0x9>);
-		make(0x0ba98765, utils::index7t<0xb,0xa,0x9,0x8,0x7,0x6,0x5>);
-		make(0x0d951ea6, utils::index7t<0xd,0x9,0x5,0x1,0xe,0xa,0x6>);
-		make(0x07654ba9, utils::index7t<0x7,0x6,0x5,0x4,0xb,0xa,0x9>);
-		make(0x0ea62d95, utils::index7t<0xe,0xa,0x6,0x2,0xd,0x9,0x5>);
-		make(0x089ab456, utils::index7t<0x8,0x9,0xa,0xb,0x4,0x5,0x6>);
-		make(0x0159d26a, utils::index7t<0x1,0x5,0x9,0xd,0x2,0x6,0xa>);
-		make(0x00123567, utils::index7t<0x0,0x1,0x2,0x3,0x5,0x6,0x7>);
-		make(0x037bf6ae, utils::index7t<0x3,0x7,0xb,0xf,0x6,0xa,0xe>);
-		make(0x0fedca98, utils::index7t<0xf,0xe,0xd,0xc,0xa,0x9,0x8>);
-		make(0x0c840951, utils::index7t<0xc,0x8,0x4,0x0,0x9,0x5,0x1>);
-		make(0x03210654, utils::index7t<0x3,0x2,0x1,0x0,0x6,0x5,0x4>);
-		make(0x0fb73a62, utils::index7t<0xf,0xb,0x7,0x3,0xa,0x6,0x2>);
-		make(0x0cdef9ab, utils::index7t<0xc,0xd,0xe,0xf,0x9,0xa,0xb>);
-		make(0x0048c59d, utils::index7t<0x0,0x4,0x8,0xc,0x5,0x9,0xd>);
-		make(0x045679ab, utils::index7t<0x4,0x5,0x6,0x7,0x9,0xa,0xb>);
-		make(0x026ae59d, utils::index7t<0x2,0x6,0xa,0xe,0x5,0x9,0xd>);
-		make(0x0ba98654, utils::index7t<0xb,0xa,0x9,0x8,0x6,0x5,0x4>);
-		make(0x0d951a62, utils::index7t<0xd,0x9,0x5,0x1,0xa,0x6,0x2>);
-		make(0x07654a98, utils::index7t<0x7,0x6,0x5,0x4,0xa,0x9,0x8>);
-		make(0x0ea62951, utils::index7t<0xe,0xa,0x6,0x2,0x9,0x5,0x1>);
-		make(0x089ab567, utils::index7t<0x8,0x9,0xa,0xb,0x5,0x6,0x7>);
-		make(0x0159d6ae, utils::index7t<0x1,0x5,0x9,0xd,0x6,0xa,0xe>);
-		make(0x001237bf, utils::index7t<0x0,0x1,0x2,0x3,0x7,0xb,0xf>);
-		make(0x037bfedc, utils::index7t<0x3,0x7,0xb,0xf,0xe,0xd,0xc>);
-		make(0x0fedc840, utils::index7t<0xf,0xe,0xd,0xc,0x8,0x4,0x0>);
-		make(0x0c840123, utils::index7t<0xc,0x8,0x4,0x0,0x1,0x2,0x3>);
-		make(0x0321048c, utils::index7t<0x3,0x2,0x1,0x0,0x4,0x8,0xc>);
-		make(0x0fb73210, utils::index7t<0xf,0xb,0x7,0x3,0x2,0x1,0x0>);
-		make(0x0cdefb73, utils::index7t<0xc,0xd,0xe,0xf,0xb,0x7,0x3>);
-		make(0x0048cdef, utils::index7t<0x0,0x4,0x8,0xc,0xd,0xe,0xf>);
-		make(0x0012348c, utils::index7t<0x0,0x1,0x2,0x3,0x4,0x8,0xc>);
-		make(0x037bf210, utils::index7t<0x3,0x7,0xb,0xf,0x2,0x1,0x0>);
-		make(0x0fedcb73, utils::index7t<0xf,0xe,0xd,0xc,0xb,0x7,0x3>);
-		make(0x0c840def, utils::index7t<0xc,0x8,0x4,0x0,0xd,0xe,0xf>);
-		make(0x032107bf, utils::index7t<0x3,0x2,0x1,0x0,0x7,0xb,0xf>);
-		make(0x0fb73edc, utils::index7t<0xf,0xb,0x7,0x3,0xe,0xd,0xc>);
-		make(0x0cdef840, utils::index7t<0xc,0xd,0xe,0xf,0x8,0x4,0x0>);
-		make(0x0048c123, utils::index7t<0x0,0x4,0x8,0xc,0x1,0x2,0x3>);
-		make(0x00123458, utils::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x8>);
-		make(0x037bf261, utils::index7t<0x3,0x7,0xb,0xf,0x2,0x6,0x1>);
-		make(0x0fedcba7, utils::index7t<0xf,0xe,0xd,0xc,0xb,0xa,0x7>);
-		make(0x0c840d9e, utils::index7t<0xc,0x8,0x4,0x0,0xd,0x9,0xe>);
-		make(0x0321076b, utils::index7t<0x3,0x2,0x1,0x0,0x7,0x6,0xb>);
-		make(0x0fb73ead, utils::index7t<0xf,0xb,0x7,0x3,0xe,0xa,0xd>);
-		make(0x0cdef894, utils::index7t<0xc,0xd,0xe,0xf,0x8,0x9,0x4>);
-		make(0x0048c152, utils::index7t<0x0,0x4,0x8,0xc,0x1,0x5,0x2>);
-		make(0x0012367b, utils::index7t<0x0,0x1,0x2,0x3,0x6,0x7,0xb>);
-		make(0x037bfaed, utils::index7t<0x3,0x7,0xb,0xf,0xa,0xe,0xd>);
-		make(0x0fedc984, utils::index7t<0xf,0xe,0xd,0xc,0x9,0x8,0x4>);
-		make(0x0c840512, utils::index7t<0xc,0x8,0x4,0x0,0x5,0x1,0x2>);
-		make(0x03210548, utils::index7t<0x3,0x2,0x1,0x0,0x5,0x4,0x8>);
-		make(0x0fb73621, utils::index7t<0xf,0xb,0x7,0x3,0x6,0x2,0x1>);
-		make(0x0cdefab7, utils::index7t<0xc,0xd,0xe,0xf,0xa,0xb,0x7>);
-		make(0x0048c9de, utils::index7t<0x0,0x4,0x8,0xc,0x9,0xd,0xe>);
-		make(0x00001234, utils::index5t<0x0,0x1,0x2,0x3,0x4>);
-		make(0x00037bf2, utils::index5t<0x3,0x7,0xb,0xf,0x2>);
-		make(0x000fedcb, utils::index5t<0xf,0xe,0xd,0xc,0xb>);
-		make(0x000c840d, utils::index5t<0xc,0x8,0x4,0x0,0xd>);
-		make(0x00032107, utils::index5t<0x3,0x2,0x1,0x0,0x7>);
-		make(0x000fb73e, utils::index5t<0xf,0xb,0x7,0x3,0xe>);
-		make(0x000cdef8, utils::index5t<0xc,0xd,0xe,0xf,0x8>);
-		make(0x000048c1, utils::index5t<0x0,0x4,0x8,0xc,0x1>);
-		make(0x00045678, utils::index5t<0x4,0x5,0x6,0x7,0x8>);
-		make(0x00026ae1, utils::index5t<0x2,0x6,0xa,0xe,0x1>);
-		make(0x000ba987, utils::index5t<0xb,0xa,0x9,0x8,0x7>);
-		make(0x000d951e, utils::index5t<0xd,0x9,0x5,0x1,0xe>);
-		make(0x0007654b, utils::index5t<0x7,0x6,0x5,0x4,0xb>);
-		make(0x000ea62d, utils::index5t<0xe,0xa,0x6,0x2,0xd>);
-		make(0x00089ab4, utils::index5t<0x8,0x9,0xa,0xb,0x4>);
-		make(0x000159d2, utils::index5t<0x1,0x5,0x9,0xd,0x2>);
-		make(0xff000000, utils::indexmerge0);
-		make(0xff000001, utils::indexmerge1<0>);
-		make(0xff000011, utils::indexmerge1<1>);
-		make(0xfe000000, utils::indexnum0);
-		make(0xfe000001, utils::indexnum1);
-		make(0xfe000002, utils::indexnum2);
-		make(0xfe000082, utils::indexnum2x<0, 0, 1>);
-		make(0xfe000092, utils::indexnum2x<0, 2, 3>);
-		make(0xfe0000c2, utils::indexnum2x<1, 0, 1>);
-		make(0xfe0000d2, utils::indexnum2x<1, 2, 3>);
-		make(0xfe000003, utils::indexnum3);
-		make(0xfe000004, utils::indexnum4);
-		make(0xfe000005, utils::indexnum5lt);
-		make(0xfe000015, utils::indexnum5st);
-		make(0xfd012301, utils::indexmono<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
-		make(0xfd37bf01, utils::indexmono<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
-		make(0xfdfedc01, utils::indexmono<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
-		make(0xfdc84001, utils::indexmono<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
-		make(0xfd321001, utils::indexmono<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
-		make(0xfdfb7301, utils::indexmono<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
-		make(0xfdcdef01, utils::indexmono<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
-		make(0xfd048c01, utils::indexmono<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
-		make(0xfd456701, utils::indexmono<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
-		make(0xfd26ae01, utils::indexmono<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
-		make(0xfdba9801, utils::indexmono<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
-		make(0xfdd95101, utils::indexmono<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
-		make(0xfd765401, utils::indexmono<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
-		make(0xfdea6201, utils::indexmono<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
-		make(0xfd89ab01, utils::indexmono<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
-		make(0xfd159d01, utils::indexmono<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
-		make(0xfc000000, utils::indexmax<0>);
-		make(0xfc000010, utils::indexmax<1>);
-		make(0xfc000020, utils::indexmax<2>);
-		make(0xfc000030, utils::indexmax<3>);
-		make(0xfc000040, utils::indexmax<4>);
-		make(0xfc000050, utils::indexmax<5>);
-		make(0xfc000060, utils::indexmax<6>);
-		make(0xfc000070, utils::indexmax<7>);
+	make("01234", index5t<0x0,0x1,0x2,0x3,0x4>);
+	make("c840d", index5t<0xc,0x8,0x4,0x0,0xd>);
+	make("fedcb", index5t<0xf,0xe,0xd,0xc,0xb>);
+	make("37bf2", index5t<0x3,0x7,0xb,0xf,0x2>);
+	make("32107", index5t<0x3,0x2,0x1,0x0,0x7>);
+	make("fb73e", index5t<0xf,0xb,0x7,0x3,0xe>);
+	make("cdef8", index5t<0xc,0xd,0xe,0xf,0x8>);
+	make("048c1", index5t<0x0,0x4,0x8,0xc,0x1>);
+	make("45678", index5t<0x4,0x5,0x6,0x7,0x8>);
+	make("d951e", index5t<0xd,0x9,0x5,0x1,0xe>);
+	make("ba987", index5t<0xb,0xa,0x9,0x8,0x7>);
+	make("26ae1", index5t<0x2,0x6,0xa,0xe,0x1>);
+	make("7654b", index5t<0x7,0x6,0x5,0x4,0xb>);
+	make("ea62d", index5t<0xe,0xa,0x6,0x2,0xd>);
+	make("89ab4", index5t<0x8,0x9,0xa,0xb,0x4>);
+	make("159d2", index5t<0x1,0x5,0x9,0xd,0x2>);
+	make("89abc", index5t<0x8,0x9,0xa,0xb,0xc>);
+	make("ea62f", index5t<0xe,0xa,0x6,0x2,0xf>);
+	make("76543", index5t<0x7,0x6,0x5,0x4,0x3>);
+	make("159d0", index5t<0x1,0x5,0x9,0xd,0x0>);
+	make("ba98f", index5t<0xb,0xa,0x9,0x8,0xf>);
+	make("d951c", index5t<0xd,0x9,0x5,0x1,0xc>);
+	make("45670", index5t<0x4,0x5,0x6,0x7,0x0>);
+	make("26ae3", index5t<0x2,0x6,0xa,0xe,0x3>);
+	make("01235", index5t<0x0,0x1,0x2,0x3,0x5>);
+	make("c8409", index5t<0xc,0x8,0x4,0x0,0x9>);
+	make("fedca", index5t<0xf,0xe,0xd,0xc,0xa>);
+	make("37bf6", index5t<0x3,0x7,0xb,0xf,0x6>);
+	make("32106", index5t<0x3,0x2,0x1,0x0,0x6>);
+	make("fb73a", index5t<0xf,0xb,0x7,0x3,0xa>);
+	make("cdef9", index5t<0xc,0xd,0xe,0xf,0x9>);
+	make("048c5", index5t<0x0,0x4,0x8,0xc,0x5>);
+	make("45679", index5t<0x4,0x5,0x6,0x7,0x9>);
+	make("d951a", index5t<0xd,0x9,0x5,0x1,0xa>);
+	make("ba986", index5t<0xb,0xa,0x9,0x8,0x6>);
+	make("26ae5", index5t<0x2,0x6,0xa,0xe,0x5>);
+	make("7654a", index5t<0x7,0x6,0x5,0x4,0xa>);
+	make("ea629", index5t<0xe,0xa,0x6,0x2,0x9>);
+	make("89ab5", index5t<0x8,0x9,0xa,0xb,0x5>);
+	make("159d6", index5t<0x1,0x5,0x9,0xd,0x6>);
+	make("89abd", index5t<0x8,0x9,0xa,0xb,0xd>);
+	make("ea62b", index5t<0xe,0xa,0x6,0x2,0xb>);
+	make("76542", index5t<0x7,0x6,0x5,0x4,0x2>);
+	make("159d4", index5t<0x1,0x5,0x9,0xd,0x4>);
+	make("ba98e", index5t<0xb,0xa,0x9,0x8,0xe>);
+	make("d9518", index5t<0xd,0x9,0x5,0x1,0x8>);
+	make("45671", index5t<0x4,0x5,0x6,0x7,0x1>);
+	make("26ae7", index5t<0x2,0x6,0xa,0xe,0x7>);
+	make("01245", index5t<0x0,0x1,0x2,0x4,0x5>);
+	make("c84d9", index5t<0xc,0x8,0x4,0xd,0x9>);
+	make("fedba", index5t<0xf,0xe,0xd,0xb,0xa>);
+	make("37b26", index5t<0x3,0x7,0xb,0x2,0x6>);
+	make("32176", index5t<0x3,0x2,0x1,0x7,0x6>);
+	make("fb7ea", index5t<0xf,0xb,0x7,0xe,0xa>);
+	make("cde89", index5t<0xc,0xd,0xe,0x8,0x9>);
+	make("04815", index5t<0x0,0x4,0x8,0x1,0x5>);
+	make("12356", index5t<0x1,0x2,0x3,0x5,0x6>);
+	make("84095", index5t<0x8,0x4,0x0,0x9,0x5>);
+	make("edca9", index5t<0xe,0xd,0xc,0xa,0x9>);
+	make("7bf6a", index5t<0x7,0xb,0xf,0x6,0xa>);
+	make("21065", index5t<0x2,0x1,0x0,0x6,0x5>);
+	make("b73a6", index5t<0xb,0x7,0x3,0xa,0x6>);
+	make("def9a", index5t<0xd,0xe,0xf,0x9,0xa>);
+	make("48c59", index5t<0x4,0x8,0xc,0x5,0x9>);
+	make("45689", index5t<0x4,0x5,0x6,0x8,0x9>);
+	make("d95ea", index5t<0xd,0x9,0x5,0xe,0xa>);
+	make("ba976", index5t<0xb,0xa,0x9,0x7,0x6>);
+	make("26a15", index5t<0x2,0x6,0xa,0x1,0x5>);
+	make("765ba", index5t<0x7,0x6,0x5,0xb,0xa>);
+	make("ea6d9", index5t<0xe,0xa,0x6,0xd,0x9>);
+	make("89a45", index5t<0x8,0x9,0xa,0x4,0x5>);
+	make("15926", index5t<0x1,0x5,0x9,0x2,0x6>);
+	make("5679a", index5t<0x5,0x6,0x7,0x9,0xa>);
+	make("951a6", index5t<0x9,0x5,0x1,0xa,0x6>);
+	make("a9865", index5t<0xa,0x9,0x8,0x6,0x5>);
+	make("6ae59", index5t<0x6,0xa,0xe,0x5,0x9>);
+	make("654a9", index5t<0x6,0x5,0x4,0xa,0x9>);
+	make("a6295", index5t<0xa,0x6,0x2,0x9,0x5>);
+	make("9ab56", index5t<0x9,0xa,0xb,0x5,0x6>);
+	make("59d6a", index5t<0x5,0x9,0xd,0x6,0xa>);
+	make("89acd", index5t<0x8,0x9,0xa,0xc,0xd>);
+	make("ea6fb", index5t<0xe,0xa,0x6,0xf,0xb>);
+	make("76532", index5t<0x7,0x6,0x5,0x3,0x2>);
+	make("15904", index5t<0x1,0x5,0x9,0x0,0x4>);
+	make("ba9fe", index5t<0xb,0xa,0x9,0xf,0xe>);
+	make("d95c8", index5t<0xd,0x9,0x5,0xc,0x8>);
+	make("45601", index5t<0x4,0x5,0x6,0x0,0x1>);
+	make("26a37", index5t<0x2,0x6,0xa,0x3,0x7>);
+	make("9abde", index5t<0x9,0xa,0xb,0xd,0xe>);
+	make("a62b7", index5t<0xa,0x6,0x2,0xb,0x7>);
+	make("65421", index5t<0x6,0x5,0x4,0x2,0x1>);
+	make("59d48", index5t<0x5,0x9,0xd,0x4,0x8>);
+	make("a98ed", index5t<0xa,0x9,0x8,0xe,0xd>);
+	make("95184", index5t<0x9,0x5,0x1,0x8,0x4>);
+	make("56712", index5t<0x5,0x6,0x7,0x1,0x2>);
+	make("6ae7b", index5t<0x6,0xa,0xe,0x7,0xb>);
+	make("01248", index5t<0x0,0x1,0x2,0x4,0x8>);
+	make("c84de", index5t<0xc,0x8,0x4,0xd,0xe>);
+	make("fedb7", index5t<0xf,0xe,0xd,0xb,0x7>);
+	make("37b21", index5t<0x3,0x7,0xb,0x2,0x1>);
+	make("3217b", index5t<0x3,0x2,0x1,0x7,0xb>);
+	make("fb7ed", index5t<0xf,0xb,0x7,0xe,0xd>);
+	make("cde84", index5t<0xc,0xd,0xe,0x8,0x4>);
+	make("04812", index5t<0x0,0x4,0x8,0x1,0x2>);
+	make("12359", index5t<0x1,0x2,0x3,0x5,0x9>);
+	make("8409a", index5t<0x8,0x4,0x0,0x9,0xa>);
+	make("edca6", index5t<0xe,0xd,0xc,0xa,0x6>);
+	make("7bf65", index5t<0x7,0xb,0xf,0x6,0x5>);
+	make("2106a", index5t<0x2,0x1,0x0,0x6,0xa>);
+	make("b73a9", index5t<0xb,0x7,0x3,0xa,0x9>);
+	make("def95", index5t<0xd,0xe,0xf,0x9,0x5>);
+	make("48c56", index5t<0x4,0x8,0xc,0x5,0x6>);
+	make("4568c", index5t<0x4,0x5,0x6,0x8,0xc>);
+	make("d95ef", index5t<0xd,0x9,0x5,0xe,0xf>);
+	make("ba973", index5t<0xb,0xa,0x9,0x7,0x3>);
+	make("26a10", index5t<0x2,0x6,0xa,0x1,0x0>);
+	make("765bf", index5t<0x7,0x6,0x5,0xb,0xf>);
+	make("ea6dc", index5t<0xe,0xa,0x6,0xd,0xc>);
+	make("89a40", index5t<0x8,0x9,0xa,0x4,0x0>);
+	make("15923", index5t<0x1,0x5,0x9,0x2,0x3>);
+	make("5679d", index5t<0x5,0x6,0x7,0x9,0xd>);
+	make("951ab", index5t<0x9,0x5,0x1,0xa,0xb>);
+	make("a9862", index5t<0xa,0x9,0x8,0x6,0x2>);
+	make("6ae54", index5t<0x6,0xa,0xe,0x5,0x4>);
+	make("654ae", index5t<0x6,0x5,0x4,0xa,0xe>);
+	make("a6298", index5t<0xa,0x6,0x2,0x9,0x8>);
+	make("9ab51", index5t<0x9,0xa,0xb,0x5,0x1>);
+	make("59d67", index5t<0x5,0x9,0xd,0x6,0x7>);
 
-		indexhdr::make<0, 256>();
+	make("0123", index4t<0x0,0x1,0x2,0x3>);
+	make("c840", index4t<0xc,0x8,0x4,0x0>);
+	make("fedc", index4t<0xf,0xe,0xd,0xc>);
+	make("37bf", index4t<0x3,0x7,0xb,0xf>);
+	make("3210", index4t<0x3,0x2,0x1,0x0>);
+	make("fb73", index4t<0xf,0xb,0x7,0x3>);
+	make("cdef", index4t<0xc,0xd,0xe,0xf>);
+	make("048c", index4t<0x0,0x4,0x8,0xc>);
+	make("4567", index4t<0x4,0x5,0x6,0x7>);
+	make("d951", index4t<0xd,0x9,0x5,0x1>);
+	make("ba98", index4t<0xb,0xa,0x9,0x8>);
+	make("26ae", index4t<0x2,0x6,0xa,0xe>);
+	make("7654", index4t<0x7,0x6,0x5,0x4>);
+	make("ea62", index4t<0xe,0xa,0x6,0x2>);
+	make("89ab", index4t<0x8,0x9,0xa,0xb>);
+	make("159d", index4t<0x1,0x5,0x9,0xd>);
+	make("89ab", index4t<0x8,0x9,0xa,0xb>); // legacy non-isomorphic
+	make("cdef", index4t<0xc,0xd,0xe,0xf>); // legacy non-isomorphic
+	make("048c", index4t<0x0,0x4,0x8,0xc>); // legacy non-isomorphic
+	make("159d", index4t<0x1,0x5,0x9,0xd>); // legacy non-isomorphic
+	make("26ae", index4t<0x2,0x6,0xa,0xe>); // legacy non-isomorphic
+	make("37bf", index4t<0x3,0x7,0xb,0xf>); // legacy non-isomorphic
+	make("0124", index4t<0x0,0x1,0x2,0x4>);
+	make("c84d", index4t<0xc,0x8,0x4,0xd>);
+	make("fedb", index4t<0xf,0xe,0xd,0xb>);
+	make("37b2", index4t<0x3,0x7,0xb,0x2>);
+	make("3217", index4t<0x3,0x2,0x1,0x7>);
+	make("fb7e", index4t<0xf,0xb,0x7,0xe>);
+	make("cde8", index4t<0xc,0xd,0xe,0x8>);
+	make("0481", index4t<0x0,0x4,0x8,0x1>);
+	make("1235", index4t<0x1,0x2,0x3,0x5>);
+	make("8409", index4t<0x8,0x4,0x0,0x9>);
+	make("edca", index4t<0xe,0xd,0xc,0xa>);
+	make("7bf6", index4t<0x7,0xb,0xf,0x6>);
+	make("2106", index4t<0x2,0x1,0x0,0x6>);
+	make("b73a", index4t<0xb,0x7,0x3,0xa>);
+	make("def9", index4t<0xd,0xe,0xf,0x9>);
+	make("48c5", index4t<0x4,0x8,0xc,0x5>);
+	make("4568", index4t<0x4,0x5,0x6,0x8>);
+	make("d95e", index4t<0xd,0x9,0x5,0xe>);
+	make("ba97", index4t<0xb,0xa,0x9,0x7>);
+	make("26a1", index4t<0x2,0x6,0xa,0x1>);
+	make("765b", index4t<0x7,0x6,0x5,0xb>);
+	make("ea6d", index4t<0xe,0xa,0x6,0xd>);
+	make("89a4", index4t<0x8,0x9,0xa,0x4>);
+	make("1592", index4t<0x1,0x5,0x9,0x2>);
+	make("5679", index4t<0x5,0x6,0x7,0x9>);
+	make("951a", index4t<0x9,0x5,0x1,0xa>);
+	make("a986", index4t<0xa,0x9,0x8,0x6>);
+	make("6ae5", index4t<0x6,0xa,0xe,0x5>);
+	make("654a", index4t<0x6,0x5,0x4,0xa>);
+	make("a629", index4t<0xa,0x6,0x2,0x9>);
+	make("9ab5", index4t<0x9,0xa,0xb,0x5>);
+	make("59d6", index4t<0x5,0x9,0xd,0x6>);
+	make("89ac", index4t<0x8,0x9,0xa,0xc>);
+	make("ea6f", index4t<0xe,0xa,0x6,0xf>);
+	make("7653", index4t<0x7,0x6,0x5,0x3>);
+	make("1590", index4t<0x1,0x5,0x9,0x0>);
+	make("ba9f", index4t<0xb,0xa,0x9,0xf>);
+	make("d95c", index4t<0xd,0x9,0x5,0xc>);
+	make("4560", index4t<0x4,0x5,0x6,0x0>);
+	make("26a3", index4t<0x2,0x6,0xa,0x3>);
+	make("9abd", index4t<0x9,0xa,0xb,0xd>);
+	make("a62b", index4t<0xa,0x6,0x2,0xb>);
+	make("6542", index4t<0x6,0x5,0x4,0x2>);
+	make("59d4", index4t<0x5,0x9,0xd,0x4>);
+	make("a98e", index4t<0xa,0x9,0x8,0xe>);
+	make("9518", index4t<0x9,0x5,0x1,0x8>);
+	make("5671", index4t<0x5,0x6,0x7,0x1>);
+	make("6ae7", index4t<0x6,0xa,0xe,0x7>);
+	make("0125", index4t<0x0,0x1,0x2,0x5>);
+	make("c849", index4t<0xc,0x8,0x4,0x9>);
+	make("feda", index4t<0xf,0xe,0xd,0xa>);
+	make("37b6", index4t<0x3,0x7,0xb,0x6>);
+	make("3216", index4t<0x3,0x2,0x1,0x6>);
+	make("fb7a", index4t<0xf,0xb,0x7,0xa>);
+	make("cde9", index4t<0xc,0xd,0xe,0x9>);
+	make("0485", index4t<0x0,0x4,0x8,0x5>);
+	make("1236", index4t<0x1,0x2,0x3,0x6>);
+	make("8405", index4t<0x8,0x4,0x0,0x5>);
+	make("edc9", index4t<0xe,0xd,0xc,0x9>);
+	make("7bfa", index4t<0x7,0xb,0xf,0xa>);
+	make("2105", index4t<0x2,0x1,0x0,0x5>);
+	make("b736", index4t<0xb,0x7,0x3,0x6>);
+	make("defa", index4t<0xd,0xe,0xf,0xa>);
+	make("48c9", index4t<0x4,0x8,0xc,0x9>);
+	make("4569", index4t<0x4,0x5,0x6,0x9>);
+	make("d95a", index4t<0xd,0x9,0x5,0xa>);
+	make("ba96", index4t<0xb,0xa,0x9,0x6>);
+	make("26a5", index4t<0x2,0x6,0xa,0x5>);
+	make("765a", index4t<0x7,0x6,0x5,0xa>);
+	make("ea69", index4t<0xe,0xa,0x6,0x9>);
+	make("89a5", index4t<0x8,0x9,0xa,0x5>);
+	make("1596", index4t<0x1,0x5,0x9,0x6>);
+	make("567a", index4t<0x5,0x6,0x7,0xa>);
+	make("9516", index4t<0x9,0x5,0x1,0x6>);
+	make("a985", index4t<0xa,0x9,0x8,0x5>);
+	make("6ae9", index4t<0x6,0xa,0xe,0x9>);
+	make("6549", index4t<0x6,0x5,0x4,0x9>);
+	make("a625", index4t<0xa,0x6,0x2,0x5>);
+	make("9ab6", index4t<0x9,0xa,0xb,0x6>);
+	make("59da", index4t<0x5,0x9,0xd,0xa>);
+	make("89ad", index4t<0x8,0x9,0xa,0xd>);
+	make("ea6b", index4t<0xe,0xa,0x6,0xb>);
+	make("7652", index4t<0x7,0x6,0x5,0x2>);
+	make("1594", index4t<0x1,0x5,0x9,0x4>);
+	make("ba9e", index4t<0xb,0xa,0x9,0xe>);
+	make("d958", index4t<0xd,0x9,0x5,0x8>);
+	make("4561", index4t<0x4,0x5,0x6,0x1>);
+	make("26a7", index4t<0x2,0x6,0xa,0x7>);
+	make("9abe", index4t<0x9,0xa,0xb,0xe>);
+	make("a627", index4t<0xa,0x6,0x2,0x7>);
+	make("6541", index4t<0x6,0x5,0x4,0x1>);
+	make("59d8", index4t<0x5,0x9,0xd,0x8>);
+	make("a98d", index4t<0xa,0x9,0x8,0xd>);
+	make("9514", index4t<0x9,0x5,0x1,0x4>);
+	make("5672", index4t<0x5,0x6,0x7,0x2>);
+	make("6aeb", index4t<0x6,0xa,0xe,0xb>);
+	make("0145", index4t<0x0,0x1,0x4,0x5>);
+	make("c8d9", index4t<0xc,0x8,0xd,0x9>);
+	make("feba", index4t<0xf,0xe,0xb,0xa>);
+	make("3726", index4t<0x3,0x7,0x2,0x6>);
+	make("3276", index4t<0x3,0x2,0x7,0x6>);
+	make("fbea", index4t<0xf,0xb,0xe,0xa>);
+	make("cd89", index4t<0xc,0xd,0x8,0x9>);
+	make("0415", index4t<0x0,0x4,0x1,0x5>);
+	make("1256", index4t<0x1,0x2,0x5,0x6>);
+	make("8495", index4t<0x8,0x4,0x9,0x5>);
+	make("eda9", index4t<0xe,0xd,0xa,0x9>);
+	make("7b6a", index4t<0x7,0xb,0x6,0xa>);
+	make("2165", index4t<0x2,0x1,0x6,0x5>);
+	make("b7a6", index4t<0xb,0x7,0xa,0x6>);
+	make("de9a", index4t<0xd,0xe,0x9,0xa>);
+	make("4859", index4t<0x4,0x8,0x5,0x9>);
+	make("569a", index4t<0x5,0x6,0x9,0xa>);
+	make("95a6", index4t<0x9,0x5,0xa,0x6>);
+	make("a965", index4t<0xa,0x9,0x6,0x5>);
+	make("6a59", index4t<0x6,0xa,0x5,0x9>);
+	make("65a9", index4t<0x6,0x5,0xa,0x9>);
+	make("a695", index4t<0xa,0x6,0x9,0x5>);
+	make("9a56", index4t<0x9,0xa,0x5,0x6>);
+	make("596a", index4t<0x5,0x9,0x6,0xa>);
+	make("2367", index4t<0x2,0x3,0x6,0x7>); // legacy non-isomorphic
+	make("4589", index4t<0x4,0x5,0x8,0x9>); // legacy non-isomorphic
+	make("67ab", index4t<0x6,0x7,0xa,0xb>); // legacy non-isomorphic
+	make("89cd", index4t<0x8,0x9,0xc,0xd>); // legacy non-isomorphic
+	make("9ade", index4t<0x9,0xa,0xd,0xe>); // legacy non-isomorphic
+	make("abef", index4t<0xa,0xb,0xe,0xf>); // legacy non-isomorphic
+
+	make("01234567", index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
+	make("c840d951", index8t<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
+	make("fedcba98", index8t<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
+	make("37bf26ae", index8t<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
+	make("32107654", index8t<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
+	make("fb73ea62", index8t<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
+	make("cdef89ab", index8t<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
+	make("048c159d", index8t<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
+	make("456789ab", index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
+	make("d951ea62", index8t<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
+	make("ba987654", index8t<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
+	make("26ae159d", index8t<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
+	make("7654ba98", index8t<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
+	make("ea62d951", index8t<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
+	make("89ab4567", index8t<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
+	make("159d26ae", index8t<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
+	make("01234589", index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x8,0x9>);
+	make("c840d9ea", index8t<0xc,0x8,0x4,0x0,0xd,0x9,0xe,0xa>);
+	make("fedcba76", index8t<0xf,0xe,0xd,0xc,0xb,0xa,0x7,0x6>);
+	make("37bf2615", index8t<0x3,0x7,0xb,0xf,0x2,0x6,0x1,0x5>);
+	make("321076ba", index8t<0x3,0x2,0x1,0x0,0x7,0x6,0xb,0xa>);
+	make("fb73ead9", index8t<0xf,0xb,0x7,0x3,0xe,0xa,0xd,0x9>);
+	make("cdef8945", index8t<0xc,0xd,0xe,0xf,0x8,0x9,0x4,0x5>);
+	make("048c1526", index8t<0x0,0x4,0x8,0xc,0x1,0x5,0x2,0x6>);
+	make("01245689", index8t<0x0,0x1,0x2,0x4,0x5,0x6,0x8,0x9>);
+	make("c84d95ea", index8t<0xc,0x8,0x4,0xd,0x9,0x5,0xe,0xa>);
+	make("fedba976", index8t<0xf,0xe,0xd,0xb,0xa,0x9,0x7,0x6>);
+	make("37b26a15", index8t<0x3,0x7,0xb,0x2,0x6,0xa,0x1,0x5>);
+	make("321765ba", index8t<0x3,0x2,0x1,0x7,0x6,0x5,0xb,0xa>);
+	make("fb7ea6d9", index8t<0xf,0xb,0x7,0xe,0xa,0x6,0xd,0x9>);
+	make("cde89a45", index8t<0xc,0xd,0xe,0x8,0x9,0xa,0x4,0x5>);
+	make("04815926", index8t<0x0,0x4,0x8,0x1,0x5,0x9,0x2,0x6>);
+
+	make("0123456", index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>);
+	make("c840d95", index7t<0xc,0x8,0x4,0x0,0xd,0x9,0x5>);
+	make("fedcba9", index7t<0xf,0xe,0xd,0xc,0xb,0xa,0x9>);
+	make("37bf26a", index7t<0x3,0x7,0xb,0xf,0x2,0x6,0xa>);
+	make("3210765", index7t<0x3,0x2,0x1,0x0,0x7,0x6,0x5>);
+	make("fb73ea6", index7t<0xf,0xb,0x7,0x3,0xe,0xa,0x6>);
+	make("cdef89a", index7t<0xc,0xd,0xe,0xf,0x8,0x9,0xa>);
+	make("048c159", index7t<0x0,0x4,0x8,0xc,0x1,0x5,0x9>);
+	make("456789a", index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>);
+	make("d951ea6", index7t<0xd,0x9,0x5,0x1,0xe,0xa,0x6>);
+	make("ba98765", index7t<0xb,0xa,0x9,0x8,0x7,0x6,0x5>);
+	make("26ae159", index7t<0x2,0x6,0xa,0xe,0x1,0x5,0x9>);
+	make("7654ba9", index7t<0x7,0x6,0x5,0x4,0xb,0xa,0x9>);
+	make("ea62d95", index7t<0xe,0xa,0x6,0x2,0xd,0x9,0x5>);
+	make("89ab456", index7t<0x8,0x9,0xa,0xb,0x4,0x5,0x6>);
+	make("159d26a", index7t<0x1,0x5,0x9,0xd,0x2,0x6,0xa>);
+	make("89abcde", index7t<0x8,0x9,0xa,0xb,0xc,0xd,0xe>);
+	make("ea62fb7", index7t<0xe,0xa,0x6,0x2,0xf,0xb,0x7>);
+	make("7654321", index7t<0x7,0x6,0x5,0x4,0x3,0x2,0x1>);
+	make("159d048", index7t<0x1,0x5,0x9,0xd,0x0,0x4,0x8>);
+	make("ba98fed", index7t<0xb,0xa,0x9,0x8,0xf,0xe,0xd>);
+	make("d951c84", index7t<0xd,0x9,0x5,0x1,0xc,0x8,0x4>);
+	make("4567012", index7t<0x4,0x5,0x6,0x7,0x0,0x1,0x2>);
+	make("26ae37b", index7t<0x2,0x6,0xa,0xe,0x3,0x7,0xb>);
+	make("0123458", index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x8>);
+	make("c840d9e", index7t<0xc,0x8,0x4,0x0,0xd,0x9,0xe>);
+	make("fedcba7", index7t<0xf,0xe,0xd,0xc,0xb,0xa,0x7>);
+	make("37bf261", index7t<0x3,0x7,0xb,0xf,0x2,0x6,0x1>);
+	make("321076b", index7t<0x3,0x2,0x1,0x0,0x7,0x6,0xb>);
+	make("fb73ead", index7t<0xf,0xb,0x7,0x3,0xe,0xa,0xd>);
+	make("cdef894", index7t<0xc,0xd,0xe,0xf,0x8,0x9,0x4>);
+	make("048c152", index7t<0x0,0x4,0x8,0xc,0x1,0x5,0x2>);
+	make("456789c", index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xc>);
+	make("d951eaf", index7t<0xd,0x9,0x5,0x1,0xe,0xa,0xf>);
+	make("ba98763", index7t<0xb,0xa,0x9,0x8,0x7,0x6,0x3>);
+	make("26ae150", index7t<0x2,0x6,0xa,0xe,0x1,0x5,0x0>);
+	make("7654baf", index7t<0x7,0x6,0x5,0x4,0xb,0xa,0xf>);
+	make("ea62d9c", index7t<0xe,0xa,0x6,0x2,0xd,0x9,0xc>);
+	make("89ab450", index7t<0x8,0x9,0xa,0xb,0x4,0x5,0x0>);
+	make("159d263", index7t<0x1,0x5,0x9,0xd,0x2,0x6,0x3>);
+
+	make("ff000000", indexmerge0);
+	make("ff000001", indexmerge1<0>);
+	make("ff000011", indexmerge1<1>);
+	make("fe000000", indexnum0);
+	make("fe000001", indexnum1);
+	make("fe000002", indexnum2);
+	make("fe000082", indexnum2x<0, 0, 1>);
+	make("fe000092", indexnum2x<0, 2, 3>);
+	make("fe0000c2", indexnum2x<1, 0, 1>);
+	make("fe0000d2", indexnum2x<1, 2, 3>);
+	make("fe000003", indexnum3);
+	make("fe000004", indexnum4);
+	make("fe000005", indexnum5lt);
+	make("fe000015", indexnum5st);
+	make("fd012301", indexmono<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
+	make("fd37bf01", indexmono<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
+	make("fdfedc01", indexmono<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
+	make("fdc84001", indexmono<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
+	make("fd321001", indexmono<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
+	make("fdfb7301", indexmono<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
+	make("fdcdef01", indexmono<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
+	make("fd048c01", indexmono<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
+	make("fd456701", indexmono<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
+	make("fd26ae01", indexmono<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
+	make("fdba9801", indexmono<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
+	make("fdd95101", indexmono<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
+	make("fd765401", indexmono<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
+	make("fdea6201", indexmono<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
+	make("fd89ab01", indexmono<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
+	make("fd159d01", indexmono<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
+	make("fc000000", indexmax<0>);
+	make("fc000010", indexmax<1>);
+	make("fc000020", indexmax<2>);
+	make("fc000030", indexmax<3>);
+	make("fc000040", indexmax<4>);
+	make("fc000050", indexmax<5>);
+	make("fc000060", indexmax<6>);
+	make("fc000070", indexmax<7>);
+
+	indexapt::make<0, 256>();
+}
+
+} // namespace utils
+
+namespace utils {
+
+class options {
+public:
+	options() {}
+	options(const options& opts) : opts(opts.opts) {}
+	typedef std::list<std::string> list;
+
+	class opinion {
+		friend class option;
+	public:
+		opinion() = delete;
+		opinion(const opinion& i) = default;
+		opinion(std::string& token) : token(token) {}
+		operator std::string() const { return value(); }
+		operator numeric() const { return std::stod(value()); }
+		std::string label() const { return token.substr(0, token.find('=')); }
+		std::string value() const { return token.find('=') != std::string::npos ? token.substr(token.find('=') + 1) : ""; }
+		std::string value(const std::string& def) const { auto val = value(); return val.size() ? val : def; }
+		numeric value(numeric def) const { try { return numeric(*this); } catch (std::invalid_argument&) {} return def; }
+		std::string operator +(const std::string& val) { return value() + val; }
+		friend std::string operator +(const std::string& val, const opinion& opi) { return val + opi.value(); }
+		friend std::ostream& operator <<(std::ostream& out, const opinion& i) { return out << i.value(); }
+		opinion& operator  =(const opinion& opi) { return operator =(opi.value()); }
+		opinion& operator  =(const numeric& val) { return operator =(ntos(val)); }
+		opinion& operator  =(const std::string& val) { token = label() + (val.size() ? ("=" + val) : ""); return (*this); }
+		opinion& operator +=(const std::string& val) { return operator =(value() + val); }
+		opinion& operator  =(const list& vec) { return operator =(vtos(vec)); }
+		opinion& operator +=(const list& vec) { return operator =(value() + vtos(vec)); }
+		bool operator ==(const std::string& val) const { return value() == val; }
+		bool operator !=(const std::string& val) const { return value() != val; }
+		bool operator ()(const std::string& val) const { return value().find(val) != std::string::npos; }
+		static bool comp(std::string token, std::string label) { return opinion(token).label() == label; }
+	private:
+		std::string& token;
+	};
+
+	class option : public list {
+		friend class options;
+	public:
+		option(const list& opt = {}) : list(opt) {}
+		operator std::string() const { return value(); }
+		operator numeric() const { return std::stod(value()); }
+		std::string value() const { return vtos(*this); }
+		std::string value(const std::string& def) const { auto val = value(); return val.size() ? val : def; }
+		numeric value(numeric def) const { try { return numeric(*this); } catch (std::invalid_argument&) {} return def; }
+		std::string operator +(const std::string& val) { return value() + val; }
+		friend std::string operator +(const std::string& val, const option& opt) { return val + opt.value(); }
+		friend std::ostream& operator <<(std::ostream& out, const option& opt) { return out << opt.value(); }
+		option& operator  =(const numeric& val) { return operator =(ntos(val)); }
+		option& operator  =(const std::string& val) { clear(); return operator +=(val); }
+		option& operator +=(const std::string& val) { push_back(val); return *this; }
+		option& operator  =(const list& vec) { clear(); return operator +=(vec); }
+		option& operator +=(const list& vec) { insert(end(), vec.begin(), vec.end()); return *this; }
+		bool operator ==(const std::string& val) const { return value() == val; }
+		bool operator !=(const std::string& val) const { return value() != val; }
+		bool operator ()(const std::string& ext) const {
+			return std::find_if(cbegin(), cend(), std::bind(opinion::comp, std::placeholders::_1, ext)) != cend();
+		}
+		bool operator ()(const std::string& ext, const std::string& val) const {
+			return operator ()(ext) && const_cast<option&>(*this)[ext](val);
+		}
+		opinion operator [](const std::string& ext) {
+			auto pos = std::find_if(begin(), end(), std::bind(opinion::comp, std::placeholders::_1, ext));
+			return (pos != end()) ? opinion(*pos) : operator +=(ext)[ext];
+		}
+		std::string find(const std::string& ext, const std::string& val = {}) const {
+			return operator() (ext) ? const_cast<option&>(*this)[ext] : val;
+		}
+	};
+
+	bool operator ()(const std::string& opt) const {
+		return opts.find(opt) != opts.end();
+	}
+	bool operator ()(const std::string& opt, const std::string& ext) const {
+		return operator ()(opt) && const_cast<options&>(*this)[opt](ext);
+	}
+	bool operator ()(const std::string& opt, const std::string& ext, const std::string& val) const {
+		return operator ()(opt, ext) && const_cast<options&>(*this)[opt][ext](val);
+	}
+	option& operator [](const std::string& opt) {
+		if (opts.find(opt) == opts.end()) opts[opt] = option();
+		return opts[opt];
+	}
+	std::string find(const std::string& opt, const std::string& val = {}) const {
+		return operator()(opt) ? const_cast<options&>(*this)[opt] : val;
+	}
+
+private:
+	std::map<std::string, option> opts;
+
+	static std::string vtos(const list& vec) {
+		std::string str = std::accumulate(vec.cbegin(), vec.cend(), std::string(),
+		    [](std::string& r, const std::string& v){ return std::move(r) + v + " "; });
+		if (str.size()) str.pop_back();
+		return str;
+	}
+	static std::string ntos(const numeric& num) {
+		std::string val = std::to_string(num);
+		if (val.find('.') != std::string::npos) {
+			while (val.back() == '0') val.pop_back();
+			if (val.back() == '.') val.pop_back();
+		}
+		return val;
 	}
 };
 
@@ -1191,6 +1487,28 @@ void init_logging(utils::options::option opt) {
 	static moporgic::redirector redirect(tee, std::cout);
 }
 
+template<typename statistic>
+statistic invoke(statistic(*run)(utils::options,std::string), utils::options& opts, std::string type) {
+#if defined(__linux__)
+	if (shm::enable()) {
+		u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"].value(1)), thdid = thdnum;
+		statistic* stats = shm::alloc<statistic>(thdnum);
+		while (std::stol(opts[type]["thread#"] = --thdid) && fork());
+		statistic& stat = stats[thdid] = run(opts, type);
+		if (thdid == 0) while (wait(nullptr) > 0); else std::exit(0);
+		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
+		return stat;
+	}
+#endif
+	std::list<std::future<statistic>> thdpool;
+	u32 thdid = std::stol(opts[type]["thread"] = opts["thread"].value(1));
+	while (std::stol(opts[type]["thread#"] = (--thdid)))
+		thdpool.push_back(std::async(std::launch::async, run, opts, type));
+	statistic stat = run(opts, type);
+	for (std::future<statistic>& thd : thdpool) stat += thd.get();
+	return stat;
+}
+
 std::map<std::string, std::string> aliases() {
 	std::map<std::string, std::string> alias;
 	alias["4x6patt/khyeh"] = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
@@ -1200,12 +1518,13 @@ std::map<std::string, std::string> aliases() {
 	alias["5x4patt/4-22"] = alias["2x4patt/4"] + "0145:0145! 1256:1256! 569a:569a! ";
 	alias["2x8patt/44"] = "01234567:01234567! 456789ab:456789ab! ";
 	alias["3x8patt/44-4211"] = alias["2x8patt/44"] + "0123458c:0123458c! ";
-//	alias["k.matsuzaki"] = "012456:012456! 12569d:12569d! 012345:012345! 01567a:01567a! 01259a:01259a! 0159de:0159de! 01589d:01589d! 01246a:01246a! ";
 	alias["4x6patt/k.matsuzaki"] = "012456:012456! 456789:456789! 012345:012345! 234569:234569! ";
 	alias["5x6patt/k.matsuzaki"] = alias["4x6patt/k.matsuzaki"] + "01259a:01259a! ";
 	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678:345678! ";
 	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567:134567! ";
 	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a:01489a! ";
+	alias["4x6patt/redundant"] = alias["4x6patt/khyeh"] + "01234:01234! 45678:45678! 01235:01235! 45679:45679! 01245:01245! 45689:45689! "
+	                             "0124:0124! 1235:1235! 0125:0125! 4568:4568! 5679:5679! 4569:4569! " + alias["5x4patt/4-22"];
 	alias["k.matsuzaki"] = alias["8x6patt/k.matsuzaki"];
 	alias["monotonic"] = "fd012301[^24]:fd012301,fd37bf01,fdfedc01,fdc84001,fd321001,fdfb7301,fdcdef01,fd048c01 "
 	                     "fd456701[^24]:fd456701,fd26ae01,fdba9801,fdd95101,fd765401,fdea6201,fd89ab01,fd159d01 ";
@@ -1270,6 +1589,18 @@ void make_network(utils::options::option opt) {
 		}
 	}
 
+	auto stov = [](std::string hash, u32 iso = 0) -> std::vector<u32> {
+		std::vector<u32> patt;
+		board x(0xfedcba9876543210ull); x.isomorphic(-iso);
+		for (char tile : hash) patt.push_back(x.at((tile & 15) + (tile & 64 ? 9 : 0)));
+		return patt;
+	};
+	auto vtos = [](std::vector<u32> patt) -> std::string {
+		std::string hash;
+		for (u32 tile : patt) hash.push_back(tile <= 9 ? tile + '0' : tile - 10 + 'a');
+		return hash;
+	};
+
 	std::stringstream unisomorphic(tokens); tokens.clear();
 	for (std::string token; unisomorphic >> token; tokens += (token + ' ')) {
 		if (token.find('!') == npos) continue;
@@ -1280,13 +1611,13 @@ void make_network(utils::options::option opt) {
 			std::string lval = lvals.back(); lvals.clear();
 			std::string hash = lval.substr(0, lval.find('!'));
 			std::string tail = lval.substr(lval.find('!') + 1);
-			for (u32 iso = 0; iso < 8; iso++) lvals.push_back(hashpatt(hashpatt(hashpatt(hash, iso)), hash.size()) + tail);
+			for (u32 iso = 0; iso < 8; iso++) lvals.push_back(vtos(stov(hash, iso)) + tail);
 		}
 		if (rvals.back().find('!') != npos) {
 			std::string rval = rvals.back(); rvals.clear();
 			std::string hash = rval.substr(0, rval.find('!')).substr(1);
 			std::string tail = rval.substr(rval.find('!') + 1);
-			for (u32 iso = 0; iso < 8; iso++) rvals.push_back(':' + hashpatt(hashpatt(hashpatt(hash, iso)), hash.size()) + tail);
+			for (u32 iso = 0; iso < 8; iso++) rvals.push_back(':' + vtos(stov(hash, iso)) + tail);
 		}
 		lvals.resize(8, lvals.back().substr(0, lvals.back().find('=')));
 		rvals.resize(8, rvals.front());
@@ -1301,7 +1632,7 @@ void make_network(utils::options::option opt) {
 	std::stringstream parser(tokens);
 	std::string token;
 	while (parser >> token) {
-		u64 wght = 0, idxr = 0;
+		std::string wght, idxr;
 		std::string wtok = token.substr(0, token.find(':'));
 		std::string itok = token.substr(token.find(':') + 1);
 
@@ -1313,9 +1644,13 @@ void make_network(utils::options::option opt) {
 			std::string name = wtok.substr(0, wtok.find_first_of("!&|:= "));
 			std::string info = wtok.find(' ') != npos ? wtok.substr(0, wtok.find_first_of("!&|:=")).substr(wtok.find(' ') + 1) : "?";
 			std::string init = wtok.find('=') != npos ? wtok.substr(wtok.find('=') + 1) : "?";
-			u64 mska = wtok.find('&') != npos ? std::stoull(wtok.substr(wtok.find('&') + 1), nullptr, 16) : -1ull;
-			u64 msko = wtok.find('|') != npos ? std::stoull(wtok.substr(wtok.find('|') + 1), nullptr, 16) : 0ull;
-			u64 sign = (std::stoull(name, nullptr, 16) & mska) | msko;
+			std::string sign = wtok.find('&') == npos && wtok.find('|') == npos ? name : ({
+				std::stringstream ss;
+				u64 mska = wtok.find('&') != npos ? std::stoull(wtok.substr(wtok.find('&') + 1), nullptr, 16) : -1ull;
+				u64 msko = wtok.find('|') != npos ? std::stoull(wtok.substr(wtok.find('|') + 1), nullptr, 16) : 0ull;
+				ss << std::hex << std::setfill('0') << std::setw(8) << ((std::stoull(name, nullptr, 16) & mska) | msko);
+				ss.str();
+			});
 			size_t size = 0;
 			if (info.find_first_of("p^?") != npos) { // ^10 16^10 16^ p ?
 				u32 base = 16, power = name.size();
@@ -1328,23 +1663,34 @@ void make_network(utils::options::option opt) {
 				size = std::stoull(info, nullptr, 0);
 			}
 			if (init.find_first_of("{}") != npos && init != "{}") {
-				weight src(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
+				weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
 				size = std::max(size, src.size());
 			} else if (init == "{}") {
 				size = 0;
 			}
 			if (weight(sign) && weight(sign).size() != size)
 				weight::erase(sign);
-			if (!weight(sign) && size) {
+			if (!weight(sign) && size) { // weight id matching: 012345 <--> 00012345
+				weight test(std::string(std::max(8 - sign.size(), size_t(8)), '0') + sign);
+				while (!test && (test.sign() + ' ')[0] == '0') test = weight(test.sign().substr(1));
+				if (test.size() == size) raw_cast<std::string>(weight::wghts().at(test.sign())) = sign; // unsafe!
+			}
+			if (!weight(sign) && size) { // create new weight table
 				weight dst = weight::make(sign, size);
 				if (init.find_first_of("{}") != npos && init != "{}") {
-					weight src(std::stoull(init.substr(0, init.find('}')).substr(init.find('{') + 1), nullptr, 16));
+					weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
 					for (size_t n = 0; n < dst.size(); n += src.size()) {
 						std::copy_n(src.data(), src.size(), dst.data() + n);
 					}
-				} else if (init.find_first_of("0123456789.-") == 0) {
+				} else if (init.find_first_of("0123456789.+-") == 0) {
 					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
 					std::fill_n(dst.data(), dst.size(), val);
+				}
+			} else if (weight(sign) && size) { // table already exists
+				weight dst = weight(sign);
+				if (init.find_first_of("+-") == 0) {
+					numeric off = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
+					std::transform(dst.data(), dst.data() + dst.size(), dst.data(), [=](numeric val) { return val += off; });
 				}
 			}
 			wght = weight(sign).sign();
@@ -1353,19 +1699,22 @@ void make_network(utils::options::option opt) {
 		if (itok.size()) {
 			// indexer indexer,indexer,indexer pattern! signature&mask|mask
 			std::string name = itok.substr(0, itok.find_first_of("!&|"));
-			u64 mska = itok.find('&') != npos ? std::stoull(itok.substr(itok.find('&') + 1), nullptr, 16) : -1ull;
-			u64 msko = itok.find('|') != npos ? std::stoull(itok.substr(itok.find('|') + 1), nullptr, 16) : 0ull;
-			u64 hash = std::stoull(name, nullptr, 16);
-			u64 sign = (hash & mska) | msko;
+			std::string sign = itok.find('&') == npos && itok.find('|') == npos ? name : ({
+				std::stringstream ss;
+				u64 mska = itok.find('&') != npos ? std::stoull(itok.substr(itok.find('&') + 1), nullptr, 16) : -1ull;
+				u64 msko = itok.find('|') != npos ? std::stoull(itok.substr(itok.find('|') + 1), nullptr, 16) : 0ull;
+				ss << std::hex << std::setfill('0') << std::setw(8) << ((std::stoull(name, nullptr, 16) & mska) | msko);
+				ss.str();
+			});
 			if (!indexer(sign)) {
-				indexer::mapper index = indexer(hash).index();
-				if (!index) index = utils::indexhdr(std::bind(utils::indexnta, std::placeholders::_1, utils::hashpatt(name)));
+				indexer::mapper index = indexer(name).index();
+				if (!index) index = index::indexapt(std::bind(index::indexnta, std::placeholders::_1, stov(name)));
 				indexer::make(sign, index);
 			}
 			idxr = indexer(sign).sign();
 		}
 
-		if (wght && idxr && !feature(wght, idxr)) feature::make(wght, idxr);
+		if (wght.size() && idxr.size() && !feature(wght, idxr)) feature::make(wght, idxr);
 	}
 }
 void load_network(utils::options::option opt) {
@@ -1381,11 +1730,13 @@ void load_network(utils::options::option opt) {
 			}
 			if (type == 'w')  weight::load(in);
 			if (type == 'f') feature::load(in);
+			if (type == 'c')   cache::load(in);
 		}
 		in.close();
 	}
-	for (feature f : list<feature>(std::move(feature::feats())))
+	for (feature f : list<feature>(std::move(feature::feats()))) {
 		feature::make(f.value().sign(), f.index().sign());
+	}
 }
 void save_network(utils::options::option opt) {
 	char buf[1 << 20];
@@ -1396,9 +1747,13 @@ void save_network(utils::options::option opt) {
 		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
 		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) continue;
-		// for upward compatibility, we still store legacy binaries if suffix are traditional (.f or .w)
-		if (type != 'f')  weight::save(type != 'w' ? out.write("w", 1) : out);
-		if (type != 'w') feature::save(type != 'f' ? out.write("f", 1) : out);
+		// for upward compatibility, we still write legacy binaries for traditional suffixes
+		if (type != 'c') {
+			if (type != 'f')  weight::save(type != 'w' ? out.write("w", 1) : out);
+			if (type != 'w') feature::save(type != 'f' ? out.write("f", 1) : out);
+		} else { // .c is reserved for cache binary
+			cache::save(type != 'c' ? out.write("c", 1) : out);
+		}
 		out.flush();
 		out.close();
 	}
@@ -1407,10 +1762,9 @@ void save_network(utils::options::option opt) {
 void list_network() {
 	for (weight w : weight::wghts()) {
 		std::stringstream buf;
-		buf << std::setfill('0');
 
-		buf << std::hex << std::setw(8) << w.sign();
-		buf << "[" << std::dec;
+		buf << w.sign();
+		buf << "[";
 		if (w.size() >> 30)
 			buf << (w.size() >> 30) << "G";
 		else if (w.size() >> 20)
@@ -1421,219 +1775,313 @@ void list_network() {
 			buf << (w.size());
 		buf << "]";
 
-		buf << " = (unused)" << std::hex;
+		buf << " : (unused)";
 		buf.seekp(-9, std::ios::end);
-		for (feature f : feature::feats()) if (f.value() == w)
-			buf << " " << std::setw(8) << f.index().sign();
+		for (feature f : feature::feats())
+			if (f.value() == w) buf << " " << f.index().sign();
 
 		std::cout << buf.rdbuf() << std::endl;
 	}
 	std::cout << std::endl;
 }
 
-typedef numeric(*estimator)(const board&, clip<feature>);
-typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
+void init_cache(std::string res = "") {
+	std::string in(res);
+	if (in == "default") in = "2G";
 
-inline numeric estimate_32f_avx2(const board& state,
-		clip<feature> range = feature::feats()) {
-	float buf[32];
-	for (u32 i = 0; i < 32; i++) buf[i] = range[i][state];
-	__m256 c1 = _mm256_loadu_ps(buf + 0);
-	__m256 c2 = _mm256_add_ps(c1, _mm256_loadu_ps(buf + 8));
-	__m256 c3 = _mm256_add_ps(c2, _mm256_loadu_ps(buf + 16));
-	__m256 c4 = _mm256_add_ps(c3, _mm256_loadu_ps(buf + 24));
-
-	__m256 t1 = _mm256_hadd_ps(c4, c4);
-	__m256 t2 = _mm256_hadd_ps(t1, t1);
-	__m128 t3 = _mm256_extractf128_ps(t2, 1);
-	__m128 t4 = _mm_add_ss(_mm256_castps256_ps128(t2), t3);
-	return _mm_cvtss_f32(t4);
-}
-
-inline numeric estimate_64f_avx2(const board& state,
-		clip<feature> range = feature::feats()) {
-	float buf[64];
-	for (u32 i = 0; i < 64; i++) buf[i] = range[i][state];
-	__m256 c1 = _mm256_loadu_ps(buf + 0);
-	__m256 c2 = _mm256_add_ps(c1, _mm256_loadu_ps(buf + 8));
-	__m256 c3 = _mm256_add_ps(c2, _mm256_loadu_ps(buf + 16));
-	__m256 c4 = _mm256_add_ps(c3, _mm256_loadu_ps(buf + 24));
-	__m256 c5 = _mm256_add_ps(c4, _mm256_loadu_ps(buf + 32));
-	__m256 c6 = _mm256_add_ps(c5, _mm256_loadu_ps(buf + 40));
-	__m256 c7 = _mm256_add_ps(c6, _mm256_loadu_ps(buf + 48));
-	__m256 c8 = _mm256_add_ps(c7, _mm256_loadu_ps(buf + 56));
-
-	__m256 t1 = _mm256_hadd_ps(c8, c8);
-	__m256 t2 = _mm256_hadd_ps(t1, t1);
-	__m128 t3 = _mm256_extractf128_ps(t2, 1);
-	__m128 t4 = _mm_add_ss(_mm256_castps256_ps128(t2), t3);
-	return _mm_cvtss_f32(t4);
-}
-
-inline numeric estimate(const board& state,
-		clip<feature> range = feature::feats()) {
-	register numeric esti = 0;
-	for (register feature& feat : range)
-		esti += feat[state];
-	return esti;
-}
-
-inline numeric optimize(const board& state, numeric error,
-		clip<feature> range = feature::feats()) {
-	register numeric esti = 0;
-	for (register feature& feat : range)
-		esti += (feat[state] += error);
-	return esti;
-}
-
-inline constexpr numeric illegal(const board& state,
-		clip<feature> range = feature::feats()) {
-	return -std::numeric_limits<numeric>::max();
-}
-
-#define invoke_4x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
-
-#define invoke_5x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x8,0x9,0xa,0xb,0xc,0xd>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x4,0x5,0x6,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
-
-#define invoke_6x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
-
-#define invoke_7x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
-
-#define invoke_8x6patt(esti, f, iso, ...)\
-esti += (VA_PASS(f[0 << 3][index6t<0x0,0x1,0x2,0x4,0x5,0x6>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[1 << 3][index6t<0x4,0x5,0x6,0x7,0x8,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[2 << 3][index6t<0x0,0x1,0x2,0x3,0x4,0x5>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[3 << 3][index6t<0x2,0x3,0x4,0x5,0x6,0x9>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[4 << 3][index6t<0x0,0x1,0x2,0x5,0x9,0xa>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[5 << 3][index6t<0x3,0x4,0x5,0x6,0x7,0x8>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[6 << 3][index6t<0x1,0x3,0x4,0x5,0x6,0x7>(iso)] __VA_ARGS__));\
-esti += (VA_PASS(f[7 << 3][index6t<0x0,0x1,0x4,0x8,0x9,0xa>(iso)] __VA_ARGS__));\
-
-#define invoke_specialized_features(name, state, range, ...)({\
-register numeric esti = 0;\
-register board iso = state;\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.transpose();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.transpose();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.transpose();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-iso.mirror();\
-invoke_##name(esti, range, iso, ##__VA_ARGS__);\
-esti;})\
-
-#define declare_specialization(name)\
-inline numeric estimate_##name(const board& state, clip<feature> range = feature::feats()) {\
-	return invoke_specialized_features(name, state, range); }\
-inline numeric optimize_##name(const board& state, numeric updv, clip<feature> range = feature::feats()) {\
-	return invoke_specialized_features(name, state, range, += updv); }\
-
-declare_specialization(4x6patt);
-declare_specialization(5x6patt);
-declare_specialization(6x6patt);
-declare_specialization(7x6patt);
-declare_specialization(8x6patt);
-
-struct specialization {
-	constexpr inline operator utils::estimator() const { return estim; }
-	constexpr inline operator utils::optimizer() const { return optim; }
-	utils::estimator estim;
-	utils::optimizer optim;
-};
-specialization specialize(utils::options& opts, const std::string& type) {
-	std::string spec = opts["options"].find("spec", "auto");
-	if (spec == "auto" || spec == "on") {
-		spec = opts["make"].value();
-		spec = spec.size() ? spec.substr(0, spec.find_first_of("&|=")) : "4x6patt";
-	}
-	switch (to_hash(spec)) {
-	default: return { utils::estimate, utils::optimize };
-	case to_hash("4x6patt"): return { utils::estimate_4x6patt, utils::optimize_4x6patt };
-	case to_hash("5x6patt"): return { utils::estimate_5x6patt, utils::optimize_5x6patt };
-	case to_hash("6x6patt"): return { utils::estimate_6x6patt, utils::optimize_6x6patt };
-	case to_hash("7x6patt"): return { utils::estimate_7x6patt, utils::optimize_7x6patt };
-	case to_hash("8x6patt"): return { utils::estimate_8x6patt, utils::optimize_8x6patt };
+	if (in.size()) {
+		size_t unit = 0, size = std::stoull(in, &unit);
+		if (unit < in.size())
+			switch (std::toupper(in[unit])) {
+			case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
+			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
+			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
+			}
+		cache::make(size);
 	}
 }
 
 } // utils
 
 
-struct state {
-	board move;
-	numeric esti;
-	inline state() : move(0ull, 0u, -1u), esti(0) {}
-	inline state(const state& s) = default;
+struct method {
+	typedef numeric(*estimator)(const board&, clip<feature>);
+	typedef numeric(*optimizer)(const board&, numeric, clip<feature>);
 
-	inline operator board&() { return move; }
-	inline operator const board&() const { return move; }
-	inline operator bool() const { return move.info() != -1u; }
-	declare_comparators(const state&, esti, inline);
+	estimator estim;
+	optimizer optim;
+	constexpr inline method(estimator estim = estimate, optimizer optim = optimize) : estim(estim), optim(optim) {}
+	constexpr inline operator estimator() const { return estim; }
+	constexpr inline operator optimizer() const { return optim; }
 
-	inline numeric value() const { return esti - move.info(); }
-	inline i32 reward() const { return move.info(); }
-
-	inline void assign(const board& b, u32 op = -1) {
-		move = b;
-		move.info(move.operate(op));
-	}
-	inline numeric estimate(
-			clip<feature> range = feature::feats(),
-			utils::estimator estim = utils::estimate) {
-		estim = move.info() != -1u ? estim : utils::illegal;
-		esti = state::reward() + estim(move, range);
+	constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
+		register numeric esti = 0;
+		for (register feature& feat : range)
+			esti += feat[state];
 		return esti;
 	}
-	inline numeric optimize(numeric exact, numeric alpha = state::alpha(),
-			clip<feature> range = feature::feats(),
-			utils::optimizer optim = utils::optimize) {
-		numeric update = (exact - state::value()) * alpha;
-		esti = state::reward() + optim(move, update, range);
+	constexpr static inline numeric optimize(const board& state, numeric error, clip<feature> range = feature::feats()) {
+		register numeric esti = 0;
+		for (register feature& feat : range)
+			esti += (feat[state] += error);
 		return esti;
+	}
+
+	static inline numeric estimate_32f_avx2(const board& state, clip<feature> range = feature::feats()) {
+		float buf[32];
+		for (u32 i = 0; i < 32; i++) buf[i] = range[i][state];
+		__m256 c1 = _mm256_loadu_ps(buf + 0);
+		__m256 c2 = _mm256_add_ps(c1, _mm256_loadu_ps(buf + 8));
+		__m256 c3 = _mm256_add_ps(c2, _mm256_loadu_ps(buf + 16));
+		__m256 c4 = _mm256_add_ps(c3, _mm256_loadu_ps(buf + 24));
+
+		__m256 t1 = _mm256_hadd_ps(c4, c4);
+		__m256 t2 = _mm256_hadd_ps(t1, t1);
+		__m128 t3 = _mm256_extractf128_ps(t2, 1);
+		__m128 t4 = _mm_add_ss(_mm256_castps256_ps128(t2), t3);
+		return _mm_cvtss_f32(t4);
+	}
+	static inline numeric estimate_64f_avx2(const board& state, clip<feature> range = feature::feats()) {
+		float buf[64];
+		for (u32 i = 0; i < 64; i++) buf[i] = range[i][state];
+		__m256 c1 = _mm256_loadu_ps(buf + 0);
+		__m256 c2 = _mm256_add_ps(c1, _mm256_loadu_ps(buf + 8));
+		__m256 c3 = _mm256_add_ps(c2, _mm256_loadu_ps(buf + 16));
+		__m256 c4 = _mm256_add_ps(c3, _mm256_loadu_ps(buf + 24));
+		__m256 c5 = _mm256_add_ps(c4, _mm256_loadu_ps(buf + 32));
+		__m256 c6 = _mm256_add_ps(c5, _mm256_loadu_ps(buf + 40));
+		__m256 c7 = _mm256_add_ps(c6, _mm256_loadu_ps(buf + 48));
+		__m256 c8 = _mm256_add_ps(c7, _mm256_loadu_ps(buf + 56));
+
+		__m256 t1 = _mm256_hadd_ps(c8, c8);
+		__m256 t2 = _mm256_hadd_ps(t1, t1);
+		__m128 t3 = _mm256_extractf128_ps(t2, 1);
+		__m128 t4 = _mm_add_ss(_mm256_castps256_ps128(t2), t3);
+		return _mm_cvtss_f32(t4);
+	}
+
+	constexpr static inline numeric illegal(const board& state, clip<feature> range = feature::feats()) {
+		return -std::numeric_limits<numeric>::max();
+	}
+
+	template<indexer::mapper... indexes>
+	struct isomorphism {
+		constexpr static std::array<indexer::mapper, sizeof...(indexes)> index = { indexes... };
+		constexpr operator method() { return { isomorphism<indexes...>::estimate, isomorphism<indexes...>::optimize }; }
+
+		template<indexer::mapper index, indexer::mapper... follow> constexpr static
+		inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, clip<feature> f) {
+			return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)]) + invoke<follow...>(iso, f);
+		}
+		template<indexer::mapper index, indexer::mapper... follow> constexpr static
+		inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, clip<feature> f) {
+			return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)]);
+		}
+
+		template<indexer::mapper index, indexer::mapper... follow> constexpr static
+		inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
+			return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv) + invoke<follow...>(iso, updv, f);
+		}
+		template<indexer::mapper index, indexer::mapper... follow> constexpr static
+		inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
+			return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv);
+		}
+
+		constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
+			register numeric esti = 0;
+			register board iso;
+			esti += invoke<indexes...>(({ iso = state;     iso; }), range);
+			esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+			esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
+			esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+			esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
+			esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+			esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
+			esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+			return esti;
+		}
+		constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
+			register numeric esti = 0;
+			register board iso;
+			esti += invoke<indexes...>(({ iso = state;     iso; }), updv, range);
+			esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+			esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
+			esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+			esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
+			esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+			esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
+			esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+			return esti;
+		}
+	};
+
+	template<typename source = method>
+	struct expectimax {
+		constexpr expectimax(utils::options::option depth) {
+			u32 n = expectimax<source>::depth(depth);
+			std::stringstream in(({
+				std::string limit = depth.find("limit", depth.value());
+				while (limit.find(',') != std::string::npos) limit[limit.find(',')] = ' ';
+				limit;
+			}));
+			for (u32& lim : expectimax<source>::limit()) {
+				in >> n;
+				lim = n & -2u;
+			}
+		}
+		constexpr operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
+
+		inline static numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
+			numeric expt = 0;
+			hexa spaces;
+			if (depth) depth = std::min(depth, limit((spaces = after.spaces()).size()));
+			cache::block::access lookup = cache::find(after, depth);
+			if (lookup) return lookup.fetch();
+			if (!depth) return source::estimate(after, range);
+			for (u32 pos : spaces) {
+				board before = after;
+				expt += 0.9 * search_best(({ before.set(pos, 1); before; }), depth - 1, range);
+				expt += 0.1 * search_best(({ before.set(pos, 2); before; }), depth - 1, range);
+			}
+			expt = lookup.store(expt / spaces.size());
+			return expt;
+		}
+
+		inline static numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
+			numeric best = 0;
+			for (const board& after : before.afters()) {
+				auto search = after.info() != -1u ? search_expt : search_illegal;
+				best = std::max(best, after.info() + search(after, depth - 1, range));
+			}
+			return best;
+		}
+
+		inline static numeric search_illegal(const board& after, u32 depth, clip<feature> range = feature::feats()) {
+			return -std::numeric_limits<numeric>::max();
+		}
+
+		inline static numeric estimate(const board& after, clip<feature> range = feature::feats()) {
+			return search_expt(after, depth() - 1, range);
+		}
+
+		inline static numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
+			return source::optimize(state, updv, range);
+		}
+
+		inline static u32& depth() { static u32 depth = 1; return depth; }
+		inline static u32& depth(u32 n) { return (expectimax<source>::depth() = n); }
+		inline static std::array<u32, 17>& limit() { static std::array<u32, 17> limit = {}; return limit; }
+		inline static u32& limit(u32 e) { return limit()[e]; }
+	};
+
+	typedef isomorphism<
+			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index::index6t<0x4,0x5,0x6,0x8,0x9,0xa>> isomorphic4x6patt;
+	typedef isomorphism<
+			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index::index6t<0x8,0x9,0xa,0xb,0xc,0xd>,
+			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index::index6t<0x4,0x5,0x6,0x8,0x9,0xa>> isomorphic5x6patt;
+	typedef isomorphism<
+			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index::index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+			index::index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>> isomorphic6x6patt;
+	typedef isomorphism<
+			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index::index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+			index::index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
+			index::index6t<0x1,0x3,0x4,0x5,0x6,0x7>> isomorphic7x6patt;
+	typedef isomorphism<
+			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index::index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
+			index::index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
+			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
+			index::index6t<0x1,0x3,0x4,0x5,0x6,0x7>,
+			index::index6t<0x0,0x1,0x4,0x8,0x9,0xa>> isomorphic8x6patt;
+
+	static method parse(utils::options opts, std::string type) {
+		std::string spec = opts["options"].find("spec", "auto");
+		if (spec == "auto" || spec == "default" || spec == "on") {
+			spec = opts["make"].value("4x6patt");
+			spec = spec.substr(0, spec.find_first_of("&|="));
+		}
+
+		if (opts["depth"].value(1) > 1) {
+			switch (to_hash(spec)) {
+			default: return method::expectimax<method>(opts["depth"]);
+			case to_hash("4x6patt"): return method::expectimax<method::isomorphic4x6patt>(opts["depth"]);
+			case to_hash("5x6patt"): return method::expectimax<method::isomorphic5x6patt>(opts["depth"]);
+			case to_hash("6x6patt"): return method::expectimax<method::isomorphic6x6patt>(opts["depth"]);
+			case to_hash("7x6patt"): return method::expectimax<method::isomorphic7x6patt>(opts["depth"]);
+			case to_hash("8x6patt"): return method::expectimax<method::isomorphic8x6patt>(opts["depth"]);
+			}
+		}
+
+		switch (to_hash(spec)) {
+		default: return method();
+		case to_hash("4x6patt"): return method::isomorphic4x6patt();
+		case to_hash("5x6patt"): return method::isomorphic5x6patt();
+		case to_hash("6x6patt"): return method::isomorphic6x6patt();
+		case to_hash("7x6patt"): return method::isomorphic7x6patt();
+		case to_hash("8x6patt"): return method::isomorphic8x6patt();
+		}
 	}
 
 	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
-	inline static numeric& alpha(numeric a) { return (state::alpha() = a); }
+	inline static numeric& alpha(numeric a) { return (method::alpha() = a); }
 	inline static numeric& lambda() { static numeric l = 0.5; return l; }
-	inline static numeric& lambda(numeric l) { return (state::lambda() = l); }
+	inline static numeric& lambda(numeric l) { return (method::lambda() = l); }
 	inline static u32& step() { static u32 n = 5; return n; }
-	inline static u32& step(u32 n) { return (state::step() = n); }
+	inline static u32& step(u32 n) { return (method::step() = n); }
+};
+
+struct state : board {
+	numeric esti;
+	inline state() : board(0ull, 0u, -1u), esti(0) {}
+	inline state(const state& s) = default;
+
+	inline operator bool() const { return info() != -1u; }
+	declare_comparators(const state&, esti, inline);
+
+	inline numeric value() const { return esti - info(); }
+	inline i32 reward() const { return info(); }
+
+	inline void assign(const board& b, u32 op = -1) {
+		set(b);
+		info(move(op));
+	}
+	inline numeric estimate(
+			clip<feature> range = feature::feats(),
+			method::estimator estim = method::estimate) {
+		estim = info() != -1u ? estim : method::illegal;
+		esti = state::reward() + estim(*this, range);
+		return esti;
+	}
+	inline numeric optimize(numeric exact, numeric alpha = method::alpha(),
+			clip<feature> range = feature::feats(),
+			method::optimizer optim = method::optimize) {
+		numeric update = (exact - state::value()) * alpha;
+		esti = state::reward() + optim(*this, update, range);
+		return esti;
+	}
 };
 struct select {
 	state move[4];
 	state *best;
 	inline select() : best(move) {}
-	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), utils::estimator estim = utils::estimate) {
-		b.after64x(move[0], move[1], move[2], move[3]);
+	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
+		b.moves64x(move[0], move[1], move[2], move[3]);
 		move[0].estimate(range, estim);
 		move[1].estimate(range, estim);
 		move[2].estimate(range, estim);
@@ -1644,10 +2092,10 @@ struct select {
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
 	inline void operator >>(state& s) const { s = (*best); }
-	inline void operator >>(board& b) const { b.set(best->move); }
+	inline void operator >>(board& b) const { b.set(*best); }
 
 	inline operator bool() const { return score() != -1; }
-	inline i32 score() const { return best->move.info(); }
+	inline i32 score() const { return best->info(); }
 	inline numeric esti() const { return best->esti; }
 	inline u32 opcode() const { return best - move; }
 
@@ -1690,7 +2138,12 @@ struct statistic {
 		}
 	} every;
 
-	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}) {}
+	struct execinfo {
+		u32 thdid;
+		u32 thdnum;
+	} info;
+
+	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}), info({0, 1}) {}
 	statistic(const utils::options::option& opt) : statistic() { init(opt); }
 	statistic(const statistic&) = default;
 
@@ -1712,12 +2165,16 @@ struct statistic {
 		unit = std::stol(opt.find("unit", std::to_string(unit)));
 		winv = std::stol(opt.find("win",  std::to_string(winv)));
 
+		info.thdid = std::stol(opt.find("thread#", "0"));
+		info.thdnum = std::stol(opt.find("thread", "1"));
+		loop = loop / info.thdnum + (loop % info.thdnum && info.thdid < (loop % info.thdnum) ? 1 : 0);
 		limit = loop * unit;
-		format();
+		format(0, (info.thdnum > 1) ? (" [" + std::to_string(info.thdid) + "]") : "");
 
 		every = {};
 		total = {};
 		local = {};
+		for (u32 i = 0; i < info.thdid; i++) moporgic::rand();
 		local.time = moporgic::millisec();
 		loop = 1;
 
@@ -1808,8 +2265,8 @@ struct statistic {
 		u32 size = 0;
 
 		size += snprintf(buf + size, sizeof(buf) - size, summaf, // "summary %llums %.2fops",
-				total.time,
-				total.opers * 1000.0 / total.time);
+				total.time / info.thdnum,
+				total.opers * 1000.0 * info.thdnum / total.time);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / limit,
@@ -1851,7 +2308,8 @@ struct statistic {
 		total += stat.total;
 		local += stat.local;
 		every += stat.every;
-		format();
+		u32 dec = (std::string(summaf).find('%') - std::string(summaf).find('y') + 5) / 2;
+		format(dec, (info.thdnum > 1) ? (" (" + std::to_string(info.thdnum) + "x)") : "");
 		return *this;
 	}
 };
@@ -1862,12 +2320,11 @@ statistic run(utils::options opts, std::string type) {
 	select best;
 	state last;
 
-	utils::estimator estim = utils::specialize(opts, type);
-	utils::optimizer optim = utils::specialize(opts, type);
+	method spec = method::parse(opts, type);
 	clip<feature> feats = feature::feats();
-	numeric alpha = state::alpha();
-	numeric lambda = state::lambda();
-	u32 step = state::step();
+	numeric alpha = method::alpha(opts["alpha"] / (opts("alpha", "norm") ? opts["alpha"]["norm"].value(feats.size()) : 1));
+	numeric lambda = method::lambda(opts["lambda"]);
+	u32 step = method::step(opts["step"]);
 
 	switch (to_hash(opts[type]["mode"].value(type))) {
 	case to_hash("optimize"):
@@ -1878,21 +2335,21 @@ statistic run(utils::options opts, std::string type) {
 			u32 opers = 0;
 
 			b.init();
-			best(b, feats, estim);
+			best(b, feats, spec);
 			score += best.score();
 			opers += 1;
 			best >> last;
 			best >> b;
 			b.next();
-			while (best(b, feats, estim)) {
-				last.optimize(best.esti(), alpha, feats, optim);
+			while (best(b, feats, spec)) {
+				last.optimize(best.esti(), alpha, feats, spec);
 				score += best.score();
 				opers += 1;
 				best >> last;
 				best >> b;
 				b.next();
 			}
-			last.optimize(0, alpha, feats, optim);
+			last.optimize(0, alpha, feats, spec);
 
 			stats.update(score, b.hash(), opers);
 		}
@@ -1904,7 +2361,7 @@ statistic run(utils::options opts, std::string type) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best(b, feats, estim); b.next()) {
+			for (b.init(); best(b, feats, spec); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -1912,8 +2369,8 @@ statistic run(utils::options opts, std::string type) {
 			}
 
 			for (numeric esti = 0; path.size(); path.pop_back()) {
-				path.back().estimate(feats, estim);
-				esti = path.back().optimize(esti, alpha, feats, optim);
+				path.back().estimate(feats, spec);
+				esti = path.back().optimize(esti, alpha, feats, spec);
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -1927,26 +2384,26 @@ statistic run(utils::options opts, std::string type) {
 			u32 opers = 0;
 
 			b.init();
-			for (u32 i = 0; i < step && best(b, feats, estim); i++) {
+			for (u32 i = 0; i < step && best(b, feats, spec); i++) {
 				score += best.score();
 				opers += 1;
 				best >> path;
 				best >> b;
 				b.next();
 			}
-			while (best(b, feats, estim)) {
+			while (best(b, feats, spec)) {
 				numeric z = best.esti();
 				numeric retain = 1 - lambda;
 				for (u32 k = 1; k < step; k++) {
 					state& source = path[opers - k];
-					source.estimate(feats, estim);
+					source.estimate(feats, spec);
 					numeric r = source.reward();
 					numeric v = source.value();
 					z = r + (lambda * z + retain * v);
 				}
 				state& update = path[opers - step];
-				update.estimate(feats, estim);
-				update.optimize(z, alpha, feats, optim);
+				update.estimate(feats, spec);
+				update.optimize(z, alpha, feats, spec);
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -1958,14 +2415,14 @@ statistic run(utils::options opts, std::string type) {
 				numeric retain = 1 - lambda;
 				for (u32 k = i + 1; k < tail; k++) {
 					state& source = path[opers + i - k];
-					source.estimate(feats, estim);
+					source.estimate(feats, spec);
 					numeric r = source.reward();
 					numeric v = source.value();
 					z = r + (lambda * z + retain * v);
 				}
 				state& update = path[opers + i - tail];
-				update.estimate(feats, estim);
-				update.optimize(z, alpha, feats, optim);
+				update.estimate(feats, spec);
+				update.optimize(z, alpha, feats, spec);
 			}
 			path.clear();
 
@@ -1980,7 +2437,7 @@ statistic run(utils::options opts, std::string type) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best(b, feats, estim); b.next()) {
+			for (b.init(); best(b, feats, spec); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -1989,13 +2446,13 @@ statistic run(utils::options opts, std::string type) {
 
 			numeric z = 0;
 			numeric r = path.back().reward();
-			numeric v = path.back().optimize(0, alpha, feats, optim) - r;
+			numeric v = path.back().optimize(0, alpha, feats, spec) - r;
 			numeric retain = 1 - lambda;
 			for (path.pop_back(); path.size(); path.pop_back()) {
-				path.back().estimate(feats, estim);
+				path.back().estimate(feats, spec);
 				z = r + (lambda * z + retain * v);
 				r = path.back().reward();
-				v = path.back().optimize(z, alpha, feats, optim) - r;
+				v = path.back().optimize(z, alpha, feats, spec) - r;
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -2009,7 +2466,7 @@ statistic run(utils::options opts, std::string type) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); best(b, feats, estim); b.next()) {
+			for (b.init(); best(b, feats, spec); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> b;
@@ -2024,10 +2481,30 @@ statistic run(utils::options opts, std::string type) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
+			u64 rbuf;
 			hex a;
 
 			for (b.init(); (a = b.actions()).size(); b.next()) {
-				score += b.operate(a[moporgic::rand() % a.size()]);
+				if (opers % 8 == 0) rbuf = moporgic::rand64();
+				score += b.operate(a[raw_cast<u8>(rbuf, opers % 8) % a.size()]);
+				opers += 1;
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("evaluate:greedy"):
+		for (stats.init(opts[type]); stats; stats++) {
+			board b;
+			struct state : board {
+				declare_comparators_with(const state&, int(info()), int(v.info()), inline constexpr)
+			} moves[4];
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); ({ b.moves(moves); (b = *std::max_element(moves, moves + 4)).info() != -1u; }); b.next()) {
+				score += b.info();
 				opers += 1;
 			}
 
@@ -2128,8 +2605,18 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-x"): case to_hash("-opt"): case to_hash("--options"):
 			opts["options"] += next_opts();
 			break;
+		case to_hash("-d"): case to_hash("--depth"):
+			opts["depth"] = next_opts();
+			break;
+		case to_hash("-c"): case to_hash("--cache"):
+			opts["cache"] = next_opt("default");
+			break;
 		case to_hash("-#"): case to_hash("--comment"):
 			opts["comment"] = next_opts();
+			break;
+		case to_hash("-p"):   case to_hash("--parallel"):
+		case to_hash("-thd"): case to_hash("--thread"):
+			opts["thread"] = next_opt(std::to_string(std::thread::hardware_concurrency()));
 			break;
 		case to_hash("-|"):
 			opts = {};
@@ -2161,8 +2648,11 @@ int main(int argc, const char* argv[]) {
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
 	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
+	if (!opts("depth")) opts["depth"] = 1;
+	if (!opts("thread")) opts["thread"] = 1;
 
 	utils::init_logging(opts["save"]);
+	shm::enable(shm::support() && !opts["options"]("noshm") && (opts["options"]("shm") || opts["thread"].value(1) > 1));
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
 	std::cout << "Develop-SIMD" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" << __DATE_ISO__ << " " << __TIME__ ")" << std::endl;
@@ -2172,20 +2662,20 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
+	std::cout << "depth = " << opts["depth"] << ", cache = " << opts["cache"].value("none") << std::endl;
+	std::cout << "agent = " << opts["thread"] << "x" << std::endl;
 	std::cout << std::endl;
+
+	moporgic::srand(to_hash(opts["seed"]));
+	utils::init_cache(opts["cache"]);
 
 	utils::load_network(opts["load"]);
 	utils::make_network(opts["make"]);
 	utils::list_network();
 
-	moporgic::srand(to_hash(opts["seed"]));
-	state::alpha(opts["alpha"] / (opts("alpha", "norm") ? opts["alpha"]["norm"].value(feature::feats().size()) : 1));
-	state::lambda(opts["lambda"]);
-	state::step(opts["step"]);
-
 	for (std::string recipe : opts["recipes"]) {
 		std::cout << recipe << ": " << opts[recipe] << std::endl << std::endl;
-		statistic stat = run(opts, recipe);
+		statistic stat = utils::invoke(run, opts, recipe);
 		if (opts[recipe]("info")) stat.summary();
 	}
 
