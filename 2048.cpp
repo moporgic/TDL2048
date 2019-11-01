@@ -12,6 +12,7 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
+#include "moporgic/shm.h"
 #include "board.h"
 #include <vector>
 #include <functional>
@@ -31,11 +32,9 @@
 #include <random>
 #include <thread>
 #include <future>
-
-#if defined(__linux__) && !defined(NOSHM)
+#if defined(__linux__)
 #include <sys/wait.h>
 #include <unistd.h>
-#include "moporgic/shm.h"
 #endif
 
 namespace moporgic {

@@ -17,7 +17,7 @@
 
 namespace moporgic {
 class shm {
-#if defined(__linux__)
+#if defined(__linux__) && !defined(NOSHM)
 public:
 	static inline constexpr bool support() { return true; }
 
