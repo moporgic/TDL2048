@@ -2620,7 +2620,7 @@ int main(int argc, const char* argv[]) {
 	utils::init_logging(opts["save"]);
 	shm::enable(shm::support() && !opts["options"]("noshm") && (opts["options"]("shm") || opts["thread"].value(1) > 1));
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "Develop-Parallel" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
+	std::cout << "Develop" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" << __DATE_ISO__ << " " << __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
