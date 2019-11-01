@@ -10,4 +10,4 @@ dump:
 static:
 	g++ -std=c++1y -static -O3 -lpthread -Wall -fmessage-length=0 -o 2048 2048.cpp
 clean:
-	rm 2048
+	rm 2048 || rm 2048.exe ||:
