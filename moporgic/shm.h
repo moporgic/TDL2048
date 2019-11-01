@@ -17,9 +17,14 @@
 
 namespace moporgic {
 class shm {
+public:
+	static inline bool enable() { return flag(); }
+private:
+	static inline bool& flag() { static bool use = support(); return use; }
 #if defined(__linux__) && !defined(NOSHM)
 public:
 	static inline constexpr bool support() { return true; }
+	static inline void enable(bool use) { flag() = use; }
 
 	template<typename type> static inline type* alloc(size_t size) {
 		static uint8_t seq = 0;
@@ -76,6 +81,7 @@ private:
 #else
 public:
 	static inline constexpr bool support() { return false; }
+	static inline void enable(bool use) { if (use) throw std::invalid_argument("shm is not supported"); }
 	template<typename type> static inline type* alloc(size_t size) { throw std::bad_alloc(); }
 	static inline void free(void* shm) { throw std::bad_alloc(); }
 #endif

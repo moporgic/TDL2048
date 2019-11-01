@@ -171,13 +171,8 @@ public:
 private:
 	inline weight(sign_t sign, size_t size) : name(sign), length(size), raw(alloc(size)) {}
 
-#if !defined(__linux__) || defined(NOSHM)
-	static inline segment* alloc(size_t size) { return new segment[size](); }
-	static inline void free(segment* v) { delete[] v; }
-#else
-	static inline segment* alloc(size_t size) { return shm::alloc<segment>(size); }
-	static inline void free(segment* v) { shm::free(v); }
-#endif
+	static inline segment* alloc(size_t size) { return shm::enable() ? shm::alloc<segment>(size) : new segment[size](); }
+	static inline void free(segment* v) { shm::enable() ? shm::free(v) : delete[] v; }
 
 	sign_t name;
 	size_t length;
@@ -466,13 +461,8 @@ public:
 	static inline cache& instance() { static cache tp; return tp; }
 
 private:
-#if !defined(__linux__) || defined(NOSHM)
-	static inline block* alloc(size_t len) { return new block[len](); }
-	static inline void free(block* alloc) { delete[] alloc; }
-#else
-	static inline block* alloc(size_t len) { return shm::alloc<block>(len); }
-	static inline void free(block* alloc) { shm::free(alloc); }
-#endif
+	static inline block* alloc(size_t len) { return shm::enable() ? shm::alloc<block>(len) : new block[len](); }
+	static inline void free(block* alloc) { shm::enable() ? shm::free(alloc) : delete[] alloc; }
 
 	cache& shape(size_t len) {
 		length = (1ull << (math::lg64(len)));
@@ -1499,21 +1489,23 @@ void init_logging(utils::options::option opt) {
 
 template<typename statistic>
 statistic invoke(statistic(*run)(utils::options,std::string), utils::options& opts, std::string type) {
-#if !defined(__linux__) || defined(NOSHM)
+#if defined(__linux__)
+	if (shm::enable()) {
+		u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"].value(1)), thdid = thdnum;
+		statistic* stats = shm::alloc<statistic>(thdnum);
+		while (std::stol(opts[type]["thread#"] = --thdid) && fork());
+		statistic& stat = stats[thdid] = run(opts, type);
+		if (thdid == 0) while (wait(nullptr) > 0); else std::exit(0);
+		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
+		return stat;
+	}
+#endif
 	std::list<std::future<statistic>> thdpool;
 	u32 thdid = std::stol(opts[type]["thread"] = opts["thread"].value(1));
 	while (std::stol(opts[type]["thread#"] = (--thdid)))
 		thdpool.push_back(std::async(std::launch::async, run, opts, type));
 	statistic stat = run(opts, type);
 	for (std::future<statistic>& thd : thdpool) stat += thd.get();
-#else
-	u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"].value(1)), thdid = thdnum;
-	statistic* stats = shm::alloc<statistic>(thdnum);
-	while (std::stol(opts[type]["thread#"] = --thdid) && fork());
-	statistic& stat = stats[thdid] = run(opts, type);
-	if (thdid == 0) while (wait(nullptr) > 0); else std::exit(0);
-	for (u32 i = 1; i < thdnum; i++) stat += stats[i];
-#endif
 	return stat;
 }
 
@@ -2626,6 +2618,7 @@ int main(int argc, const char* argv[]) {
 	if (!opts("thread")) opts["thread"] = 1;
 
 	utils::init_logging(opts["save"]);
+	shm::enable(shm::support() && !opts["options"]("noshm") && (opts["options"]("shm") || opts["thread"].value(1) > 1));
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
 	std::cout << "Develop-Parallel" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" << __DATE_ISO__ << " " << __TIME__ ")" << std::endl;
