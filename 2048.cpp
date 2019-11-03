@@ -2509,16 +2509,17 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["seed"] = next_opt("moporgic");
 			break;
 		case to_hash("-r"): case to_hash("--recipe"):
-			opts["recipe"] = next_opt("");
-			if (opts["recipe"] == "") break;
+			label = next_opt("");
+			if (label == "") break;
 			// no break: optimize and evaluate are also handled by the same recipe logic
 		case to_hash("-t"): case to_hash("--train"): case to_hash("--optimize"):
 		case to_hash("-e"): case to_hash("--test"):  case to_hash("--evaluate"):
 			opts["recipe"] = label.substr(label.find_first_not_of('-'));
 			if (opts["recipe"] == "t" || opts["recipe"] == "train") opts["recipe"] = "optimize";
 			if (opts["recipe"] == "e" || opts["recipe"] == "test")  opts["recipe"] = "evaluate";
-			opts[opts["recipe"]] = next_opts();
-			opts["recipes"] += opts["recipe"];
+			opts[""] = next_opts();
+			if (opts[""].size()) opts[opts["recipe"]] = opts[""];
+			if (opts[opts["recipe"]].size()) opts["recipes"] += opts["recipe"];
 			break;
 		case to_hash("--recipes"):
 			opts["recipes"] = next_opts();
