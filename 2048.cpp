@@ -2516,7 +2516,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["recipe"] = label.substr(label.find_first_not_of('-'));
 			if (opts["recipe"] == "t" || opts["recipe"] == "train") opts["recipe"] = "optimize";
 			if (opts["recipe"] == "e" || opts["recipe"] == "test")  opts["recipe"] = "evaluate";
-			opts[opts["recipe"]] += next_opts();
+			opts[opts["recipe"]] = next_opts();
 			opts["recipes"] += opts["recipe"];
 			break;
 		case to_hash("--recipes"):
