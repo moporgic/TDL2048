@@ -1488,15 +1488,16 @@ void init_logging(utils::options::option opt) {
 }
 
 template<typename statistic>
-statistic invoke(statistic(*run)(utils::options,std::string), utils::options& opts, std::string type) {
+statistic invoke(statistic(*run)(utils::options,std::string), utils::options opts, std::string type) {
 #if defined(__linux__)
 	if (shm::enable()) {
 		u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"].value(1)), thdid = thdnum;
 		statistic* stats = shm::alloc<statistic>(thdnum);
 		while (std::stol(opts[type]["thread#"] = --thdid) && fork());
-		statistic& stat = stats[thdid] = run(opts, type);
-		if (thdid == 0) while (wait(nullptr) > 0); else std::exit(0);
+		statistic stat = stats[thdid] = run(opts, type);
+		if (thdid == 0) while (wait(nullptr) > 0); else std::quick_exit(0);
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
+		shm::free(stats);
 		return stat;
 	}
 #endif
