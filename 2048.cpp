@@ -819,7 +819,7 @@ struct make {
 	}
 	make(indexer::sign_t) {}
 
-	static constexpr board iso[] = {
+	static constexpr board isoindex[] = {
 		0xfedcba9876543210ull,
 		0xc840d951ea62fb73ull,
 		0x0123456789abcdefull,
@@ -838,57 +838,57 @@ struct make {
 
 	template<u32 t0, u32 t1, u32 t2, u32 t3>
 	struct index4t {
-		index4t() { isomorphic(); }
-		template<u32 i = 0> static typename std::enable_if<(i != 8), void>::type isomorphic() {
-			constexpr board x = iso[i];
+		index4t(bool iso = true) { isomorphic(iso); }
+		template<u32 i = 0> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
+			constexpr board x = isoindex[i];
 			make(vtos({x[t0], x[t1], x[t2], x[t3]}), index::index4t<x[t0], x[t1], x[t2], x[t3]>);
-			isomorphic<i + 1>();
+			if (iso) isomorphic<i + 1>(iso);
 		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic() {}
+		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
 	};
 
 	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4>
 	struct index5t {
-		index5t() { isomorphic(); }
-		template<u32 i = 0> static typename std::enable_if<(i != 8), void>::type isomorphic() {
-			constexpr board x = iso[i];
+		index5t(bool iso = true) { isomorphic(iso); }
+		template<u32 i = 0> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
+			constexpr board x = isoindex[i];
 			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4]}), index::index5t<x[t0], x[t1], x[t2], x[t3], x[t4]>);
-			isomorphic<i + 1>();
+			if (iso) isomorphic<i + 1>(iso);
 		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic() {}
+		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
 	};
 
 	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4, u32 t5>
 	struct index6t {
-		index6t() { isomorphic(); }
-		template<u32 i = 0> static typename std::enable_if<(i != 8), void>::type isomorphic() {
-			constexpr board x = iso[i];
+		index6t(bool iso = true) { isomorphic(iso); }
+		template<u32 i = 0> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
+			constexpr board x = isoindex[i];
 			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4], x[t5]}), index::index6t<x[t0], x[t1], x[t2], x[t3], x[t4], x[t5]>);
-			isomorphic<i + 1>();
+			if (iso) isomorphic<i + 1>(iso);
 		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic() {}
+		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
 	};
 
 	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4, u32 t5, u32 t6>
 	struct index7t {
-		index7t() { isomorphic(); }
-		template<u32 i = 0> static typename std::enable_if<(i != 8), void>::type isomorphic() {
-			constexpr board x = iso[i];
+		index7t(bool iso = true) { isomorphic(iso); }
+		template<u32 i = 0> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
+			constexpr board x = isoindex[i];
 			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6]}), index::index7t<x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6]>);
-			isomorphic<i + 1>();
+			if (iso) isomorphic<i + 1>(iso);
 		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic() {}
+		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
 	};
 
 	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4, u32 t5, u32 t6, u32 t7>
 	struct index8t {
-		index8t() { isomorphic(); }
-		template<u32 i = 0> static typename std::enable_if<(i != 8), void>::type isomorphic() {
-			constexpr board x = iso[i];
+		index8t(bool iso = true) { isomorphic(iso); }
+		template<u32 i = 0> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
+			constexpr board x = isoindex[i];
 			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6], x[t7]}), index::index8t<x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6], x[t7]>);
-			isomorphic<i + 1>();
+			if (iso) isomorphic<i + 1>(iso);
 		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic() {}
+		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
 	};
 };
 
@@ -938,18 +938,18 @@ __attribute__((constructor)) void init() {
 	make::index4t<0x0,0x1,0x4,0x5>(); // 0145
 	make::index4t<0x1,0x2,0x5,0x6>(); // 1256
 	make::index4t<0x5,0x6,0x9,0xa>(); // 569a
-	make("89ab", index4t<0x8,0x9,0xa,0xb>); // legacy non-isomorphic
-	make("cdef", index4t<0xc,0xd,0xe,0xf>); // legacy non-isomorphic
-	make("048c", index4t<0x0,0x4,0x8,0xc>); // legacy non-isomorphic
-	make("159d", index4t<0x1,0x5,0x9,0xd>); // legacy non-isomorphic
-	make("26ae", index4t<0x2,0x6,0xa,0xe>); // legacy non-isomorphic
-	make("37bf", index4t<0x3,0x7,0xb,0xf>); // legacy non-isomorphic
-	make("2367", index4t<0x2,0x3,0x6,0x7>); // legacy non-isomorphic
-	make("4589", index4t<0x4,0x5,0x8,0x9>); // legacy non-isomorphic
-	make("67ab", index4t<0x6,0x7,0xa,0xb>); // legacy non-isomorphic
-	make("89cd", index4t<0x8,0x9,0xc,0xd>); // legacy non-isomorphic
-	make("9ade", index4t<0x9,0xa,0xd,0xe>); // legacy non-isomorphic
-	make("abef", index4t<0xa,0xb,0xe,0xf>); // legacy non-isomorphic
+	make::index4t<0x8,0x9,0xa,0xb>(false); // 89ab legacy non-isomorphic 4patt
+	make::index4t<0xc,0xd,0xe,0xf>(false); // cdef legacy non-isomorphic 4patt
+	make::index4t<0x0,0x4,0x8,0xc>(false); // 048c legacy non-isomorphic 4patt
+	make::index4t<0x1,0x5,0x9,0xd>(false); // 159d legacy non-isomorphic 4patt
+	make::index4t<0x2,0x6,0xa,0xe>(false); // 26ae legacy non-isomorphic 4patt
+	make::index4t<0x3,0x7,0xb,0xf>(false); // 37bf legacy non-isomorphic 4patt
+	make::index4t<0x2,0x3,0x6,0x7>(false); // 2367 legacy non-isomorphic 4patt
+	make::index4t<0x4,0x5,0x8,0x9>(false); // 4589 legacy non-isomorphic 4patt
+	make::index4t<0x6,0x7,0xa,0xb>(false); // 67ab legacy non-isomorphic 4patt
+	make::index4t<0x8,0x9,0xc,0xd>(false); // 89cd legacy non-isomorphic 4patt
+	make::index4t<0x9,0xa,0xd,0xe>(false); // 9ade legacy non-isomorphic 4patt
+	make::index4t<0xa,0xb,0xe,0xf>(false); // abef legacy non-isomorphic 4patt
 
 	make::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>(); // 01234567
 	make::index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>(); // 456789ab
