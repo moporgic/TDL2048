@@ -587,7 +587,7 @@ template<> u64 index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>(const board& b) { return
 template<> u64 index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>(const board& b) { return (u32(u64(b) >> 16)); }
 template<> u64 index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x8,0xc>(const board& b) { return (u32(u64(b)) & 0x00ffffff) | (u32(u64(b) >> 8) & 0x0f000000) | (u32(u64(b) >> 20) & 0xf0000000); }
 
-u64 indexnta(const board& b, const std::vector<u32>& p) {
+u64 indexpt(const board& b, const std::vector<u32>& p) {
 	register u64 index = 0;
 	for (size_t i = 0; i < p.size(); i++)
 		index += b.at(p[i]) << (i << 2);
@@ -789,13 +789,13 @@ u64 indexmax(const board& b) { // 16-bit
 	return k.mask(k.max());
 }
 
-struct indexapt {
+struct adapter {
 	static inline auto& wlist() { static moporgic::list<indexer::mapper> w; return w; }
 	static inline auto& hlist() { static moporgic::list<std::function<u64(const board&)>> h; return h; }
 
 	inline operator indexer::mapper() const { return wlist().front(); }
-	indexapt(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
-	~indexapt() { wlist().pop_front(); }
+	adapter(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
+	~adapter() { wlist().pop_front(); }
 
 	template<u32 idx>
 	static u64 adapt(const board& b) { return hlist()[idx](b); }
@@ -805,7 +805,7 @@ struct indexapt {
 
 	template<u32 idx, u32 lim>
 	struct make_wrappers {
-		make_wrappers() { wlist().push_back(indexapt::adapt<idx>); }
+		make_wrappers() { wlist().push_back(adapter::adapt<idx>); }
 		~make_wrappers() { make_wrappers<idx + 1, lim>(); }
 	};
 	template<u32 idx>
@@ -1003,7 +1003,7 @@ __attribute__((constructor)) void init() {
 	make("fc000060", indexmax<6>);
 	make("fc000070", indexmax<7>);
 
-	indexapt::make<0, 256>();
+	adapter::make<0, 256>();
 }
 
 } // namespace utils
@@ -1352,7 +1352,7 @@ void make_network(utils::options::option opt) {
 			});
 			if (!indexer(sign)) {
 				indexer::mapper index = indexer(name).index();
-				if (!index) index = index::indexapt(std::bind(index::indexnta, std::placeholders::_1, stov(name)));
+				if (!index) index = index::adapter(std::bind(index::indexpt, std::placeholders::_1, stov(name)));
 				indexer::make(sign, index);
 			}
 			idxr = indexer(sign).sign();
