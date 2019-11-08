@@ -390,41 +390,35 @@ public:
 	constexpr cache() : cached(&initial), length(1), mask(0), nmap{} {}
 	cache(const cache& tp) = default;
 	~cache() {}
-	inline size_t size() const { return length; }
-	inline block& operator[] (size_t i) { return cached[i]; }
-	inline const block& operator[] (size_t i) const { return cached[i]; }
+	constexpr inline size_t size() const { return length; }
+	constexpr inline block& operator[] (size_t i) { return cached[i]; }
+	constexpr inline const block& operator[] (size_t i) const { return cached[i]; }
 	inline block::access operator() (const board& b, u32 n) {
 		u64 x = min_isomorphic(b);
-		size_t i = (math::fmix64(x) ^ nmap[n >> 1]) & mask;
-		block& blk = operator[](i);
+		block& blk = operator[]((math::fmix64(x) ^ nmap[n >> 1]) & mask);
 		return blk(x, n);
 	}
 
     friend std::ostream& operator <<(std::ostream& out, const cache& c) {
-		u32 code = 5;
+		u32 code = 4;
 		write_cast<byte>(out, code);
 		switch (code) {
 		default:
 		case 4:
-			write_cast<u16>(out, 0); // reserved for header
+			// reserved for header
+			write_cast<u16>(out, 0);
 			write_cast<u64>(out, 0);
+			// write blocks
 			write_cast<u16>(out, sizeof(cache::block));
 			write_cast<u64>(out, c.size());
 			for (size_t i = 0; i < c.size(); i++)
 				out << c[i];
-			write_cast<u16>(out, 0); // reserved for fields
-			break;
-		case 5:
-			write_cast<u16>(out, 0); // reserved for header
-			write_cast<u64>(out, 0);
-			write_cast<u16>(out, sizeof(cache::block));
-			write_cast<u64>(out, c.size());
-			for (size_t i = 0; i < c.size(); i++)
-				out << c[i];
+			// write depth-map (nmap)
 			write_cast<u16>(out, sizeof(size_t));
 			write_cast<u64>(out, c.nmap.size());
 			write_cast<u64>(out, c.nmap.begin(), c.nmap.end());
-			write_cast<u16>(out, 0); // reserved for fields
+			// reserved for fields
+			write_cast<u16>(out, 0);
 			break;
 		}
 		return out;
@@ -435,21 +429,15 @@ public:
 		switch (code) {
 		default:
 		case 4:
+			// ignore unused header
 			in.ignore(read<u16>(in) * read<u64>(in));
-			c.shape(read<u64>(in.ignore(2)));
+			// read blocks
+			c.init(read<u64>(in.ignore(2)));
 			for (size_t i = 0; i < c.size(); i++)
 				in >> c[i];
-			while ((code = read<u16>(in)) != 0)
-				in.ignore(code * read<u64>(in));
-			break;
-		case 5:
-			in.ignore(read<u16>(in) * read<u64>(in));
-			c.shape(read<u64>(in.ignore(2)));
-			for (size_t i = 0; i < c.size(); i++)
-				in >> c[i];
-			in.ignore(2); // sizeof(size_t)
-			read_cast<u64>(in, c.nmap.begin(),
-				c.nmap.begin() + std::min(c.nmap.size(), read<u64>(in)));
+			// read depth-map (nmap)
+			read_cast<u64>(in, c.nmap.begin(), c.nmap.begin() + read<u64>(in.ignore(2)));
+			// ignore unrecognized fields
 			while ((code = read<u16>(in)) != 0)
 				in.ignore(code * read<u64>(in));
 			break;
@@ -480,21 +468,20 @@ public:
 	}
 
 	static inline block::access find(const board& b, u32 n) { return instance()(b, n); }
-	static inline cache& make(size_t len, bool peek = false) { return instance().shape(std::max(len, size_t(1)), peek); }
+	static inline cache& make(size_t len, bool peek = false) { return instance().init(std::max(len, size_t(1)), peek); }
 	static inline cache& instance() { static cache tp; return tp; }
 
 private:
 	static inline block* alloc(size_t len) { return shm::enable() ? shm::alloc<block>(len) : new block[len](); }
 	static inline void free(block* alloc) { shm::enable() ? shm::free(alloc) : delete[] alloc; }
 
-	cache& shape(size_t len, bool peek = false) {
+	cache& init(size_t len, bool peek = false) {
 		length = (1ull << (math::lg64(len)));
 		mask = length - 1;
 		if (cached != &initial) free(cached);
-		cached = alloc(length);
+		cached = length > 1 ? alloc(length) : &initial;
 		for (size_t i = 0; i < nmap.size(); i++)
-			nmap[i] = math::fmix64(i);
-		if (peek) nmap.fill(0);
+			nmap[i] = peek ? 0 : math::fmix64(i);
 		return *this;
 	}
 
@@ -1456,19 +1443,19 @@ void list_network() {
 	std::cout << std::endl;
 }
 
-void init_cache(std::string res = "") {
-	std::string in(res);
-	if (in == "default") in = "2G";
+void init_cache(utils::options::option opt) {
+	std::string res(opt);
+	if (res == "default") res = "2G";
 
-	if (in.size()) {
-		size_t unit = 0, size = std::stoull(in, &unit);
-		if (unit < in.size())
-			switch (std::toupper(in[unit])) {
+	if (res.size()) {
+		size_t unit = 0, size = std::stoull(res, &unit);
+		if (unit < res.size())
+			switch (std::toupper(res[unit])) {
 			case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
 			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
 			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
 			}
-		bool peek = (in.find("+peek") != std::string::npos);
+		bool peek = (res.find("+peek") != std::string::npos);
 		cache::make(size, peek);
 	}
 }
