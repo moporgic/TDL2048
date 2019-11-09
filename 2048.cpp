@@ -1141,6 +1141,10 @@ void init_logging(utils::options::option opt) {
 	static moporgic::redirector redirect(tee, std::cout);
 }
 
+void config_thread(utils::options::option opt) {
+	shm::enable(shm::support() && !opt("noshm") && (opt("shm") || opt.value(1) > 1));
+}
+
 template<typename statistic>
 statistic invoke(statistic(*run)(utils::options,std::string), utils::options opts, std::string type) {
 #if defined(__linux__)
@@ -1445,7 +1449,6 @@ void list_network() {
 
 void init_cache(utils::options::option opt) {
 	std::string res(opt);
-	if (res == "default") res = "2G";
 
 	if (res.size()) {
 		size_t unit = 0, size = std::stoull(res, &unit);
@@ -1455,7 +1458,7 @@ void init_cache(utils::options::option opt) {
 			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
 			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
 			}
-		bool peek = (res.find("+peek") != std::string::npos);
+		bool peek = !opt("nopeek");
 		cache::make(size, peek);
 	}
 }
@@ -2228,21 +2231,22 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-%"): case to_hash("-I"): case to_hash("--info"):
 			opts["info"] = next_opt("full");
 			break;
-		case to_hash("-x"): case to_hash("-opt"): case to_hash("--options"):
-			opts["options"] += next_opts();
-			break;
 		case to_hash("-d"): case to_hash("--depth"):
 			opts["depth"] = next_opts();
 			break;
 		case to_hash("-c"): case to_hash("--cache"):
-			opts["cache"] = next_opt("default");
+			opts[""] = next_opt("2048M");
+			opts[""] += next_opts();
+			opts["cache"] += opts[""];
+			break;
+		case to_hash("-p"): case to_hash("--parallel"): case to_hash("--thread"):
+			opts["thread"] = next_opt(std::to_string(std::thread::hardware_concurrency()));
+			break;
+		case to_hash("-x"): case to_hash("-opt"): case to_hash("--options"):
+			opts["options"] += next_opts();
 			break;
 		case to_hash("-#"): case to_hash("--comment"):
 			opts["comment"] = next_opts();
-			break;
-		case to_hash("-p"):   case to_hash("--parallel"):
-		case to_hash("-thd"): case to_hash("--thread"):
-			opts["thread"] = next_opt(std::to_string(std::thread::hardware_concurrency()));
 			break;
 		case to_hash("-|"):
 			opts = {};
@@ -2275,10 +2279,8 @@ int main(int argc, const char* argv[]) {
 	if (!opts("lambda")) opts["lambda"] = 0;
 	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
 	if (!opts("depth")) opts["depth"] = 1;
-	if (!opts("thread")) opts["thread"] = 1;
 
 	utils::init_logging(opts["save"]);
-	shm::enable(shm::support() && !opts["options"]("noshm") && (opts["options"]("shm") || opts["thread"].value(1) > 1));
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
 	std::cout << "Develop" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" << __DATE_ISO__ << " " << __TIME__ ")" << std::endl;
@@ -2288,11 +2290,12 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
-	std::cout << "depth = " << opts["depth"] << ", cache = " << opts["cache"].value("none") << std::endl;
-	std::cout << "agent = " << opts["thread"] << "x" << std::endl;
+	std::cout << "search = " << opts["depth"] << ", cache = " << opts["cache"].value("none") << std::endl;
+	std::cout << "concurrent = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
 
 	moporgic::srand(to_hash(opts["seed"]));
+	utils::config_thread(opts["thread"]);
 	utils::init_cache(opts["cache"]);
 
 	utils::load_network(opts["load"]);
