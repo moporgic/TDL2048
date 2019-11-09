@@ -347,18 +347,18 @@ public:
 		ext = 0;
 	}
 
-	inline void rotright()   { rotright64(); }
-	inline void rotright64() { transpose64(); mirror64(); }
-	inline void rotright80() { transpose80(); mirror80(); }
+	inline constexpr void rotright()   { rotright64(); }
+	inline constexpr void rotright64() { transpose64(); mirror64(); }
+	inline constexpr void rotright80() { transpose80(); mirror80(); }
 
-	inline void rotleft()   { rotleft64(); }
-	inline void rotleft64() { transpose64(); flip64(); }
-	inline void rotleft80() { transpose80(); flip80(); }
+	inline constexpr void rotleft()   { rotleft64(); }
+	inline constexpr void rotleft64() { transpose64(); flip64(); }
+	inline constexpr void rotleft80() { transpose80(); flip80(); }
 
-	inline void rotate(int r = 1) {
+	inline constexpr void rotate(int r = 1) {
 		rotate64(r);
 	}
-	inline void rotate64(int r = 1) {
+	inline constexpr void rotate64(int r = 1) {
 		switch (((r % 4) + 4) % 4) {
 		default:
 		case 0: break;
@@ -367,7 +367,7 @@ public:
 		case 3: rotleft64(); break;
 		}
 	}
-	inline void rotate80(int r = 1) {
+	inline constexpr void rotate80(int r = 1) {
 		switch (((r % 4) + 4) % 4) {
 		default:
 		case 0: break;
@@ -377,14 +377,14 @@ public:
 		}
 	}
 
-	inline void isomorphic(int i = 0) {
+	inline constexpr void isomorphic(int i = 0) {
 		return isomorphic64(i);
 	}
-	inline void isomorphic64(int i = 0) {
+	inline constexpr void isomorphic64(int i = 0) {
 		if ((i % 8) / 4) mirror64();
 		rotate64(i);
 	}
-	inline void isomorphic80(int i = 0) {
+	inline constexpr void isomorphic80(int i = 0) {
 		if ((i % 8) / 4) mirror80();
 		rotate80(i);
 	}
