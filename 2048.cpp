@@ -1114,10 +1114,10 @@ statistic invoke(statistic(*run)(utils::options,std::string), utils::options opt
 std::map<std::string, std::string> aliases() {
 	std::map<std::string, std::string> alias;
 	alias["4x6patt/khyeh"] = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
-	alias["khyeh"] = alias["4x6patt/khyeh"];
 	alias["5x6patt/42-33"] = "012345:012345! 456789:456789! 89abcd:89abcd! 012456:012456! 45689a:45689a! ";
 	alias["2x4patt/4"] = "0123:0123! 4567:4567! ";
 	alias["5x4patt/4-22"] = alias["2x4patt/4"] + "0145:0145! 1256:1256! 569a:569a! ";
+	alias["8x4patt/legacy"] = "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
 	alias["2x8patt/44"] = "01234567:01234567! 456789ab:456789ab! ";
 	alias["3x8patt/44-332"] = alias["2x8patt/44"] + "01245689:01245689! ";
 	alias["3x8patt/44-4211"] = alias["2x8patt/44"] + "0123458c:0123458c! ";
@@ -1127,21 +1127,17 @@ std::map<std::string, std::string> aliases() {
 	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678:345678! ";
 	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567:134567! ";
 	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a:01489a! ";
-	alias["4x6patt/redundant"] = alias["4x6patt/khyeh"] + "01234:01234! 45678:45678! 01235:01235! 45679:45679! 01245:01245! 45689:45689! "
-	                             "0124:0124! 1235:1235! 0125:0125! 4568:4568! 5679:5679! 4569:4569! " + alias["5x4patt/4-22"];
-	alias["k.matsuzaki"] = alias["8x6patt/k.matsuzaki"];
 	alias["monotonic"] = "fd012301[^24]:fd012301,fd37bf01,fdfedc01,fdc84001,fd321001,fdfb7301,fdcdef01,fd048c01 "
 	                     "fd456701[^24]:fd456701,fd26ae01,fdba9801,fdd95101,fd765401,fdea6201,fd89ab01,fd159d01 ";
 	alias["quantity"] = "fe000005[^24]:fe000005 fe000015[^24]:fe000015 ";
-	alias["moporgic"] = alias["4x6patt/khyeh"] + alias["monotonic"] + alias["quantity"];
 	alias["4x6patt"] = alias["4x6patt/khyeh"];
 	alias["5x6patt"] = alias["5x6patt/42-33"];
 	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
 	alias["7x6patt"] = alias["7x6patt/k.matsuzaki"];
 	alias["8x6patt"] = alias["8x6patt/k.matsuzaki"];
-	alias["8x4patt"] = "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
-	alias["5x4patt"] = alias["5x4patt/4-22"];
 	alias["2x4patt"] = alias["2x4patt/4"];
+	alias["5x4patt"] = alias["5x4patt/4-22"];
+	alias["8x4patt"] = alias["8x4patt/legacy"];
 	alias["2x8patt"] = alias["2x8patt/44"];
 	alias["3x8patt"] = alias["3x8patt/44-4211"];
 	alias["4x8patt"] = alias["4x8patt/44-332-4211"];
