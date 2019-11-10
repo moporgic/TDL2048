@@ -237,63 +237,6 @@ public:
 	inline operator bool() const { return map && raw; }
 	declare_comparators(const feature&, sign(), inline);
 
-	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
-		u32 code = 0;
-		write_cast<u8>(out, code);
-		switch (code) {
-		default:
-		case 0:
-			write_cast<u32>(out, std::stoul(f.index().sign(), nullptr, 16));
-			write_cast<u32>(out, std::stoul(f.value().sign(), nullptr, 16));
-			break;
-		}
-		return out;
-	}
-	friend std::istream& operator >>(std::istream& in, feature& f) {
-		u32 code = 0;
-		read_cast<u8>(in, code);
-		switch (code) {
-		default:
-		case 0:
-			f.map = indexer(({
-				std::stringstream ss;
-				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
-				ss.str();
-			}));
-			f.raw = weight(({
-				std::stringstream ss;
-				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
-				ss.str();
-			}));
-			f.name = f.raw.sign() + ':' + f.map.sign();
-			break;
-		}
-		return in;
-	}
-
-	static void save(std::ostream& out) {
-		u32 code = 0;
-		write_cast<u8>(out, code);
-		switch (code) {
-		default:
-		case 0:
-			write_cast<u32>(out, feats().size());
-			for (feature f : feats()) out << f;
-			break;
-		}
-	}
-	static void load(std::istream& in) {
-		u32 code = 0;
-		read_cast<u8>(in, code);
-		switch (code) {
-		default:
-		case 0:
-			for (read_cast<u32>(in, code); code; code--)
-				in >> list<feature>::as(feats()).emplace_back();
-			break;
-		}
-	}
-
 	class container : public clip<feature> {
 	public:
 		constexpr container() noexcept : clip<feature>() {}
@@ -1391,13 +1334,9 @@ void load_network(utils::options::option opt) {
 				type = path[path.find_last_of(".") + 1];
 			}
 			if (type == 'w')  weight::load(in);
-			if (type == 'f') feature::load(in);
 			if (type == 'c')   cache::load(in);
 		}
 		in.close();
-	}
-	for (feature f : list<feature>(std::move(feature::feats()))) {
-		feature::make(f.value().sign(), f.index().sign());
 	}
 }
 void save_network(utils::options::option opt) {
@@ -1411,8 +1350,7 @@ void save_network(utils::options::option opt) {
 		if (!out.is_open()) continue;
 		// for upward compatibility, we still write legacy binaries for traditional suffixes
 		if (type != 'c') {
-			if (type != 'f')  weight::save(type != 'w' ? out.write("w", 1) : out);
-			if (type != 'w') feature::save(type != 'f' ? out.write("f", 1) : out);
+			weight::save(type != 'w' ? out.write("w", 1) : out);
 		} else { // .c is reserved for cache binary
 			cache::save(type != 'c' ? out.write("c", 1) : out);
 		}
