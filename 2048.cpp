@@ -65,16 +65,18 @@ public:
 		switch (code) {
 		default:
 		case 4:
-			try {
+			try { // write sign as 32-bit integer if possible
 				write_cast<u32>(out, std::stoul(w.sign(), nullptr, 16));
 				write_cast<u16>(out, w.sign().size());
 				write_cast<u16>(out, 0);
-			} catch (std::invalid_argument&) {
+			} catch (std::logic_error&) { // otherwise, write it as raw string
 				out.write(w.sign().append(8, ' ').c_str(), 8);
 			}
+			// write value table
 			write_cast<u16>(out, sizeof(weight::numeric));
 			write_cast<u64>(out, w.size());
 			write_cast<numeric>(out, w.value().begin(), w.value().end());
+			// reserved for fields
 			write_cast<u16>(out, 0);
 			break;
 		}
@@ -87,14 +89,12 @@ public:
 		case 0:
 		case 1:
 		case 2:
-			w.name = ({
-				std::stringstream ss;
-				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
-				ss.str();
-			});
-			read_cast<u64>(in, w.length);
-			if (w.length == (1ull << math::lg64(w.length)))
+			// read name and size
+			w.name = format("%08x", read<u32>(in));
+			w.length = read<u64>(in);
+			if (math::ones64(w.length) == 1) // remove extra beginning '0'
 				w.name = w.name.substr(8 - (math::lg64(w.length) >> 2));
+			// read value table
 			w.raw = weight::alloc(w.length);
 			switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
@@ -103,15 +103,20 @@ public:
 			break;
 		default:
 		case 4:
+			// read name
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
-			w.name = raw_cast<u16>(w.name[6]) == 0 ? ({
-				std::stringstream ss;
-				ss << std::setw(raw_cast<u16>(w.name[4]) ? raw_cast<u16>(w.name[4]) : ({
+			if (raw_cast<u16>(w.name[6]) == 0) { // name is written as integer
+				u32 width = raw_cast<u16>(w.name[4]);
+				if (width == 0) { // name display width is missing, try recalculate it
 					read_cast<u64>(in.ignore(2), w.length).seekg(-10, std::ios::cur);
-					(w.length == (1ull << math::lg64(w.length))) ? (math::lg64(w.length) >> 2) : 8;
-				})) << std::setfill('0') << std::hex << raw_cast<u32>(w.name[0]);
-				ss.str();
-			}) : w.name.substr(0, w.name.find(' '));
+					width = (math::ones64(w.length) == 1) ? (math::lg64(w.length) >> 2) : 8;
+					if (format("%x", raw_cast<u32>(w.name[0])).size() > width) width = 8;
+				}
+				w.name = format(format("%%0%ux", width), raw_cast<u32>(w.name[0]));
+			} else { // name is written as string
+				w.name = w.name.substr(0, w.name.find(' '));
+			}
+			// read value table
 			read_cast<u16>(in, code);
 			read_cast<u64>(in, w.length);
 			w.raw = weight::alloc(w.length);
@@ -120,6 +125,7 @@ public:
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
+			// ignore unrecognized extra fields
 			while (read_cast<u16>(in, code) && code)
 				in.ignore(code * read<u64>(in));
 			break;
