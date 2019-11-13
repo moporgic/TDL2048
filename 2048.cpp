@@ -66,7 +66,10 @@ public:
 		default:
 		case 4:
 			try { // write sign as 32-bit integer if possible
-				write_cast<u32>(out, std::stoul(w.sign(), nullptr, 16));
+				size_t idx = 0;
+				u32 sign = std::stoul(w.sign(), &idx, 16);
+				if (idx != w.sign().size()) throw std::invalid_argument("unresolved");
+				write_cast<u32>(out, sign);
 				write_cast<u16>(out, w.sign().size());
 				write_cast<u16>(out, 0);
 			} catch (std::logic_error&) { // otherwise, write it as raw string
