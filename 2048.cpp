@@ -557,7 +557,7 @@ u64 indexpt(const board& b, const std::vector<u32>& p) {
 	return index;
 }
 
-u64 indexmerge0(const board& b) { // 16-bit
+u64 indexmerge(const board& b) { // 16-bit
 	board q = b; q.transpose();
 	register u32 hori = 0, vert = 0;
 	hori |= b.query(0).merge << 0;
@@ -571,102 +571,7 @@ u64 indexmerge0(const board& b) { // 16-bit
 	return hori | (vert << 8);
 }
 
-template<u32 transpose>
-u64 indexmerge1(const board& b) { // 8-bit
-	register u32 merge = 0;
-	board k = b; if (transpose) k.transpose();
-	merge |= k.query(0).merge << 0;
-	merge |= k.query(1).merge << 2;
-	merge |= k.query(2).merge << 4;
-	merge |= k.query(3).merge << 6;
-	return merge;
-}
-
-u64 indexnum0(const board& b) { // 10-bit
-	// 2k ~ 32k, 2-bit ea.
-	auto num = b.numof();
-	register u64 index = 0;
-	index += (num[11] & 0x03) << 0;
-	index += (num[12] & 0x03) << 2;
-	index += (num[13] & 0x03) << 4;
-	index += (num[14] & 0x03) << 6;
-	index += (num[15] & 0x03) << 8;
-	return index;
-}
-
-u64 indexnum1(const board& b) { // 25-bit
-	auto num = b.numof();
-	register u64 index = 0;
-	index += ((num[5] + num[6]) & 0x0f) << 0; // 32 & 64, 4-bit
-	index += (num[7] & 0x07) << 4; // 128, 3-bit
-	index += (num[8] & 0x07) << 7; // 256, 3-bit
-	index += (num[9] & 0x07) << 10; // 512, 3-bit
-	index += (num[10] & 0x03) << 13; // 1k ~ 32k, 2-bit ea.
-	index += (num[11] & 0x03) << 15;
-	index += (num[12] & 0x03) << 17;
-	index += (num[13] & 0x03) << 19;
-	index += (num[14] & 0x03) << 21;
-	index += (num[15] & 0x03) << 23;
-	return index;
-}
-
-u64 indexnum2(const board& b) { // 25-bit
-	auto num = b.numof();
-	register u64 index = 0;
-	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-bit
-	index += ((num[3] + num[4]) & 0x07) << 3; // 8 & 16, 3-bit
-	index += ((num[5] + num[6]) & 0x07) << 6; // 32 & 64, 3-bit
-	index += ((num[7] + num[8]) & 0x07) << 9; // 126 & 256, 3-bit
-	index += ((num[9] + num[10]) & 0x07) << 12; // 512 & 1k, 3-bit
-	index += ((num[11]) & 0x03) << 15; // 2k ~ 32k, 2-bit ea.
-	index += ((num[12]) & 0x03) << 17;
-	index += ((num[13]) & 0x03) << 19;
-	index += ((num[14]) & 0x03) << 21;
-	index += ((num[15]) & 0x03) << 23;
-	return index;
-}
-
-template<u32 transpose, u32 qu0, u32 qu1>
-u64 indexnum2x(const board& b) { // 25-bit
-	board o = b;
-	if (transpose) o.transpose();
-	auto& m = o.query(qu0).numof;
-	auto& n = o.query(qu1).numof;
-
-	register u64 index = 0;
-	index += ((m[1] + n[1] + m[2] + n[2]) & 0x07) << 0; // 2 & 4, 3-bit
-	index += ((m[3] + n[3] + m[4] + n[4]) & 0x07) << 3; // 8 & 16, 3-bit
-	index += ((m[5] + n[5] + m[6] + n[6]) & 0x07) << 6; // 32 & 64, 3-bit
-	index += ((m[7] + n[7] + m[8] + n[8]) & 0x07) << 9; // 126 & 256, 3-bit
-	index += ((m[9] + n[9] + m[10] + n[10]) & 0x07) << 12; // 512 & 1k, 3-bit
-	index += ((m[11] + n[11]) & 0x03) << 15; // 2k ~ 32k, 2-bit ea.
-	index += ((m[12] + n[12]) & 0x03) << 17;
-	index += ((m[13] + n[13]) & 0x03) << 19;
-	index += ((m[14] + n[14]) & 0x03) << 21;
-	index += ((m[15] + n[15]) & 0x03) << 23;
-
-	return index;
-}
-
-u64 indexnum3(const board& b) { // 28-bit
-	auto num = b.numof();
-	register u64 index = 0;
-	index += ((num[0] + num[1] + num[2]) & 0x0f) << 0; // 0 & 2 & 4, 4-bit
-	index += ((num[3] + num[4]) & 0x07) << 4; // 8 & 16, 3-bit
-	index += ((num[5] + num[6]) & 0x07) << 7; // 32 & 64, 3-bit
-	index += (num[7] & 0x03) << 10; // 128, 2-bit
-	index += (num[8] & 0x03) << 12; // 256, 2-bit
-	index += (num[9] & 0x03) << 14; // 512, 2-bit
-	index += (num[10] & 0x03) << 16; // 1k ~ 32k, 2-bit ea.
-	index += (num[11] & 0x03) << 18;
-	index += (num[12] & 0x03) << 20;
-	index += (num[13] & 0x03) << 22;
-	index += (num[14] & 0x03) << 24;
-	index += (num[15] & 0x03) << 26;
-	return index;
-}
-
-u64 indexnum4(const board& b) { // 24-bit
+u64 indexnum(const board& b) { // 24-bit
 	auto num = b.numof();
 	register u64 index = 0;
 	index |= (num[0] + num[1] + num[2] + num[3]) << 0; // 0+2+4+8, 4-bit
@@ -681,7 +586,7 @@ u64 indexnum4(const board& b) { // 24-bit
 	return index;
 }
 
-u64 indexnum5lt(const board& b) { // 24-bit
+u64 indexnumlt(const board& b) { // 24-bit
 	auto num = b.numof();
 	register u64 index = 0;
 	index |= std::min(u32(num[8]),  7u) <<  0; // 256, 3-bit
@@ -695,7 +600,7 @@ u64 indexnum5lt(const board& b) { // 24-bit
 	return index;
 }
 
-u64 indexnum5st(const board& b) { // 24-bit
+u64 indexnumst(const board& b) { // 24-bit
 	auto num = b.numof();
 	register u64 index = 0;
 	index |= std::min(u32(num[0]), 7u) <<  0; // 0, 3-bit
@@ -927,44 +832,36 @@ __attribute__((constructor)) void init() {
 	make::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x8>(); // 0123458!
 	make::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xc>(); // 456789c!
 
-	make("ff000000", indexmerge0);
-	make("ff000001", indexmerge1<0>);
-	make("ff000011", indexmerge1<1>);
-	make("fe000000", indexnum0);
-	make("fe000001", indexnum1);
-	make("fe000002", indexnum2);
-	make("fe000082", indexnum2x<0, 0, 1>);
-	make("fe000092", indexnum2x<0, 2, 3>);
-	make("fe0000c2", indexnum2x<1, 0, 1>);
-	make("fe0000d2", indexnum2x<1, 2, 3>);
-	make("fe000003", indexnum3);
-	make("fe000004", indexnum4);
-	make("fe000005", indexnum5lt);
-	make("fe000015", indexnum5st);
-	make("fd012301", indexmono<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
-	make("fd37bf01", indexmono<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
-	make("fdfedc01", indexmono<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
-	make("fdc84001", indexmono<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
-	make("fd321001", indexmono<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
-	make("fdfb7301", indexmono<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
-	make("fdcdef01", indexmono<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
-	make("fd048c01", indexmono<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
-	make("fd456701", indexmono<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
-	make("fd26ae01", indexmono<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
-	make("fdba9801", indexmono<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
-	make("fdd95101", indexmono<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
-	make("fd765401", indexmono<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
-	make("fdea6201", indexmono<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
-	make("fd89ab01", indexmono<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
-	make("fd159d01", indexmono<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
-	make("fc000000", indexmax<0>);
-	make("fc000010", indexmax<1>);
-	make("fc000020", indexmax<2>);
-	make("fc000030", indexmax<3>);
-	make("fc000040", indexmax<4>);
-	make("fc000050", indexmax<5>);
-	make("fc000060", indexmax<6>);
-	make("fc000070", indexmax<7>);
+	make("merge",  indexmerge);
+	make("num",    indexnum);
+	make("num@lt", indexnumlt);
+	make("num@st", indexnumst);
+
+	make("m@0123", indexmono<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
+	make("m@37bf", indexmono<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
+	make("m@fedc", indexmono<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
+	make("m@c840", indexmono<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
+	make("m@3210", indexmono<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
+	make("m@fb73", indexmono<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
+	make("m@cdef", indexmono<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
+	make("m@048c", indexmono<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
+	make("m@4567", indexmono<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
+	make("m@26ae", indexmono<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
+	make("m@ba98", indexmono<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
+	make("m@d951", indexmono<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
+	make("m@7654", indexmono<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
+	make("m@ea62", indexmono<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
+	make("m@89ab", indexmono<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
+	make("m@159d", indexmono<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
+
+	make("max#0", indexmax<0>);
+	make("max#1", indexmax<1>);
+	make("max#2", indexmax<2>);
+	make("max#3", indexmax<3>);
+	make("max#4", indexmax<4>);
+	make("max#5", indexmax<5>);
+	make("max#6", indexmax<6>);
+	make("max#7", indexmax<7>);
 
 	adapter::make<0, 256>();
 }
@@ -1133,9 +1030,9 @@ std::map<std::string, std::string> aliases() {
 	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678:345678! ";
 	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567:134567! ";
 	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a:01489a! ";
-	alias["monotonic"] = "fd012301[^24]:fd012301,fd37bf01,fdfedc01,fdc84001,fd321001,fdfb7301,fdcdef01,fd048c01 "
-	                     "fd456701[^24]:fd456701,fd26ae01,fdba9801,fdd95101,fd765401,fdea6201,fd89ab01,fd159d01 ";
-	alias["quantity"] = "fe000005[^24]:fe000005 fe000015[^24]:fe000015 ";
+	alias["monotonic"] = alias["mono"] = "m@0123[^24]:m@0123,m@37bf,m@fedc,m@c840,m@3210,m@fb73,m@cdef,m@048c "
+	                                     "m@4567[^24]:m@4567,m@26ae,m@ba98,m@d951,m@7654,m@ea62,m@89ab,m@159d ";
+	alias["quantity"] = alias["num"] = "num@lt[^24]:num@lt num@st[^24]:num@st ";
 	alias["4x6patt"] = alias["4x6patt/khyeh"];
 	alias["5x6patt"] = alias["5x6patt/42-33"];
 	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
