@@ -1277,10 +1277,13 @@ void list_network() {
 			buf << (w.size());
 		buf << "]";
 
-		buf << " : (unused)";
-		buf.seekp(-9, std::ios::end);
+		buf << " :";
+		std::ios::pos_type pos = buf.tellp();
 		for (feature f : feature::feats())
-			if (f.value() == w) buf << " " << f.index().sign();
+			if (f.value() == w)
+				buf << " " << f.index().sign();
+		if (buf.tellp() == pos)
+			buf << " (n/a)";
 
 		std::cout << buf.rdbuf() << std::endl;
 	}
