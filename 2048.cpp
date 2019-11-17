@@ -1050,6 +1050,7 @@ std::map<std::string, std::string> aliases() {
 	alias["default"] = alias["4x6patt"];
 	return alias;
 }
+
 void make_network(utils::options::option opt) {
 	std::string tokens = opt;
 	if (tokens.empty() && feature::feats().empty())
@@ -1413,6 +1414,7 @@ struct method {
 
 	template<typename source = method>
 	struct expectimax {
+		constexpr inline operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
 		constexpr inline expectimax(utils::options::option depth) {
 			u32 n = expectimax<source>::depth(depth);
 			std::stringstream in(({
@@ -1425,7 +1427,6 @@ struct method {
 				lim = n & -2u;
 			}
 		}
-		constexpr inline operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
 
 		static inline numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
 			numeric expt = 0;
@@ -1459,7 +1460,6 @@ struct method {
 		static inline numeric estimate(const board& after, clip<feature> range = feature::feats()) {
 			return search_expt(after, depth() - 1, range);
 		}
-
 		static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
 			return source::optimize(state, updv, range);
 		}
@@ -1507,34 +1507,32 @@ struct method {
 			index::index6t<0x0,0x1,0x4,0x8,0x9,0xa>> iso8x6patt;
 
 	static method parse(utils::options opts, std::string type) {
-		std::string spec = opts["options"].find("spec", "auto");
-		if (spec == "auto" || spec == "default" || spec == "on") {
+		std::string spec = opts["options"]["spec"].value("auto");
+		if (spec == "auto" || spec == "on" || spec == "default") {
 			spec = opts["make"].value("4x6patt");
 			spec = spec.substr(0, spec.find_first_of("&|="));
 		}
 
 		if (opts["depth"].value(1) > 1) {
 			switch (to_hash(spec)) {
-			default: return method::expectimax<method>(opts["depth"]);
-			case to_hash("isomorphic"):
-			case to_hash("isopatt"): return method::expectimax<method::isomorphic>(opts["depth"]);
-			case to_hash("4x6patt"): return method::expectimax<method::iso4x6patt>(opts["depth"]);
-			case to_hash("5x6patt"): return method::expectimax<method::iso5x6patt>(opts["depth"]);
-			case to_hash("6x6patt"): return method::expectimax<method::iso6x6patt>(opts["depth"]);
-			case to_hash("7x6patt"): return method::expectimax<method::iso7x6patt>(opts["depth"]);
-			case to_hash("8x6patt"): return method::expectimax<method::iso8x6patt>(opts["depth"]);
+			default:                    return method::expectimax<method>(opts["depth"]);
+			case to_hash("isomorphic"): return method::expectimax<method::isomorphic>(opts["depth"]);
+			case to_hash("4x6patt"):    return method::expectimax<method::iso4x6patt>(opts["depth"]);
+			case to_hash("5x6patt"):    return method::expectimax<method::iso5x6patt>(opts["depth"]);
+			case to_hash("6x6patt"):    return method::expectimax<method::iso6x6patt>(opts["depth"]);
+			case to_hash("7x6patt"):    return method::expectimax<method::iso7x6patt>(opts["depth"]);
+			case to_hash("8x6patt"):    return method::expectimax<method::iso8x6patt>(opts["depth"]);
 			}
 		}
 
 		switch (to_hash(spec)) {
-		default: return method();
-		case to_hash("isomorphic"):
-		case to_hash("isopatt"): return method::isomorphic();
-		case to_hash("4x6patt"): return method::iso4x6patt();
-		case to_hash("5x6patt"): return method::iso5x6patt();
-		case to_hash("6x6patt"): return method::iso6x6patt();
-		case to_hash("7x6patt"): return method::iso7x6patt();
-		case to_hash("8x6patt"): return method::iso8x6patt();
+		default:                    return method();
+		case to_hash("isomorphic"): return method::isomorphic();
+		case to_hash("4x6patt"):    return method::iso4x6patt();
+		case to_hash("5x6patt"):    return method::iso5x6patt();
+		case to_hash("6x6patt"):    return method::iso6x6patt();
+		case to_hash("7x6patt"):    return method::iso7x6patt();
+		case to_hash("8x6patt"):    return method::iso8x6patt();
 		}
 	}
 
