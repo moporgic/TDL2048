@@ -1409,35 +1409,6 @@ struct method {
 				return isomorphic::optimize<invoke<indexes...>>(state, updv, range);
 			}
 		};
-
-		template<u32 xpatt>
-		struct dynamic_index {
-			constexpr inline operator method() { return { dynamic_index::estimate, dynamic_index::optimize }; }
-
-			template<u32 idx> constexpr static
-			inline_always typename std::enable_if<(idx + 1 != xpatt), numeric>::type invoke(const board& iso, clip<feature> f) {
-				return (f[idx << 3][iso]) + invoke<idx + 1>(iso, f);
-			}
-			template<u32 idx> constexpr static
-			inline_always typename std::enable_if<(idx + 1 == xpatt), numeric>::type invoke(const board& iso, clip<feature> f) {
-				return (f[idx << 3][iso]);
-			}
-			template<u32 idx> constexpr static
-			inline_always typename std::enable_if<(idx + 1 != xpatt), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
-				return (f[idx << 3][iso] += updv) + invoke<idx + 1>(iso, updv, f);
-			}
-			template<u32 idx> constexpr static
-			inline_always typename std::enable_if<(idx + 1 == xpatt), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
-				return (f[idx << 3][iso] += updv);
-			}
-
-			constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
-				return isomorphic::estimate<invoke<xpatt * 0>>(state, range);
-			}
-			constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
-				return isomorphic::optimize<invoke<xpatt * 0>>(state, updv, range);
-			}
-		};
 	};
 
 	template<typename source = method>
@@ -1534,15 +1505,6 @@ struct method {
 			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
 			index::index6t<0x1,0x3,0x4,0x5,0x6,0x7>,
 			index::index6t<0x0,0x1,0x4,0x8,0x9,0xa>> iso8x6patt;
-	struct isopatt {
-		constexpr inline isopatt(u32 x) : x(x) {}
-		constexpr inline operator method() { return fetch(); }
-		template<u32 i = 32> constexpr inline
-		typename std::enable_if<(i != 0), method>::type fetch() { return x == i ? isomorphic::dynamic_index<i>() : fetch<i - 1>(); }
-		template<u32 i = 32> constexpr inline
-		typename std::enable_if<(i == 0), method>::type fetch() { return isomorphic(); }
-		const u32 x;
-	};
 
 	static method parse(utils::options opts, std::string type) {
 		std::string spec = opts["options"].find("spec", "auto");
@@ -1567,7 +1529,7 @@ struct method {
 		switch (to_hash(spec)) {
 		default: return method();
 		case to_hash("isomorphic"):
-		case to_hash("isopatt"): return method::isopatt(opts["options"]["isopatt"].value(feature::feats().size() >> 3));
+		case to_hash("isopatt"): return method::isomorphic();
 		case to_hash("4x6patt"): return method::iso4x6patt();
 		case to_hash("5x6patt"): return method::iso5x6patt();
 		case to_hash("6x6patt"): return method::iso6x6patt();
