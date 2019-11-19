@@ -1353,7 +1353,7 @@ struct method {
 		}
 
 		template<estimator estim = isomorphic::invoke>
-		constexpr static inline_always numeric estimate(const board& state, clip<feature> range = feature::feats()) {
+		constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
 			register numeric esti = 0;
 			register board iso;
 			esti += estim(({ iso = state;     iso; }), range);
@@ -1367,7 +1367,7 @@ struct method {
 			return esti;
 		}
 		template<optimizer optim = isomorphic::invoke>
-		constexpr static inline_always numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
+		constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
 			register numeric esti = 0;
 			register board iso;
 			esti += optim(({ iso = state;     iso; }), updv, range);
@@ -1403,12 +1403,8 @@ struct method {
 				return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv);
 			}
 
-			constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
-				return isomorphic::estimate<invoke<indexes...>>(state, range);
-			}
-			constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
-				return isomorphic::optimize<invoke<indexes...>>(state, updv, range);
-			}
+			constexpr static estimator estimate = isomorphic::estimate<invoke<indexes...>>;
+			constexpr static optimizer optimize = isomorphic::optimize<invoke<indexes...>>;
 		};
 	};
 
