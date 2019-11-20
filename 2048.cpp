@@ -1487,6 +1487,18 @@ struct method {
 			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
 			index::index6t<0x1,0x3,0x4,0x5,0x6,0x7>,
 			index::index6t<0x0,0x1,0x4,0x8,0x9,0xa>> iso8x6patt;
+	typedef isomorphic::static_index<
+			index::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
+			index::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>> iso2x7patt;
+	typedef isomorphic::static_index<
+			index::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
+			index::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>,
+			index::index7t<0x8,0x9,0xa,0xb,0xc,0xd,0xe>> iso3x7patt;
+	typedef isomorphic::static_index<
+			index::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>> iso1x8patt;
+	typedef isomorphic::static_index<
+			index::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>,
+			index::index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>> iso2x8patt;
 
 	static method parse(utils::options opts, std::string type) {
 		std::string spec = opts["options"]["spec"].value("auto");
@@ -1504,6 +1516,10 @@ struct method {
 			case to_hash("6x6patt"):    return method::expectimax<method::iso6x6patt>(opts["depth"]);
 			case to_hash("7x6patt"):    return method::expectimax<method::iso7x6patt>(opts["depth"]);
 			case to_hash("8x6patt"):    return method::expectimax<method::iso8x6patt>(opts["depth"]);
+			case to_hash("2x7patt"):    return method::expectimax<method::iso2x7patt>(opts["depth"]);
+			case to_hash("3x7patt"):    return method::expectimax<method::iso3x7patt>(opts["depth"]);
+			case to_hash("1x8patt"):    return method::expectimax<method::iso1x8patt>(opts["depth"]);
+			case to_hash("2x8patt"):    return method::expectimax<method::iso2x8patt>(opts["depth"]);
 			}
 		}
 
@@ -1515,6 +1531,10 @@ struct method {
 		case to_hash("6x6patt"):    return method::iso6x6patt();
 		case to_hash("7x6patt"):    return method::iso7x6patt();
 		case to_hash("8x6patt"):    return method::iso8x6patt();
+		case to_hash("2x7patt"):    return method::iso2x7patt();
+		case to_hash("3x7patt"):    return method::iso3x7patt();
+		case to_hash("1x8patt"):    return method::iso1x8patt();
+		case to_hash("2x8patt"):    return method::iso2x8patt();
 		}
 	}
 
