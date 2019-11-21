@@ -1035,6 +1035,7 @@ std::string alias(const std::string& token) {
 	case to_hash("num@lt"):              return "num@lt[^24]:num@lt ";
 	case to_hash("num@st"):              return "num@st[^24]:num@st ";
 	case to_hash("num"):                 return alias("num@lt") + alias("num@st");
+	case to_hash("none"):                return "";
 	}
 }
 
@@ -1249,6 +1250,8 @@ void save_network(utils::options::option opt) {
 }
 
 void list_network() {
+	if (weight::wghts().empty()) return;
+
 	for (weight w : weight::wghts()) {
 		std::stringstream buf;
 
