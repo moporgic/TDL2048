@@ -2112,7 +2112,10 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["cache"] += opts[""];
 			break;
 		case to_hash("-p"): case to_hash("--parallel"): case to_hash("--thread"):
-			opts["thread"] = next_opt(std::to_string(std::thread::hardware_concurrency()));
+			opts["thread"] = std::thread::hardware_concurrency();
+			opts[""] = next_opts();
+			if (opts[""].value(0)) opts["thread"].clear();
+			opts["thread"] += opts[""];
 			break;
 		case to_hash("-x"): case to_hash("-opt"): case to_hash("--options"):
 			opts["options"] += next_opts();
