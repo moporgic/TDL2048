@@ -996,46 +996,49 @@ statistic invoke(statistic(*run)(utils::options,std::string), utils::options opt
 
 std::string alias(const std::string& token) {
 	switch (to_hash(token)) {
-	default:                             return token;
-	case to_hash("default"):
-	case to_hash("4x6patt"):
+	default: return token;
+
+	case to_hash("default"): return alias("4x6patt");
+	case to_hash("4x6patt"): return alias("4x6patt/khyeh");
+	case to_hash("5x6patt"): return alias("5x6patt/42-33");
+	case to_hash("2x4patt"): return alias("2x4patt/4");
+	case to_hash("5x4patt"): return alias("5x4patt/4-22");
+	case to_hash("8x4patt"): return alias("8x4patt/legacy");
+	case to_hash("1x8patt"): return alias("1x8patt/44");
+	case to_hash("2x8patt"): return alias("2x8patt/44");
+	case to_hash("3x8patt"): return alias("3x8patt/44-4211");
+	case to_hash("4x8patt"): return alias("4x8patt/44-332-4211");
+	case to_hash("2x7patt"): return alias("2x7patt/43");
+	case to_hash("3x7patt"): return alias("3x7patt/43");
+	case to_hash("6x6patt"): return alias("6x6patt/k.matsuzaki");
+	case to_hash("7x6patt"): return alias("7x6patt/k.matsuzaki");
+	case to_hash("8x6patt"): return alias("8x6patt/k.matsuzaki");
+
 	case to_hash("4x6patt/khyeh"):       return "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
-	case to_hash("5x6patt"):
 	case to_hash("5x6patt/42-33"):       return "012345:012345! 456789:456789! 89abcd:89abcd! 012456:012456! 45689a:45689a! ";
-	case to_hash("2x4patt"):
 	case to_hash("2x4patt/4"):           return "0123:0123! 4567:4567! ";
-	case to_hash("5x4patt"):
 	case to_hash("5x4patt/4-22"):        return alias("2x4patt/4") + "0145:0145! 1256:1256! 569a:569a! ";
-	case to_hash("8x4patt"):
 	case to_hash("8x4patt/legacy"):      return "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
-	case to_hash("1x8patt"):
 	case to_hash("1x8patt/44"):          return "01234567:01234567! ";
-	case to_hash("2x8patt"):
 	case to_hash("2x8patt/44"):          return "01234567:01234567! 456789ab:456789ab! ";
 	case to_hash("3x8patt/44-332"):      return alias("2x8patt/44") + "01245689:01245689! ";
-	case to_hash("3x8patt"):
 	case to_hash("3x8patt/44-4211"):     return alias("2x8patt/44") + "0123458c:0123458c! ";
-	case to_hash("4x8patt"):
 	case to_hash("4x8patt/44-332-4211"): return alias("3x8patt/44-332") + "0123458c:0123458c! ";
-	case to_hash("2x7patt"):
 	case to_hash("2x7patt/43"):          return "0123456:0123456! 456789a:456789a! ";
-	case to_hash("3x7patt"):
 	case to_hash("3x7patt/43"):          return alias("2x7patt/43") + "89abcde:89abcde! ";
 	case to_hash("4x6patt/k.matsuzaki"): return "012456:012456! 456789:456789! 012345:012345! 234569:234569! ";
 	case to_hash("5x6patt/k.matsuzaki"): return alias("4x6patt/k.matsuzaki") + "01259a:01259a! ";
-	case to_hash("6x6patt"):
 	case to_hash("6x6patt/k.matsuzaki"): return alias("5x6patt/k.matsuzaki") + "345678:345678! ";
-	case to_hash("7x6patt"):
 	case to_hash("7x6patt/k.matsuzaki"): return alias("6x6patt/k.matsuzaki") + "134567:134567! ";
-	case to_hash("8x6patt"):
 	case to_hash("8x6patt/k.matsuzaki"): return alias("7x6patt/k.matsuzaki") + "01489a:01489a! ";
-	case to_hash("mono/0123"):           return "m@0123[^24]:m@0123,m@37bf,m@fedc,m@c840,m@3210,m@fb73,m@cdef,m@048c ";
-	case to_hash("mono/4567"):           return "m@4567[^24]:m@4567,m@26ae,m@ba98,m@d951,m@7654,m@ea62,m@89ab,m@159d ";
-	case to_hash("mono"):                return alias("mono/0123") + alias("mono/4567");
-	case to_hash("num@lt"):              return "num@lt[^24]:num@lt ";
-	case to_hash("num@st"):              return "num@st[^24]:num@st ";
-	case to_hash("num"):                 return alias("num@lt") + alias("num@st");
-	case to_hash("none"):                return "";
+
+	case to_hash("mono/0123"): return "m@0123[^24]:m@0123,m@37bf,m@fedc,m@c840,m@3210,m@fb73,m@cdef,m@048c ";
+	case to_hash("mono/4567"): return "m@4567[^24]:m@4567,m@26ae,m@ba98,m@d951,m@7654,m@ea62,m@89ab,m@159d ";
+	case to_hash("mono"):      return alias("mono/0123") + alias("mono/4567");
+	case to_hash("num@lt"):    return "num@lt[^24]:num@lt ";
+	case to_hash("num@st"):    return "num@st[^24]:num@st ";
+	case to_hash("num"):       return alias("num@lt") + alias("num@st");
+	case to_hash("none"):      return "";
 	}
 }
 
