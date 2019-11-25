@@ -15,6 +15,7 @@
 #include <numeric>
 #include <iterator>
 #include <algorithm>
+#include <x86intrin.h>
 
 namespace moporgic {
 
@@ -234,7 +235,6 @@ unsigned int ones4(register unsigned int x) noexcept {
 	x = ((x & 0b1010) >> 1) + (x & 0b0101);
 	return (((x & 0b1100) >> 2) + (x & 0b0011)) & 0b0111;
 }
-
 
 /**
  * Leading Zero Count
@@ -520,6 +520,57 @@ static inline constexpr
 unsigned int tzc(register unsigned int x) noexcept { return tzc32(x); }
 static inline constexpr
 unsigned int tzc(register unsigned long long int x) noexcept { return tzc64(x); }
+
+/**
+ * instruction based count: popcnt, lzcnt, tzcnt
+ * to use these functions, compile flags -mpopcnt -mbmi -mbmi2 are necessary
+ */
+static inline uint64_t popcnt64(register uint64_t x) noexcept { return _mm_popcnt_u64(x); }
+static inline uint32_t popcnt32(register uint32_t x) noexcept { return _mm_popcnt_u32(x); }
+static inline uint64_t popcnt(register uint64_t x) noexcept { return popcnt64(x); }
+static inline uint32_t popcnt(register uint32_t x) noexcept { return popcnt32(x); }
+
+static inline uint64_t lzcnt64(register uint64_t x) noexcept { return _lzcnt_u64(x); }
+static inline uint32_t lzcnt32(register uint32_t x) noexcept { return _lzcnt_u32(x); }
+static inline uint64_t lzcnt(register uint64_t x) noexcept { return lzcnt64(x); }
+static inline uint32_t lzcnt(register uint32_t x) noexcept { return lzcnt32(x); }
+
+static inline uint64_t tzcnt64(register uint64_t x) noexcept { return _tzcnt_u64(x); }
+static inline uint32_t tzcnt32(register uint32_t x) noexcept { return _tzcnt_u32(x); }
+static inline uint64_t tzcnt(register uint64_t x) noexcept { return tzcnt64(x); }
+static inline uint32_t tzcnt(register uint32_t x) noexcept { return tzcnt32(x); }
+
+/**
+ * bit extraction
+ * to use these functions, compile flag -mbmi is necessary
+ */
+static inline uint64_t bextr64(register uint64_t x, register uint32_t off, register uint32_t len) noexcept { return _bextr_u64(x, off, len); }
+static inline uint32_t bextr32(register uint32_t x, register uint32_t off, register uint32_t len) noexcept { return _bextr_u32(x, off, len); }
+static inline uint64_t bextr(register uint64_t x, register uint32_t off, register uint32_t len) noexcept { return _bextr_u64(x, off, len); }
+static inline uint32_t bextr(register uint32_t x, register uint32_t off, register uint32_t len) noexcept { return _bextr_u32(x, off, len); }
+
+/**
+ * Parallel bit deposit and extract: PEXT and PDEP
+ * to use these functions, compile flag -mbmi2 is necessary
+ */
+static inline uint64_t pdep64(register uint64_t a, register uint64_t mask) noexcept { return _pdep_u64(a, mask); }
+static inline uint32_t pdep32(register uint32_t a, register uint32_t mask) noexcept { return _pdep_u32(a, mask); }
+static inline uint64_t pdep(register uint64_t a, register uint64_t mask) noexcept { return pdep64(a, mask); }
+static inline uint32_t pdep(register uint32_t a, register uint32_t mask) noexcept { return pdep32(a, mask); }
+static inline uint64_t pext64(register uint64_t a, register uint64_t mask) noexcept { return _pext_u64(a, mask); }
+static inline uint32_t pext32(register uint32_t a, register uint32_t mask) noexcept { return _pext_u32(a, mask); }
+static inline uint64_t pext(register uint64_t a, register uint64_t mask) noexcept { return pext64(a, mask); }
+static inline uint32_t pext(register uint32_t a, register uint32_t mask) noexcept { return pext32(a, mask); }
+
+/**
+ * return the lowest nth set bit (n starting from 0)
+ * to use these functions, compile flag -mbmi2 is necessary
+ * https://stackoverflow.com/questions/7669057/find-nth-set-bit-in-an-int/27453505#27453505
+ */
+static inline uint64_t nthset64(register uint64_t x, register uint32_t n) noexcept { return _pdep_u64(1ULL << n, x); }
+static inline uint32_t nthset32(register uint32_t x, register uint32_t n) noexcept { return _pdep_u32(1U << n, x); }
+static inline uint64_t nthset(register uint64_t x, register uint32_t n) noexcept { return nthset64(x, n); }
+static inline uint32_t nthset(register uint32_t x, register uint32_t n) noexcept { return nthset32(x, n); }
 
 /**
  * Tail recursive pow

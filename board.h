@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 4.5
+// Version     : 5.0
 // Description : bitboard of 2048
 //============================================================================
 
@@ -296,32 +296,20 @@ public:
 		x |= (x >> 2);
 		x |= (x >> 1);
 		x = ~x & 0x1111111111111111ull;
-		u32 e = x + (x >> 32);
-		e += e >> 16;
-		e += e >> 8;
-		e = (e & 0x0f) + ((e >> 4) & 0x0f);
+		u32 e = math::popcnt64(x);
 		u32 u = moporgic::rand();
-		u32 k = (u >> 16) % e;
-		while (k--) x &= ~(x & -x);
-		u32 p = math::lg64(x & -x);;
-		raw |= (u % 10 ? 1ull : 2ull) << p;
+		u64 t = math::nthset64(x, (u >> 16) % e);
+		raw |= (t << (u % 10 ? 0 : 1));
 	}
 	inline void next80() {
 		u64 x = raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
-		x = ~x & 0x1111111111111111ull;
-		u16 z[]{ 0x1111, 0x1110, 0x1101, 0x1100, 0x1011, 0x1010, 0x1001, 0x1000, 0x0111, 0x0110, 0x0101, 0x0100, 0x0011, 0x0010, 0x0001, 0x0000 };
-		x &= (u64(z[(ext >> 28) & 0x0f]) << 48) | (u64(z[(ext >> 24) & 0x0f]) << 32) | (u64(z[(ext >> 20) & 0x0f]) << 16) | u64(z[(ext >> 16) & 0x0f]);
-		u32 e = x + (x >> 32);
-		e += e >> 16;
-		e += e >> 8;
-		e = (e & 0x0f) + ((e >> 4) & 0x0f);
+		x = ~x & math::pdep64(~ext >> 16, 0x1111111111111111ull);
+		u32 e = math::popcnt64(x);
 		u32 u = moporgic::rand();
-		u32 k = (u >> 16) % e;
-		while (k--) x &= ~(x & -x);
-		u32 p = math::lg64(x & -x);;
-		raw |= (u % 10 ? 1ull : 2ull) << p;
+		u64 t = math::nthset64(x, (u >> 16) % e);
+		raw |= (t << (u % 10 ? 0 : 1));
 	}
 
 	inline bool popup() { return popup64(); }
