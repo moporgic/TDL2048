@@ -65,16 +65,21 @@ public:
 		switch (code) {
 		default:
 		case 4:
-			try {
-				write_cast<u32>(out, std::stoul(w.sign(), nullptr, 16));
+			try { // write sign as 32-bit integer if possible
+				size_t idx = 0;
+				u32 sign = std::stoul(w.sign(), &idx, 16);
+				if (idx != w.sign().size()) throw std::invalid_argument("unresolved");
+				write_cast<u32>(out, sign);
 				write_cast<u16>(out, w.sign().size());
 				write_cast<u16>(out, 0);
-			} catch (std::invalid_argument&) {
+			} catch (std::logic_error&) { // otherwise, write it as raw string
 				out.write(w.sign().append(8, ' ').c_str(), 8);
 			}
+			// write value table
 			write_cast<u16>(out, sizeof(weight::numeric));
 			write_cast<u64>(out, w.size());
 			write_cast<numeric>(out, w.value().begin(), w.value().end());
+			// reserved for fields
 			write_cast<u16>(out, 0);
 			break;
 		}
@@ -87,14 +92,12 @@ public:
 		case 0:
 		case 1:
 		case 2:
-			w.name = ({
-				std::stringstream ss;
-				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
-				ss.str();
-			});
-			read_cast<u64>(in, w.length);
-			if (w.length == (1ull << math::lg64(w.length)))
+			// read name and size
+			w.name = format("%08x", read<u32>(in));
+			w.length = read<u64>(in);
+			if (math::ones64(w.length) == 1) // remove extra beginning '0'
 				w.name = w.name.substr(8 - (math::lg64(w.length) >> 2));
+			// read value table
 			w.raw = weight::alloc(w.length);
 			switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
@@ -103,15 +106,20 @@ public:
 			break;
 		default:
 		case 4:
+			// read name
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
-			w.name = raw_cast<u16>(w.name[6]) == 0 ? ({
-				std::stringstream ss;
-				ss << std::setw(raw_cast<u16>(w.name[4]) ? raw_cast<u16>(w.name[4]) : ({
+			if (raw_cast<u16>(w.name[6]) == 0) { // name is written as integer
+				u32 width = raw_cast<u16>(w.name[4]);
+				if (width == 0) { // name display width is missing, try recalculate it
 					read_cast<u64>(in.ignore(2), w.length).seekg(-10, std::ios::cur);
-					(w.length == (1ull << math::lg64(w.length))) ? (math::lg64(w.length) >> 2) : 8;
-				})) << std::setfill('0') << std::hex << raw_cast<u32>(w.name[0]);
-				ss.str();
-			}) : w.name.substr(0, w.name.find(' '));
+					width = (math::ones64(w.length) == 1) ? (math::lg64(w.length) >> 2) : 8;
+					if (format("%x", raw_cast<u32>(w.name[0])).size() > width) width = 8;
+				}
+				w.name = format(format("%%0%ux", width), raw_cast<u32>(w.name[0]));
+			} else { // name is written as string
+				w.name = w.name.substr(0, w.name.find(' '));
+			}
+			// read value table
 			read_cast<u16>(in, code);
 			read_cast<u64>(in, w.length);
 			w.raw = weight::alloc(w.length);
@@ -120,6 +128,7 @@ public:
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
+			// ignore unrecognized extra fields
 			while (read_cast<u16>(in, code) && code)
 				in.ignore(code * read<u64>(in));
 			break;
@@ -237,63 +246,6 @@ public:
 	inline operator bool() const { return map && raw; }
 	declare_comparators(const feature&, sign(), inline);
 
-	friend std::ostream& operator <<(std::ostream& out, const feature& f) {
-		u32 code = 0;
-		write_cast<u8>(out, code);
-		switch (code) {
-		default:
-		case 0:
-			write_cast<u32>(out, std::stoul(f.index().sign(), nullptr, 16));
-			write_cast<u32>(out, std::stoul(f.value().sign(), nullptr, 16));
-			break;
-		}
-		return out;
-	}
-	friend std::istream& operator >>(std::istream& in, feature& f) {
-		u32 code = 0;
-		read_cast<u8>(in, code);
-		switch (code) {
-		default:
-		case 0:
-			f.map = indexer(({
-				std::stringstream ss;
-				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
-				ss.str();
-			}));
-			f.raw = weight(({
-				std::stringstream ss;
-				ss << std::setw(8) << std::setfill('0') << std::hex << read<u32>(in);
-				ss.str();
-			}));
-			f.name = f.raw.sign() + ':' + f.map.sign();
-			break;
-		}
-		return in;
-	}
-
-	static void save(std::ostream& out) {
-		u32 code = 0;
-		write_cast<u8>(out, code);
-		switch (code) {
-		default:
-		case 0:
-			write_cast<u32>(out, feats().size());
-			for (feature f : feats()) out << f;
-			break;
-		}
-	}
-	static void load(std::istream& in) {
-		u32 code = 0;
-		read_cast<u8>(in, code);
-		switch (code) {
-		default:
-		case 0:
-			for (read_cast<u32>(in, code); code; code--)
-				in >> list<feature>::as(feats()).emplace_back();
-			break;
-		}
-	}
-
 	class container : public clip<feature> {
 	public:
 		constexpr container() noexcept : clip<feature>() {}
@@ -387,16 +339,15 @@ public:
 		u64 info; // f32 esti; u16 hold; u16 hits;
 	};
 
-	constexpr cache() : cached(&initial), length(1), mask(0) {}
+	constexpr cache() : cached(&initial), length(1), mask(0), nmap{} {}
 	cache(const cache& tp) = default;
 	~cache() {}
-	inline size_t size() const { return length; }
-	inline block& operator[] (size_t i) { return cached[i]; }
-	inline const block& operator[] (size_t i) const { return cached[i]; }
+	constexpr inline size_t size() const { return length; }
+	constexpr inline block& operator[] (size_t i) { return cached[i]; }
+	constexpr inline const block& operator[] (size_t i) const { return cached[i]; }
 	inline block::access operator() (const board& b, u32 n) {
 		u64 x = min_isomorphic(b);
-		size_t i = math::fmix64(x) & mask;
-		block& blk = operator[](i);
+		block& blk = operator[]((math::fmix64(x) ^ nmap[n >> 1]) & mask);
 		return blk(x, n);
 	}
 
@@ -406,13 +357,20 @@ public:
 		switch (code) {
 		default:
 		case 4:
-			write_cast<u16>(out, 0); // reserved for header
+			// reserved for header
+			write_cast<u16>(out, 0);
 			write_cast<u64>(out, 0);
+			// write blocks
 			write_cast<u16>(out, sizeof(cache::block));
 			write_cast<u64>(out, c.size());
 			for (size_t i = 0; i < c.size(); i++)
 				out << c[i];
-			write_cast<u16>(out, 0); // reserved for fields
+			// write depth-map (nmap)
+			write_cast<u16>(out, sizeof(size_t));
+			write_cast<u64>(out, c.nmap.size());
+			write_cast<u64>(out, c.nmap.begin(), c.nmap.end());
+			// reserved for fields
+			write_cast<u16>(out, 0);
 			break;
 		}
 		return out;
@@ -423,10 +381,15 @@ public:
 		switch (code) {
 		default:
 		case 4:
+			// ignore unused header
 			in.ignore(read<u16>(in) * read<u64>(in));
-			c.shape(read<u64>(in.ignore(2)));
+			// read blocks
+			c.init(read<u64>(in.ignore(2)));
 			for (size_t i = 0; i < c.size(); i++)
 				in >> c[i];
+			// read depth-map (nmap)
+			read_cast<u64>(in, c.nmap.begin(), c.nmap.begin() + read<u64>(in.ignore(2)));
+			// ignore unrecognized fields
 			while ((code = read<u16>(in)) != 0)
 				in.ignore(code * read<u64>(in));
 			break;
@@ -457,18 +420,20 @@ public:
 	}
 
 	static inline block::access find(const board& b, u32 n) { return instance()(b, n); }
-	static inline cache& make(size_t len) { return instance().shape(std::max(len, size_t(1))); }
+	static inline cache& make(size_t len, bool peek = false) { return instance().init(std::max(len, size_t(1)), peek); }
 	static inline cache& instance() { static cache tp; return tp; }
 
 private:
 	static inline block* alloc(size_t len) { return shm::enable() ? shm::alloc<block>(len) : new block[len](); }
 	static inline void free(block* alloc) { shm::enable() ? shm::free(alloc) : delete[] alloc; }
 
-	cache& shape(size_t len) {
+	cache& init(size_t len, bool peek = false) {
 		length = (1ull << (math::lg64(len)));
 		mask = length - 1;
 		if (cached != &initial) free(cached);
-		cached = alloc(length);
+		cached = length > 1 ? alloc(length) : &initial;
+		for (size_t i = 0; i < nmap.size(); i++)
+			nmap[i] = peek ? 0 : math::fmix64(i);
 		return *this;
 	}
 
@@ -489,6 +454,7 @@ private:
 	block initial;
 	size_t length;
 	size_t mask;
+	std::array<size_t, 16> nmap;
 };
 
 namespace index {
@@ -558,12 +524,6 @@ template<> u64 index4t<0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b) >> 
 template<> u64 index4t<0x0,0x1,0x4,0x5>(const board& b) { return (u32(u64(b)) & 0x00ff) | (u32(u64(b) >> 8) & 0xff00); }
 template<> u64 index4t<0x1,0x2,0x5,0x6>(const board& b) { return (u32(u64(b) >> 4) & 0x00ff) | (u32(u64(b) >> 12) & 0xff00); }
 template<> u64 index4t<0x5,0x6,0x9,0xa>(const board& b) { return (u32(u64(b) >> 20) & 0x00ff) | (u32(u64(b) >> 28) & 0xff00); }
-template<> u64 index4t<0x0,0x1,0x2,0x4>(const board& b) { return (u32(u64(b)) & 0x0fff) | (u32(u64(b) >> 4) & 0xf000); }
-template<> u64 index4t<0x1,0x2,0x3,0x5>(const board& b) { return (u32(u64(b) >> 4) & 0x0fff) | (u32(u64(b) >> 8) & 0xf000); }
-template<> u64 index4t<0x4,0x5,0x6,0x8>(const board& b) { return (u32(u64(b) >> 16) & 0x0fff) | (u32(u64(b) >> 20) & 0xf000); }
-template<> u64 index4t<0x5,0x6,0x7,0x9>(const board& b) { return (u32(u64(b) >> 20) & 0x0fff) | (u32(u64(b) >> 24) & 0xf000); }
-template<> u64 index4t<0x0,0x1,0x2,0x5>(const board& b) { return (u32(u64(b)) & 0x0fff) | (u32(u64(b) >> 8) & 0xf000); }
-template<> u64 index4t<0x4,0x5,0x6,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0x0fff) | (u32(u64(b) >> 24) & 0xf000); }
 template<> u64 index5t<0x0,0x1,0x2,0x3,0x4>(const board& b) { return (u32(u64(b)) & 0xfffff); }
 template<> u64 index5t<0x4,0x5,0x6,0x7,0x8>(const board& b) { return (u32(u64(b) >> 16) & 0xfffff); }
 template<> u64 index5t<0x0,0x1,0x2,0x4,0x5>(const board& b) { return (u32(u64(b)) & 0x00fff) | ((u32(u64(b)) >> 4) & 0xff000); }
@@ -582,19 +542,18 @@ template<> u64 index6t<0x1,0x3,0x4,0x5,0x6,0x7>(const board& b) { return (u32(u6
 template<> u64 index6t<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) { return (u32(u64(b)) & 0x0000ff) | (u32(u64(b) >> 8) & 0x000f00) | (u32(u64(b) >> 20) & 0xfff000); }
 template<> u64 index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>(const board& b) { return (u32(u64(b)) & 0xfffffff); }
 template<> u64 index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>(const board& b) { return (u32(u64(b) >> 16) & 0xfffffff); }
-template<> u64 index7t<0x0,0x1,0x2,0x3,0x4,0x8,0xc>(const board& b) { return (u32(u64(b)) & 0x00fffff) | (u32(u64(b) >> 12) & 0x0f00000) | (u32(u64(b) >> 24) & 0xf000000); }
+template<> u64 index7t<0x8,0x9,0xa,0xb,0xc,0xd,0xe>(const board& b) { return (u32(u64(b) >> 32) & 0xfffffff); }
 template<> u64 index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b))); }
 template<> u64 index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>(const board& b) { return (u32(u64(b) >> 16)); }
-template<> u64 index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x8,0xc>(const board& b) { return (u32(u64(b)) & 0x00ffffff) | (u32(u64(b) >> 8) & 0x0f000000) | (u32(u64(b) >> 20) & 0xf0000000); }
 
-u64 indexnta(const board& b, const std::vector<u32>& p) {
+u64 indexpt(const board& b, const std::vector<u32>& p) {
 	register u64 index = 0;
 	for (size_t i = 0; i < p.size(); i++)
 		index += b.at(p[i]) << (i << 2);
 	return index;
 }
 
-u64 indexmerge0(const board& b) { // 16-bit
+u64 indexmerge(const board& b) { // 16-bit
 	board q = b; q.transpose();
 	register u32 hori = 0, vert = 0;
 	hori |= b.query(0).merge << 0;
@@ -608,102 +567,7 @@ u64 indexmerge0(const board& b) { // 16-bit
 	return hori | (vert << 8);
 }
 
-template<u32 transpose>
-u64 indexmerge1(const board& b) { // 8-bit
-	register u32 merge = 0;
-	board k = b; if (transpose) k.transpose();
-	merge |= k.query(0).merge << 0;
-	merge |= k.query(1).merge << 2;
-	merge |= k.query(2).merge << 4;
-	merge |= k.query(3).merge << 6;
-	return merge;
-}
-
-u64 indexnum0(const board& b) { // 10-bit
-	// 2k ~ 32k, 2-bit ea.
-	auto num = b.numof();
-	register u64 index = 0;
-	index += (num[11] & 0x03) << 0;
-	index += (num[12] & 0x03) << 2;
-	index += (num[13] & 0x03) << 4;
-	index += (num[14] & 0x03) << 6;
-	index += (num[15] & 0x03) << 8;
-	return index;
-}
-
-u64 indexnum1(const board& b) { // 25-bit
-	auto num = b.numof();
-	register u64 index = 0;
-	index += ((num[5] + num[6]) & 0x0f) << 0; // 32 & 64, 4-bit
-	index += (num[7] & 0x07) << 4; // 128, 3-bit
-	index += (num[8] & 0x07) << 7; // 256, 3-bit
-	index += (num[9] & 0x07) << 10; // 512, 3-bit
-	index += (num[10] & 0x03) << 13; // 1k ~ 32k, 2-bit ea.
-	index += (num[11] & 0x03) << 15;
-	index += (num[12] & 0x03) << 17;
-	index += (num[13] & 0x03) << 19;
-	index += (num[14] & 0x03) << 21;
-	index += (num[15] & 0x03) << 23;
-	return index;
-}
-
-u64 indexnum2(const board& b) { // 25-bit
-	auto num = b.numof();
-	register u64 index = 0;
-	index += ((num[1] + num[2]) & 0x07) << 0; // 2 & 4, 3-bit
-	index += ((num[3] + num[4]) & 0x07) << 3; // 8 & 16, 3-bit
-	index += ((num[5] + num[6]) & 0x07) << 6; // 32 & 64, 3-bit
-	index += ((num[7] + num[8]) & 0x07) << 9; // 126 & 256, 3-bit
-	index += ((num[9] + num[10]) & 0x07) << 12; // 512 & 1k, 3-bit
-	index += ((num[11]) & 0x03) << 15; // 2k ~ 32k, 2-bit ea.
-	index += ((num[12]) & 0x03) << 17;
-	index += ((num[13]) & 0x03) << 19;
-	index += ((num[14]) & 0x03) << 21;
-	index += ((num[15]) & 0x03) << 23;
-	return index;
-}
-
-template<u32 transpose, u32 qu0, u32 qu1>
-u64 indexnum2x(const board& b) { // 25-bit
-	board o = b;
-	if (transpose) o.transpose();
-	auto& m = o.query(qu0).numof;
-	auto& n = o.query(qu1).numof;
-
-	register u64 index = 0;
-	index += ((m[1] + n[1] + m[2] + n[2]) & 0x07) << 0; // 2 & 4, 3-bit
-	index += ((m[3] + n[3] + m[4] + n[4]) & 0x07) << 3; // 8 & 16, 3-bit
-	index += ((m[5] + n[5] + m[6] + n[6]) & 0x07) << 6; // 32 & 64, 3-bit
-	index += ((m[7] + n[7] + m[8] + n[8]) & 0x07) << 9; // 126 & 256, 3-bit
-	index += ((m[9] + n[9] + m[10] + n[10]) & 0x07) << 12; // 512 & 1k, 3-bit
-	index += ((m[11] + n[11]) & 0x03) << 15; // 2k ~ 32k, 2-bit ea.
-	index += ((m[12] + n[12]) & 0x03) << 17;
-	index += ((m[13] + n[13]) & 0x03) << 19;
-	index += ((m[14] + n[14]) & 0x03) << 21;
-	index += ((m[15] + n[15]) & 0x03) << 23;
-
-	return index;
-}
-
-u64 indexnum3(const board& b) { // 28-bit
-	auto num = b.numof();
-	register u64 index = 0;
-	index += ((num[0] + num[1] + num[2]) & 0x0f) << 0; // 0 & 2 & 4, 4-bit
-	index += ((num[3] + num[4]) & 0x07) << 4; // 8 & 16, 3-bit
-	index += ((num[5] + num[6]) & 0x07) << 7; // 32 & 64, 3-bit
-	index += (num[7] & 0x03) << 10; // 128, 2-bit
-	index += (num[8] & 0x03) << 12; // 256, 2-bit
-	index += (num[9] & 0x03) << 14; // 512, 2-bit
-	index += (num[10] & 0x03) << 16; // 1k ~ 32k, 2-bit ea.
-	index += (num[11] & 0x03) << 18;
-	index += (num[12] & 0x03) << 20;
-	index += (num[13] & 0x03) << 22;
-	index += (num[14] & 0x03) << 24;
-	index += (num[15] & 0x03) << 26;
-	return index;
-}
-
-u64 indexnum4(const board& b) { // 24-bit
+u64 indexnum(const board& b) { // 24-bit
 	auto num = b.numof();
 	register u64 index = 0;
 	index |= (num[0] + num[1] + num[2] + num[3]) << 0; // 0+2+4+8, 4-bit
@@ -718,7 +582,7 @@ u64 indexnum4(const board& b) { // 24-bit
 	return index;
 }
 
-u64 indexnum5lt(const board& b) { // 24-bit
+u64 indexnumlt(const board& b) { // 24-bit
 	auto num = b.numof();
 	register u64 index = 0;
 	index |= std::min(u32(num[8]),  7u) <<  0; // 256, 3-bit
@@ -732,7 +596,7 @@ u64 indexnum5lt(const board& b) { // 24-bit
 	return index;
 }
 
-u64 indexnum5st(const board& b) { // 24-bit
+u64 indexnumst(const board& b) { // 24-bit
 	auto num = b.numof();
 	register u64 index = 0;
 	index |= std::min(u32(num[0]), 7u) <<  0; // 0, 3-bit
@@ -789,13 +653,13 @@ u64 indexmax(const board& b) { // 16-bit
 	return k.mask(k.max());
 }
 
-struct indexapt {
+struct adapter {
 	static inline auto& wlist() { static moporgic::list<indexer::mapper> w; return w; }
 	static inline auto& hlist() { static moporgic::list<std::function<u64(const board&)>> h; return h; }
 
 	inline operator indexer::mapper() const { return wlist().front(); }
-	indexapt(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
-	~indexapt() { wlist().pop_front(); }
+	adapter(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
+	~adapter() { wlist().pop_front(); }
 
 	template<u32 idx>
 	static u64 adapt(const board& b) { return hlist()[idx](b); }
@@ -805,565 +669,181 @@ struct indexapt {
 
 	template<u32 idx, u32 lim>
 	struct make_wrappers {
-		make_wrappers() { wlist().push_back(indexapt::adapt<idx>); }
+		make_wrappers() { wlist().push_back(adapter::adapt<idx>); }
 		~make_wrappers() { make_wrappers<idx + 1, lim>(); }
 	};
 	template<u32 idx>
 	struct make_wrappers<idx, idx> {};
 };
 
-__attribute__((constructor)) void init() {
-	auto make = [&](indexer::sign_t sign, indexer::mapper func) {
+struct make {
+	make(indexer::sign_t sign, indexer::mapper func) {
 		if (!indexer(sign)) indexer::make(sign, func);
 		else if (indexer(sign).index() != func) std::exit(127);
+	}
+
+	static constexpr board isoindex[] = {
+		0xfedcba9876543210ull,
+		0xc840d951ea62fb73ull,
+		0x0123456789abcdefull,
+		0x37bf26ae159d048cull,
+		0xcdef89ab45670123ull,
+		0xfb73ea62d951c840ull,
+		0x32107654ba98fedcull,
+		0x048c159d26ae37bfull,
 	};
-	make("012345", index6t<0x0,0x1,0x2,0x3,0x4,0x5>);
-	make("37bf26", index6t<0x3,0x7,0xb,0xf,0x2,0x6>);
-	make("fedcba", index6t<0xf,0xe,0xd,0xc,0xb,0xa>);
-	make("c840d9", index6t<0xc,0x8,0x4,0x0,0xd,0x9>);
-	make("321076", index6t<0x3,0x2,0x1,0x0,0x7,0x6>);
-	make("048c15", index6t<0x0,0x4,0x8,0xc,0x1,0x5>);
-	make("cdef89", index6t<0xc,0xd,0xe,0xf,0x8,0x9>);
-	make("fb73ea", index6t<0xf,0xb,0x7,0x3,0xe,0xa>);
-	make("456789", index6t<0x4,0x5,0x6,0x7,0x8,0x9>);
-	make("26ae15", index6t<0x2,0x6,0xa,0xe,0x1,0x5>);
-	make("ba9876", index6t<0xb,0xa,0x9,0x8,0x7,0x6>);
-	make("d951ea", index6t<0xd,0x9,0x5,0x1,0xe,0xa>);
-	make("7654ba", index6t<0x7,0x6,0x5,0x4,0xb,0xa>);
-	make("159d26", index6t<0x1,0x5,0x9,0xd,0x2,0x6>);
-	make("89ab45", index6t<0x8,0x9,0xa,0xb,0x4,0x5>);
-	make("ea62d9", index6t<0xe,0xa,0x6,0x2,0xd,0x9>);
-	make("012456", index6t<0x0,0x1,0x2,0x4,0x5,0x6>);
-	make("37b26a", index6t<0x3,0x7,0xb,0x2,0x6,0xa>);
-	make("fedba9", index6t<0xf,0xe,0xd,0xb,0xa,0x9>);
-	make("c84d95", index6t<0xc,0x8,0x4,0xd,0x9,0x5>);
-	make("321765", index6t<0x3,0x2,0x1,0x7,0x6,0x5>);
-	make("048159", index6t<0x0,0x4,0x8,0x1,0x5,0x9>);
-	make("cde89a", index6t<0xc,0xd,0xe,0x8,0x9,0xa>);
-	make("fb7ea6", index6t<0xf,0xb,0x7,0xe,0xa,0x6>);
-	make("45689a", index6t<0x4,0x5,0x6,0x8,0x9,0xa>);
-	make("26a159", index6t<0x2,0x6,0xa,0x1,0x5,0x9>);
-	make("ba9765", index6t<0xb,0xa,0x9,0x7,0x6,0x5>);
-	make("d95ea6", index6t<0xd,0x9,0x5,0xe,0xa,0x6>);
-	make("765ba9", index6t<0x7,0x6,0x5,0xb,0xa,0x9>);
-	make("15926a", index6t<0x1,0x5,0x9,0x2,0x6,0xa>);
-	make("89a456", index6t<0x8,0x9,0xa,0x4,0x5,0x6>);
-	make("ea6d95", index6t<0xe,0xa,0x6,0xd,0x9,0x5>);
-	make("89abcd", index6t<0x8,0x9,0xa,0xb,0xc,0xd>);
-	make("159d04", index6t<0x1,0x5,0x9,0xd,0x0,0x4>);
-	make("765432", index6t<0x7,0x6,0x5,0x4,0x3,0x2>);
-	make("ea62fb", index6t<0xe,0xa,0x6,0x2,0xf,0xb>);
-	make("ba98fe", index6t<0xb,0xa,0x9,0x8,0xf,0xe>);
-	make("26ae37", index6t<0x2,0x6,0xa,0xe,0x3,0x7>);
-	make("456701", index6t<0x4,0x5,0x6,0x7,0x0,0x1>);
-	make("d951c8", index6t<0xd,0x9,0x5,0x1,0xc,0x8>);
-	make("012458", index6t<0x0,0x1,0x2,0x4,0x5,0x8>);
-	make("c84d9e", index6t<0xc,0x8,0x4,0xd,0x9,0xe>);
-	make("fedba7", index6t<0xf,0xe,0xd,0xb,0xa,0x7>);
-	make("37b261", index6t<0x3,0x7,0xb,0x2,0x6,0x1>);
-	make("32176b", index6t<0x3,0x2,0x1,0x7,0x6,0xb>);
-	make("fb7ead", index6t<0xf,0xb,0x7,0xe,0xa,0xd>);
-	make("cde894", index6t<0xc,0xd,0xe,0x8,0x9,0x4>);
-	make("048152", index6t<0x0,0x4,0x8,0x1,0x5,0x2>);
-	make("123569", index6t<0x1,0x2,0x3,0x5,0x6,0x9>);
-	make("84095a", index6t<0x8,0x4,0x0,0x9,0x5,0xa>);
-	make("edca96", index6t<0xe,0xd,0xc,0xa,0x9,0x6>);
-	make("7bf6a5", index6t<0x7,0xb,0xf,0x6,0xa,0x5>);
-	make("21065a", index6t<0x2,0x1,0x0,0x6,0x5,0xa>);
-	make("b73a69", index6t<0xb,0x7,0x3,0xa,0x6,0x9>);
-	make("def9a5", index6t<0xd,0xe,0xf,0x9,0xa,0x5>);
-	make("48c596", index6t<0x4,0x8,0xc,0x5,0x9,0x6>);
-	make("45689c", index6t<0x4,0x5,0x6,0x8,0x9,0xc>);
-	make("d95eaf", index6t<0xd,0x9,0x5,0xe,0xa,0xf>);
-	make("ba9763", index6t<0xb,0xa,0x9,0x7,0x6,0x3>);
-	make("26a150", index6t<0x2,0x6,0xa,0x1,0x5,0x0>);
-	make("765baf", index6t<0x7,0x6,0x5,0xb,0xa,0xf>);
-	make("ea6d9c", index6t<0xe,0xa,0x6,0xd,0x9,0xc>);
-	make("89a450", index6t<0x8,0x9,0xa,0x4,0x5,0x0>);
-	make("159263", index6t<0x1,0x5,0x9,0x2,0x6,0x3>);
-	make("5679ad", index6t<0x5,0x6,0x7,0x9,0xa,0xd>);
-	make("951a6b", index6t<0x9,0x5,0x1,0xa,0x6,0xb>);
-	make("a98652", index6t<0xa,0x9,0x8,0x6,0x5,0x2>);
-	make("6ae594", index6t<0x6,0xa,0xe,0x5,0x9,0x4>);
-	make("654a9e", index6t<0x6,0x5,0x4,0xa,0x9,0xe>);
-	make("a62958", index6t<0xa,0x6,0x2,0x9,0x5,0x8>);
-	make("9ab561", index6t<0x9,0xa,0xb,0x5,0x6,0x1>);
-	make("59d6a7", index6t<0x5,0x9,0xd,0x6,0xa,0x7>);
-	make("012348", index6t<0x0,0x1,0x2,0x3,0x4,0x8>);
-	make("c840de", index6t<0xc,0x8,0x4,0x0,0xd,0xe>);
-	make("fedcb7", index6t<0xf,0xe,0xd,0xc,0xb,0x7>);
-	make("37bf21", index6t<0x3,0x7,0xb,0xf,0x2,0x1>);
-	make("32107b", index6t<0x3,0x2,0x1,0x0,0x7,0xb>);
-	make("fb73ed", index6t<0xf,0xb,0x7,0x3,0xe,0xd>);
-	make("cdef84", index6t<0xc,0xd,0xe,0xf,0x8,0x4>);
-	make("048c12", index6t<0x0,0x4,0x8,0xc,0x1,0x2>);
-	make("45678c", index6t<0x4,0x5,0x6,0x7,0x8,0xc>);
-	make("d951ef", index6t<0xd,0x9,0x5,0x1,0xe,0xf>);
-	make("ba9873", index6t<0xb,0xa,0x9,0x8,0x7,0x3>);
-	make("26ae10", index6t<0x2,0x6,0xa,0xe,0x1,0x0>);
-	make("7654bf", index6t<0x7,0x6,0x5,0x4,0xb,0xf>);
-	make("ea62dc", index6t<0xe,0xa,0x6,0x2,0xd,0xc>);
-	make("89ab40", index6t<0x8,0x9,0xa,0xb,0x4,0x0>);
-	make("159d23", index6t<0x1,0x5,0x9,0xd,0x2,0x3>);
 
-	// k.matsuzaki
-	make("012456", index6t<0x0,0x1,0x2,0x4,0x5,0x6>);
-	make("37b26a", index6t<0x3,0x7,0xb,0x2,0x6,0xa>);
-	make("fedba9", index6t<0xf,0xe,0xd,0xb,0xa,0x9>);
-	make("c84d95", index6t<0xc,0x8,0x4,0xd,0x9,0x5>);
-	make("321765", index6t<0x3,0x2,0x1,0x7,0x6,0x5>);
-	make("048159", index6t<0x0,0x4,0x8,0x1,0x5,0x9>);
-	make("cde89a", index6t<0xc,0xd,0xe,0x8,0x9,0xa>);
-	make("fb7ea6", index6t<0xf,0xb,0x7,0xe,0xa,0x6>);
-	make("456789", index6t<0x4,0x5,0x6,0x7,0x8,0x9>);
-	make("26ae15", index6t<0x2,0x6,0xa,0xe,0x1,0x5>);
-	make("ba9876", index6t<0xb,0xa,0x9,0x8,0x7,0x6>);
-	make("d951ea", index6t<0xd,0x9,0x5,0x1,0xe,0xa>);
-	make("7654ba", index6t<0x7,0x6,0x5,0x4,0xb,0xa>);
-	make("159d26", index6t<0x1,0x5,0x9,0xd,0x2,0x6>);
-	make("89ab45", index6t<0x8,0x9,0xa,0xb,0x4,0x5>);
-	make("ea62d9", index6t<0xe,0xa,0x6,0x2,0xd,0x9>);
-	make("012345", index6t<0x0,0x1,0x2,0x3,0x4,0x5>);
-	make("37bf26", index6t<0x3,0x7,0xb,0xf,0x2,0x6>);
-	make("fedcba", index6t<0xf,0xe,0xd,0xc,0xb,0xa>);
-	make("c840d9", index6t<0xc,0x8,0x4,0x0,0xd,0x9>);
-	make("321076", index6t<0x3,0x2,0x1,0x0,0x7,0x6>);
-	make("048c15", index6t<0x0,0x4,0x8,0xc,0x1,0x5>);
-	make("cdef89", index6t<0xc,0xd,0xe,0xf,0x8,0x9>);
-	make("fb73ea", index6t<0xf,0xb,0x7,0x3,0xe,0xa>);
-	make("234569", index6t<0x2,0x3,0x4,0x5,0x6,0x9>);
-	make("bf26a5", index6t<0xb,0xf,0x2,0x6,0xa,0x5>);
-	make("dcba96", index6t<0xd,0xc,0xb,0xa,0x9,0x6>);
-	make("40d95a", index6t<0x4,0x0,0xd,0x9,0x5,0xa>);
-	make("10765a", index6t<0x1,0x0,0x7,0x6,0x5,0xa>);
-	make("8c1596", index6t<0x8,0xc,0x1,0x5,0x9,0x6>);
-	make("ef89a5", index6t<0xe,0xf,0x8,0x9,0xa,0x5>);
-	make("73ea69", index6t<0x7,0x3,0xe,0xa,0x6,0x9>);
-	make("01259a", index6t<0x0,0x1,0x2,0x5,0x9,0xa>);
-	make("37b659", index6t<0x3,0x7,0xb,0x6,0x5,0x9>);
-	make("feda65", index6t<0xf,0xe,0xd,0xa,0x6,0x5>);
-	make("c849a6", index6t<0xc,0x8,0x4,0x9,0xa,0x6>);
-	make("3216a9", index6t<0x3,0x2,0x1,0x6,0xa,0x9>);
-	make("04856a", index6t<0x0,0x4,0x8,0x5,0x6,0xa>);
-	make("cde956", index6t<0xc,0xd,0xe,0x9,0x5,0x6>);
-	make("fb7a95", index6t<0xf,0xb,0x7,0xa,0x9,0x5>);
-	make("345678", index6t<0x3,0x4,0x5,0x6,0x7,0x8>);
-	make("f26ae1", index6t<0xf,0x2,0x6,0xa,0xe,0x1>);
-	make("cba987", index6t<0xc,0xb,0xa,0x9,0x8,0x7>);
-	make("0d951e", index6t<0x0,0xd,0x9,0x5,0x1,0xe>);
-	make("07654b", index6t<0x0,0x7,0x6,0x5,0x4,0xb>);
-	make("c159d2", index6t<0xc,0x1,0x5,0x9,0xd,0x2>);
-	make("f89ab4", index6t<0xf,0x8,0x9,0xa,0xb,0x4>);
-	make("3ea62d", index6t<0x3,0xe,0xa,0x6,0x2,0xd>);
-	make("134567", index6t<0x1,0x3,0x4,0x5,0x6,0x7>);
-	make("7f26ae", index6t<0x7,0xf,0x2,0x6,0xa,0xe>);
-	make("ecba98", index6t<0xe,0xc,0xb,0xa,0x9,0x8>);
-	make("80d951", index6t<0x8,0x0,0xd,0x9,0x5,0x1>);
-	make("207654", index6t<0x2,0x0,0x7,0x6,0x5,0x4>);
-	make("4c159d", index6t<0x4,0xc,0x1,0x5,0x9,0xd>);
-	make("df89ab", index6t<0xd,0xf,0x8,0x9,0xa,0xb>);
-	make("b3ea62", index6t<0xb,0x3,0xe,0xa,0x6,0x2>);
-	make("01489a", index6t<0x0,0x1,0x4,0x8,0x9,0xa>);
-	make("372159", index6t<0x3,0x7,0x2,0x1,0x5,0x9>);
-	make("feb765", index6t<0xf,0xe,0xb,0x7,0x6,0x5>);
-	make("c8dea6", index6t<0xc,0x8,0xd,0xe,0xa,0x6>);
-	make("327ba9", index6t<0x3,0x2,0x7,0xb,0xa,0x9>);
-	make("04126a", index6t<0x0,0x4,0x1,0x2,0x6,0xa>);
-	make("cd8456", index6t<0xc,0xd,0x8,0x4,0x5,0x6>);
-	make("fbed95", index6t<0xf,0xb,0xe,0xd,0x9,0x5>);
+	static std::string vtos(const std::vector<u32>& v) {
+		std::string patt;
+		for (u32 i : v) patt += char((i < 10) ? ('0' + i) : ('a' + i - 10));
+		return patt;
+	}
 
-	make("01234", index5t<0x0,0x1,0x2,0x3,0x4>);
-	make("c840d", index5t<0xc,0x8,0x4,0x0,0xd>);
-	make("fedcb", index5t<0xf,0xe,0xd,0xc,0xb>);
-	make("37bf2", index5t<0x3,0x7,0xb,0xf,0x2>);
-	make("32107", index5t<0x3,0x2,0x1,0x0,0x7>);
-	make("fb73e", index5t<0xf,0xb,0x7,0x3,0xe>);
-	make("cdef8", index5t<0xc,0xd,0xe,0xf,0x8>);
-	make("048c1", index5t<0x0,0x4,0x8,0xc,0x1>);
-	make("45678", index5t<0x4,0x5,0x6,0x7,0x8>);
-	make("d951e", index5t<0xd,0x9,0x5,0x1,0xe>);
-	make("ba987", index5t<0xb,0xa,0x9,0x8,0x7>);
-	make("26ae1", index5t<0x2,0x6,0xa,0xe,0x1>);
-	make("7654b", index5t<0x7,0x6,0x5,0x4,0xb>);
-	make("ea62d", index5t<0xe,0xa,0x6,0x2,0xd>);
-	make("89ab4", index5t<0x8,0x9,0xa,0xb,0x4>);
-	make("159d2", index5t<0x1,0x5,0x9,0xd,0x2>);
-	make("89abc", index5t<0x8,0x9,0xa,0xb,0xc>);
-	make("ea62f", index5t<0xe,0xa,0x6,0x2,0xf>);
-	make("76543", index5t<0x7,0x6,0x5,0x4,0x3>);
-	make("159d0", index5t<0x1,0x5,0x9,0xd,0x0>);
-	make("ba98f", index5t<0xb,0xa,0x9,0x8,0xf>);
-	make("d951c", index5t<0xd,0x9,0x5,0x1,0xc>);
-	make("45670", index5t<0x4,0x5,0x6,0x7,0x0>);
-	make("26ae3", index5t<0x2,0x6,0xa,0xe,0x3>);
-	make("01235", index5t<0x0,0x1,0x2,0x3,0x5>);
-	make("c8409", index5t<0xc,0x8,0x4,0x0,0x9>);
-	make("fedca", index5t<0xf,0xe,0xd,0xc,0xa>);
-	make("37bf6", index5t<0x3,0x7,0xb,0xf,0x6>);
-	make("32106", index5t<0x3,0x2,0x1,0x0,0x6>);
-	make("fb73a", index5t<0xf,0xb,0x7,0x3,0xa>);
-	make("cdef9", index5t<0xc,0xd,0xe,0xf,0x9>);
-	make("048c5", index5t<0x0,0x4,0x8,0xc,0x5>);
-	make("45679", index5t<0x4,0x5,0x6,0x7,0x9>);
-	make("d951a", index5t<0xd,0x9,0x5,0x1,0xa>);
-	make("ba986", index5t<0xb,0xa,0x9,0x8,0x6>);
-	make("26ae5", index5t<0x2,0x6,0xa,0xe,0x5>);
-	make("7654a", index5t<0x7,0x6,0x5,0x4,0xa>);
-	make("ea629", index5t<0xe,0xa,0x6,0x2,0x9>);
-	make("89ab5", index5t<0x8,0x9,0xa,0xb,0x5>);
-	make("159d6", index5t<0x1,0x5,0x9,0xd,0x6>);
-	make("89abd", index5t<0x8,0x9,0xa,0xb,0xd>);
-	make("ea62b", index5t<0xe,0xa,0x6,0x2,0xb>);
-	make("76542", index5t<0x7,0x6,0x5,0x4,0x2>);
-	make("159d4", index5t<0x1,0x5,0x9,0xd,0x4>);
-	make("ba98e", index5t<0xb,0xa,0x9,0x8,0xe>);
-	make("d9518", index5t<0xd,0x9,0x5,0x1,0x8>);
-	make("45671", index5t<0x4,0x5,0x6,0x7,0x1>);
-	make("26ae7", index5t<0x2,0x6,0xa,0xe,0x7>);
-	make("01245", index5t<0x0,0x1,0x2,0x4,0x5>);
-	make("c84d9", index5t<0xc,0x8,0x4,0xd,0x9>);
-	make("fedba", index5t<0xf,0xe,0xd,0xb,0xa>);
-	make("37b26", index5t<0x3,0x7,0xb,0x2,0x6>);
-	make("32176", index5t<0x3,0x2,0x1,0x7,0x6>);
-	make("fb7ea", index5t<0xf,0xb,0x7,0xe,0xa>);
-	make("cde89", index5t<0xc,0xd,0xe,0x8,0x9>);
-	make("04815", index5t<0x0,0x4,0x8,0x1,0x5>);
-	make("12356", index5t<0x1,0x2,0x3,0x5,0x6>);
-	make("84095", index5t<0x8,0x4,0x0,0x9,0x5>);
-	make("edca9", index5t<0xe,0xd,0xc,0xa,0x9>);
-	make("7bf6a", index5t<0x7,0xb,0xf,0x6,0xa>);
-	make("21065", index5t<0x2,0x1,0x0,0x6,0x5>);
-	make("b73a6", index5t<0xb,0x7,0x3,0xa,0x6>);
-	make("def9a", index5t<0xd,0xe,0xf,0x9,0xa>);
-	make("48c59", index5t<0x4,0x8,0xc,0x5,0x9>);
-	make("45689", index5t<0x4,0x5,0x6,0x8,0x9>);
-	make("d95ea", index5t<0xd,0x9,0x5,0xe,0xa>);
-	make("ba976", index5t<0xb,0xa,0x9,0x7,0x6>);
-	make("26a15", index5t<0x2,0x6,0xa,0x1,0x5>);
-	make("765ba", index5t<0x7,0x6,0x5,0xb,0xa>);
-	make("ea6d9", index5t<0xe,0xa,0x6,0xd,0x9>);
-	make("89a45", index5t<0x8,0x9,0xa,0x4,0x5>);
-	make("15926", index5t<0x1,0x5,0x9,0x2,0x6>);
-	make("5679a", index5t<0x5,0x6,0x7,0x9,0xa>);
-	make("951a6", index5t<0x9,0x5,0x1,0xa,0x6>);
-	make("a9865", index5t<0xa,0x9,0x8,0x6,0x5>);
-	make("6ae59", index5t<0x6,0xa,0xe,0x5,0x9>);
-	make("654a9", index5t<0x6,0x5,0x4,0xa,0x9>);
-	make("a6295", index5t<0xa,0x6,0x2,0x9,0x5>);
-	make("9ab56", index5t<0x9,0xa,0xb,0x5,0x6>);
-	make("59d6a", index5t<0x5,0x9,0xd,0x6,0xa>);
-	make("89acd", index5t<0x8,0x9,0xa,0xc,0xd>);
-	make("ea6fb", index5t<0xe,0xa,0x6,0xf,0xb>);
-	make("76532", index5t<0x7,0x6,0x5,0x3,0x2>);
-	make("15904", index5t<0x1,0x5,0x9,0x0,0x4>);
-	make("ba9fe", index5t<0xb,0xa,0x9,0xf,0xe>);
-	make("d95c8", index5t<0xd,0x9,0x5,0xc,0x8>);
-	make("45601", index5t<0x4,0x5,0x6,0x0,0x1>);
-	make("26a37", index5t<0x2,0x6,0xa,0x3,0x7>);
-	make("9abde", index5t<0x9,0xa,0xb,0xd,0xe>);
-	make("a62b7", index5t<0xa,0x6,0x2,0xb,0x7>);
-	make("65421", index5t<0x6,0x5,0x4,0x2,0x1>);
-	make("59d48", index5t<0x5,0x9,0xd,0x4,0x8>);
-	make("a98ed", index5t<0xa,0x9,0x8,0xe,0xd>);
-	make("95184", index5t<0x9,0x5,0x1,0x8,0x4>);
-	make("56712", index5t<0x5,0x6,0x7,0x1,0x2>);
-	make("6ae7b", index5t<0x6,0xa,0xe,0x7,0xb>);
-	make("01248", index5t<0x0,0x1,0x2,0x4,0x8>);
-	make("c84de", index5t<0xc,0x8,0x4,0xd,0xe>);
-	make("fedb7", index5t<0xf,0xe,0xd,0xb,0x7>);
-	make("37b21", index5t<0x3,0x7,0xb,0x2,0x1>);
-	make("3217b", index5t<0x3,0x2,0x1,0x7,0xb>);
-	make("fb7ed", index5t<0xf,0xb,0x7,0xe,0xd>);
-	make("cde84", index5t<0xc,0xd,0xe,0x8,0x4>);
-	make("04812", index5t<0x0,0x4,0x8,0x1,0x2>);
-	make("12359", index5t<0x1,0x2,0x3,0x5,0x9>);
-	make("8409a", index5t<0x8,0x4,0x0,0x9,0xa>);
-	make("edca6", index5t<0xe,0xd,0xc,0xa,0x6>);
-	make("7bf65", index5t<0x7,0xb,0xf,0x6,0x5>);
-	make("2106a", index5t<0x2,0x1,0x0,0x6,0xa>);
-	make("b73a9", index5t<0xb,0x7,0x3,0xa,0x9>);
-	make("def95", index5t<0xd,0xe,0xf,0x9,0x5>);
-	make("48c56", index5t<0x4,0x8,0xc,0x5,0x6>);
-	make("4568c", index5t<0x4,0x5,0x6,0x8,0xc>);
-	make("d95ef", index5t<0xd,0x9,0x5,0xe,0xf>);
-	make("ba973", index5t<0xb,0xa,0x9,0x7,0x3>);
-	make("26a10", index5t<0x2,0x6,0xa,0x1,0x0>);
-	make("765bf", index5t<0x7,0x6,0x5,0xb,0xf>);
-	make("ea6dc", index5t<0xe,0xa,0x6,0xd,0xc>);
-	make("89a40", index5t<0x8,0x9,0xa,0x4,0x0>);
-	make("15923", index5t<0x1,0x5,0x9,0x2,0x3>);
-	make("5679d", index5t<0x5,0x6,0x7,0x9,0xd>);
-	make("951ab", index5t<0x9,0x5,0x1,0xa,0xb>);
-	make("a9862", index5t<0xa,0x9,0x8,0x6,0x2>);
-	make("6ae54", index5t<0x6,0xa,0xe,0x5,0x4>);
-	make("654ae", index5t<0x6,0x5,0x4,0xa,0xe>);
-	make("a6298", index5t<0xa,0x6,0x2,0x9,0x8>);
-	make("9ab51", index5t<0x9,0xa,0xb,0x5,0x1>);
-	make("59d67", index5t<0x5,0x9,0xd,0x6,0x7>);
+	template<u32 t0, u32 t1, u32 t2, u32 t3>
+	struct index4t {
+		index4t(bool iso = true) { isomorphic<0>(iso); }
+		template<u32 i> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
+			constexpr board x = isoindex[i];
+			make(vtos({x[t0], x[t1], x[t2], x[t3]}), index::index4t<x[t0], x[t1], x[t2], x[t3]>);
+			if (iso) isomorphic<i + 1>(iso);
+		}
+		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
+	};
 
-	make("0123", index4t<0x0,0x1,0x2,0x3>);
-	make("c840", index4t<0xc,0x8,0x4,0x0>);
-	make("fedc", index4t<0xf,0xe,0xd,0xc>);
-	make("37bf", index4t<0x3,0x7,0xb,0xf>);
-	make("3210", index4t<0x3,0x2,0x1,0x0>);
-	make("fb73", index4t<0xf,0xb,0x7,0x3>);
-	make("cdef", index4t<0xc,0xd,0xe,0xf>);
-	make("048c", index4t<0x0,0x4,0x8,0xc>);
-	make("4567", index4t<0x4,0x5,0x6,0x7>);
-	make("d951", index4t<0xd,0x9,0x5,0x1>);
-	make("ba98", index4t<0xb,0xa,0x9,0x8>);
-	make("26ae", index4t<0x2,0x6,0xa,0xe>);
-	make("7654", index4t<0x7,0x6,0x5,0x4>);
-	make("ea62", index4t<0xe,0xa,0x6,0x2>);
-	make("89ab", index4t<0x8,0x9,0xa,0xb>);
-	make("159d", index4t<0x1,0x5,0x9,0xd>);
-	make("89ab", index4t<0x8,0x9,0xa,0xb>); // legacy non-isomorphic
-	make("cdef", index4t<0xc,0xd,0xe,0xf>); // legacy non-isomorphic
-	make("048c", index4t<0x0,0x4,0x8,0xc>); // legacy non-isomorphic
-	make("159d", index4t<0x1,0x5,0x9,0xd>); // legacy non-isomorphic
-	make("26ae", index4t<0x2,0x6,0xa,0xe>); // legacy non-isomorphic
-	make("37bf", index4t<0x3,0x7,0xb,0xf>); // legacy non-isomorphic
-	make("0124", index4t<0x0,0x1,0x2,0x4>);
-	make("c84d", index4t<0xc,0x8,0x4,0xd>);
-	make("fedb", index4t<0xf,0xe,0xd,0xb>);
-	make("37b2", index4t<0x3,0x7,0xb,0x2>);
-	make("3217", index4t<0x3,0x2,0x1,0x7>);
-	make("fb7e", index4t<0xf,0xb,0x7,0xe>);
-	make("cde8", index4t<0xc,0xd,0xe,0x8>);
-	make("0481", index4t<0x0,0x4,0x8,0x1>);
-	make("1235", index4t<0x1,0x2,0x3,0x5>);
-	make("8409", index4t<0x8,0x4,0x0,0x9>);
-	make("edca", index4t<0xe,0xd,0xc,0xa>);
-	make("7bf6", index4t<0x7,0xb,0xf,0x6>);
-	make("2106", index4t<0x2,0x1,0x0,0x6>);
-	make("b73a", index4t<0xb,0x7,0x3,0xa>);
-	make("def9", index4t<0xd,0xe,0xf,0x9>);
-	make("48c5", index4t<0x4,0x8,0xc,0x5>);
-	make("4568", index4t<0x4,0x5,0x6,0x8>);
-	make("d95e", index4t<0xd,0x9,0x5,0xe>);
-	make("ba97", index4t<0xb,0xa,0x9,0x7>);
-	make("26a1", index4t<0x2,0x6,0xa,0x1>);
-	make("765b", index4t<0x7,0x6,0x5,0xb>);
-	make("ea6d", index4t<0xe,0xa,0x6,0xd>);
-	make("89a4", index4t<0x8,0x9,0xa,0x4>);
-	make("1592", index4t<0x1,0x5,0x9,0x2>);
-	make("5679", index4t<0x5,0x6,0x7,0x9>);
-	make("951a", index4t<0x9,0x5,0x1,0xa>);
-	make("a986", index4t<0xa,0x9,0x8,0x6>);
-	make("6ae5", index4t<0x6,0xa,0xe,0x5>);
-	make("654a", index4t<0x6,0x5,0x4,0xa>);
-	make("a629", index4t<0xa,0x6,0x2,0x9>);
-	make("9ab5", index4t<0x9,0xa,0xb,0x5>);
-	make("59d6", index4t<0x5,0x9,0xd,0x6>);
-	make("89ac", index4t<0x8,0x9,0xa,0xc>);
-	make("ea6f", index4t<0xe,0xa,0x6,0xf>);
-	make("7653", index4t<0x7,0x6,0x5,0x3>);
-	make("1590", index4t<0x1,0x5,0x9,0x0>);
-	make("ba9f", index4t<0xb,0xa,0x9,0xf>);
-	make("d95c", index4t<0xd,0x9,0x5,0xc>);
-	make("4560", index4t<0x4,0x5,0x6,0x0>);
-	make("26a3", index4t<0x2,0x6,0xa,0x3>);
-	make("9abd", index4t<0x9,0xa,0xb,0xd>);
-	make("a62b", index4t<0xa,0x6,0x2,0xb>);
-	make("6542", index4t<0x6,0x5,0x4,0x2>);
-	make("59d4", index4t<0x5,0x9,0xd,0x4>);
-	make("a98e", index4t<0xa,0x9,0x8,0xe>);
-	make("9518", index4t<0x9,0x5,0x1,0x8>);
-	make("5671", index4t<0x5,0x6,0x7,0x1>);
-	make("6ae7", index4t<0x6,0xa,0xe,0x7>);
-	make("0125", index4t<0x0,0x1,0x2,0x5>);
-	make("c849", index4t<0xc,0x8,0x4,0x9>);
-	make("feda", index4t<0xf,0xe,0xd,0xa>);
-	make("37b6", index4t<0x3,0x7,0xb,0x6>);
-	make("3216", index4t<0x3,0x2,0x1,0x6>);
-	make("fb7a", index4t<0xf,0xb,0x7,0xa>);
-	make("cde9", index4t<0xc,0xd,0xe,0x9>);
-	make("0485", index4t<0x0,0x4,0x8,0x5>);
-	make("1236", index4t<0x1,0x2,0x3,0x6>);
-	make("8405", index4t<0x8,0x4,0x0,0x5>);
-	make("edc9", index4t<0xe,0xd,0xc,0x9>);
-	make("7bfa", index4t<0x7,0xb,0xf,0xa>);
-	make("2105", index4t<0x2,0x1,0x0,0x5>);
-	make("b736", index4t<0xb,0x7,0x3,0x6>);
-	make("defa", index4t<0xd,0xe,0xf,0xa>);
-	make("48c9", index4t<0x4,0x8,0xc,0x9>);
-	make("4569", index4t<0x4,0x5,0x6,0x9>);
-	make("d95a", index4t<0xd,0x9,0x5,0xa>);
-	make("ba96", index4t<0xb,0xa,0x9,0x6>);
-	make("26a5", index4t<0x2,0x6,0xa,0x5>);
-	make("765a", index4t<0x7,0x6,0x5,0xa>);
-	make("ea69", index4t<0xe,0xa,0x6,0x9>);
-	make("89a5", index4t<0x8,0x9,0xa,0x5>);
-	make("1596", index4t<0x1,0x5,0x9,0x6>);
-	make("567a", index4t<0x5,0x6,0x7,0xa>);
-	make("9516", index4t<0x9,0x5,0x1,0x6>);
-	make("a985", index4t<0xa,0x9,0x8,0x5>);
-	make("6ae9", index4t<0x6,0xa,0xe,0x9>);
-	make("6549", index4t<0x6,0x5,0x4,0x9>);
-	make("a625", index4t<0xa,0x6,0x2,0x5>);
-	make("9ab6", index4t<0x9,0xa,0xb,0x6>);
-	make("59da", index4t<0x5,0x9,0xd,0xa>);
-	make("89ad", index4t<0x8,0x9,0xa,0xd>);
-	make("ea6b", index4t<0xe,0xa,0x6,0xb>);
-	make("7652", index4t<0x7,0x6,0x5,0x2>);
-	make("1594", index4t<0x1,0x5,0x9,0x4>);
-	make("ba9e", index4t<0xb,0xa,0x9,0xe>);
-	make("d958", index4t<0xd,0x9,0x5,0x8>);
-	make("4561", index4t<0x4,0x5,0x6,0x1>);
-	make("26a7", index4t<0x2,0x6,0xa,0x7>);
-	make("9abe", index4t<0x9,0xa,0xb,0xe>);
-	make("a627", index4t<0xa,0x6,0x2,0x7>);
-	make("6541", index4t<0x6,0x5,0x4,0x1>);
-	make("59d8", index4t<0x5,0x9,0xd,0x8>);
-	make("a98d", index4t<0xa,0x9,0x8,0xd>);
-	make("9514", index4t<0x9,0x5,0x1,0x4>);
-	make("5672", index4t<0x5,0x6,0x7,0x2>);
-	make("6aeb", index4t<0x6,0xa,0xe,0xb>);
-	make("0145", index4t<0x0,0x1,0x4,0x5>);
-	make("c8d9", index4t<0xc,0x8,0xd,0x9>);
-	make("feba", index4t<0xf,0xe,0xb,0xa>);
-	make("3726", index4t<0x3,0x7,0x2,0x6>);
-	make("3276", index4t<0x3,0x2,0x7,0x6>);
-	make("fbea", index4t<0xf,0xb,0xe,0xa>);
-	make("cd89", index4t<0xc,0xd,0x8,0x9>);
-	make("0415", index4t<0x0,0x4,0x1,0x5>);
-	make("1256", index4t<0x1,0x2,0x5,0x6>);
-	make("8495", index4t<0x8,0x4,0x9,0x5>);
-	make("eda9", index4t<0xe,0xd,0xa,0x9>);
-	make("7b6a", index4t<0x7,0xb,0x6,0xa>);
-	make("2165", index4t<0x2,0x1,0x6,0x5>);
-	make("b7a6", index4t<0xb,0x7,0xa,0x6>);
-	make("de9a", index4t<0xd,0xe,0x9,0xa>);
-	make("4859", index4t<0x4,0x8,0x5,0x9>);
-	make("569a", index4t<0x5,0x6,0x9,0xa>);
-	make("95a6", index4t<0x9,0x5,0xa,0x6>);
-	make("a965", index4t<0xa,0x9,0x6,0x5>);
-	make("6a59", index4t<0x6,0xa,0x5,0x9>);
-	make("65a9", index4t<0x6,0x5,0xa,0x9>);
-	make("a695", index4t<0xa,0x6,0x9,0x5>);
-	make("9a56", index4t<0x9,0xa,0x5,0x6>);
-	make("596a", index4t<0x5,0x9,0x6,0xa>);
-	make("2367", index4t<0x2,0x3,0x6,0x7>); // legacy non-isomorphic
-	make("4589", index4t<0x4,0x5,0x8,0x9>); // legacy non-isomorphic
-	make("67ab", index4t<0x6,0x7,0xa,0xb>); // legacy non-isomorphic
-	make("89cd", index4t<0x8,0x9,0xc,0xd>); // legacy non-isomorphic
-	make("9ade", index4t<0x9,0xa,0xd,0xe>); // legacy non-isomorphic
-	make("abef", index4t<0xa,0xb,0xe,0xf>); // legacy non-isomorphic
+	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4>
+	struct index5t {
+		index5t(bool iso = true) { isomorphic<0>(iso); }
+		template<u32 i> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
+			constexpr board x = isoindex[i];
+			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4]}), index::index5t<x[t0], x[t1], x[t2], x[t3], x[t4]>);
+			if (iso) isomorphic<i + 1>(iso);
+		}
+		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
+	};
 
-	make("01234567", index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
-	make("c840d951", index8t<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
-	make("fedcba98", index8t<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
-	make("37bf26ae", index8t<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
-	make("32107654", index8t<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
-	make("fb73ea62", index8t<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
-	make("cdef89ab", index8t<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
-	make("048c159d", index8t<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
-	make("456789ab", index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
-	make("d951ea62", index8t<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
-	make("ba987654", index8t<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
-	make("26ae159d", index8t<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
-	make("7654ba98", index8t<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
-	make("ea62d951", index8t<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
-	make("89ab4567", index8t<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
-	make("159d26ae", index8t<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
-	make("01234589", index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x8,0x9>);
-	make("c840d9ea", index8t<0xc,0x8,0x4,0x0,0xd,0x9,0xe,0xa>);
-	make("fedcba76", index8t<0xf,0xe,0xd,0xc,0xb,0xa,0x7,0x6>);
-	make("37bf2615", index8t<0x3,0x7,0xb,0xf,0x2,0x6,0x1,0x5>);
-	make("321076ba", index8t<0x3,0x2,0x1,0x0,0x7,0x6,0xb,0xa>);
-	make("fb73ead9", index8t<0xf,0xb,0x7,0x3,0xe,0xa,0xd,0x9>);
-	make("cdef8945", index8t<0xc,0xd,0xe,0xf,0x8,0x9,0x4,0x5>);
-	make("048c1526", index8t<0x0,0x4,0x8,0xc,0x1,0x5,0x2,0x6>);
-	make("01245689", index8t<0x0,0x1,0x2,0x4,0x5,0x6,0x8,0x9>);
-	make("c84d95ea", index8t<0xc,0x8,0x4,0xd,0x9,0x5,0xe,0xa>);
-	make("fedba976", index8t<0xf,0xe,0xd,0xb,0xa,0x9,0x7,0x6>);
-	make("37b26a15", index8t<0x3,0x7,0xb,0x2,0x6,0xa,0x1,0x5>);
-	make("321765ba", index8t<0x3,0x2,0x1,0x7,0x6,0x5,0xb,0xa>);
-	make("fb7ea6d9", index8t<0xf,0xb,0x7,0xe,0xa,0x6,0xd,0x9>);
-	make("cde89a45", index8t<0xc,0xd,0xe,0x8,0x9,0xa,0x4,0x5>);
-	make("04815926", index8t<0x0,0x4,0x8,0x1,0x5,0x9,0x2,0x6>);
+	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4, u32 t5>
+	struct index6t {
+		index6t(bool iso = true) { isomorphic<0>(iso); }
+		template<u32 i> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
+			constexpr board x = isoindex[i];
+			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4], x[t5]}), index::index6t<x[t0], x[t1], x[t2], x[t3], x[t4], x[t5]>);
+			if (iso) isomorphic<i + 1>(iso);
+		}
+		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
+	};
 
-	make("0123456", index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>);
-	make("c840d95", index7t<0xc,0x8,0x4,0x0,0xd,0x9,0x5>);
-	make("fedcba9", index7t<0xf,0xe,0xd,0xc,0xb,0xa,0x9>);
-	make("37bf26a", index7t<0x3,0x7,0xb,0xf,0x2,0x6,0xa>);
-	make("3210765", index7t<0x3,0x2,0x1,0x0,0x7,0x6,0x5>);
-	make("fb73ea6", index7t<0xf,0xb,0x7,0x3,0xe,0xa,0x6>);
-	make("cdef89a", index7t<0xc,0xd,0xe,0xf,0x8,0x9,0xa>);
-	make("048c159", index7t<0x0,0x4,0x8,0xc,0x1,0x5,0x9>);
-	make("456789a", index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>);
-	make("d951ea6", index7t<0xd,0x9,0x5,0x1,0xe,0xa,0x6>);
-	make("ba98765", index7t<0xb,0xa,0x9,0x8,0x7,0x6,0x5>);
-	make("26ae159", index7t<0x2,0x6,0xa,0xe,0x1,0x5,0x9>);
-	make("7654ba9", index7t<0x7,0x6,0x5,0x4,0xb,0xa,0x9>);
-	make("ea62d95", index7t<0xe,0xa,0x6,0x2,0xd,0x9,0x5>);
-	make("89ab456", index7t<0x8,0x9,0xa,0xb,0x4,0x5,0x6>);
-	make("159d26a", index7t<0x1,0x5,0x9,0xd,0x2,0x6,0xa>);
-	make("89abcde", index7t<0x8,0x9,0xa,0xb,0xc,0xd,0xe>);
-	make("ea62fb7", index7t<0xe,0xa,0x6,0x2,0xf,0xb,0x7>);
-	make("7654321", index7t<0x7,0x6,0x5,0x4,0x3,0x2,0x1>);
-	make("159d048", index7t<0x1,0x5,0x9,0xd,0x0,0x4,0x8>);
-	make("ba98fed", index7t<0xb,0xa,0x9,0x8,0xf,0xe,0xd>);
-	make("d951c84", index7t<0xd,0x9,0x5,0x1,0xc,0x8,0x4>);
-	make("4567012", index7t<0x4,0x5,0x6,0x7,0x0,0x1,0x2>);
-	make("26ae37b", index7t<0x2,0x6,0xa,0xe,0x3,0x7,0xb>);
-	make("0123458", index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x8>);
-	make("c840d9e", index7t<0xc,0x8,0x4,0x0,0xd,0x9,0xe>);
-	make("fedcba7", index7t<0xf,0xe,0xd,0xc,0xb,0xa,0x7>);
-	make("37bf261", index7t<0x3,0x7,0xb,0xf,0x2,0x6,0x1>);
-	make("321076b", index7t<0x3,0x2,0x1,0x0,0x7,0x6,0xb>);
-	make("fb73ead", index7t<0xf,0xb,0x7,0x3,0xe,0xa,0xd>);
-	make("cdef894", index7t<0xc,0xd,0xe,0xf,0x8,0x9,0x4>);
-	make("048c152", index7t<0x0,0x4,0x8,0xc,0x1,0x5,0x2>);
-	make("456789c", index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xc>);
-	make("d951eaf", index7t<0xd,0x9,0x5,0x1,0xe,0xa,0xf>);
-	make("ba98763", index7t<0xb,0xa,0x9,0x8,0x7,0x6,0x3>);
-	make("26ae150", index7t<0x2,0x6,0xa,0xe,0x1,0x5,0x0>);
-	make("7654baf", index7t<0x7,0x6,0x5,0x4,0xb,0xa,0xf>);
-	make("ea62d9c", index7t<0xe,0xa,0x6,0x2,0xd,0x9,0xc>);
-	make("89ab450", index7t<0x8,0x9,0xa,0xb,0x4,0x5,0x0>);
-	make("159d263", index7t<0x1,0x5,0x9,0xd,0x2,0x6,0x3>);
+	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4, u32 t5, u32 t6>
+	struct index7t {
+		index7t(bool iso = true) { isomorphic<0>(iso); }
+		template<u32 i> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
+			constexpr board x = isoindex[i];
+			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6]}), index::index7t<x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6]>);
+			if (iso) isomorphic<i + 1>(iso);
+		}
+		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
+	};
 
-	make("ff000000", indexmerge0);
-	make("ff000001", indexmerge1<0>);
-	make("ff000011", indexmerge1<1>);
-	make("fe000000", indexnum0);
-	make("fe000001", indexnum1);
-	make("fe000002", indexnum2);
-	make("fe000082", indexnum2x<0, 0, 1>);
-	make("fe000092", indexnum2x<0, 2, 3>);
-	make("fe0000c2", indexnum2x<1, 0, 1>);
-	make("fe0000d2", indexnum2x<1, 2, 3>);
-	make("fe000003", indexnum3);
-	make("fe000004", indexnum4);
-	make("fe000005", indexnum5lt);
-	make("fe000015", indexnum5st);
-	make("fd012301", indexmono<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
-	make("fd37bf01", indexmono<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
-	make("fdfedc01", indexmono<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
-	make("fdc84001", indexmono<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
-	make("fd321001", indexmono<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
-	make("fdfb7301", indexmono<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
-	make("fdcdef01", indexmono<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
-	make("fd048c01", indexmono<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
-	make("fd456701", indexmono<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
-	make("fd26ae01", indexmono<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
-	make("fdba9801", indexmono<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
-	make("fdd95101", indexmono<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
-	make("fd765401", indexmono<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
-	make("fdea6201", indexmono<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
-	make("fd89ab01", indexmono<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
-	make("fd159d01", indexmono<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
-	make("fc000000", indexmax<0>);
-	make("fc000010", indexmax<1>);
-	make("fc000020", indexmax<2>);
-	make("fc000030", indexmax<3>);
-	make("fc000040", indexmax<4>);
-	make("fc000050", indexmax<5>);
-	make("fc000060", indexmax<6>);
-	make("fc000070", indexmax<7>);
+	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4, u32 t5, u32 t6, u32 t7>
+	struct index8t {
+		index8t(bool iso = true) { isomorphic<0>(iso); }
+		template<u32 i> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
+			constexpr board x = isoindex[i];
+			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6], x[t7]}), index::index8t<x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6], x[t7]>);
+			if (iso) isomorphic<i + 1>(iso);
+		}
+		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
+	};
+};
 
-	indexapt::make<0, 256>();
+__attribute__((constructor)) void init() {
+	make::index6t<0x0,0x1,0x2,0x3,0x4,0x5>(); // 012345!
+	make::index6t<0x4,0x5,0x6,0x7,0x8,0x9>(); // 456789!
+	make::index6t<0x0,0x1,0x2,0x4,0x5,0x6>(); // 012456!
+	make::index6t<0x4,0x5,0x6,0x8,0x9,0xa>(); // 45689a!
+	make::index6t<0x8,0x9,0xa,0xb,0xc,0xd>(); // 89abcd!
+	make::index6t<0x2,0x3,0x4,0x5,0x6,0x9>(); // 234569!
+	make::index6t<0x0,0x1,0x2,0x5,0x9,0xa>(); // 01259a!
+	make::index6t<0x3,0x4,0x5,0x6,0x7,0x8>(); // 345678!
+	make::index6t<0x1,0x3,0x4,0x5,0x6,0x7>(); // 134567!
+	make::index6t<0x0,0x1,0x4,0x8,0x9,0xa>(); // 01489a!
+
+	make::index5t<0x0,0x1,0x2,0x3,0x4>(); // 01234!
+	make::index5t<0x4,0x5,0x6,0x7,0x8>(); // 45678!
+	make::index5t<0x0,0x1,0x2,0x4,0x5>(); // 01245!
+	make::index5t<0x4,0x5,0x6,0x8,0x9>(); // 45689!
+	make::index5t<0x0,0x1,0x2,0x3,0x5>(); // 01235!
+	make::index5t<0x4,0x5,0x6,0x7,0x9>(); // 45679!
+	make::index5t<0x8,0x9,0xa,0xb,0xc>(false); // 89abc
+	make::index5t<0x8,0x9,0xa,0xc,0xd>(false); // 89acd
+	make::index5t<0x8,0x9,0xa,0xb,0xd>(false); // 89abd
+	make::index5t<0x1,0x2,0x3,0x5,0x6>(false); // 12356
+	make::index5t<0x5,0x6,0x7,0x9,0xa>(false); // 5679a
+	make::index5t<0x9,0xa,0xb,0xd,0xe>(false); // 9abde
+
+	make::index4t<0x0,0x1,0x2,0x3>(); // 0123!
+	make::index4t<0x4,0x5,0x6,0x7>(); // 4567!
+	make::index4t<0x0,0x1,0x4,0x5>(); // 0145!
+	make::index4t<0x1,0x2,0x5,0x6>(); // 1256!
+	make::index4t<0x5,0x6,0x9,0xa>(); // 569a!
+	make::index4t<0x8,0x9,0xa,0xb>(false); // 89ab
+	make::index4t<0xc,0xd,0xe,0xf>(false); // cdef
+	make::index4t<0x0,0x4,0x8,0xc>(false); // 048c
+	make::index4t<0x1,0x5,0x9,0xd>(false); // 159d
+	make::index4t<0x2,0x6,0xa,0xe>(false); // 26ae
+	make::index4t<0x3,0x7,0xb,0xf>(false); // 37bf
+	make::index4t<0x0,0x1,0x2,0x4>(false); // 0124
+	make::index4t<0x1,0x2,0x3,0x5>(false); // 1235
+	make::index4t<0x4,0x5,0x6,0x8>(false); // 4568
+	make::index4t<0x5,0x6,0x7,0x9>(false); // 5679
+	make::index4t<0x8,0x9,0xa,0xc>(false); // 89ac
+	make::index4t<0x9,0xa,0xb,0xd>(false); // 9abd
+	make::index4t<0x0,0x1,0x2,0x5>(false); // 0125
+	make::index4t<0x4,0x5,0x6,0x9>(false); // 4569
+	make::index4t<0x8,0x9,0xa,0xd>(false); // 89ad
+
+	make::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>(); // 01234567!
+	make::index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>(); // 456789ab!
+	make::index8t<0x0,0x1,0x2,0x4,0x5,0x6,0x8,0x9>(); // 01245689!
+	make::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x8,0xc>(); // 0123458c!
+
+	make::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>(); // 0123456!
+	make::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>(); // 456789a!
+	make::index7t<0x8,0x9,0xa,0xb,0xc,0xd,0xe>(); // 89abcde!
+	make::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x8>(); // 0123458!
+	make::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xc>(); // 456789c!
+
+	make("merge",  indexmerge);
+	make("num",    indexnum);
+	make("num@lt", indexnumlt);
+	make("num@st", indexnumst);
+
+	make("m@0123", indexmono<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>);
+	make("m@37bf", indexmono<0x3,0x7,0xb,0xf,0x2,0x6,0xa,0xe>);
+	make("m@fedc", indexmono<0xf,0xe,0xd,0xc,0xb,0xa,0x9,0x8>);
+	make("m@c840", indexmono<0xc,0x8,0x4,0x0,0xd,0x9,0x5,0x1>);
+	make("m@3210", indexmono<0x3,0x2,0x1,0x0,0x7,0x6,0x5,0x4>);
+	make("m@fb73", indexmono<0xf,0xb,0x7,0x3,0xe,0xa,0x6,0x2>);
+	make("m@cdef", indexmono<0xc,0xd,0xe,0xf,0x8,0x9,0xa,0xb>);
+	make("m@048c", indexmono<0x0,0x4,0x8,0xc,0x1,0x5,0x9,0xd>);
+	make("m@4567", indexmono<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>);
+	make("m@26ae", indexmono<0x2,0x6,0xa,0xe,0x1,0x5,0x9,0xd>);
+	make("m@ba98", indexmono<0xb,0xa,0x9,0x8,0x7,0x6,0x5,0x4>);
+	make("m@d951", indexmono<0xd,0x9,0x5,0x1,0xe,0xa,0x6,0x2>);
+	make("m@7654", indexmono<0x7,0x6,0x5,0x4,0xb,0xa,0x9,0x8>);
+	make("m@ea62", indexmono<0xe,0xa,0x6,0x2,0xd,0x9,0x5,0x1>);
+	make("m@89ab", indexmono<0x8,0x9,0xa,0xb,0x4,0x5,0x6,0x7>);
+	make("m@159d", indexmono<0x1,0x5,0x9,0xd,0x2,0x6,0xa,0xe>);
+
+	make("max#0", indexmax<0>);
+	make("max#1", indexmax<1>);
+	make("max#2", indexmax<2>);
+	make("max#3", indexmax<3>);
+	make("max#4", indexmax<4>);
+	make("max#5", indexmax<5>);
+	make("max#6", indexmax<6>);
+	make("max#7", indexmax<7>);
+
+	adapter::make<0, 256>();
 }
 
 } // namespace utils
@@ -1487,16 +967,21 @@ void init_logging(utils::options::option opt) {
 	static moporgic::redirector redirect(tee, std::cout);
 }
 
+void config_thread(utils::options::option opt) {
+	shm::enable(shm::support() && !opt("noshm") && (opt("shm") || opt.value(1) > 1));
+}
+
 template<typename statistic>
-statistic invoke(statistic(*run)(utils::options,std::string), utils::options& opts, std::string type) {
+statistic invoke(statistic(*run)(utils::options,std::string), utils::options opts, std::string type) {
 #if defined(__linux__)
 	if (shm::enable()) {
 		u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"].value(1)), thdid = thdnum;
 		statistic* stats = shm::alloc<statistic>(thdnum);
 		while (std::stol(opts[type]["thread#"] = --thdid) && fork());
-		statistic& stat = stats[thdid] = run(opts, type);
-		if (thdid == 0) while (wait(nullptr) > 0); else std::exit(0);
+		statistic stat = stats[thdid] = run(opts, type);
+		if (thdid == 0) while (wait(nullptr) > 0); else std::quick_exit(0);
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
+		shm::free(stats);
 		return stat;
 	}
 #endif
@@ -1509,40 +994,54 @@ statistic invoke(statistic(*run)(utils::options,std::string), utils::options& op
 	return stat;
 }
 
-std::map<std::string, std::string> aliases() {
-	std::map<std::string, std::string> alias;
-	alias["4x6patt/khyeh"] = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
-	alias["khyeh"] = alias["4x6patt/khyeh"];
-	alias["5x6patt/42-33"] = "012345:012345! 456789:456789! 89abcd:89abcd! 012456:012456! 45689a:45689a! ";
-	alias["2x4patt/4"] = "0123:0123! 4567:4567! ";
-	alias["5x4patt/4-22"] = alias["2x4patt/4"] + "0145:0145! 1256:1256! 569a:569a! ";
-	alias["2x8patt/44"] = "01234567:01234567! 456789ab:456789ab! ";
-	alias["3x8patt/44-4211"] = alias["2x8patt/44"] + "0123458c:0123458c! ";
-	alias["4x6patt/k.matsuzaki"] = "012456:012456! 456789:456789! 012345:012345! 234569:234569! ";
-	alias["5x6patt/k.matsuzaki"] = alias["4x6patt/k.matsuzaki"] + "01259a:01259a! ";
-	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678:345678! ";
-	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567:134567! ";
-	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a:01489a! ";
-	alias["4x6patt/redundant"] = alias["4x6patt/khyeh"] + "01234:01234! 45678:45678! 01235:01235! 45679:45679! 01245:01245! 45689:45689! "
-	                             "0124:0124! 1235:1235! 0125:0125! 4568:4568! 5679:5679! 4569:4569! " + alias["5x4patt/4-22"];
-	alias["k.matsuzaki"] = alias["8x6patt/k.matsuzaki"];
-	alias["monotonic"] = "fd012301[^24]:fd012301,fd37bf01,fdfedc01,fdc84001,fd321001,fdfb7301,fdcdef01,fd048c01 "
-	                     "fd456701[^24]:fd456701,fd26ae01,fdba9801,fdd95101,fd765401,fdea6201,fd89ab01,fd159d01 ";
-	alias["quantity"] = "fe000005[^24]:fe000005 fe000015[^24]:fe000015 ";
-	alias["moporgic"] = alias["4x6patt/khyeh"] + alias["monotonic"] + alias["quantity"];
-	alias["4x6patt"] = alias["4x6patt/khyeh"];
-	alias["5x6patt"] = alias["5x6patt/42-33"];
-	alias["6x6patt"] = alias["6x6patt/k.matsuzaki"];
-	alias["7x6patt"] = alias["7x6patt/k.matsuzaki"];
-	alias["8x6patt"] = alias["8x6patt/k.matsuzaki"];
-	alias["8x4patt"] = "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
-	alias["5x4patt"] = alias["5x4patt/4-22"];
-	alias["2x4patt"] = alias["2x4patt/4"];
-	alias["2x8patt"] = alias["2x8patt/44"];
-	alias["3x8patt"] = alias["3x8patt/44-4211"];
-	alias["default"] = alias["4x6patt"];
-	return alias;
+std::string alias(const std::string& token) {
+	switch (to_hash(token)) {
+	default: return token;
+
+	case to_hash("default"): return alias("4x6patt");
+	case to_hash("4x6patt"): return alias("4x6patt/khyeh");
+	case to_hash("5x6patt"): return alias("5x6patt/42-33");
+	case to_hash("2x4patt"): return alias("2x4patt/4");
+	case to_hash("5x4patt"): return alias("5x4patt/4-22");
+	case to_hash("8x4patt"): return alias("8x4patt/legacy");
+	case to_hash("1x8patt"): return alias("1x8patt/44");
+	case to_hash("2x8patt"): return alias("2x8patt/44");
+	case to_hash("3x8patt"): return alias("3x8patt/44-4211");
+	case to_hash("4x8patt"): return alias("4x8patt/44-332-4211");
+	case to_hash("2x7patt"): return alias("2x7patt/43");
+	case to_hash("3x7patt"): return alias("3x7patt/43");
+	case to_hash("6x6patt"): return alias("6x6patt/k.matsuzaki");
+	case to_hash("7x6patt"): return alias("7x6patt/k.matsuzaki");
+	case to_hash("8x6patt"): return alias("8x6patt/k.matsuzaki");
+
+	case to_hash("4x6patt/khyeh"):       return "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
+	case to_hash("5x6patt/42-33"):       return "012345:012345! 456789:456789! 89abcd:89abcd! 012456:012456! 45689a:45689a! ";
+	case to_hash("2x4patt/4"):           return "0123:0123! 4567:4567! ";
+	case to_hash("5x4patt/4-22"):        return alias("2x4patt/4") + "0145:0145! 1256:1256! 569a:569a! ";
+	case to_hash("8x4patt/legacy"):      return "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
+	case to_hash("1x8patt/44"):          return "01234567:01234567! ";
+	case to_hash("2x8patt/44"):          return "01234567:01234567! 456789ab:456789ab! ";
+	case to_hash("3x8patt/44-332"):      return alias("2x8patt/44") + "01245689:01245689! ";
+	case to_hash("3x8patt/44-4211"):     return alias("2x8patt/44") + "0123458c:0123458c! ";
+	case to_hash("4x8patt/44-332-4211"): return alias("3x8patt/44-332") + "0123458c:0123458c! ";
+	case to_hash("2x7patt/43"):          return "0123456:0123456! 456789a:456789a! ";
+	case to_hash("3x7patt/43"):          return alias("2x7patt/43") + "89abcde:89abcde! ";
+	case to_hash("4x6patt/k.matsuzaki"): return "012456:012456! 456789:456789! 012345:012345! 234569:234569! ";
+	case to_hash("5x6patt/k.matsuzaki"): return alias("4x6patt/k.matsuzaki") + "01259a:01259a! ";
+	case to_hash("6x6patt/k.matsuzaki"): return alias("5x6patt/k.matsuzaki") + "345678:345678! ";
+	case to_hash("7x6patt/k.matsuzaki"): return alias("6x6patt/k.matsuzaki") + "134567:134567! ";
+	case to_hash("8x6patt/k.matsuzaki"): return alias("7x6patt/k.matsuzaki") + "01489a:01489a! ";
+
+	case to_hash("mono/0123"): return "m@0123[^24]:m@0123,m@37bf,m@fedc,m@c840,m@3210,m@fb73,m@cdef,m@048c ";
+	case to_hash("mono/4567"): return "m@4567[^24]:m@4567,m@26ae,m@ba98,m@d951,m@7654,m@ea62,m@89ab,m@159d ";
+	case to_hash("mono"):      return alias("mono/0123") + alias("mono/4567");
+	case to_hash("num@lt"):    return "num@lt[^24]:num@lt ";
+	case to_hash("num@st"):    return "num@st[^24]:num@st ";
+	case to_hash("num"):       return alias("num@lt") + alias("num@st");
+	case to_hash("none"):      return "";
+	}
 }
+
 void make_network(utils::options::option opt) {
 	std::string tokens = opt;
 	if (tokens.empty() && feature::feats().empty())
@@ -1551,13 +1050,12 @@ void make_network(utils::options::option opt) {
 	const auto npos = std::string::npos;
 	for (size_t i; (i = tokens.find(" norm")) != npos; tokens[i] = '/');
 
-	auto aliases = utils::aliases();
 	std::stringstream unalias(tokens); tokens.clear();
 	for (std::string token; unalias >> token; tokens += (token + ' ')) {
 		if (token.find(':') != npos) continue;
 		std::string name = token.substr(0, token.find_first_of("&|="));
 		std::string info = token != name ? token.substr(name.size()) : "";
-		if (aliases.find(name) != aliases.end()) token = aliases[name];
+		token = alias(name);
 		if (info.empty()) continue;
 
 		std::string winfo, iinfo, buff;
@@ -1708,7 +1206,7 @@ void make_network(utils::options::option opt) {
 			});
 			if (!indexer(sign)) {
 				indexer::mapper index = indexer(name).index();
-				if (!index) index = index::indexapt(std::bind(index::indexnta, std::placeholders::_1, stov(name)));
+				if (!index) index = index::adapter(std::bind(index::indexpt, std::placeholders::_1, stov(name)));
 				indexer::make(sign, index);
 			}
 			idxr = indexer(sign).sign();
@@ -1729,13 +1227,9 @@ void load_network(utils::options::option opt) {
 				type = path[path.find_last_of(".") + 1];
 			}
 			if (type == 'w')  weight::load(in);
-			if (type == 'f') feature::load(in);
 			if (type == 'c')   cache::load(in);
 		}
 		in.close();
-	}
-	for (feature f : list<feature>(std::move(feature::feats()))) {
-		feature::make(f.value().sign(), f.index().sign());
 	}
 }
 void save_network(utils::options::option opt) {
@@ -1749,8 +1243,7 @@ void save_network(utils::options::option opt) {
 		if (!out.is_open()) continue;
 		// for upward compatibility, we still write legacy binaries for traditional suffixes
 		if (type != 'c') {
-			if (type != 'f')  weight::save(type != 'w' ? out.write("w", 1) : out);
-			if (type != 'w') feature::save(type != 'f' ? out.write("f", 1) : out);
+			weight::save(type != 'w' ? out.write("w", 1) : out);
 		} else { // .c is reserved for cache binary
 			cache::save(type != 'c' ? out.write("c", 1) : out);
 		}
@@ -1760,6 +1253,8 @@ void save_network(utils::options::option opt) {
 }
 
 void list_network() {
+	if (weight::wghts().empty()) return;
+
 	for (weight w : weight::wghts()) {
 		std::stringstream buf;
 
@@ -1775,29 +1270,32 @@ void list_network() {
 			buf << (w.size());
 		buf << "]";
 
-		buf << " : (unused)";
-		buf.seekp(-9, std::ios::end);
+		buf << " :";
+		std::ios::pos_type pos = buf.tellp();
 		for (feature f : feature::feats())
-			if (f.value() == w) buf << " " << f.index().sign();
+			if (f.value() == w)
+				buf << " " << f.index().sign();
+		if (buf.tellp() == pos)
+			buf << " (n/a)";
 
 		std::cout << buf.rdbuf() << std::endl;
 	}
 	std::cout << std::endl;
 }
 
-void init_cache(std::string res = "") {
-	std::string in(res);
-	if (in == "default") in = "2G";
+void init_cache(utils::options::option opt) {
+	std::string res(opt);
 
-	if (in.size()) {
-		size_t unit = 0, size = std::stoull(in, &unit);
-		if (unit < in.size())
-			switch (std::toupper(in[unit])) {
+	if (res.size()) {
+		size_t unit = 0, size = std::stoull(res, &unit);
+		if (unit < res.size())
+			switch (std::toupper(res[unit])) {
 			case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
 			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
 			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
 			}
-		cache::make(size);
+		bool peek = !opt("nopeek");
+		cache::make(size, peek);
 	}
 }
 
@@ -1830,60 +1328,82 @@ struct method {
 		return -std::numeric_limits<numeric>::max();
 	}
 
-	template<indexer::mapper... indexes>
-	struct isomorphism {
-		constexpr static std::array<indexer::mapper, sizeof...(indexes)> index = { indexes... };
-		constexpr operator method() { return { isomorphism<indexes...>::estimate, isomorphism<indexes...>::optimize }; }
+	struct isomorphic {
+		constexpr inline operator method() { return { isomorphic::estimate, isomorphic::optimize }; }
 
-		template<indexer::mapper index, indexer::mapper... follow> constexpr static
-		inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, clip<feature> f) {
-			return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)]) + invoke<follow...>(iso, f);
+		constexpr static inline_always numeric invoke(const board& iso, clip<feature> f) {
+			register numeric esti = 0;
+			for (register auto feat = f.begin(); feat != f.end(); feat += 8)
+				esti += (*feat)[iso];
+			return esti;
 		}
-		template<indexer::mapper index, indexer::mapper... follow> constexpr static
-		inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, clip<feature> f) {
-			return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)]);
-		}
-
-		template<indexer::mapper index, indexer::mapper... follow> constexpr static
-		inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
-			return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv) + invoke<follow...>(iso, updv, f);
-		}
-		template<indexer::mapper index, indexer::mapper... follow> constexpr static
-		inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
-			return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv);
+		constexpr static inline_always numeric invoke(const board& iso, numeric updv, clip<feature> f) {
+			register numeric esti = 0;
+			for (register auto feat = f.begin(); feat != f.end(); feat += 8)
+				esti += ((*feat)[iso] += updv);
+			return esti;
 		}
 
+		template<estimator estim = isomorphic::invoke>
 		constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
 			register numeric esti = 0;
 			register board iso;
-			esti += invoke<indexes...>(({ iso = state;     iso; }), range);
-			esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
-			esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
-			esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
-			esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
-			esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
-			esti += invoke<indexes...>(({ iso.transpose(); iso; }), range);
-			esti += invoke<indexes...>(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso = state;     iso; }), range);
+			esti += estim(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso.transpose(); iso; }), range);
+			esti += estim(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso.transpose(); iso; }), range);
+			esti += estim(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso.transpose(); iso; }), range);
+			esti += estim(({ iso.mirror();    iso; }), range);
 			return esti;
 		}
+		template<optimizer optim = isomorphic::invoke>
 		constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
 			register numeric esti = 0;
 			register board iso;
-			esti += invoke<indexes...>(({ iso = state;     iso; }), updv, range);
-			esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
-			esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
-			esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
-			esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
-			esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
-			esti += invoke<indexes...>(({ iso.transpose(); iso; }), updv, range);
-			esti += invoke<indexes...>(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso = state;     iso; }), updv, range);
+			esti += optim(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso.transpose(); iso; }), updv, range);
+			esti += optim(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso.transpose(); iso; }), updv, range);
+			esti += optim(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso.transpose(); iso; }), updv, range);
+			esti += optim(({ iso.mirror();    iso; }), updv, range);
 			return esti;
 		}
+
+		template<indexer::mapper... indexes>
+		struct static_index {
+			constexpr static std::array<indexer::mapper, sizeof...(indexes)> index = { indexes... };
+			constexpr inline operator method() { return { static_index::estimate, static_index::optimize }; }
+
+			template<indexer::mapper index, indexer::mapper... follow> constexpr static
+			inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, clip<feature> f) {
+				return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)]) + invoke<follow...>(iso, f);
+			}
+			template<indexer::mapper index, indexer::mapper... follow> constexpr static
+			inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, clip<feature> f) {
+				return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)]);
+			}
+			template<indexer::mapper index, indexer::mapper... follow> constexpr static
+			inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
+				return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv) + invoke<follow...>(iso, updv, f);
+			}
+			template<indexer::mapper index, indexer::mapper... follow> constexpr static
+			inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
+				return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv);
+			}
+
+			constexpr static estimator estimate = isomorphic::estimate<invoke<indexes...>>;
+			constexpr static optimizer optimize = isomorphic::optimize<invoke<indexes...>>;
+		};
 	};
 
 	template<typename source = method>
 	struct expectimax {
-		constexpr expectimax(utils::options::option depth) {
+		constexpr inline operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
+		constexpr inline expectimax(utils::options::option depth) {
 			u32 n = expectimax<source>::depth(depth);
 			std::stringstream in(({
 				std::string limit = depth.find("limit", depth.value());
@@ -1895,9 +1415,8 @@ struct method {
 				lim = n & -2u;
 			}
 		}
-		constexpr operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
 
-		inline static numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
+		static inline numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
 			numeric expt = 0;
 			hexa spaces;
 			if (depth) depth = std::min(depth, limit((spaces = after.spaces()).size()));
@@ -1913,7 +1432,7 @@ struct method {
 			return expt;
 		}
 
-		inline static numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
+		static inline numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
 			numeric best = 0;
 			for (const board& after : before.afters()) {
 				auto search = after.info() != -1u ? search_expt : search_illegal;
@@ -1922,51 +1441,50 @@ struct method {
 			return best;
 		}
 
-		inline static numeric search_illegal(const board& after, u32 depth, clip<feature> range = feature::feats()) {
+		static inline numeric search_illegal(const board& after, u32 depth, clip<feature> range = feature::feats()) {
 			return -std::numeric_limits<numeric>::max();
 		}
 
-		inline static numeric estimate(const board& after, clip<feature> range = feature::feats()) {
+		static inline numeric estimate(const board& after, clip<feature> range = feature::feats()) {
 			return search_expt(after, depth() - 1, range);
 		}
-
-		inline static numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
+		static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
 			return source::optimize(state, updv, range);
 		}
 
-		inline static u32& depth() { static u32 depth = 1; return depth; }
-		inline static u32& depth(u32 n) { return (expectimax<source>::depth() = n); }
-		inline static std::array<u32, 17>& limit() { static std::array<u32, 17> limit = {}; return limit; }
-		inline static u32& limit(u32 e) { return limit()[e]; }
+		static inline u32& depth() { static u32 depth = 1; return depth; }
+		static inline u32& depth(u32 n) { return (expectimax<source>::depth() = n); }
+		static inline std::array<u32, 17>& limit() { static std::array<u32, 17> limit = {}; return limit; }
+		static inline u32& limit(u32 e) { return limit()[e]; }
 	};
 
-	typedef isomorphism<
+	typedef isomorphic::static_index<
 			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
 			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
 			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::index6t<0x4,0x5,0x6,0x8,0x9,0xa>> isomorphic4x6patt;
-	typedef isomorphism<
+			index::index6t<0x4,0x5,0x6,0x8,0x9,0xa>> iso4x6patt;
+	typedef isomorphic::static_index<
 			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
 			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
 			index::index6t<0x8,0x9,0xa,0xb,0xc,0xd>,
 			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::index6t<0x4,0x5,0x6,0x8,0x9,0xa>> isomorphic5x6patt;
-	typedef isomorphism<
+			index::index6t<0x4,0x5,0x6,0x8,0x9,0xa>> iso5x6patt;
+	typedef isomorphic::static_index<
 			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
 			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
 			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
 			index::index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
 			index::index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
-			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>> isomorphic6x6patt;
-	typedef isomorphism<
+			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>> iso6x6patt;
+	typedef isomorphic::static_index<
 			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
 			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
 			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
 			index::index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
 			index::index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
 			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
-			index::index6t<0x1,0x3,0x4,0x5,0x6,0x7>> isomorphic7x6patt;
-	typedef isomorphism<
+			index::index6t<0x1,0x3,0x4,0x5,0x6,0x7>> iso7x6patt;
+	typedef isomorphic::static_index<
 			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
 			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
 			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
@@ -1974,33 +1492,55 @@ struct method {
 			index::index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
 			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
 			index::index6t<0x1,0x3,0x4,0x5,0x6,0x7>,
-			index::index6t<0x0,0x1,0x4,0x8,0x9,0xa>> isomorphic8x6patt;
+			index::index6t<0x0,0x1,0x4,0x8,0x9,0xa>> iso8x6patt;
+	typedef isomorphic::static_index<
+			index::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
+			index::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>> iso2x7patt;
+	typedef isomorphic::static_index<
+			index::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
+			index::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>,
+			index::index7t<0x8,0x9,0xa,0xb,0xc,0xd,0xe>> iso3x7patt;
+	typedef isomorphic::static_index<
+			index::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>> iso1x8patt;
+	typedef isomorphic::static_index<
+			index::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>,
+			index::index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>> iso2x8patt;
 
 	static method parse(utils::options opts, std::string type) {
-		std::string spec = opts["options"].find("spec", "auto");
-		if (spec == "auto" || spec == "default" || spec == "on") {
+		std::string spec = opts["options"]["spec"].value("auto");
+		if (spec == "auto" || spec == "on" || spec == "default") {
 			spec = opts["make"].value("4x6patt");
 			spec = spec.substr(0, spec.find_first_of("&|="));
 		}
 
 		if (opts["depth"].value(1) > 1) {
 			switch (to_hash(spec)) {
-			default: return method::expectimax<method>(opts["depth"]);
-			case to_hash("4x6patt"): return method::expectimax<method::isomorphic4x6patt>(opts["depth"]);
-			case to_hash("5x6patt"): return method::expectimax<method::isomorphic5x6patt>(opts["depth"]);
-			case to_hash("6x6patt"): return method::expectimax<method::isomorphic6x6patt>(opts["depth"]);
-			case to_hash("7x6patt"): return method::expectimax<method::isomorphic7x6patt>(opts["depth"]);
-			case to_hash("8x6patt"): return method::expectimax<method::isomorphic8x6patt>(opts["depth"]);
+			default:                    return method::expectimax<method>(opts["depth"]);
+			case to_hash("isomorphic"): return method::expectimax<method::isomorphic>(opts["depth"]);
+			case to_hash("4x6patt"):    return method::expectimax<method::iso4x6patt>(opts["depth"]);
+			case to_hash("5x6patt"):    return method::expectimax<method::iso5x6patt>(opts["depth"]);
+			case to_hash("6x6patt"):    return method::expectimax<method::iso6x6patt>(opts["depth"]);
+			case to_hash("7x6patt"):    return method::expectimax<method::iso7x6patt>(opts["depth"]);
+			case to_hash("8x6patt"):    return method::expectimax<method::iso8x6patt>(opts["depth"]);
+			case to_hash("2x7patt"):    return method::expectimax<method::iso2x7patt>(opts["depth"]);
+			case to_hash("3x7patt"):    return method::expectimax<method::iso3x7patt>(opts["depth"]);
+			case to_hash("1x8patt"):    return method::expectimax<method::iso1x8patt>(opts["depth"]);
+			case to_hash("2x8patt"):    return method::expectimax<method::iso2x8patt>(opts["depth"]);
 			}
 		}
 
 		switch (to_hash(spec)) {
-		default: return method();
-		case to_hash("4x6patt"): return method::isomorphic4x6patt();
-		case to_hash("5x6patt"): return method::isomorphic5x6patt();
-		case to_hash("6x6patt"): return method::isomorphic6x6patt();
-		case to_hash("7x6patt"): return method::isomorphic7x6patt();
-		case to_hash("8x6patt"): return method::isomorphic8x6patt();
+		default:                    return method();
+		case to_hash("isomorphic"): return method::isomorphic();
+		case to_hash("4x6patt"):    return method::iso4x6patt();
+		case to_hash("5x6patt"):    return method::iso5x6patt();
+		case to_hash("6x6patt"):    return method::iso6x6patt();
+		case to_hash("7x6patt"):    return method::iso7x6patt();
+		case to_hash("8x6patt"):    return method::iso8x6patt();
+		case to_hash("2x7patt"):    return method::iso2x7patt();
+		case to_hash("3x7patt"):    return method::iso3x7patt();
+		case to_hash("1x8patt"):    return method::iso1x8patt();
+		case to_hash("2x8patt"):    return method::iso2x8patt();
 		}
 	}
 
@@ -2508,16 +2048,17 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["seed"] = next_opt("moporgic");
 			break;
 		case to_hash("-r"): case to_hash("--recipe"):
-			opts["recipe"] = next_opt("");
-			if (opts["recipe"] == "") break;
+			label = next_opt("");
+			if (label == "") break;
 			// no break: optimize and evaluate are also handled by the same recipe logic
 		case to_hash("-t"): case to_hash("--train"): case to_hash("--optimize"):
 		case to_hash("-e"): case to_hash("--test"):  case to_hash("--evaluate"):
 			opts["recipe"] = label.substr(label.find_first_not_of('-'));
 			if (opts["recipe"] == "t" || opts["recipe"] == "train") opts["recipe"] = "optimize";
 			if (opts["recipe"] == "e" || opts["recipe"] == "test")  opts["recipe"] = "evaluate";
-			opts[opts["recipe"]] += next_opts();
-			opts["recipes"] += opts["recipe"];
+			opts[""] = next_opts();
+			if (opts[""].size()) opts[opts["recipe"]] = opts[""];
+			if (opts[opts["recipe"]].size()) opts["recipes"] += opts["recipe"];
 			break;
 		case to_hash("--recipes"):
 			opts["recipes"] = next_opts();
@@ -2568,21 +2109,25 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-%"): case to_hash("-I"): case to_hash("--info"):
 			opts["info"] = next_opt("full");
 			break;
-		case to_hash("-x"): case to_hash("-opt"): case to_hash("--options"):
-			opts["options"] += next_opts();
-			break;
 		case to_hash("-d"): case to_hash("--depth"):
 			opts["depth"] = next_opts();
 			break;
 		case to_hash("-c"): case to_hash("--cache"):
-			opts["cache"] = next_opt("default");
+			opts[""] = next_opt("2048M");
+			opts[""] += next_opts();
+			opts["cache"] += opts[""];
+			break;
+		case to_hash("-p"): case to_hash("--parallel"): case to_hash("--thread"):
+			opts["thread"] = std::thread::hardware_concurrency();
+			opts[""] = next_opts();
+			if (opts[""].value(0)) opts["thread"].clear();
+			opts["thread"] += opts[""];
+			break;
+		case to_hash("-x"): case to_hash("-opt"): case to_hash("--options"):
+			opts["options"] += next_opts();
 			break;
 		case to_hash("-#"): case to_hash("--comment"):
 			opts["comment"] = next_opts();
-			break;
-		case to_hash("-p"):   case to_hash("--parallel"):
-		case to_hash("-thd"): case to_hash("--thread"):
-			opts["thread"] = next_opt(std::to_string(std::thread::hardware_concurrency()));
 			break;
 		case to_hash("-|"):
 			opts = {};
@@ -2615,10 +2160,8 @@ int main(int argc, const char* argv[]) {
 	if (!opts("lambda")) opts["lambda"] = 0;
 	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
 	if (!opts("depth")) opts["depth"] = 1;
-	if (!opts("thread")) opts["thread"] = 1;
 
 	utils::init_logging(opts["save"]);
-	shm::enable(shm::support() && !opts["options"]("noshm") && (opts["options"]("shm") || opts["thread"].value(1) > 1));
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
 	std::cout << "Develop" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" << __DATE_ISO__ << " " << __TIME__ ")" << std::endl;
@@ -2628,11 +2171,12 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
-	std::cout << "depth = " << opts["depth"] << ", cache = " << opts["cache"].value("none") << std::endl;
-	std::cout << "agent = " << opts["thread"] << "x" << std::endl;
+	std::cout << "search = " << opts["depth"] << ", cache = " << opts["cache"].value("none") << std::endl;
+	std::cout << "concurrent = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
 
 	moporgic::srand(to_hash(opts["seed"]));
+	utils::config_thread(opts["thread"]);
 	utils::init_cache(opts["cache"]);
 
 	utils::load_network(opts["load"]);
