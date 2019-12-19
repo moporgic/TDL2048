@@ -794,39 +794,31 @@ public:
 	inline hex actions() const { return actions64(); }
 	inline hex actions64() const {
 		u32 o = operations64();
+		u32 u = o & 1, r = o & 2, d = o & 4, l = o & 8;
 		u32 k = 0, x = 0;
-		u32 u = o & 1;
 		k |= (u ? 0 : 0) << x;
 		x += (u << 2);
-		u32 r = o & 2;
 		k |= (r ? 1 : 0) << x;
 		x += (r << 1);
-		u32 d = o & 4;
 		k |= (d ? 2 : 0) << x;
 		x += (d >> 0);
-		u32 l = o & 8;
 		k |= (l ? 3 : 0) << x;
 		x += (l >> 1);
-		hex a(k); a[15] = (x >> 2);
-		return a;
+		return { k | (u64(x >> 2) << (15 << 2)) };
 	}
 	inline hex actions80() const {
 		u32 o = operations80();
+		u32 u = o & 1, r = o & 2, d = o & 4, l = o & 8;
 		u32 k = 0, x = 0;
-		u32 u = o & 1;
 		k |= (u ? 0 : 0) << x;
 		x += (u << 2);
-		u32 r = o & 2;
 		k |= (r ? 1 : 0) << x;
 		x += (r << 1);
-		u32 d = o & 4;
 		k |= (d ? 2 : 0) << x;
 		x += (d >> 0);
-		u32 l = o & 8;
 		k |= (l ? 3 : 0) << x;
 		x += (l >> 1);
-		hex a(k); a[15] = (x >> 2);
-		return a;
+		return { k | (u64(x >> 2) << (15 << 2)) };
 	}
 
 	inline bool operable() const { return operable64(); }
