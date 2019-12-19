@@ -257,22 +257,14 @@ public:
 		x |= (x >> 2);
 		x |= (x >> 1);
 		x = ~x & 0x1111111111111111ull;
-		register u32 e = x + (x >> 32);
-		e += e >> 16;
-		e += e >> 8;
-		return (e & 0x0f) + ((e >> 4) & 0x0f);
+		return math::popcnt64(x);
 	}
 	inline constexpr u32 empty80() const {
 		register u64 x = raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
-		x = ~x & 0x1111111111111111ull;
-		u16 z[]{ 0x1111, 0x1110, 0x1101, 0x1100, 0x1011, 0x1010, 0x1001, 0x1000, 0x0111, 0x0110, 0x0101, 0x0100, 0x0011, 0x0010, 0x0001, 0x0000 };
-		x &= (u64(z[(ext >> 28) & 0x0f]) << 48) | (u64(z[(ext >> 24) & 0x0f]) << 32) | (u64(z[(ext >> 20) & 0x0f]) << 16) | u64(z[(ext >> 16) & 0x0f]);
-		register u32 e = x + (x >> 32);
-		e += e >> 16;
-		e += e >> 8;
-		return (e & 0x0f) + ((e >> 4) & 0x0f);
+		x = ~x & math::pdep64(~ext >> 16, 0x1111111111111111ull);
+		return math::popcnt64(x);
 	}
 
 	inline hexa spaces() const { return spaces64(); }
