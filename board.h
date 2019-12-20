@@ -305,22 +305,8 @@ public:
 	}
 
 	inline bool popup() { return popup64(); }
-	inline bool popup64() {
-		hexa empty = spaces64();
-		if (empty.size() == 0) return false;
-		u32 u = moporgic::rand();
-		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
-		return true;
-	}
-	inline bool popup80() {
-		hexa empty = spaces80();
-		if (empty.size() == 0) return false;
-		u32 u = moporgic::rand();
-		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
-		return true;
-	}
+	inline bool popup64() { return empty64() ? next64(), true : false; }
+	inline bool popup80() { return empty80() ? next80(), true : false; }
 
 	inline constexpr void clear() {
 		raw = 0;
