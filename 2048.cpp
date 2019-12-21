@@ -459,62 +459,6 @@ private:
 
 namespace index {
 
-template<u32 p0, u32 p1, u32 p2, u32 p3>
-inline constexpr u64 indexptx(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	return index;
-}
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4>
-inline constexpr u64 indexptx(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	return index;
-}
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5>
-inline constexpr u64 indexptx(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	return index;
-}
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6>
-inline constexpr u64 indexptx(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	index += b.at(p6) << 24;
-	return index;
-}
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7>
-inline constexpr u64 indexptx(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	index += b.at(p6) << 24;
-	index += b.at(p7) << 28;
-	return index;
-}
-
 template<u32 p, u32... x>
 inline constexpr u32 order() {
 	if (sizeof...(x) + 1 > 8) return -1;
@@ -536,7 +480,11 @@ inline constexpr u64 mask(idx... patt) {
 
 template<u32... patt>
 inline constexpr typename std::enable_if<order<patt...>() == 0, u64>::type indexpt(const board& b) {
-	return index::indexptx<patt...>(b);
+	constexpr u32 x[] = { patt... };
+	register u32 index = 0;
+	for (register u32 i = 0; i < sizeof...(patt); i++)
+		index += b.at(x[i]) << (i << 2);
+	return index;
 }
 template<u32... patt>
 inline constexpr typename std::enable_if<order<patt...>() == 1, u64>::type indexpt(const board& b) {
