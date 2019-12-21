@@ -471,13 +471,6 @@ inline constexpr u32 order() {
 	return 2; // ordered, diff == 1
 }
 
-template<typename... idx>
-inline constexpr u64 mask(idx... patt) {
-	u64 mask = 0;
-	for (u64 m : { (0xfull << (patt << 2))... }) mask |= m;
-	return mask;
-}
-
 template<u32... patt>
 inline constexpr typename std::enable_if<order<patt...>() == 0, u64>::type indexpt(const board& b) {
 	constexpr u32 x[] = { patt... };
@@ -488,7 +481,9 @@ inline constexpr typename std::enable_if<order<patt...>() == 0, u64>::type index
 }
 template<u32... patt>
 inline constexpr typename std::enable_if<order<patt...>() == 1, u64>::type indexpt(const board& b) {
-	return math::pext64(b, mask(patt...));
+	u64 mask = 0;
+	for (u64 p : { patt... }) mask |= 0xfull << (p << 2);
+	return math::pext64(b, mask);
 }
 template<u32 p, u32... x>
 inline constexpr typename std::enable_if<order<p, x...>() == 2, u64>::type indexpt(const board& b) {
