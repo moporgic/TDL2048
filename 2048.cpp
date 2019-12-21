@@ -515,15 +515,19 @@ inline constexpr u64 indexptx(const board& b) {
 	return index;
 }
 
-inline constexpr u64 mask(u32 p) { return (0xfull << (p << 2)); }
-template<typename... idx>
-inline constexpr u64 mask(u32 p, idx... a) { return mask(p) | mask(a...); }
-
 template<u32... patt>
 inline constexpr bool is_ordered() {
-	constexpr u32 test[] = { 0, patt... };
-	for (u32 i = 1; i <= sizeof...(patt); i++) if (test[i] < test[i - 1]) return false;
+	u32 last = 0;
+	for (u32 p : { patt... })
+		if (p >= last) last = p; else return false;
 	return true;
+}
+
+template<typename... idx>
+inline constexpr u64 mask(idx... patt) {
+	u64 mask = 0;
+	for (u64 m : { (0xfull << (patt << 2))... }) mask |= m;
+	return mask;
 }
 
 template<u32... patt>
