@@ -459,12 +459,77 @@ private:
 
 namespace index {
 
+template<u32 p0, u32 p1, u32 p2, u32 p3>
+inline constexpr u64 indexptx(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	return index;
+}
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4>
+inline constexpr u64 indexptx(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	return index;
+}
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5>
+inline constexpr u64 indexptx(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	index += b.at(p5) << 20;
+	return index;
+}
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6>
+inline constexpr u64 indexptx(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	index += b.at(p5) << 20;
+	index += b.at(p6) << 24;
+	return index;
+}
+template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7>
+inline constexpr u64 indexptx(const board& b) {
+	register u64 index = 0;
+	index += b.at(p0) <<  0;
+	index += b.at(p1) <<  4;
+	index += b.at(p2) <<  8;
+	index += b.at(p3) << 12;
+	index += b.at(p4) << 16;
+	index += b.at(p5) << 20;
+	index += b.at(p6) << 24;
+	index += b.at(p7) << 28;
+	return index;
+}
+
 inline constexpr u64 mask(u32 p) { return (0xfull << (p << 2)); }
 template<typename... idx>
 inline constexpr u64 mask(u32 p, idx... a) { return mask(p) | mask(a...); }
 
 template<u32... patt>
-inline constexpr u64 indexpt(const board& b) { return math::pext64(b, mask(patt...)); }
+inline constexpr bool is_ordered() {
+	constexpr u32 test[] = { 0, patt... };
+	for (u32 i = 1; i <= sizeof...(patt); i++) if (test[i] < test[i - 1]) return false;
+	return true;
+}
+
+template<u32... patt>
+inline constexpr typename std::enable_if<is_ordered<patt...>() != true, u64>::type indexpt(const board& b) { return indexptx<patt...>(b); }
+template<u32... patt>
+inline constexpr typename std::enable_if<is_ordered<patt...>() == true, u64>::type indexpt(const board& b) { return math::pext64(b, mask(patt...)); }
 
 //template<> u64 indexpt<0x0,0x1,0x2,0x3>(const board& b) { return (u32(u64(b)) & 0xffff); }
 //template<> u64 indexpt<0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b) >> 16) & 0xffff); }
@@ -493,7 +558,12 @@ inline constexpr u64 indexpt(const board& b) { return math::pext64(b, mask(patt.
 //template<> u64 indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b))); }
 //template<> u64 indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>(const board& b) { return (u32(u64(b) >> 16)); }
 
-inline constexpr u64 indexpt(const board& b, u64 mask) { return math::pext64(b, mask); }
+u64 indexptv(const board& b, const std::vector<u32>& p) {
+	register u64 index = 0;
+	for (size_t i = 0; i < p.size(); i++)
+		index += b.at(p[i]) << (i << 2);
+	return index;
+}
 
 u64 indexmerge(const board& b) { // 16-bit
 	board q = b; q.transpose();
@@ -1149,12 +1219,7 @@ void make_network(utils::options::option opt) {
 			});
 			if (!indexer(sign)) {
 				indexer::mapper index = indexer(name).index();
-				if (!index) {
-					u64 mask = 0;
-					for (u32 p : stov(name)) mask |= (0xfull << (p << 2));
-					u64 (&indexpt) (const board&, u64) = index::indexpt;
-					index = index::adapter(std::bind(indexpt, std::placeholders::_1, mask));
-				}
+				if (!index) index = index::adapter(std::bind(index::indexptv, std::placeholders::_1, stov(name)));
 				indexer::make(sign, index);
 			}
 			idxr = indexer(sign).sign();
