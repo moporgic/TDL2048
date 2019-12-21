@@ -187,6 +187,24 @@ public:
 		ext = (ext & ~(0xf0000 << (i << 2))) | ((r & 0xf0000) << (i << 2));
 	}
 
+	inline constexpr u32 cext(u32 i) const { return cext16(i); }
+	inline constexpr u32 cext16(u32 i) const {
+		return math::pext64(raw, 0x000f000f000f000full << (i << 2));
+	}
+	inline constexpr u32 cext20(u32 i) const {
+		return cext16(i) | (math::pext32(ext, 0x11110000u << i) << 16);
+	}
+	inline constexpr void cdep(u32 i, u32 c) { cdep16(i, c); }
+	inline constexpr void cdep16(u32 i, u32 c) {
+		u64 m = 0x000f000f000f000full << (i << 2);
+		raw = (raw & ~m) | math::pdep64(c, m);
+	}
+	inline constexpr void cdep20(u32 i, u32 c) {
+		cdep16(i, c & 0xffff);
+		u32 m = 0x11110000u << i;
+		ext = (ext & ~m) | math::pdep32(c >> 16, m);
+	}
+
 	inline constexpr u32 at(u32 i) const { return at4(i); }
 	inline constexpr u32 at4(u32 i) const {
 		return (raw >> (i << 2)) & 0x0f;
