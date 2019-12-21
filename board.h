@@ -236,19 +236,13 @@ public:
 
 	inline constexpr void transpose() { transpose64(); }
 	inline constexpr void transpose64() {
-		register u64 buf = 0;
-		buf = (raw ^ (raw >> 12)) & 0x0000f0f00000f0f0ull;
-		raw ^= buf ^ (buf << 12);
-		buf = (raw ^ (raw >> 24)) & 0x00000000ff00ff00ull;
-		raw ^= buf ^ (buf << 24);
+		raw = (math::pext64(raw, 0x000f000f000f000full) <<  0) | (math::pext64(raw, 0x00f000f000f000f0ull) << 16)
+		    | (math::pext64(raw, 0x0f000f000f000f00ull) << 32) | (math::pext64(raw, 0xf000f000f000f000ull) << 48);
 	}
 	inline constexpr void transpose80() {
 		transpose64();
-		register u32 buf = 0;
-		buf = (ext ^ (ext >> 3)) & 0x0a0a0000;
-		ext ^= buf ^ (buf << 3);
-		buf = (ext ^ (ext >> 6)) & 0x00cc0000;
-		ext ^= buf ^ (buf << 6);
+		ext = (math::pext32(ext, 0x11110000u) << 16) | (math::pext32(ext, 0x22220000u) << 20)
+			| (math::pext32(ext, 0x44440000u) << 24) | (math::pext32(ext, 0x88880000u) << 28);
 	}
 
 	inline constexpr u32 empty() const { return empty64(); }
