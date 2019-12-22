@@ -9,10 +9,6 @@
 #include "moporgic/type.h"
 #include "moporgic/util.h"
 #include "moporgic/math.h"
-#include <mmintrin.h>
-#include <emmintrin.h>
-#include <immintrin.h>
-#include <smmintrin.h>
 
 namespace moporgic {
 
