@@ -459,94 +459,38 @@ private:
 
 namespace index {
 
-template<u32 p0, u32 p1, u32 p2, u32 p3>
-u64 index4t(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	return index;
+template<u32 p, u32... x>
+inline constexpr u32 order() {
+	if (sizeof...(x) + 1 > 8) return -1;
+	u32 last = p;
+	for (u32 i : { x... })
+		if (i >= last) last = i; else return 0; // not ordered, diff may < 0
+	u32 expt = p + 1;
+	for (u32 i : { x... })
+		if (i == expt) expt = i + 1; else return 1; // ordered, diff >= 0
+	return 2; // ordered, diff == 1
 }
 
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4>
-u64 index5t(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
+template<u32... patt>
+inline constexpr typename std::enable_if<order<patt...>() == 0, u64>::type indexpt(const board& b) {
+	constexpr u32 x[] = { patt... };
+	register u32 index = 0;
+	for (register u32 i = 0; i < sizeof...(patt); i++)
+		index += b.at(x[i]) << (i << 2);
 	return index;
 }
-
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5>
-u64 index6t(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	return index;
+template<u32... patt>
+inline constexpr typename std::enable_if<order<patt...>() == 1, u64>::type indexpt(const board& b) {
+	u64 mask = 0;
+	for (u64 p : { patt... }) mask |= 0xfull << (p << 2);
+	return math::pext64(b, mask);
+}
+template<u32 p, u32... x>
+inline constexpr typename std::enable_if<order<p, x...>() == 2, u64>::type indexpt(const board& b) {
+	return u32(u64(b) >> (p << 2)) & u32((1ull << ((sizeof...(x) + 1) << 2)) - 1);
 }
 
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6>
-u64 index7t(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	index += b.at(p6) << 24;
-	return index;
-}
-
-template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7>
-u64 index8t(const board& b) {
-	register u64 index = 0;
-	index += b.at(p0) <<  0;
-	index += b.at(p1) <<  4;
-	index += b.at(p2) <<  8;
-	index += b.at(p3) << 12;
-	index += b.at(p4) << 16;
-	index += b.at(p5) << 20;
-	index += b.at(p6) << 24;
-	index += b.at(p7) << 28;
-	return index;
-}
-
-template<> u64 index4t<0x0,0x1,0x2,0x3>(const board& b) { return (u32(u64(b)) & 0xffff); }
-template<> u64 index4t<0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b) >> 16) & 0xffff); }
-template<> u64 index4t<0x0,0x1,0x4,0x5>(const board& b) { return (u32(u64(b)) & 0x00ff) | (u32(u64(b) >> 8) & 0xff00); }
-template<> u64 index4t<0x1,0x2,0x5,0x6>(const board& b) { return (u32(u64(b) >> 4) & 0x00ff) | (u32(u64(b) >> 12) & 0xff00); }
-template<> u64 index4t<0x5,0x6,0x9,0xa>(const board& b) { return (u32(u64(b) >> 20) & 0x00ff) | (u32(u64(b) >> 28) & 0xff00); }
-template<> u64 index5t<0x0,0x1,0x2,0x3,0x4>(const board& b) { return (u32(u64(b)) & 0xfffff); }
-template<> u64 index5t<0x4,0x5,0x6,0x7,0x8>(const board& b) { return (u32(u64(b) >> 16) & 0xfffff); }
-template<> u64 index5t<0x0,0x1,0x2,0x4,0x5>(const board& b) { return (u32(u64(b)) & 0x00fff) | ((u32(u64(b)) >> 4) & 0xff000); }
-template<> u64 index5t<0x4,0x5,0x6,0x8,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0x00fff) | (u32(u64(b) >> 20) & 0xff000); }
-template<> u64 index5t<0x0,0x1,0x2,0x3,0x5>(const board& b) { return (u32(u64(b)) & 0x0ffff) | (u32(u64(b) >> 4) & 0xf0000); }
-template<> u64 index5t<0x4,0x5,0x6,0x7,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0x0ffff) | (u32(u64(b) >> 20) & 0xf0000); }
-template<> u64 index6t<0x0,0x1,0x2,0x3,0x4,0x5>(const board& b) { return (u32(u64(b)) & 0xffffff); }
-template<> u64 index6t<0x4,0x5,0x6,0x7,0x8,0x9>(const board& b) { return (u32(u64(b) >> 16) & 0xffffff); }
-template<> u64 index6t<0x8,0x9,0xa,0xb,0xc,0xd>(const board& b) { return (u32(u64(b) >> 32) & 0xffffff); }
-template<> u64 index6t<0x0,0x1,0x2,0x4,0x5,0x6>(const board& b) { return (u32(u64(b)) & 0x000fff) | ((u32(u64(b)) >> 4) & 0xfff000); }
-template<> u64 index6t<0x4,0x5,0x6,0x8,0x9,0xa>(const board& b) { return (u32(u64(b) >> 16) & 0x000fff) | (u32(u64(b) >> 20) & 0xfff000); }
-template<> u64 index6t<0x2,0x3,0x4,0x5,0x6,0x9>(const board& b) { return (u32(u64(b) >> 8) & 0x0fffff) | (u32(u64(b) >> 16) & 0xf00000); }
-template<> u64 index6t<0x0,0x1,0x2,0x5,0x9,0xa>(const board& b) { return (u32(u64(b)) & 0x000fff) | (u32(u64(b) >> 8) & 0x00f000) | (u32(u64(b) >> 20) & 0xff0000); }
-template<> u64 index6t<0x3,0x4,0x5,0x6,0x7,0x8>(const board& b) { return (u32(u64(b) >> 12) & 0xffffff); }
-template<> u64 index6t<0x1,0x3,0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b) >> 4) & 0x00000f) | (u32(u64(b) >> 8) & 0xfffff0); }
-template<> u64 index6t<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) { return (u32(u64(b)) & 0x0000ff) | (u32(u64(b) >> 8) & 0x000f00) | (u32(u64(b) >> 20) & 0xfff000); }
-template<> u64 index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>(const board& b) { return (u32(u64(b)) & 0xfffffff); }
-template<> u64 index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>(const board& b) { return (u32(u64(b) >> 16) & 0xfffffff); }
-template<> u64 index7t<0x8,0x9,0xa,0xb,0xc,0xd,0xe>(const board& b) { return (u32(u64(b) >> 32) & 0xfffffff); }
-template<> u64 index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>(const board& b) { return (u32(u64(b))); }
-template<> u64 index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>(const board& b) { return (u32(u64(b) >> 16)); }
-
-u64 indexpt(const board& b, const std::vector<u32>& p) {
+u64 indexptv(const board& b, const std::vector<u32>& p) {
 	register u64 index = 0;
 	for (size_t i = 0; i < p.size(); i++)
 		index += b.at(p[i]) << (i << 2);
@@ -610,7 +554,7 @@ u64 indexnumst(const board& b) { // 24-bit
 	return index;
 }
 
-u64 indexnuma(const board& b, const std::vector<u32>& n) {
+u64 indexnumv(const board& b, const std::vector<u32>& n) {
 	auto num = b.numof();
 	register u64 index = 0;
 	register u32 offset = 0;
@@ -682,135 +626,85 @@ struct make {
 		else if (indexer(sign).index() != func) std::exit(127);
 	}
 
-	static constexpr board isoindex[] = {
-		0xfedcba9876543210ull,
-		0xc840d951ea62fb73ull,
-		0x0123456789abcdefull,
-		0x37bf26ae159d048cull,
-		0xcdef89ab45670123ull,
-		0xfb73ea62d951c840ull,
-		0x32107654ba98fedcull,
-		0x048c159d26ae37bfull,
-	};
-
-	static std::string vtos(const std::vector<u32>& v) {
-		std::string patt;
-		for (u32 i : v) patt += char((i < 10) ? ('0' + i) : ('a' + i - 10));
-		return patt;
-	}
-
-	template<u32 t0, u32 t1, u32 t2, u32 t3>
-	struct index4t {
-		index4t(bool iso = true) { isomorphic<0>(iso); }
+	template<u32... patt>
+	struct indexpt {
+		indexpt(bool iso = true) { isomorphic<0>(iso); }
 		template<u32 i> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
-			constexpr board x = isoindex[i];
-			make(vtos({x[t0], x[t1], x[t2], x[t3]}), index::index4t<x[t0], x[t1], x[t2], x[t3]>);
+			constexpr board x = isoindex(i);
+			make(vtos({x[patt]...}), index::indexpt<x[patt]...>);
 			if (iso) isomorphic<i + 1>(iso);
 		}
 		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
-	};
 
-	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4>
-	struct index5t {
-		index5t(bool iso = true) { isomorphic<0>(iso); }
-		template<u32 i> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
-			constexpr board x = isoindex[i];
-			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4]}), index::index5t<x[t0], x[t1], x[t2], x[t3], x[t4]>);
-			if (iso) isomorphic<i + 1>(iso);
+		static constexpr board isoindex(u32 i) {
+			board x = 0xfedcba9876543210ull;
+			x.isomorphic((i & 4) + (8 - i) % 4);
+			return x;
 		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
-	};
-
-	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4, u32 t5>
-	struct index6t {
-		index6t(bool iso = true) { isomorphic<0>(iso); }
-		template<u32 i> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
-			constexpr board x = isoindex[i];
-			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4], x[t5]}), index::index6t<x[t0], x[t1], x[t2], x[t3], x[t4], x[t5]>);
-			if (iso) isomorphic<i + 1>(iso);
+		static std::string vtos(const std::initializer_list<u32>& v) {
+			std::string name;
+			for (u32 i : v) name += char((i < 10) ? ('0' + i) : ('a' + i - 10));
+			return name;
 		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
-	};
-
-	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4, u32 t5, u32 t6>
-	struct index7t {
-		index7t(bool iso = true) { isomorphic<0>(iso); }
-		template<u32 i> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
-			constexpr board x = isoindex[i];
-			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6]}), index::index7t<x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6]>);
-			if (iso) isomorphic<i + 1>(iso);
-		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
-	};
-
-	template<u32 t0, u32 t1, u32 t2, u32 t3, u32 t4, u32 t5, u32 t6, u32 t7>
-	struct index8t {
-		index8t(bool iso = true) { isomorphic<0>(iso); }
-		template<u32 i> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
-			constexpr board x = isoindex[i];
-			make(vtos({x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6], x[t7]}), index::index8t<x[t0], x[t1], x[t2], x[t3], x[t4], x[t5], x[t6], x[t7]>);
-			if (iso) isomorphic<i + 1>(iso);
-		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
 	};
 };
 
 __attribute__((constructor)) void init() {
-	make::index6t<0x0,0x1,0x2,0x3,0x4,0x5>(); // 012345!
-	make::index6t<0x4,0x5,0x6,0x7,0x8,0x9>(); // 456789!
-	make::index6t<0x0,0x1,0x2,0x4,0x5,0x6>(); // 012456!
-	make::index6t<0x4,0x5,0x6,0x8,0x9,0xa>(); // 45689a!
-	make::index6t<0x8,0x9,0xa,0xb,0xc,0xd>(); // 89abcd!
-	make::index6t<0x2,0x3,0x4,0x5,0x6,0x9>(); // 234569!
-	make::index6t<0x0,0x1,0x2,0x5,0x9,0xa>(); // 01259a!
-	make::index6t<0x3,0x4,0x5,0x6,0x7,0x8>(); // 345678!
-	make::index6t<0x1,0x3,0x4,0x5,0x6,0x7>(); // 134567!
-	make::index6t<0x0,0x1,0x4,0x8,0x9,0xa>(); // 01489a!
+	make::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>(); // 012345!
+	make::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>(); // 456789!
+	make::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>(); // 012456!
+	make::indexpt<0x4,0x5,0x6,0x8,0x9,0xa>(); // 45689a!
+	make::indexpt<0x8,0x9,0xa,0xb,0xc,0xd>(); // 89abcd!
+	make::indexpt<0x2,0x3,0x4,0x5,0x6,0x9>(); // 234569!
+	make::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>(); // 01259a!
+	make::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>(); // 345678!
+	make::indexpt<0x1,0x3,0x4,0x5,0x6,0x7>(); // 134567!
+	make::indexpt<0x0,0x1,0x4,0x8,0x9,0xa>(); // 01489a!
 
-	make::index5t<0x0,0x1,0x2,0x3,0x4>(); // 01234!
-	make::index5t<0x4,0x5,0x6,0x7,0x8>(); // 45678!
-	make::index5t<0x0,0x1,0x2,0x4,0x5>(); // 01245!
-	make::index5t<0x4,0x5,0x6,0x8,0x9>(); // 45689!
-	make::index5t<0x0,0x1,0x2,0x3,0x5>(); // 01235!
-	make::index5t<0x4,0x5,0x6,0x7,0x9>(); // 45679!
-	make::index5t<0x8,0x9,0xa,0xb,0xc>(false); // 89abc
-	make::index5t<0x8,0x9,0xa,0xc,0xd>(false); // 89acd
-	make::index5t<0x8,0x9,0xa,0xb,0xd>(false); // 89abd
-	make::index5t<0x1,0x2,0x3,0x5,0x6>(false); // 12356
-	make::index5t<0x5,0x6,0x7,0x9,0xa>(false); // 5679a
-	make::index5t<0x9,0xa,0xb,0xd,0xe>(false); // 9abde
+	make::indexpt<0x0,0x1,0x2,0x3,0x4>(); // 01234!
+	make::indexpt<0x4,0x5,0x6,0x7,0x8>(); // 45678!
+	make::indexpt<0x0,0x1,0x2,0x4,0x5>(); // 01245!
+	make::indexpt<0x4,0x5,0x6,0x8,0x9>(); // 45689!
+	make::indexpt<0x0,0x1,0x2,0x3,0x5>(); // 01235!
+	make::indexpt<0x4,0x5,0x6,0x7,0x9>(); // 45679!
+	make::indexpt<0x8,0x9,0xa,0xb,0xc>(false); // 89abc
+	make::indexpt<0x8,0x9,0xa,0xc,0xd>(false); // 89acd
+	make::indexpt<0x8,0x9,0xa,0xb,0xd>(false); // 89abd
+	make::indexpt<0x1,0x2,0x3,0x5,0x6>(false); // 12356
+	make::indexpt<0x5,0x6,0x7,0x9,0xa>(false); // 5679a
+	make::indexpt<0x9,0xa,0xb,0xd,0xe>(false); // 9abde
 
-	make::index4t<0x0,0x1,0x2,0x3>(); // 0123!
-	make::index4t<0x4,0x5,0x6,0x7>(); // 4567!
-	make::index4t<0x0,0x1,0x4,0x5>(); // 0145!
-	make::index4t<0x1,0x2,0x5,0x6>(); // 1256!
-	make::index4t<0x5,0x6,0x9,0xa>(); // 569a!
-	make::index4t<0x8,0x9,0xa,0xb>(false); // 89ab
-	make::index4t<0xc,0xd,0xe,0xf>(false); // cdef
-	make::index4t<0x0,0x4,0x8,0xc>(false); // 048c
-	make::index4t<0x1,0x5,0x9,0xd>(false); // 159d
-	make::index4t<0x2,0x6,0xa,0xe>(false); // 26ae
-	make::index4t<0x3,0x7,0xb,0xf>(false); // 37bf
-	make::index4t<0x0,0x1,0x2,0x4>(false); // 0124
-	make::index4t<0x1,0x2,0x3,0x5>(false); // 1235
-	make::index4t<0x4,0x5,0x6,0x8>(false); // 4568
-	make::index4t<0x5,0x6,0x7,0x9>(false); // 5679
-	make::index4t<0x8,0x9,0xa,0xc>(false); // 89ac
-	make::index4t<0x9,0xa,0xb,0xd>(false); // 9abd
-	make::index4t<0x0,0x1,0x2,0x5>(false); // 0125
-	make::index4t<0x4,0x5,0x6,0x9>(false); // 4569
-	make::index4t<0x8,0x9,0xa,0xd>(false); // 89ad
+	make::indexpt<0x0,0x1,0x2,0x3>(); // 0123!
+	make::indexpt<0x4,0x5,0x6,0x7>(); // 4567!
+	make::indexpt<0x0,0x1,0x4,0x5>(); // 0145!
+	make::indexpt<0x1,0x2,0x5,0x6>(); // 1256!
+	make::indexpt<0x5,0x6,0x9,0xa>(); // 569a!
+	make::indexpt<0x8,0x9,0xa,0xb>(false); // 89ab
+	make::indexpt<0xc,0xd,0xe,0xf>(false); // cdef
+	make::indexpt<0x0,0x4,0x8,0xc>(false); // 048c
+	make::indexpt<0x1,0x5,0x9,0xd>(false); // 159d
+	make::indexpt<0x2,0x6,0xa,0xe>(false); // 26ae
+	make::indexpt<0x3,0x7,0xb,0xf>(false); // 37bf
+	make::indexpt<0x0,0x1,0x2,0x4>(false); // 0124
+	make::indexpt<0x1,0x2,0x3,0x5>(false); // 1235
+	make::indexpt<0x4,0x5,0x6,0x8>(false); // 4568
+	make::indexpt<0x5,0x6,0x7,0x9>(false); // 5679
+	make::indexpt<0x8,0x9,0xa,0xc>(false); // 89ac
+	make::indexpt<0x9,0xa,0xb,0xd>(false); // 9abd
+	make::indexpt<0x0,0x1,0x2,0x5>(false); // 0125
+	make::indexpt<0x4,0x5,0x6,0x9>(false); // 4569
+	make::indexpt<0x8,0x9,0xa,0xd>(false); // 89ad
 
-	make::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>(); // 01234567!
-	make::index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>(); // 456789ab!
-	make::index8t<0x0,0x1,0x2,0x4,0x5,0x6,0x8,0x9>(); // 01245689!
-	make::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x8,0xc>(); // 0123458c!
+	make::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>(); // 01234567!
+	make::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>(); // 456789ab!
+	make::indexpt<0x0,0x1,0x2,0x4,0x5,0x6,0x8,0x9>(); // 01245689!
+	make::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x8,0xc>(); // 0123458c!
 
-	make::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>(); // 0123456!
-	make::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>(); // 456789a!
-	make::index7t<0x8,0x9,0xa,0xb,0xc,0xd,0xe>(); // 89abcde!
-	make::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x8>(); // 0123458!
-	make::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xc>(); // 456789c!
+	make::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6>(); // 0123456!
+	make::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa>(); // 456789a!
+	make::indexpt<0x8,0x9,0xa,0xb,0xc,0xd,0xe>(); // 89abcde!
+	make::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x8>(); // 0123458!
+	make::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xc>(); // 456789c!
 
 	make("merge",  indexmerge);
 	make("num",    indexnum);
@@ -994,52 +888,52 @@ statistic invoke(statistic(*run)(utils::options,std::string), utils::options opt
 	return stat;
 }
 
-std::string alias(const std::string& token) {
-	switch (to_hash(token)) {
-	default: return token;
+std::map<std::string, std::string> aliases() {
+	std::map<std::string, std::string> alias;
 
-	case to_hash("default"): return alias("4x6patt");
-	case to_hash("4x6patt"): return alias("4x6patt/khyeh");
-	case to_hash("5x6patt"): return alias("5x6patt/42-33");
-	case to_hash("2x4patt"): return alias("2x4patt/4");
-	case to_hash("5x4patt"): return alias("5x4patt/4-22");
-	case to_hash("8x4patt"): return alias("8x4patt/legacy");
-	case to_hash("1x8patt"): return alias("1x8patt/44");
-	case to_hash("2x8patt"): return alias("2x8patt/44");
-	case to_hash("3x8patt"): return alias("3x8patt/44-4211");
-	case to_hash("4x8patt"): return alias("4x8patt/44-332-4211");
-	case to_hash("2x7patt"): return alias("2x7patt/43");
-	case to_hash("3x7patt"): return alias("3x7patt/43");
-	case to_hash("6x6patt"): return alias("6x6patt/k.matsuzaki");
-	case to_hash("7x6patt"): return alias("7x6patt/k.matsuzaki");
-	case to_hash("8x6patt"): return alias("8x6patt/k.matsuzaki");
+	alias["4x6patt/khyeh"]       = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
+	alias["5x6patt/42-33"]       = "012345:012345! 456789:456789! 89abcd:89abcd! 012456:012456! 45689a:45689a! ";
+	alias["2x4patt/4"]           = "0123:0123! 4567:4567! ";
+	alias["5x4patt/4-22"]        = alias["2x4patt/4"] + "0145:0145! 1256:1256! 569a:569a! ";
+	alias["8x4patt/legacy"]      = "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
+	alias["1x8patt/44"]          = "01234567:01234567! ";
+	alias["2x8patt/44"]          = "01234567:01234567! 456789ab:456789ab! ";
+	alias["3x8patt/44-332"]      = alias["2x8patt/44"] + "01245689:01245689! ";
+	alias["3x8patt/44-4211"]     = alias["2x8patt/44"] + "0123458c:0123458c! ";
+	alias["4x8patt/44-332-4211"] = alias["3x8patt/44-332"] + "0123458c:0123458c! ";
+	alias["2x7patt/43"]          = "0123456:0123456! 456789a:456789a! ";
+	alias["3x7patt/43"]          = alias["2x7patt/43"] + "89abcde:89abcde! ";
+	alias["4x6patt/k.matsuzaki"] = "012456:012456! 456789:456789! 012345:012345! 234569:234569! ";
+	alias["5x6patt/k.matsuzaki"] = alias["4x6patt/k.matsuzaki"] + "01259a:01259a! ";
+	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678:345678! ";
+	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567:134567! ";
+	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a:01489a! ";
 
-	case to_hash("4x6patt/khyeh"):       return "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
-	case to_hash("5x6patt/42-33"):       return "012345:012345! 456789:456789! 89abcd:89abcd! 012456:012456! 45689a:45689a! ";
-	case to_hash("2x4patt/4"):           return "0123:0123! 4567:4567! ";
-	case to_hash("5x4patt/4-22"):        return alias("2x4patt/4") + "0145:0145! 1256:1256! 569a:569a! ";
-	case to_hash("8x4patt/legacy"):      return "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
-	case to_hash("1x8patt/44"):          return "01234567:01234567! ";
-	case to_hash("2x8patt/44"):          return "01234567:01234567! 456789ab:456789ab! ";
-	case to_hash("3x8patt/44-332"):      return alias("2x8patt/44") + "01245689:01245689! ";
-	case to_hash("3x8patt/44-4211"):     return alias("2x8patt/44") + "0123458c:0123458c! ";
-	case to_hash("4x8patt/44-332-4211"): return alias("3x8patt/44-332") + "0123458c:0123458c! ";
-	case to_hash("2x7patt/43"):          return "0123456:0123456! 456789a:456789a! ";
-	case to_hash("3x7patt/43"):          return alias("2x7patt/43") + "89abcde:89abcde! ";
-	case to_hash("4x6patt/k.matsuzaki"): return "012456:012456! 456789:456789! 012345:012345! 234569:234569! ";
-	case to_hash("5x6patt/k.matsuzaki"): return alias("4x6patt/k.matsuzaki") + "01259a:01259a! ";
-	case to_hash("6x6patt/k.matsuzaki"): return alias("5x6patt/k.matsuzaki") + "345678:345678! ";
-	case to_hash("7x6patt/k.matsuzaki"): return alias("6x6patt/k.matsuzaki") + "134567:134567! ";
-	case to_hash("8x6patt/k.matsuzaki"): return alias("7x6patt/k.matsuzaki") + "01489a:01489a! ";
+	alias["4x6patt"]   = alias["4x6patt/khyeh"];
+	alias["5x6patt"]   = alias["5x6patt/42-33"];
+	alias["2x4patt"]   = alias["2x4patt/4"];
+	alias["5x4patt"]   = alias["5x4patt/4-22"];
+	alias["8x4patt"]   = alias["8x4patt/legacy"];
+	alias["1x8patt"]   = alias["1x8patt/44"];
+	alias["2x8patt"]   = alias["2x8patt/44"];
+	alias["3x8patt"]   = alias["3x8patt/44-4211"];
+	alias["4x8patt"]   = alias["4x8patt/44-332-4211"];
+	alias["2x7patt"]   = alias["2x7patt/43"];
+	alias["3x7patt"]   = alias["3x7patt/43"];
+	alias["6x6patt"]   = alias["6x6patt/k.matsuzaki"];
+	alias["7x6patt"]   = alias["7x6patt/k.matsuzaki"];
+	alias["8x6patt"]   = alias["8x6patt/k.matsuzaki"];
 
-	case to_hash("mono/0123"): return "m@0123[^24]:m@0123,m@37bf,m@fedc,m@c840,m@3210,m@fb73,m@cdef,m@048c ";
-	case to_hash("mono/4567"): return "m@4567[^24]:m@4567,m@26ae,m@ba98,m@d951,m@7654,m@ea62,m@89ab,m@159d ";
-	case to_hash("mono"):      return alias("mono/0123") + alias("mono/4567");
-	case to_hash("num@lt"):    return "num@lt[^24]:num@lt ";
-	case to_hash("num@st"):    return "num@st[^24]:num@st ";
-	case to_hash("num"):       return alias("num@lt") + alias("num@st");
-	case to_hash("none"):      return "";
-	}
+	alias["mono/0123"] = "m@0123[^24]:m@0123,m@37bf,m@fedc,m@c840,m@3210,m@fb73,m@cdef,m@048c ";
+	alias["mono/4567"] = "m@4567[^24]:m@4567,m@26ae,m@ba98,m@d951,m@7654,m@ea62,m@89ab,m@159d ";
+	alias["mono"]      = alias["mono/0123"] + alias["mono/4567"];
+	alias["num@lt"]    = "num@lt[^24]:num@lt ";
+	alias["num@st"]    = "num@st[^24]:num@st ";
+	alias["num"]       = alias["num@lt"] + alias["num@st"];
+	alias["default"]   = alias["4x6patt"];
+	alias["none"]      = "";
+
+	return alias;
 }
 
 void make_network(utils::options::option opt) {
@@ -1050,12 +944,13 @@ void make_network(utils::options::option opt) {
 	const auto npos = std::string::npos;
 	for (size_t i; (i = tokens.find(" norm")) != npos; tokens[i] = '/');
 
+	auto aliases = utils::aliases();
 	std::stringstream unalias(tokens); tokens.clear();
 	for (std::string token; unalias >> token; tokens += (token + ' ')) {
 		if (token.find(':') != npos) continue;
 		std::string name = token.substr(0, token.find_first_of("&|="));
 		std::string info = token != name ? token.substr(name.size()) : "";
-		token = alias(name);
+		if (aliases.find(name) != aliases.end()) token = aliases[name];
 		if (info.empty()) continue;
 
 		std::string winfo, iinfo, buff;
@@ -1206,7 +1101,7 @@ void make_network(utils::options::option opt) {
 			});
 			if (!indexer(sign)) {
 				indexer::mapper index = indexer(name).index();
-				if (!index) index = index::adapter(std::bind(index::indexpt, std::placeholders::_1, stov(name)));
+				if (!index) index = index::adapter(std::bind(index::indexptv, std::placeholders::_1, stov(name)));
 				indexer::make(sign, index);
 			}
 			idxr = indexer(sign).sign();
@@ -1459,52 +1354,52 @@ struct method {
 	};
 
 	typedef isomorphic::static_index<
-			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
-			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
-			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::index6t<0x4,0x5,0x6,0x8,0x9,0xa>> iso4x6patt;
+			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index::indexpt<0x4,0x5,0x6,0x8,0x9,0xa>> iso4x6patt;
 	typedef isomorphic::static_index<
-			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
-			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
-			index::index6t<0x8,0x9,0xa,0xb,0xc,0xd>,
-			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::index6t<0x4,0x5,0x6,0x8,0x9,0xa>> iso5x6patt;
+			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index::indexpt<0x8,0x9,0xa,0xb,0xc,0xd>,
+			index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index::indexpt<0x4,0x5,0x6,0x8,0x9,0xa>> iso5x6patt;
 	typedef isomorphic::static_index<
-			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
-			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
-			index::index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
-			index::index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
-			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>> iso6x6patt;
+			index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index::indexpt<0x2,0x3,0x4,0x5,0x6,0x9>,
+			index::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>,
+			index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>> iso6x6patt;
 	typedef isomorphic::static_index<
-			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
-			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
-			index::index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
-			index::index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
-			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
-			index::index6t<0x1,0x3,0x4,0x5,0x6,0x7>> iso7x6patt;
+			index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index::indexpt<0x2,0x3,0x4,0x5,0x6,0x9>,
+			index::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>,
+			index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>,
+			index::indexpt<0x1,0x3,0x4,0x5,0x6,0x7>> iso7x6patt;
 	typedef isomorphic::static_index<
-			index::index6t<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::index6t<0x4,0x5,0x6,0x7,0x8,0x9>,
-			index::index6t<0x0,0x1,0x2,0x3,0x4,0x5>,
-			index::index6t<0x2,0x3,0x4,0x5,0x6,0x9>,
-			index::index6t<0x0,0x1,0x2,0x5,0x9,0xa>,
-			index::index6t<0x3,0x4,0x5,0x6,0x7,0x8>,
-			index::index6t<0x1,0x3,0x4,0x5,0x6,0x7>,
-			index::index6t<0x0,0x1,0x4,0x8,0x9,0xa>> iso8x6patt;
+			index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
+			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
+			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
+			index::indexpt<0x2,0x3,0x4,0x5,0x6,0x9>,
+			index::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>,
+			index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>,
+			index::indexpt<0x1,0x3,0x4,0x5,0x6,0x7>,
+			index::indexpt<0x0,0x1,0x4,0x8,0x9,0xa>> iso8x6patt;
 	typedef isomorphic::static_index<
-			index::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
-			index::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>> iso2x7patt;
+			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
+			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa>> iso2x7patt;
 	typedef isomorphic::static_index<
-			index::index7t<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
-			index::index7t<0x4,0x5,0x6,0x7,0x8,0x9,0xa>,
-			index::index7t<0x8,0x9,0xa,0xb,0xc,0xd,0xe>> iso3x7patt;
+			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
+			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa>,
+			index::indexpt<0x8,0x9,0xa,0xb,0xc,0xd,0xe>> iso3x7patt;
 	typedef isomorphic::static_index<
-			index::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>> iso1x8patt;
+			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>> iso1x8patt;
 	typedef isomorphic::static_index<
-			index::index8t<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>,
-			index::index8t<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>> iso2x8patt;
+			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>,
+			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>> iso2x8patt;
 
 	static method parse(utils::options opts, std::string type) {
 		std::string spec = opts["options"]["spec"].value("auto");

@@ -191,6 +191,24 @@ public:
 		ext = (ext & ~(0xf0000 << (i << 2))) | ((r & 0xf0000) << (i << 2));
 	}
 
+	inline constexpr u32 cext(u32 i) const { return cext16(i); }
+	inline constexpr u32 cext16(u32 i) const {
+		return math::pext64(raw, 0x000f000f000f000full << (i << 2));
+	}
+	inline constexpr u32 cext20(u32 i) const {
+		return cext16(i) | (math::pext32(ext, 0x11110000u << i) << 16);
+	}
+	inline constexpr void cdep(u32 i, u32 c) { cdep16(i, c); }
+	inline constexpr void cdep16(u32 i, u32 c) {
+		u64 m = 0x000f000f000f000full << (i << 2);
+		raw = (raw & ~m) | math::pdep64(c, m);
+	}
+	inline constexpr void cdep20(u32 i, u32 c) {
+		cdep16(i, c & 0xffff);
+		u32 m = 0x11110000u << i;
+		ext = (ext & ~m) | math::pdep32(c >> 16, m);
+	}
+
 	inline constexpr u32 at(u32 i) const { return at4(i); }
 	inline constexpr u32 at4(u32 i) const {
 		return (raw >> (i << 2)) & 0x0f;
@@ -240,19 +258,13 @@ public:
 
 	inline constexpr void transpose() { transpose64(); }
 	inline constexpr void transpose64() {
-		register u64 buf = 0;
-		buf = (raw ^ (raw >> 12)) & 0x0000f0f00000f0f0ull;
-		raw ^= buf ^ (buf << 12);
-		buf = (raw ^ (raw >> 24)) & 0x00000000ff00ff00ull;
-		raw ^= buf ^ (buf << 24);
+		raw = (math::pext64(raw, 0x000f000f000f000full) <<  0) | (math::pext64(raw, 0x00f000f000f000f0ull) << 16)
+		    | (math::pext64(raw, 0x0f000f000f000f00ull) << 32) | (math::pext64(raw, 0xf000f000f000f000ull) << 48);
 	}
 	inline constexpr void transpose80() {
 		transpose64();
-		register u32 buf = 0;
-		buf = (ext ^ (ext >> 3)) & 0x0a0a0000;
-		ext ^= buf ^ (buf << 3);
-		buf = (ext ^ (ext >> 6)) & 0x00cc0000;
-		ext ^= buf ^ (buf << 6);
+		ext = (math::pext32(ext, 0x11110000u) << 16) | (math::pext32(ext, 0x22220000u) << 20)
+			| (math::pext32(ext, 0x44440000u) << 24) | (math::pext32(ext, 0x88880000u) << 28);
 	}
 
 	inline constexpr u32 empty() const { return empty64(); }
@@ -261,22 +273,14 @@ public:
 		x |= (x >> 2);
 		x |= (x >> 1);
 		x = ~x & 0x1111111111111111ull;
-		register u32 e = x + (x >> 32);
-		e += e >> 16;
-		e += e >> 8;
-		return (e & 0x0f) + ((e >> 4) & 0x0f);
+		return math::popcnt64(x);
 	}
 	inline constexpr u32 empty80() const {
 		register u64 x = raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
-		x = ~x & 0x1111111111111111ull;
-		u16 z[]{ 0x1111, 0x1110, 0x1101, 0x1100, 0x1011, 0x1010, 0x1001, 0x1000, 0x0111, 0x0110, 0x0101, 0x0100, 0x0011, 0x0010, 0x0001, 0x0000 };
-		x &= (u64(z[(ext >> 28) & 0x0f]) << 48) | (u64(z[(ext >> 24) & 0x0f]) << 32) | (u64(z[(ext >> 20) & 0x0f]) << 16) | u64(z[(ext >> 16) & 0x0f]);
-		register u32 e = x + (x >> 32);
-		e += e >> 16;
-		e += e >> 8;
-		return (e & 0x0f) + ((e >> 4) & 0x0f);
+		x = ~x & math::pdep64(~ext >> 16, 0x1111111111111111ull);
+		return math::popcnt64(x);
 	}
 
 	inline hexa spaces() const { return spaces64(); }
@@ -317,22 +321,8 @@ public:
 	}
 
 	inline bool popup() { return popup64(); }
-	inline bool popup64() {
-		hexa empty = spaces64();
-		if (empty.size() == 0) return false;
-		u32 u = moporgic::rand();
-		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
-		return true;
-	}
-	inline bool popup80() {
-		hexa empty = spaces80();
-		if (empty.size() == 0) return false;
-		u32 u = moporgic::rand();
-		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
-		return true;
-	}
+	inline bool popup64() { return empty64() ? next64(), true : false; }
+	inline bool popup80() { return empty80() ? next80(), true : false; }
 
 	inline constexpr void clear() {
 		raw = 0;
@@ -1056,39 +1046,31 @@ public:
 	inline hex actions() const { return actions64(); }
 	inline hex actions64() const {
 		u32 o = operations64();
+		u32 u = o & 1, r = o & 2, d = o & 4, l = o & 8;
 		u32 k = 0, x = 0;
-		u32 u = o & 1;
 		k |= (u ? 0 : 0) << x;
 		x += (u << 2);
-		u32 r = o & 2;
 		k |= (r ? 1 : 0) << x;
 		x += (r << 1);
-		u32 d = o & 4;
 		k |= (d ? 2 : 0) << x;
 		x += (d >> 0);
-		u32 l = o & 8;
 		k |= (l ? 3 : 0) << x;
 		x += (l >> 1);
-		hex a(k); a[15] = (x >> 2);
-		return a;
+		return { k | (u64(x >> 2) << (15 << 2)) };
 	}
 	inline hex actions80() const {
 		u32 o = operations80();
+		u32 u = o & 1, r = o & 2, d = o & 4, l = o & 8;
 		u32 k = 0, x = 0;
-		u32 u = o & 1;
 		k |= (u ? 0 : 0) << x;
 		x += (u << 2);
-		u32 r = o & 2;
 		k |= (r ? 1 : 0) << x;
 		x += (r << 1);
-		u32 d = o & 4;
 		k |= (d ? 2 : 0) << x;
 		x += (d >> 0);
-		u32 l = o & 8;
 		k |= (l ? 3 : 0) << x;
 		x += (l >> 1);
-		hex a(k); a[15] = (x >> 2);
-		return a;
+		return { k | (u64(x >> 2) << (15 << 2)) };
 	}
 
 	inline bool operable() const { return operable64(); }
