@@ -1663,8 +1663,9 @@ struct statistic {
 	}
 
 	void summary() const {
+		if (limit == 0) return;
 		char buf[1024];
-		u32 size = 0;
+		size_t size = 0;
 
 		size += snprintf(buf + size, sizeof(buf) - size, summaf, // "summary %llums %.2fops",
 				total.time / info.thdnum,
