@@ -170,6 +170,10 @@ public:
 	inline const cache& query16(u32 r) const { return cache::load(fetch16(r)); }
 	inline const cache& query20(u32 r) const { return cache::load(fetch20(r)); }
 
+	inline const cache& qcext(u32 c) const { return qcext16(c); }
+	inline const cache& qcext16(u32 c) const { return cache::load(cext16(c)); }
+	inline const cache& qcext20(u32 c) const { return cache::load(cext20(c)); }
+
 	inline constexpr u32 fetch(u32 i) const { return fetch16(i); }
 	inline constexpr u32 fetch16(u32 i) const {
 		return ((raw >> (i << 4)) & 0xffff);
@@ -393,23 +397,21 @@ public:
 		return move.inf;
 	}
 	inline i32 up64() {
-		board move, look(*this);
-		look.transpose64();
-		look.query16(0).left.movev64<0>(move);
-		look.query16(1).left.movev64<1>(move);
-		look.query16(2).left.movev64<2>(move);
-		look.query16(3).left.movev64<3>(move);
+		board move;
+		qcext16(0).left.movev64<0>(move);
+		qcext16(1).left.movev64<1>(move);
+		qcext16(2).left.movev64<2>(move);
+		qcext16(3).left.movev64<3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
 		set64(move);
 		return move.inf;
 	}
 	inline i32 down64() {
-		board move, look(*this);
-		look.transpose64();
-		look.query16(0).right.movev64<0>(move);
-		look.query16(1).right.movev64<1>(move);
-		look.query16(2).right.movev64<2>(move);
-		look.query16(3).right.movev64<3>(move);
+		board move;
+		qcext16(0).right.movev64<0>(move);
+		qcext16(1).right.movev64<1>(move);
+		qcext16(2).right.movev64<2>(move);
+		qcext16(3).right.movev64<3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
 		set64(move);
 		return move.inf;
@@ -436,23 +438,21 @@ public:
 		return move.inf;
 	}
 	inline i32 up80() {
-		board move, look(*this);
-		look.transpose80();
-		look.query20(0).left.movev80<0>(move);
-		look.query20(1).left.movev80<1>(move);
-		look.query20(2).left.movev80<2>(move);
-		look.query20(3).left.movev80<3>(move);
+		board move;
+		qcext20(0).left.movev80<0>(move);
+		qcext20(1).left.movev80<1>(move);
+		qcext20(2).left.movev80<2>(move);
+		qcext20(3).left.movev80<3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
 		set80(move);
 		return move.inf;
 	}
 	inline i32 down80() {
-		board move, look(*this);
-		look.transpose80();
-		look.query20(0).right.movev80<0>(move);
-		look.query20(1).right.movev80<1>(move);
-		look.query20(2).right.movev80<2>(move);
-		look.query20(3).right.movev80<3>(move);
+		board move;
+		qcext20(0).right.movev80<0>(move);
+		qcext20(1).right.movev80<1>(move);
+		qcext20(2).right.movev80<2>(move);
+		qcext20(3).right.movev80<3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
 		set80(move);
 		return move.inf;
@@ -464,38 +464,34 @@ public:
 	inline void moves64(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
 
-		board b(*this);
-		b.query16(0).moveh64<0>(L, R);
-		b.query16(1).moveh64<1>(L, R);
-		b.query16(2).moveh64<2>(L, R);
-		b.query16(3).moveh64<3>(L, R);
+		query16(0).moveh64<0>(L, R);
+		query16(1).moveh64<1>(L, R);
+		query16(2).moveh64<2>(L, R);
+		query16(3).moveh64<3>(L, R);
 		L.inf |= (L.raw ^ raw) ? 0 : -1;
 		R.inf |= (R.raw ^ raw) ? 0 : -1;
 
-		b.transpose64();
-		b.query16(0).movev64<0>(U, D);
-		b.query16(1).movev64<1>(U, D);
-		b.query16(2).movev64<2>(U, D);
-		b.query16(3).movev64<3>(U, D);
+		qcext16(0).movev64<0>(U, D);
+		qcext16(1).movev64<1>(U, D);
+		qcext16(2).movev64<2>(U, D);
+		qcext16(3).movev64<3>(U, D);
 		U.inf |= (U.raw ^ raw) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) ? 0 : -1;
 	}
 	inline void moves80(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
 
-		board b(*this);
-		b.query20(0).moveh80<0>(L, R);
-		b.query20(1).moveh80<1>(L, R);
-		b.query20(2).moveh80<2>(L, R);
-		b.query20(3).moveh80<3>(L, R);
+		query20(0).moveh80<0>(L, R);
+		query20(1).moveh80<1>(L, R);
+		query20(2).moveh80<2>(L, R);
+		query20(3).moveh80<3>(L, R);
 		L.inf |= (L.raw ^ raw) | (L.ext ^ ext) ? 0 : -1;
 		R.inf |= (R.raw ^ raw) | (R.ext ^ ext) ? 0 : -1;
 
-		b.transpose80();
-		b.query20(0).movev80<0>(U, D);
-		b.query20(1).movev80<1>(U, D);
-		b.query20(2).movev80<2>(U, D);
-		b.query20(3).movev80<3>(U, D);
+		qcext20(0).movev80<0>(U, D);
+		qcext20(1).movev80<1>(U, D);
+		qcext20(2).movev80<2>(U, D);
+		qcext20(3).movev80<3>(U, D);
 		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
 	}
@@ -769,15 +765,13 @@ public:
 
 	inline u32 operations() const { return operations64(); }
 	inline u32 operations64() const {
-		board trans(*this); trans.transpose64();
-		u32 hori = this->query16(0).legal | this->query16(1).legal | this->query16(2).legal | this->query16(3).legal;
-		u32 vert = trans.query16(0).legal | trans.query16(1).legal | trans.query16(2).legal | trans.query16(3).legal;
+		u32 hori = query16(0).legal | query16(1).legal | query16(2).legal | query16(3).legal;
+		u32 vert = qcext16(0).legal | qcext16(1).legal | qcext16(2).legal | qcext16(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
 	inline u32 operations80() const {
-		board trans(*this); trans.transpose80();
-		u32 hori = this->query20(0).legal | this->query20(1).legal | this->query20(2).legal | this->query20(3).legal;
-		u32 vert = trans.query20(0).legal | trans.query20(1).legal | trans.query20(2).legal | trans.query20(3).legal;
+		u32 hori = query20(0).legal | query20(1).legal | query20(2).legal | query20(3).legal;
+		u32 vert = qcext20(0).legal | qcext20(1).legal | qcext20(2).legal | qcext20(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
 
@@ -813,28 +807,12 @@ public:
 
 	inline bool operable() const { return operable64(); }
 	inline bool operable64() const {
-		if (this->query16(0).moved == 0) return true;
-		if (this->query16(1).moved == 0) return true;
-		if (this->query16(2).moved == 0) return true;
-		if (this->query16(3).moved == 0) return true;
-		board trans(*this); trans.transpose64();
-		if (trans.query16(0).moved == 0) return true;
-		if (trans.query16(1).moved == 0) return true;
-		if (trans.query16(2).moved == 0) return true;
-		if (trans.query16(3).moved == 0) return true;
-		return false;
+		return (query16(0).moved == 0) || (query16(1).moved == 0) || (query16(2).moved == 0) || (query16(3).moved == 0)
+		    || (qcext16(0).moved == 0) || (qcext16(1).moved == 0) || (qcext16(2).moved == 0) || (qcext16(3).moved == 0);
 	}
 	inline bool operable80() const {
-		if (this->query20(0).moved == 0) return true;
-		if (this->query20(1).moved == 0) return true;
-		if (this->query20(2).moved == 0) return true;
-		if (this->query20(3).moved == 0) return true;
-		board trans(*this); trans.transpose80();
-		if (trans.query20(0).moved == 0) return true;
-		if (trans.query20(1).moved == 0) return true;
-		if (trans.query20(2).moved == 0) return true;
-		if (trans.query20(3).moved == 0) return true;
-		return false;
+		return (query20(0).moved == 0) || (query20(1).moved == 0) || (query20(2).moved == 0) || (query20(3).moved == 0)
+		    || (qcext20(0).moved == 0) || (qcext20(1).moved == 0) || (qcext20(2).moved == 0) || (qcext20(3).moved == 0);
 	}
 
 	inline bool movable() const   { return operable(); }
