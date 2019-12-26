@@ -96,6 +96,14 @@ invoke_on_destruct_t<run> invoke_on_destruct(run fx) { return invoke_on_destruct
 
 namespace moporgic {
 
+template<typename... types>
+static inline std::string format(const std::string& spec, types&&... args) {
+	size_t n = std::snprintf(nullptr, 0, spec.c_str(), std::forward<types>(args)...);
+	std::string buf(n + 1, '\0');
+	buf.resize(std::snprintf(&buf[0], buf.capacity(), spec.c_str(), std::forward<types>(args)...));
+	return buf;
+}
+
 static inline uint64_t millisec() {
 	auto now = std::chrono::system_clock::now();
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());

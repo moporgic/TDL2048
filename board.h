@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 4.5
+// Version     : 5.0
 // Description : bitboard of 2048
 //============================================================================
 
@@ -170,6 +170,10 @@ public:
 	inline const cache& query16(u32 r) const { return cache::load(fetch16(r)); }
 	inline const cache& query20(u32 r) const { return cache::load(fetch20(r)); }
 
+	inline const cache& qcext(u32 c) const { return qcext16(c); }
+	inline const cache& qcext16(u32 c) const { return cache::load(cext16(c)); }
+	inline const cache& qcext20(u32 c) const { return cache::load(cext20(c)); }
+
 	inline constexpr u32 fetch(u32 i) const { return fetch16(i); }
 	inline constexpr u32 fetch16(u32 i) const {
 		return ((raw >> (i << 4)) & 0xffff);
@@ -185,6 +189,24 @@ public:
 	inline constexpr void place20(u32 i, u32 r) {
 		place16(i, r & 0xffff);
 		ext = (ext & ~(0xf0000 << (i << 2))) | ((r & 0xf0000) << (i << 2));
+	}
+
+	inline constexpr u32 cext(u32 i) const { return cext16(i); }
+	inline constexpr u32 cext16(u32 i) const {
+		return math::pext64(raw, 0x000f000f000f000full << (i << 2));
+	}
+	inline constexpr u32 cext20(u32 i) const {
+		return cext16(i) | (math::pext32(ext, 0x11110000u << i) << 16);
+	}
+	inline constexpr void cdep(u32 i, u32 c) { cdep16(i, c); }
+	inline constexpr void cdep16(u32 i, u32 c) {
+		u64 m = 0x000f000f000f000full << (i << 2);
+		raw = (raw & ~m) | math::pdep64(c, m);
+	}
+	inline constexpr void cdep20(u32 i, u32 c) {
+		cdep16(i, c & 0xffff);
+		u32 m = 0x11110000u << i;
+		ext = (ext & ~m) | math::pdep32(c >> 16, m);
 	}
 
 	inline constexpr u32 at(u32 i) const { return at4(i); }
@@ -236,19 +258,13 @@ public:
 
 	inline constexpr void transpose() { transpose64(); }
 	inline constexpr void transpose64() {
-		register u64 buf = 0;
-		buf = (raw ^ (raw >> 12)) & 0x0000f0f00000f0f0ull;
-		raw ^= buf ^ (buf << 12);
-		buf = (raw ^ (raw >> 24)) & 0x00000000ff00ff00ull;
-		raw ^= buf ^ (buf << 24);
+		raw = (math::pext64(raw, 0x000f000f000f000full) <<  0) | (math::pext64(raw, 0x00f000f000f000f0ull) << 16)
+		    | (math::pext64(raw, 0x0f000f000f000f00ull) << 32) | (math::pext64(raw, 0xf000f000f000f000ull) << 48);
 	}
 	inline constexpr void transpose80() {
 		transpose64();
-		register u32 buf = 0;
-		buf = (ext ^ (ext >> 3)) & 0x0a0a0000;
-		ext ^= buf ^ (buf << 3);
-		buf = (ext ^ (ext >> 6)) & 0x00cc0000;
-		ext ^= buf ^ (buf << 6);
+		ext = (math::pext32(ext, 0x11110000u) << 16) | (math::pext32(ext, 0x22220000u) << 20)
+			| (math::pext32(ext, 0x44440000u) << 24) | (math::pext32(ext, 0x88880000u) << 28);
 	}
 
 	inline constexpr u32 empty() const { return empty64(); }
@@ -257,22 +273,14 @@ public:
 		x |= (x >> 2);
 		x |= (x >> 1);
 		x = ~x & 0x1111111111111111ull;
-		register u32 e = x + (x >> 32);
-		e += e >> 16;
-		e += e >> 8;
-		return (e & 0x0f) + ((e >> 4) & 0x0f);
+		return math::popcnt64(x);
 	}
 	inline constexpr u32 empty80() const {
 		register u64 x = raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
-		x = ~x & 0x1111111111111111ull;
-		u16 z[]{ 0x1111, 0x1110, 0x1101, 0x1100, 0x1011, 0x1010, 0x1001, 0x1000, 0x0111, 0x0110, 0x0101, 0x0100, 0x0011, 0x0010, 0x0001, 0x0000 };
-		x &= (u64(z[(ext >> 28) & 0x0f]) << 48) | (u64(z[(ext >> 24) & 0x0f]) << 32) | (u64(z[(ext >> 20) & 0x0f]) << 16) | u64(z[(ext >> 16) & 0x0f]);
-		register u32 e = x + (x >> 32);
-		e += e >> 16;
-		e += e >> 8;
-		return (e & 0x0f) + ((e >> 4) & 0x0f);
+		x = ~x & math::pdep64(~ext >> 16, 0x1111111111111111ull);
+		return math::popcnt64(x);
 	}
 
 	inline hexa spaces() const { return spaces64(); }
@@ -296,51 +304,25 @@ public:
 		x |= (x >> 2);
 		x |= (x >> 1);
 		x = ~x & 0x1111111111111111ull;
-		u32 e = x + (x >> 32);
-		e += e >> 16;
-		e += e >> 8;
-		e = (e & 0x0f) + ((e >> 4) & 0x0f);
+		u32 e = math::popcnt64(x);
 		u32 u = moporgic::rand();
-		u32 k = (u >> 16) % e;
-		while (k--) x &= ~(x & -x);
-		u32 p = math::lg64(x & -x);;
-		raw |= (u % 10 ? 1ull : 2ull) << p;
+		u64 t = math::nthset64(x, (u >> 16) % e);
+		raw |= (t << (u % 10 ? 0 : 1));
 	}
 	inline void next80() {
 		u64 x = raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
-		x = ~x & 0x1111111111111111ull;
-		u16 z[]{ 0x1111, 0x1110, 0x1101, 0x1100, 0x1011, 0x1010, 0x1001, 0x1000, 0x0111, 0x0110, 0x0101, 0x0100, 0x0011, 0x0010, 0x0001, 0x0000 };
-		x &= (u64(z[(ext >> 28) & 0x0f]) << 48) | (u64(z[(ext >> 24) & 0x0f]) << 32) | (u64(z[(ext >> 20) & 0x0f]) << 16) | u64(z[(ext >> 16) & 0x0f]);
-		u32 e = x + (x >> 32);
-		e += e >> 16;
-		e += e >> 8;
-		e = (e & 0x0f) + ((e >> 4) & 0x0f);
+		x = ~x & math::pdep64(~ext >> 16, 0x1111111111111111ull);
+		u32 e = math::popcnt64(x);
 		u32 u = moporgic::rand();
-		u32 k = (u >> 16) % e;
-		while (k--) x &= ~(x & -x);
-		u32 p = math::lg64(x & -x);;
-		raw |= (u % 10 ? 1ull : 2ull) << p;
+		u64 t = math::nthset64(x, (u >> 16) % e);
+		raw |= (t << (u % 10 ? 0 : 1));
 	}
 
 	inline bool popup() { return popup64(); }
-	inline bool popup64() {
-		hexa empty = spaces64();
-		if (empty.size() == 0) return false;
-		u32 u = moporgic::rand();
-		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
-		return true;
-	}
-	inline bool popup80() {
-		hexa empty = spaces80();
-		if (empty.size() == 0) return false;
-		u32 u = moporgic::rand();
-		u32 p = hex::as(empty)[(u >> 16) % empty.size()];
-		raw |= (u % 10 ? 1ull : 2ull) << (p << 2);
-		return true;
-	}
+	inline bool popup64() { return empty64() ? next64(), true : false; }
+	inline bool popup80() { return empty80() ? next80(), true : false; }
 
 	inline constexpr void clear() {
 		raw = 0;
@@ -415,23 +397,21 @@ public:
 		return move.inf;
 	}
 	inline i32 up64() {
-		board move, look(*this);
-		look.transpose64();
-		look.query16(0).left.movev64<0>(move);
-		look.query16(1).left.movev64<1>(move);
-		look.query16(2).left.movev64<2>(move);
-		look.query16(3).left.movev64<3>(move);
+		board move;
+		qcext16(0).left.movev64<0>(move);
+		qcext16(1).left.movev64<1>(move);
+		qcext16(2).left.movev64<2>(move);
+		qcext16(3).left.movev64<3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
 		set64(move);
 		return move.inf;
 	}
 	inline i32 down64() {
-		board move, look(*this);
-		look.transpose64();
-		look.query16(0).right.movev64<0>(move);
-		look.query16(1).right.movev64<1>(move);
-		look.query16(2).right.movev64<2>(move);
-		look.query16(3).right.movev64<3>(move);
+		board move;
+		qcext16(0).right.movev64<0>(move);
+		qcext16(1).right.movev64<1>(move);
+		qcext16(2).right.movev64<2>(move);
+		qcext16(3).right.movev64<3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
 		set64(move);
 		return move.inf;
@@ -458,23 +438,21 @@ public:
 		return move.inf;
 	}
 	inline i32 up80() {
-		board move, look(*this);
-		look.transpose80();
-		look.query20(0).left.movev80<0>(move);
-		look.query20(1).left.movev80<1>(move);
-		look.query20(2).left.movev80<2>(move);
-		look.query20(3).left.movev80<3>(move);
+		board move;
+		qcext20(0).left.movev80<0>(move);
+		qcext20(1).left.movev80<1>(move);
+		qcext20(2).left.movev80<2>(move);
+		qcext20(3).left.movev80<3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
 		set80(move);
 		return move.inf;
 	}
 	inline i32 down80() {
-		board move, look(*this);
-		look.transpose80();
-		look.query20(0).right.movev80<0>(move);
-		look.query20(1).right.movev80<1>(move);
-		look.query20(2).right.movev80<2>(move);
-		look.query20(3).right.movev80<3>(move);
+		board move;
+		qcext20(0).right.movev80<0>(move);
+		qcext20(1).right.movev80<1>(move);
+		qcext20(2).right.movev80<2>(move);
+		qcext20(3).right.movev80<3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
 		set80(move);
 		return move.inf;
@@ -486,38 +464,34 @@ public:
 	inline void moves64(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
 
-		board b(*this);
-		b.query16(0).moveh64<0>(L, R);
-		b.query16(1).moveh64<1>(L, R);
-		b.query16(2).moveh64<2>(L, R);
-		b.query16(3).moveh64<3>(L, R);
+		query16(0).moveh64<0>(L, R);
+		query16(1).moveh64<1>(L, R);
+		query16(2).moveh64<2>(L, R);
+		query16(3).moveh64<3>(L, R);
 		L.inf |= (L.raw ^ raw) ? 0 : -1;
 		R.inf |= (R.raw ^ raw) ? 0 : -1;
 
-		b.transpose64();
-		b.query16(0).movev64<0>(U, D);
-		b.query16(1).movev64<1>(U, D);
-		b.query16(2).movev64<2>(U, D);
-		b.query16(3).movev64<3>(U, D);
+		qcext16(0).movev64<0>(U, D);
+		qcext16(1).movev64<1>(U, D);
+		qcext16(2).movev64<2>(U, D);
+		qcext16(3).movev64<3>(U, D);
 		U.inf |= (U.raw ^ raw) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) ? 0 : -1;
 	}
 	inline void moves80(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
 
-		board b(*this);
-		b.query20(0).moveh80<0>(L, R);
-		b.query20(1).moveh80<1>(L, R);
-		b.query20(2).moveh80<2>(L, R);
-		b.query20(3).moveh80<3>(L, R);
+		query20(0).moveh80<0>(L, R);
+		query20(1).moveh80<1>(L, R);
+		query20(2).moveh80<2>(L, R);
+		query20(3).moveh80<3>(L, R);
 		L.inf |= (L.raw ^ raw) | (L.ext ^ ext) ? 0 : -1;
 		R.inf |= (R.raw ^ raw) | (R.ext ^ ext) ? 0 : -1;
 
-		b.transpose80();
-		b.query20(0).movev80<0>(U, D);
-		b.query20(1).movev80<1>(U, D);
-		b.query20(2).movev80<2>(U, D);
-		b.query20(3).movev80<3>(U, D);
+		qcext20(0).movev80<0>(U, D);
+		qcext20(1).movev80<1>(U, D);
+		qcext20(2).movev80<2>(U, D);
+		qcext20(3).movev80<3>(U, D);
 		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
 	}
@@ -791,80 +765,54 @@ public:
 
 	inline u32 operations() const { return operations64(); }
 	inline u32 operations64() const {
-		board trans(*this); trans.transpose64();
-		u32 hori = this->query16(0).legal | this->query16(1).legal | this->query16(2).legal | this->query16(3).legal;
-		u32 vert = trans.query16(0).legal | trans.query16(1).legal | trans.query16(2).legal | trans.query16(3).legal;
+		u32 hori = query16(0).legal | query16(1).legal | query16(2).legal | query16(3).legal;
+		u32 vert = qcext16(0).legal | qcext16(1).legal | qcext16(2).legal | qcext16(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
 	inline u32 operations80() const {
-		board trans(*this); trans.transpose80();
-		u32 hori = this->query20(0).legal | this->query20(1).legal | this->query20(2).legal | this->query20(3).legal;
-		u32 vert = trans.query20(0).legal | trans.query20(1).legal | trans.query20(2).legal | trans.query20(3).legal;
+		u32 hori = query20(0).legal | query20(1).legal | query20(2).legal | query20(3).legal;
+		u32 vert = qcext20(0).legal | qcext20(1).legal | qcext20(2).legal | qcext20(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
 
 	inline hex actions() const { return actions64(); }
 	inline hex actions64() const {
 		u32 o = operations64();
+		u32 u = o & 1, r = o & 2, d = o & 4, l = o & 8;
 		u32 k = 0, x = 0;
-		u32 u = o & 1;
 		k |= (u ? 0 : 0) << x;
 		x += (u << 2);
-		u32 r = o & 2;
 		k |= (r ? 1 : 0) << x;
 		x += (r << 1);
-		u32 d = o & 4;
 		k |= (d ? 2 : 0) << x;
 		x += (d >> 0);
-		u32 l = o & 8;
 		k |= (l ? 3 : 0) << x;
 		x += (l >> 1);
-		hex a(k); a[15] = (x >> 2);
-		return a;
+		return { k | (u64(x >> 2) << (15 << 2)) };
 	}
 	inline hex actions80() const {
 		u32 o = operations80();
+		u32 u = o & 1, r = o & 2, d = o & 4, l = o & 8;
 		u32 k = 0, x = 0;
-		u32 u = o & 1;
 		k |= (u ? 0 : 0) << x;
 		x += (u << 2);
-		u32 r = o & 2;
 		k |= (r ? 1 : 0) << x;
 		x += (r << 1);
-		u32 d = o & 4;
 		k |= (d ? 2 : 0) << x;
 		x += (d >> 0);
-		u32 l = o & 8;
 		k |= (l ? 3 : 0) << x;
 		x += (l >> 1);
-		hex a(k); a[15] = (x >> 2);
-		return a;
+		return { k | (u64(x >> 2) << (15 << 2)) };
 	}
 
 	inline bool operable() const { return operable64(); }
 	inline bool operable64() const {
-		if (this->query16(0).moved == 0) return true;
-		if (this->query16(1).moved == 0) return true;
-		if (this->query16(2).moved == 0) return true;
-		if (this->query16(3).moved == 0) return true;
-		board trans(*this); trans.transpose64();
-		if (trans.query16(0).moved == 0) return true;
-		if (trans.query16(1).moved == 0) return true;
-		if (trans.query16(2).moved == 0) return true;
-		if (trans.query16(3).moved == 0) return true;
-		return false;
+		return (query16(0).moved == 0) || (query16(1).moved == 0) || (query16(2).moved == 0) || (query16(3).moved == 0)
+		    || (qcext16(0).moved == 0) || (qcext16(1).moved == 0) || (qcext16(2).moved == 0) || (qcext16(3).moved == 0);
 	}
 	inline bool operable80() const {
-		if (this->query20(0).moved == 0) return true;
-		if (this->query20(1).moved == 0) return true;
-		if (this->query20(2).moved == 0) return true;
-		if (this->query20(3).moved == 0) return true;
-		board trans(*this); trans.transpose80();
-		if (trans.query20(0).moved == 0) return true;
-		if (trans.query20(1).moved == 0) return true;
-		if (trans.query20(2).moved == 0) return true;
-		if (trans.query20(3).moved == 0) return true;
-		return false;
+		return (query20(0).moved == 0) || (query20(1).moved == 0) || (query20(2).moved == 0) || (query20(3).moved == 0)
+		    || (qcext20(0).moved == 0) || (qcext20(1).moved == 0) || (qcext20(2).moved == 0) || (qcext20(3).moved == 0);
 	}
 
 	inline bool movable() const   { return operable(); }
