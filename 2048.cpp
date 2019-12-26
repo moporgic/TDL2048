@@ -940,7 +940,6 @@ void make_network(utils::options::option opt) {
 	std::string tokens = opt;
 	if (tokens.empty() && feature::feats().empty())
 		tokens = "default";
-	if (tokens == "none") return;
 
 	const auto npos = std::string::npos;
 	for (size_t i; (i = tokens.find(" norm")) != npos; tokens[i] = '/');
