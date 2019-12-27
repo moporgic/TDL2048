@@ -580,8 +580,8 @@ struct adapter {
 	static inline auto& hlist() { static moporgic::list<std::function<u64(const board&)>> h; return h; }
 
 	inline operator indexer::mapper() const { return wlist().front(); }
-	adapter(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
-	~adapter() { wlist().pop_front(); }
+	inline adapter(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
+	inline ~adapter() { wlist().pop_front(); }
 
 	template<u32 idx>
 	static u64 adapt(const board& b) { return hlist()[idx](b); }
@@ -594,8 +594,8 @@ struct adapter {
 		make_wrappers() { wlist().push_back(adapter::adapt<idx>); }
 		~make_wrappers() { make_wrappers<idx + 1, lim>(); }
 	};
-	template<u32 idx>
-	struct make_wrappers<idx, idx> {};
+	template<u32 lim>
+	struct make_wrappers<lim, lim> {};
 };
 
 struct make {
