@@ -459,8 +459,8 @@ private:
 
 namespace index {
 
-template<u32 p, u32... x>
-inline constexpr u32 order() {
+template<typename... idx>
+inline constexpr u32 order(u32 p, idx... x) {
 	if (sizeof...(x) + 1 > 8) return -1;
 	u32 last = p;
 	for (u32 i : { x... })
@@ -472,7 +472,7 @@ inline constexpr u32 order() {
 }
 
 template<u32... patt>
-inline constexpr typename std::enable_if<order<patt...>() == 0, u64>::type indexpt(const board& b) {
+inline constexpr typename std::enable_if<order(patt...) == 0, u64>::type indexpt(const board& b) {
 	constexpr u32 x[] = { patt... };
 	register u32 index = 0;
 	for (register u32 i = 0; i < sizeof...(patt); i++)
@@ -480,13 +480,13 @@ inline constexpr typename std::enable_if<order<patt...>() == 0, u64>::type index
 	return index;
 }
 template<u32... patt>
-inline constexpr typename std::enable_if<order<patt...>() == 1, u64>::type indexpt(const board& b) {
+inline constexpr typename std::enable_if<order(patt...) == 1, u64>::type indexpt(const board& b) {
 	u64 mask = 0;
 	for (u64 p : { patt... }) mask |= 0xfull << (p << 2);
 	return math::pext64(b, mask);
 }
 template<u32 p, u32... x>
-inline constexpr typename std::enable_if<order<p, x...>() == 2, u64>::type indexpt(const board& b) {
+inline constexpr typename std::enable_if<order(p, x...) == 2, u64>::type indexpt(const board& b) {
 	return u32(u64(b) >> (p << 2)) & u32((1ull << ((sizeof...(x) + 1) << 2)) - 1);
 }
 
@@ -554,28 +554,6 @@ u64 indexnumst(const board& b) { // 24-bit
 	return index;
 }
 
-u64 indexnumv(const board& b, const std::vector<u32>& n) {
-	auto num = b.numof();
-	register u64 index = 0;
-	register u32 offset = 0;
-	for (u32 code : n) {
-		using moporgic::math::msb32;
-		using moporgic::math::log2;
-		// code: 0x00SSTTTT
-		u32 size = (code >> 16);
-		u32 tile = (code & 0xffff);
-		u32 idx = log2(tile);
-		u32 var = num[idx];
-		while ((tile &= ~(1 << idx)) != 0) {
-			idx = log2(tile);
-			var += num[idx];
-		}
-		index += (var & ~(-1 << size)) << offset;
-		offset += size;
-	}
-	return index;
-}
-
 template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7>
 u64 indexmono(const board& b) { // 24-bit
 	u32 h0 = (b.at(p0)) | (b.at(p1) << 4) | (b.at(p2) << 8) | (b.at(p3) << 12);
@@ -602,8 +580,8 @@ struct adapter {
 	static inline auto& hlist() { static moporgic::list<std::function<u64(const board&)>> h; return h; }
 
 	inline operator indexer::mapper() const { return wlist().front(); }
-	adapter(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
-	~adapter() { wlist().pop_front(); }
+	inline adapter(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
+	inline ~adapter() { wlist().pop_front(); }
 
 	template<u32 idx>
 	static u64 adapt(const board& b) { return hlist()[idx](b); }
@@ -616,8 +594,8 @@ struct adapter {
 		make_wrappers() { wlist().push_back(adapter::adapt<idx>); }
 		~make_wrappers() { make_wrappers<idx + 1, lim>(); }
 	};
-	template<u32 idx>
-	struct make_wrappers<idx, idx> {};
+	template<u32 lim>
+	struct make_wrappers<lim, lim> {};
 };
 
 struct make {
@@ -1662,8 +1640,9 @@ struct statistic {
 	}
 
 	void summary() const {
+		if (limit == 0) return;
 		char buf[1024];
-		u32 size = 0;
+		size_t size = 0;
 
 		size += snprintf(buf + size, sizeof(buf) - size, summaf, // "summary %llums %.2fops",
 				total.time / info.thdnum,
