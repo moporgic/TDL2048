@@ -659,28 +659,6 @@ u64 indexnumst(const board& b) { // 24-bit
 	return index;
 }
 
-u64 indexnumv(const board& b, const std::vector<u32>& n) {
-	auto num = b.numof();
-	register u64 index = 0;
-	register u32 offset = 0;
-	for (u32 code : n) {
-		using moporgic::math::msb32;
-		using moporgic::math::log2;
-		// code: 0x00SSTTTT
-		u32 size = (code >> 16);
-		u32 tile = (code & 0xffff);
-		u32 idx = log2(tile);
-		u32 var = num[idx];
-		while ((tile &= ~(1 << idx)) != 0) {
-			idx = log2(tile);
-			var += num[idx];
-		}
-		index += (var & ~(-1 << size)) << offset;
-		offset += size;
-	}
-	return index;
-}
-
 template<u32 p0, u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6, u32 p7>
 u64 indexmono(const board& b) { // 24-bit
 	u32 h0 = (b.at(p0)) | (b.at(p1) << 4) | (b.at(p2) << 8) | (b.at(p3) << 12);
@@ -707,8 +685,8 @@ struct adapter {
 	static inline auto& hlist() { static moporgic::list<std::function<u64(const board&)>> h; return h; }
 
 	inline operator indexer::mapper() const { return wlist().front(); }
-	adapter(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
-	~adapter() { wlist().pop_front(); }
+	inline adapter(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
+	inline ~adapter() { wlist().pop_front(); }
 
 	template<u32 idx>
 	static u64 adapt(const board& b) { return hlist()[idx](b); }
@@ -721,8 +699,8 @@ struct adapter {
 		make_wrappers() { wlist().push_back(adapter::adapt<idx>); }
 		~make_wrappers() { make_wrappers<idx + 1, lim>(); }
 	};
-	template<u32 idx>
-	struct make_wrappers<idx, idx> {};
+	template<u32 lim>
+	struct make_wrappers<lim, lim> {};
 };
 
 struct make {
@@ -1045,7 +1023,6 @@ void make_network(utils::options::option opt) {
 	std::string tokens = opt;
 	if (tokens.empty() && feature::feats().empty())
 		tokens = "default";
-	if (tokens == "none") return;
 
 	const auto npos = std::string::npos;
 	for (size_t i; (i = tokens.find(" norm")) != npos; tokens[i] = '/');
