@@ -459,20 +459,19 @@ private:
 
 namespace index {
 
-template<typename... idx>
-inline constexpr u32 order(u32 p, idx... x) {
-	if (sizeof...(x) + 1 > 8) return -1;
-	u32 last = p;
-	for (u32 i : { x... })
-		if (i >= last) last = i; else return 0; // not ordered, diff may < 0
-	u32 expt = p + 1;
-	for (u32 i : { x... })
-		if (i == expt) expt = i + 1; else return 1; // ordered, diff >= 0
-	return 2; // ordered, diff == 1
+template<u32... patt>
+inline constexpr u32 order() {
+	if (sizeof...(patt) > 8 || sizeof...(patt) == 0) return -1;
+	constexpr u32 x[] = { patt... };
+	for (u32 i = 1; i < sizeof...(patt); i++)
+		if (x[i] <= x[i - 1]) return 0; // unordered or duplicated, e.g. {4,3,2,1} or {0,1,2,2}
+	for (u32 i = 1; i < sizeof...(patt); i++)
+		if (x[i] != x[i - 1] + 1) return 1; // ordered, e.g. {0,1,2,4}
+	return 2; // strictly ordered, e.g. {0,1,2,3}
 }
 
 template<u32... patt>
-inline constexpr typename std::enable_if<order(patt...) == 0, u64>::type indexpt(const board& b) {
+inline constexpr typename std::enable_if<order<patt...>() == 0, u64>::type indexpt(const board& b) {
 	constexpr u32 x[] = { patt... };
 	register u32 index = 0;
 	for (register u32 i = 0; i < sizeof...(patt); i++)
@@ -480,13 +479,13 @@ inline constexpr typename std::enable_if<order(patt...) == 0, u64>::type indexpt
 	return index;
 }
 template<u32... patt>
-inline constexpr typename std::enable_if<order(patt...) == 1, u64>::type indexpt(const board& b) {
+inline constexpr typename std::enable_if<order<patt...>() == 1, u64>::type indexpt(const board& b) {
 	u64 mask = 0;
 	for (u64 p : { patt... }) mask |= 0xfull << (p << 2);
 	return math::pext64(b, mask);
 }
 template<u32 p, u32... x>
-inline constexpr typename std::enable_if<order(p, x...) == 2, u64>::type indexpt(const board& b) {
+inline constexpr typename std::enable_if<order<p, x...>() == 2, u64>::type indexpt(const board& b) {
 	return u32(u64(b) >> (p << 2)) & u32((1ull << ((sizeof...(x) + 1) << 2)) - 1);
 }
 
