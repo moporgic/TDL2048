@@ -324,16 +324,6 @@ public:
 		constexpr u16 hold() const { return raw_cast<u16, 2>(info); }
 		constexpr u16 hits() const { return raw_cast<u16, 3>(info); }
 
-	    friend std::ostream& operator <<(std::ostream& out, const block& blk) {
-	    	write_cast<u64>(out, blk.hash);
-	    	write_cast<u64>(out, blk.info);
-	    	return out;
-	    }
-		friend std::istream& operator >>(std::istream& in, block& blk) {
-			read_cast<u64>(in, blk.hash);
-			read_cast<u64>(in, blk.info);
-			return in;
-		}
 	private:
 		u64 hash;
 		u64 info; // f32 esti; u16 hold; u16 hits;
@@ -361,10 +351,9 @@ public:
 			write_cast<u16>(out, 0);
 			write_cast<u64>(out, 0);
 			// write blocks
-			write_cast<u16>(out, sizeof(cache::block));
+			write_cast<u16>(out, sizeof(block));
 			write_cast<u64>(out, c.size());
-			for (size_t i = 0; i < c.size(); i++)
-				out << c[i];
+			write<block>(out, c.cached, c.cached + c.size());
 			// write depth-map (nmap)
 			write_cast<u16>(out, sizeof(size_t));
 			write_cast<u64>(out, c.nmap.size());
@@ -385,8 +374,7 @@ public:
 			in.ignore(read<u16>(in) * read<u64>(in));
 			// read blocks
 			c.init(read<u64>(in.ignore(2)));
-			for (size_t i = 0; i < c.size(); i++)
-				in >> c[i];
+			read<block>(in, c.cached, c.cached + c.size());
 			// read depth-map (nmap)
 			read_cast<u64>(in, c.nmap.begin(), c.nmap.begin() + read<u64>(in.ignore(2)));
 			// ignore unrecognized fields
