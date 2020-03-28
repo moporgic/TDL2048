@@ -1154,7 +1154,7 @@ void init_cache(utils::options::option opt) {
 			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
 			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
 			}
-		bool peek = !opt("nopeek");
+		bool peek = opt("peek") & !opt("nopeek");
 		cache::make(size, peek);
 	}
 }
