@@ -1144,19 +1144,18 @@ void list_network() {
 }
 
 void init_cache(utils::options::option opt) {
-	std::string res(opt);
+	if (opt.value(0) == 0) return;
 
-	if (res.size()) {
-		size_t unit = 0, size = std::stoull(res, &unit);
-		if (unit < res.size())
-			switch (std::toupper(res[unit])) {
-			case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
-			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
-			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
-			}
-		bool peek = opt("peek") & !opt("nopeek");
-		cache::make(size, peek);
-	}
+	std::string res(opt);
+	size_t unit = 0, size = std::stoull(res, &unit);
+	if (unit < res.size())
+		switch (std::toupper(res[unit])) {
+		case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
+		case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
+		case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
+		}
+	bool peek = opt("peek") & !opt("nopeek");
+	cache::make(size, peek);
 }
 
 } // utils
@@ -1264,12 +1263,11 @@ struct method {
 	struct expectimax {
 		constexpr inline operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
 		constexpr inline expectimax(utils::options::option depth) {
-			u32 n = expectimax<source>::depth(depth);
-			std::stringstream in(({
-				std::string limit = depth.find("limit", depth.value());
-				while (limit.find(',') != std::string::npos) limit[limit.find(',')] = ' ';
-				limit;
-			}));
+			u32 n = expectimax<source>::depth(depth.value(1));
+			std::string limit = depth.find("limit", depth.value("1"));
+			while (limit.find(',') != std::string::npos)
+				limit[limit.find(',')] = ' ';
+			std::stringstream in(limit);
 			for (u32& lim : expectimax<source>::limit()) {
 				in >> n;
 				lim = n & -2u;
@@ -1509,7 +1507,7 @@ struct statistic {
 		u32 thdnum;
 	} info;
 
-	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}), info({0, 1}) {}
+	statistic() : limit(0), loop(0), unit(0), winv(0), total{}, local{}, every{}, info{0, 1} {}
 	statistic(const utils::options::option& opt) : statistic() { init(opt); }
 	statistic(const statistic&) = default;
 
@@ -1689,9 +1687,9 @@ statistic run(utils::options opts, std::string type) {
 
 	method spec = method::parse(opts, type);
 	clip<feature> feats = feature::feats();
-	numeric alpha = method::alpha(opts["alpha"] / (opts("alpha", "norm") ? opts["alpha"]["norm"].value(feats.size()) : 1));
-	numeric lambda = method::lambda(opts["lambda"]);
-	u32 step = method::step(opts["step"]);
+	numeric alpha = method::alpha(opts["alpha"].value(0.1) / (opts["alpha"]("norm") ? opts["alpha"]["norm"].value(feats.size()) : 1));
+	numeric lambda = method::lambda(opts["lambda"].value(0));
+	u32 step = method::step(opts["step"].value(lambda ? 5 : 1));
 
 	switch (to_hash(opts[type]["mode"].value(type))) {
 	case to_hash("optimize"):
@@ -1887,39 +1885,37 @@ utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
 	for (int i = 1; i < argc; i++) {
 		std::string label = argv[i];
-		auto next_opt = [&](const std::string& v) -> std::string {
+		auto next_opt = [&](std::string v = "") -> std::string {
 			return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
 		};
-		auto next_opts = [&]() -> utils::options::list {
+		auto next_opts = [&](std::string v = "") -> utils::options::list {
 			utils::options::list args;
-			for (std::string v; (v = next_opt("")).size(); ) args.push_back(v);
+			if (v.size()) args.push_back(next_opt(v));
+			while ((v = next_opt()).size()) args.push_back(v);
 			return args;
 		};
 		switch (to_hash(label)) {
 		case to_hash("-a"): case to_hash("--alpha"):
-			opts[""] = next_opts();
-			if (opts[""].empty()) (opts[""] += "0.1") += "norm";
-			opts["alpha"] = opts[""];
+			opts["alpha"] = next_opts();
+			if (opts["alpha"].empty()) (opts["alpha"] = "0.1") += "norm";
 			break;
 		case to_hash("-l"): case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
-			opts["step"] = next_opt(numeric(opts["lambda"]) ? "5" : "1");
+			opts["step"] = next_opt(opts["lambda"].value(0) ? "5" : "1");
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
 			break;
 		case to_hash("-r"): case to_hash("--recipe"):
-			label = next_opt("");
-			if (label == "") break;
+			label = next_opt("optimize");
 			// no break: optimize and evaluate are also handled by the same recipe logic
 		case to_hash("-t"): case to_hash("--train"): case to_hash("--optimize"):
 		case to_hash("-e"): case to_hash("--test"):  case to_hash("--evaluate"):
-			opts["recipe"] = label.substr(label.find_first_not_of('-'));
-			if (opts["recipe"] == "t" || opts["recipe"] == "train") opts["recipe"] = "optimize";
-			if (opts["recipe"] == "e" || opts["recipe"] == "test")  opts["recipe"] = "evaluate";
-			opts[""] = next_opts();
-			if (opts[""].size()) opts[opts["recipe"]] = opts[""];
-			if (opts[opts["recipe"]].size()) opts["recipes"] += opts["recipe"];
+			label = label.substr(label.find_first_not_of('-'));
+			if (label == "t" || label == "train") label = "optimize";
+			if (label == "e" || label == "test")  label = "evaluate";
+			if ((opts[""] = next_opts()).size()) opts[label] = opts[""];
+			if (opts[label].size()) opts["recipes"] += label;
 			break;
 		case to_hash("--recipes"):
 			opts["recipes"] = next_opts();
@@ -1927,31 +1923,23 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-io"):  case to_hash("--input-output"):
 		case to_hash("-nio"): case to_hash("--network-input-output"):
 		case to_hash("-wio"): case to_hash("--weight-input-output"):
-		case to_hash("-fio"): case to_hash("--feature-input-output"):
 		case to_hash("-i"):   case to_hash("--input"):
 		case to_hash("-wi"):  case to_hash("--weight-input"):
-		case to_hash("-fi"):  case to_hash("--feature-input"):
 		case to_hash("-ni"):  case to_hash("--network-input"):
 		case to_hash("-o"):   case to_hash("--output"):
 		case to_hash("-wo"):  case to_hash("--weight-output"):
-		case to_hash("-fo"):  case to_hash("--feature-output"):
 		case to_hash("-no"):  case to_hash("--network-output"):
-			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
-			opts[""] += next_opts();
+			opts[""] = next_opts(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			if (label.find(label[1] != '-' ? "i" : "input")  != std::string::npos) opts["load"] += opts[""];
 			if (label.find(label[1] != '-' ? "o" : "output") != std::string::npos) opts["save"] += opts[""];
 			break;
-		case to_hash("-w"):  case to_hash("--weight"):
-		case to_hash("-f"):  case to_hash("--feature"):
-		case to_hash("-n"):  case to_hash("--network"):
-		case to_hash("-wf"): case to_hash("--weight-feature"):
-		case to_hash("-fw"): case to_hash("--feature-weight"):
-			opts[""] = next_opt("default");
-			opts[""] += next_opts();
-			opts["make"] += opts[""];
+		case to_hash("-w"): case to_hash("--weight"):
+		case to_hash("-f"): case to_hash("--feature"):
+		case to_hash("-n"): case to_hash("--network"):
+			opts["make"] = next_opts("default");
 			break;
 		case to_hash("-m"): case to_hash("--mode"):
-			opts["mode"] = next_opt("bias");
+			opts["mode"] = next_opt();
 			break;
 		case to_hash("-tt"): case to_hash("--train-type"): case to_hash("--optimize-type"):
 		case to_hash("-tm"): case to_hash("--train-mode"): case to_hash("--optimize-mode"):
@@ -1971,24 +1959,21 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["info"] = next_opt("full");
 			break;
 		case to_hash("-d"): case to_hash("--depth"):
-			opts["depth"] = next_opts();
+			opts["depth"] = next_opts("3");
 			break;
 		case to_hash("-c"): case to_hash("--cache"):
-			opts[""] = next_opt("2048M");
-			opts[""] += next_opts();
-			opts["cache"] += opts[""];
+			opts["cache"] = next_opts("2048M");
 			break;
 		case to_hash("-p"): case to_hash("--parallel"): case to_hash("--thread"):
 			opts["thread"] = std::thread::hardware_concurrency();
-			opts[""] = next_opts();
-			if (opts[""].value(0)) opts["thread"].clear();
+			if ((opts[""] = next_opts()).value(0)) opts["thread"].clear();
 			opts["thread"] += opts[""];
 			break;
-		case to_hash("-x"): case to_hash("-opt"): case to_hash("--options"):
+		case to_hash("-x"): case to_hash("--options"):
 			opts["options"] += next_opts();
 			break;
 		case to_hash("-#"): case to_hash("--comment"):
-			opts["comment"] = next_opts();
+			opts["comment"] += next_opts();
 			break;
 		case to_hash("-|"):
 			opts = {};
@@ -2015,12 +2000,11 @@ utils::options parse(int argc, const char* argv[]) {
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts["recipes"].size()) opts["recipes"] += "optimize", opts["optimize"] = 1000;
+	if (!opts("recipes")) opts["recipes"] = "optimize", opts["optimize"] = 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
-	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
-	if (!opts("depth")) opts["depth"] = 1;
+	if (!opts("step")) opts["step"] = opts["lambda"].value(0) ? 5 : 1;
 
 	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
@@ -2032,8 +2016,8 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
-	std::cout << "search = " << opts["depth"] << ", cache = " << opts["cache"].value("none") << std::endl;
-	std::cout << "concurrent = " << opts["thread"].value(1) << "x" << std::endl;
+	std::cout << "search = " << opts["depth"].value("1") << ", cache = " << opts["cache"].value("none") << std::endl;
+	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
 
 	moporgic::srand(to_hash(opts["seed"]));
