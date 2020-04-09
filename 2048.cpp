@@ -1262,16 +1262,14 @@ struct method {
 	template<typename source = method>
 	struct expectimax {
 		constexpr inline operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
-		constexpr inline expectimax(utils::options::option depth) {
-			u32 n = expectimax<source>::depth(depth.value(1));
-			std::string limit = depth.find("limit", depth.value("1"));
+		constexpr inline expectimax(utils::options::option opt) {
+			u32 n = expectimax<source>::depth(opt.value(1));
+			std::string limit = opt["limit"].value("");
 			while (limit.find(',') != std::string::npos)
 				limit[limit.find(',')] = ' ';
 			std::stringstream in(limit);
-			for (u32& lim : expectimax<source>::limit()) {
-				in >> n;
-				lim = n & -2u;
-			}
+			for (u32& lim : expectimax<source>::limit())
+				in >> n, lim = n & -2u;
 		}
 
 		static inline numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
@@ -1371,19 +1369,19 @@ struct method {
 			spec = spec.substr(0, spec.find_first_of("&|="));
 		}
 
-		if (opts["depth"].value(1) > 1) {
+		if (opts["search"].value(1) > 1) {
 			switch (to_hash(spec)) {
-			default:                    return method::expectimax<method>(opts["depth"]);
-			case to_hash("isomorphic"): return method::expectimax<method::isomorphic>(opts["depth"]);
-			case to_hash("4x6patt"):    return method::expectimax<method::iso4x6patt>(opts["depth"]);
-			case to_hash("5x6patt"):    return method::expectimax<method::iso5x6patt>(opts["depth"]);
-			case to_hash("6x6patt"):    return method::expectimax<method::iso6x6patt>(opts["depth"]);
-			case to_hash("7x6patt"):    return method::expectimax<method::iso7x6patt>(opts["depth"]);
-			case to_hash("8x6patt"):    return method::expectimax<method::iso8x6patt>(opts["depth"]);
-			case to_hash("2x7patt"):    return method::expectimax<method::iso2x7patt>(opts["depth"]);
-			case to_hash("3x7patt"):    return method::expectimax<method::iso3x7patt>(opts["depth"]);
-			case to_hash("1x8patt"):    return method::expectimax<method::iso1x8patt>(opts["depth"]);
-			case to_hash("2x8patt"):    return method::expectimax<method::iso2x8patt>(opts["depth"]);
+			default:                    return method::expectimax<method>(opts["search"]);
+			case to_hash("isomorphic"): return method::expectimax<method::isomorphic>(opts["search"]);
+			case to_hash("4x6patt"):    return method::expectimax<method::iso4x6patt>(opts["search"]);
+			case to_hash("5x6patt"):    return method::expectimax<method::iso5x6patt>(opts["search"]);
+			case to_hash("6x6patt"):    return method::expectimax<method::iso6x6patt>(opts["search"]);
+			case to_hash("7x6patt"):    return method::expectimax<method::iso7x6patt>(opts["search"]);
+			case to_hash("8x6patt"):    return method::expectimax<method::iso8x6patt>(opts["search"]);
+			case to_hash("2x7patt"):    return method::expectimax<method::iso2x7patt>(opts["search"]);
+			case to_hash("3x7patt"):    return method::expectimax<method::iso3x7patt>(opts["search"]);
+			case to_hash("1x8patt"):    return method::expectimax<method::iso1x8patt>(opts["search"]);
+			case to_hash("2x8patt"):    return method::expectimax<method::iso2x8patt>(opts["search"]);
 			}
 		}
 
@@ -1959,7 +1957,8 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["info"] = next_opt("full");
 			break;
 		case to_hash("-d"): case to_hash("--depth"):
-			opts["depth"] = next_opts("3");
+		case to_hash("-S"): case to_hash("--search"):
+			opts["search"] = next_opts("3");
 			break;
 		case to_hash("-c"): case to_hash("--cache"):
 			opts["cache"] = next_opts("2048M");
@@ -2016,7 +2015,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
-	std::cout << "search = " << opts["depth"].value("1") << ", cache = " << opts["cache"].value("none") << std::endl;
+	std::cout << "search = " << opts["search"].value("1") << ", cache = " << opts["cache"].value("none") << std::endl;
 	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
 
