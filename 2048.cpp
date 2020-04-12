@@ -853,7 +853,7 @@ statistic invoke(statistic(*run)(utils::options,std::string), utils::options opt
 	return stat;
 }
 
-std::map<std::string, std::string> aliases() {
+std::string resolve(const std::string& token) {
 	std::map<std::string, std::string> alias;
 
 	alias["4x6patt/khyeh"]       = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
@@ -898,7 +898,8 @@ std::map<std::string, std::string> aliases() {
 	alias["default"]   = alias["4x6patt"];
 	alias["none"]      = "";
 
-	return alias;
+	try { return alias.at(token);
+	} catch (std::out_of_range&) { return token; }
 }
 
 void make_network(utils::options::option opt) {
@@ -909,14 +910,12 @@ void make_network(utils::options::option opt) {
 	const auto npos = std::string::npos;
 	for (size_t i; (i = tokens.find(" norm")) != npos; tokens[i] = '/');
 
-	auto aliases = utils::aliases();
 	std::stringstream unalias(tokens); tokens.clear();
 	for (std::string token; unalias >> token; tokens += (token + ' ')) {
 		if (token.find(':') != npos) continue;
 		std::string name = token.substr(0, token.find_first_of("&|="));
 		std::string info = token != name ? token.substr(name.size()) : "";
-		if (aliases.find(name) != aliases.end()) token = aliases[name];
-		if (info.empty()) continue;
+		if ((token = utils::resolve(name)).empty() || info.empty()) continue;
 
 		std::string winfo, iinfo, buff;
 		for (char set : std::string("&|=")) {
