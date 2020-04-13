@@ -1739,6 +1739,81 @@ statistic run(utils::options opts, std::string type) {
 		}
 		break;
 
+	case to_hash("optimize:forward-step"):
+		for (stats.init(opts[type]); stats; stats++) {
+			board b;
+			u32 score = 0;
+			u32 opers = 0;
+			u32 rsum = 0;
+
+			b.init();
+			for (u32 i = 0; i < step && best(b, feats, spec); i++) {
+				rsum += best.score();
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			while (best(b, feats, spec)) {
+				state& update = path[opers - step];
+				rsum -= update.info();
+				update.estimate(feats, spec);
+				update.optimize(rsum + best.esti(), alpha, feats, spec);
+				rsum += best.score();
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			for (u32 i = opers - std::min(step, opers); i < opers; i++) {
+				state& update = path[i];
+				rsum -= update.info();
+				update.estimate(feats, spec);
+				update.optimize(rsum, alpha, feats, spec);
+			}
+			path.clear();
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
+	case to_hash("optimize:backward-step"):
+		for (stats.init(opts[type]); stats; stats++) {
+			board b;
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, spec); b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			u32 rsum = 0;
+			for (u32 i = opers - 1; i >= opers - std::min(step, opers); i--) {
+				state& update = path[i];
+				update.estimate(feats, spec);
+				update.optimize(rsum, alpha, feats, spec);
+				rsum += update.info();
+			}
+			for (u32 i = opers - 1; i >= step; i--) {
+				state& source = path[i];
+				state& update = path[i - step];
+				rsum -= source.info();
+				numeric esti = source.estimate(feats, spec);
+				update.estimate(feats, spec);
+				update.optimize(rsum + esti, alpha, feats, spec);
+				rsum += update.info();
+			}
+			path.clear();
+
+			stats.update(score, b.hash(), opers);
+		}
+		break;
+
 	case to_hash("optimize:forward-lambda"):
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
@@ -1898,6 +1973,8 @@ utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-l"): case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
+			// no break: lambda may also come with step
+		case to_hash("--step"):
 			opts["step"] = next_opt(opts["lambda"].value(0) ? "5" : "1");
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
