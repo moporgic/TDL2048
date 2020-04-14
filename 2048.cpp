@@ -1690,7 +1690,7 @@ statistic run(utils::options opts, std::string type) {
 
 	switch (to_hash(opts[type]["mode"].value(type))) {
 	case to_hash("optimize"):
-	case to_hash("optimize:forward"):
+	case to_hash("optimize:forward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1715,9 +1715,9 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("optimize:backward"):
+	case to_hash("optimize:backward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1737,9 +1737,9 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("optimize:forward-step"):
+	case to_hash("optimize:forward-step"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1777,9 +1777,9 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("optimize:backward-step"):
+	case to_hash("optimize:backward-step"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1812,9 +1812,9 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("optimize:forward-lambda"):
+	case to_hash("optimize:forward-lambda"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1865,10 +1865,10 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
 	case to_hash("optimize:lambda"):
-	case to_hash("optimize:backward-lambda"):
+	case to_hash("optimize:backward-lambda"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1894,10 +1894,10 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
 	case to_hash("evaluate"):
-	case to_hash("evaluate:best"):
+	case to_hash("evaluate:best"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1911,9 +1911,9 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("evaluate:random"):
+	case to_hash("evaluate:random"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1929,9 +1929,9 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("evaluate:greedy"):
+	case to_hash("evaluate:greedy"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			struct state : board {
@@ -1947,7 +1947,7 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 	}
 
 	return stats;
