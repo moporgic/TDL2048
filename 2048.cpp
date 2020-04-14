@@ -1739,7 +1739,7 @@ statistic run(utils::options opts, std::string type) {
 		}
 		}(); break;
 
-	case to_hash("optimize:forward-step"): [&]() {
+	case to_hash("optimize:step-forward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1779,7 +1779,7 @@ statistic run(utils::options opts, std::string type) {
 		}
 		}(); break;
 
-	case to_hash("optimize:backward-step"): [&]() {
+	case to_hash("optimize:step-backward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1814,7 +1814,7 @@ statistic run(utils::options opts, std::string type) {
 		}
 		}(); break;
 
-	case to_hash("optimize:forward-lambda"): [&]() {
+	case to_hash("optimize:lambda-forward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1868,7 +1868,7 @@ statistic run(utils::options opts, std::string type) {
 		}(); break;
 
 	case to_hash("optimize:lambda"):
-	case to_hash("optimize:backward-lambda"): [&]() {
+	case to_hash("optimize:lambda-backward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
