@@ -1749,7 +1749,7 @@ statistic run(utils::options opts, std::string type) {
 			u32 rsum = 0;
 
 			b.init();
-			for (u32 i = 0; i < step && best(b, feats, spec); i++) {
+			while (best(b, feats, spec) && opers < step) {
 				rsum += best.score();
 				score += best.score();
 				opers += 1;
@@ -1803,9 +1803,9 @@ statistic run(utils::options opts, std::string type) {
 			}
 			for (u32 i = opers - 1; i >= step; i--) {
 				state& source = path[i];
-				state& update = path[i - step];
 				rsum -= source.info();
 				numeric esti = source.estimate(feats, spec);
+				state& update = path[i - step];
 				update.estimate(feats, spec);
 				update.optimize(rsum + esti, alpha, feats, spec);
 				rsum += update.info();
@@ -1823,7 +1823,7 @@ statistic run(utils::options opts, std::string type) {
 			u32 opers = 0;
 
 			b.init();
-			for (u32 i = 0; i < step && best(b, feats, spec); i++) {
+			while (best(b, feats, spec) && opers < step) {
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -1832,13 +1832,12 @@ statistic run(utils::options opts, std::string type) {
 			}
 			while (best(b, feats, spec)) {
 				numeric z = best.esti();
-				numeric retain = 1 - lambda;
 				for (u32 k = 1; k < step; k++) {
 					state& source = path[opers - k];
 					source.estimate(feats, spec);
 					numeric r = source.reward();
 					numeric v = source.value();
-					z = r + (lambda * z + retain * v);
+					z = r + (lambda * z + (1 - lambda) * v);
 				}
 				state& update = path[opers - step];
 				update.estimate(feats, spec);
@@ -1849,17 +1848,16 @@ statistic run(utils::options opts, std::string type) {
 				best >> b;
 				b.next();
 			}
-			for (u32 tail = std::min(step, opers), i = 0; i < tail; i++) {
-				numeric z = 0;
-				numeric retain = 1 - lambda;
-				for (u32 k = i + 1; k < tail; k++) {
-					state& source = path[opers + i - k];
+			for (u32 i = std::min(step, opers); i > 0; i--) {
+				numeric z = best.esti();
+				for (u32 k = 1; k < i; k++) {
+					state& source = path[opers - k];
 					source.estimate(feats, spec);
 					numeric r = source.reward();
 					numeric v = source.value();
-					z = r + (lambda * z + retain * v);
+					z = r + (lambda * z + (1 - lambda) * v);
 				}
-				state& update = path[opers + i - tail];
+				state& update = path[opers - i];
 				update.estimate(feats, spec);
 				update.optimize(z, alpha, feats, spec);
 			}
@@ -1886,10 +1884,9 @@ statistic run(utils::options opts, std::string type) {
 			numeric z = 0;
 			numeric r = path.back().reward();
 			numeric v = path.back().optimize(0, alpha, feats, spec) - r;
-			numeric retain = 1 - lambda;
 			for (path.pop_back(); path.size(); path.pop_back()) {
 				path.back().estimate(feats, spec);
-				z = r + (lambda * z + retain * v);
+				z = r + (lambda * z + (1 - lambda) * v);
 				r = path.back().reward();
 				v = path.back().optimize(z, alpha, feats, spec) - r;
 			}
@@ -1920,12 +1917,10 @@ statistic run(utils::options opts, std::string type) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
-			u64 rbuf;
 			hex a;
 
 			for (b.init(); (a = b.actions()).size(); b.next()) {
-				if (opers % 8 == 0) rbuf = moporgic::rand64();
-				score += b.operate(a[raw_cast<u8>(rbuf, opers % 8) % a.size()]);
+				score += b.operate(a[moporgic::rand() % a.size()]);
 				opers += 1;
 			}
 
