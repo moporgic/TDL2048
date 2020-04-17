@@ -1739,6 +1739,7 @@ statistic run(utils::options opts, std::string type) {
 		}
 		}(); break;
 
+	case to_hash("optimize:step"):
 	case to_hash("optimize:step-forward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
@@ -1931,7 +1932,7 @@ statistic run(utils::options opts, std::string type) {
 		}
 		}(); break;
 
-	case to_hash("evaluate:greedy"): [&]() {
+	case to_hash("evaluate:reward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			struct state : board {
@@ -1974,7 +1975,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-l"): case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
 			// no break: lambda may also come with step
-		case to_hash("--step"):
+		case to_hash("--step"): case to_hash("--n-step"):
 			opts["step"] = next_opt(opts["lambda"].value(0) ? "5" : "1");
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
@@ -1983,11 +1984,9 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-r"): case to_hash("--recipe"):
 			label = next_opt("optimize");
 			// no break: optimize and evaluate are also handled by the same recipe logic
-		case to_hash("-t"): case to_hash("--train"): case to_hash("--optimize"):
-		case to_hash("-e"): case to_hash("--test"):  case to_hash("--evaluate"):
-			label = label.substr(label.find_first_not_of('-'));
-			if (label == "t" || label == "train") label = "optimize";
-			if (label == "e" || label == "test")  label = "evaluate";
+		case to_hash("-t"): case to_hash("--optimize"):
+		case to_hash("-e"): case to_hash("--evaluate"):
+			label = label[label.find_first_not_of('-')] != 'e' ? "optimize" : "evaluate";
 			if ((opts[""] = next_opts()).size()) opts[label] = opts[""];
 			if (opts[label].size()) opts["recipes"] += label;
 			break;
@@ -2010,18 +2009,19 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-w"): case to_hash("--weight"):
 		case to_hash("-f"): case to_hash("--feature"):
 		case to_hash("-n"): case to_hash("--network"):
-			opts["make"] = next_opts("default");
+			opts["make"] += next_opts("default");
 			break;
-		case to_hash("-m"): case to_hash("--mode"):
-			opts["mode"] = next_opt();
+		case to_hash("-tt"): case to_hash("--optimize-type"):
+		case to_hash("-tm"): case to_hash("--optimize-mode"):
+		case to_hash("-et"): case to_hash("--evaluate-type"):
+		case to_hash("-em"): case to_hash("--evaluate-mode"):
+			label = label[label.find_first_not_of('-')] != 'e' ? "optimize" : "evaluate";
+			opts[label]["mode"] = next_opt(label);
+			if (!opts["recipes"](label)) opts["recipes"] += label;
 			break;
-		case to_hash("-tt"): case to_hash("--train-type"): case to_hash("--optimize-type"):
-		case to_hash("-tm"): case to_hash("--train-mode"): case to_hash("--optimize-mode"):
-			opts["optimize"]["mode"] = next_opt("optimize");
-			break;
-		case to_hash("-et"): case to_hash("--test-type"): case to_hash("--evaluate-type"):
-		case to_hash("-em"): case to_hash("--test-mode"): case to_hash("--evaluate-mode"):
-			opts["evaluate"]["mode"] = next_opt("evaluate");
+		case to_hash("-m"):  case to_hash("--mode"):
+			if (opts["recipes"].empty()) opts["recipes"] += "optimize";
+			opts[opts["recipes"].back()]["mode"] = next_opt(opts["recipes"].back());
 			break;
 		case to_hash("-u"): case to_hash("--unit"):
 			opts["unit"] = next_opt("1000");
@@ -2030,7 +2030,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["win"] = next_opt("2048");
 			break;
 		case to_hash("-%"): case to_hash("-I"): case to_hash("--info"):
-			opts["info"] = next_opt("full");
+			opts["info"] = next_opt();
 			break;
 		case to_hash("-d"): case to_hash("--depth"):
 		case to_hash("-S"): case to_hash("--search"):
@@ -2058,17 +2058,24 @@ utils::options parse(int argc, const char* argv[]) {
 			break;
 		}
 	}
-	for (auto recipe : opts["recipes"]) {
-		for (auto item : {"mode", "unit", "win", "info"})
-			if (!opts(recipe, item) && opts(item))
-				opts[recipe][item] = opts[item];
-		for (auto mode : {"optimize", "evaluate"})
-			if (recipe == mode && opts[recipe].find("mode", recipe).find(recipe) != 0)
-				opts[recipe]["mode"] = recipe + ":" + opts[recipe]["mode"];
-		if (!opts(recipe, "info") && opts[recipe].find("mode", recipe).find("evaluate") == 0)
-			opts[recipe]["info"] = "auto";
-		for (auto item : {"info=none", "info=off"})
-			opts[recipe].remove(item);
+	for (std::string recipe : opts["recipes"]) {
+		utils::options::option& ropt = opts[recipe];
+		for (auto item : {"unit", "win", "info"})
+			if (opts(item) && !ropt(item))
+				ropt[item] = opts[item];
+
+		if (recipe.find("optimize") == 0 && !ropt("mode")) {
+			if (ropt("lambda") || opts("lambda"))  ropt["mode"] = "lambda";
+			else if (ropt("step") || opts("step")) ropt["mode"] = "step";
+		}
+		if (recipe.find("optimize") == 0 || recipe.find("evaluate") == 0)
+			if (ropt.find("mode", recipe).find(recipe) != 0)
+				ropt["mode"] = recipe + ":" + ropt["mode"];
+		ropt.remove("mode");
+
+		if (!ropt("info") && ropt.find("mode", recipe).find("evaluate") == 0)
+			ropt["info"];
+		ropt.remove("info=none");
 	}
 	return opts;
 }
