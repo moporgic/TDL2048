@@ -832,11 +832,12 @@ void config_thread(utils::options::option opt) {
 
 template<typename statistic>
 statistic invoke(statistic(*run)(utils::options,std::string), utils::options opts, std::string type) {
+	opts[type]["thread"] = opts[type]["thread"].value(opts["thread"].value(1));
+	u32 thdnum = opts[type]["thread"].value(1), thdid = thdnum;
 #if defined(__linux__)
 	if (shm::enable()) {
-		u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"].value(1)), thdid = thdnum;
 		statistic* stats = shm::alloc<statistic>(thdnum);
-		while (std::stol(opts[type]["thread#"] = --thdid) && fork());
+		while ((opts[type]["thread#"] = (--thdid)).value(0) && fork());
 		statistic stat = stats[thdid] = run(opts, type);
 		if (thdid == 0) while (wait(nullptr) > 0); else std::quick_exit(0);
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
@@ -845,8 +846,7 @@ statistic invoke(statistic(*run)(utils::options,std::string), utils::options opt
 	}
 #endif
 	std::list<std::future<statistic>> thdpool;
-	u32 thdid = std::stol(opts[type]["thread"] = opts["thread"].value(1));
-	while (std::stol(opts[type]["thread#"] = (--thdid)))
+	while ((opts[type]["thread#"] = (--thdid)).value(0))
 		thdpool.push_back(std::async(std::launch::async, run, opts, type));
 	statistic stat = run(opts, type);
 	for (std::future<statistic>& thd : thdpool) stat += thd.get();
@@ -1684,9 +1684,10 @@ statistic run(utils::options opts, std::string type) {
 
 	method spec = method::parse(opts, type);
 	clip<feature> feats = feature::feats();
-	numeric alpha = method::alpha(opts["alpha"].value(0.1) / (opts["alpha"]("norm") ? opts["alpha"]["norm"].value(feats.size()) : 1));
-	numeric lambda = method::lambda(opts["lambda"].value(0));
-	u32 step = method::step(opts["step"].value(lambda ? 5 : 1));
+	numeric alpha = method::alpha(opts[type]["alpha"].value(opts["alpha"].value(0.1))
+			/ (opts["alpha"]("norm") ? opts["alpha"]["norm"].value(feats.size()) : 1));
+	numeric lambda = method::lambda(opts[type]["lambda"].value(opts["lambda"].value(0)));
+	u32 step = method::step(opts[type]["step"].value(opts["step"].value(lambda ? 5 : 1)));
 
 	switch (to_hash(opts[type]["mode"].value(type))) {
 	case to_hash("optimize"):
