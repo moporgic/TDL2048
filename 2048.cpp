@@ -324,16 +324,6 @@ public:
 		constexpr u16 hold() const { return raw_cast<u16, 2>(info); }
 		constexpr u16 hits() const { return raw_cast<u16, 3>(info); }
 
-	    friend std::ostream& operator <<(std::ostream& out, const block& blk) {
-	    	write_cast<u64>(out, blk.hash);
-	    	write_cast<u64>(out, blk.info);
-	    	return out;
-	    }
-		friend std::istream& operator >>(std::istream& in, block& blk) {
-			read_cast<u64>(in, blk.hash);
-			read_cast<u64>(in, blk.info);
-			return in;
-		}
 	private:
 		u64 hash;
 		u64 info; // f32 esti; u16 hold; u16 hits;
@@ -361,10 +351,9 @@ public:
 			write_cast<u16>(out, 0);
 			write_cast<u64>(out, 0);
 			// write blocks
-			write_cast<u16>(out, sizeof(cache::block));
+			write_cast<u16>(out, sizeof(block));
 			write_cast<u64>(out, c.size());
-			for (size_t i = 0; i < c.size(); i++)
-				out << c[i];
+			write<block>(out, c.cached, c.cached + c.size());
 			// write depth-map (nmap)
 			write_cast<u16>(out, sizeof(size_t));
 			write_cast<u64>(out, c.nmap.size());
@@ -385,8 +374,7 @@ public:
 			in.ignore(read<u16>(in) * read<u64>(in));
 			// read blocks
 			c.init(read<u64>(in.ignore(2)));
-			for (size_t i = 0; i < c.size(); i++)
-				in >> c[i];
+			read<block>(in, c.cached, c.cached + c.size());
 			// read depth-map (nmap)
 			read_cast<u64>(in, c.nmap.begin(), c.nmap.begin() + read<u64>(in.ignore(2)));
 			// ignore unrecognized fields
@@ -459,20 +447,19 @@ private:
 
 namespace index {
 
-template<typename... idx>
-inline constexpr u32 order(u32 p, idx... x) {
-	if (sizeof...(x) + 1 > 8) return -1;
-	u32 last = p;
-	for (u32 i : { x... })
-		if (i >= last) last = i; else return 0; // not ordered, diff may < 0
-	u32 expt = p + 1;
-	for (u32 i : { x... })
-		if (i == expt) expt = i + 1; else return 1; // ordered, diff >= 0
-	return 2; // ordered, diff == 1
+template<u32... patt>
+inline constexpr u32 order() {
+	if (sizeof...(patt) > 8 || sizeof...(patt) == 0) return -1;
+	constexpr u32 x[] = { patt... };
+	for (u32 i = 1; i < sizeof...(patt); i++)
+		if (x[i] <= x[i - 1]) return 0; // unordered or duplicated, e.g. {4,3,2,1} or {0,1,2,2}
+	for (u32 i = 1; i < sizeof...(patt); i++)
+		if (x[i] != x[i - 1] + 1) return 1; // ordered, e.g. {0,1,2,4}
+	return 2; // strictly ordered, e.g. {0,1,2,3}
 }
 
 template<u32... patt>
-inline constexpr typename std::enable_if<order(patt...) == 0, u64>::type indexpt(const board& b) {
+inline constexpr typename std::enable_if<order<patt...>() == 0, u64>::type indexpt(const board& b) {
 	constexpr u32 x[] = { patt... };
 	register u32 index = 0;
 	for (register u32 i = 0; i < sizeof...(patt); i++)
@@ -480,13 +467,13 @@ inline constexpr typename std::enable_if<order(patt...) == 0, u64>::type indexpt
 	return index;
 }
 template<u32... patt>
-inline constexpr typename std::enable_if<order(patt...) == 1, u64>::type indexpt(const board& b) {
+inline constexpr typename std::enable_if<order<patt...>() == 1, u64>::type indexpt(const board& b) {
 	u64 mask = 0;
 	for (u64 p : { patt... }) mask |= 0xfull << (p << 2);
 	return math::pext64(b, mask);
 }
 template<u32 p, u32... x>
-inline constexpr typename std::enable_if<order(p, x...) == 2, u64>::type indexpt(const board& b) {
+inline constexpr typename std::enable_if<order<p, x...>() == 2, u64>::type indexpt(const board& b) {
 	return u32(u64(b) >> (p << 2)) & u32((1ull << ((sizeof...(x) + 1) << 2)) - 1);
 }
 
@@ -845,11 +832,12 @@ void config_thread(utils::options::option opt) {
 
 template<typename statistic>
 statistic invoke(statistic(*run)(utils::options,std::string), utils::options opts, std::string type) {
+	opts[type]["thread"] = opts[type]["thread"].value(opts["thread"].value(1));
+	u32 thdnum = opts[type]["thread"].value(1), thdid = thdnum;
 #if defined(__linux__)
 	if (shm::enable()) {
-		u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"].value(1)), thdid = thdnum;
 		statistic* stats = shm::alloc<statistic>(thdnum);
-		while (std::stol(opts[type]["thread#"] = --thdid) && fork());
+		while ((opts[type]["thread#"] = (--thdid)).value(0) && fork());
 		statistic stat = stats[thdid] = run(opts, type);
 		if (thdid == 0) while (wait(nullptr) > 0); else std::quick_exit(0);
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
@@ -858,15 +846,14 @@ statistic invoke(statistic(*run)(utils::options,std::string), utils::options opt
 	}
 #endif
 	std::list<std::future<statistic>> thdpool;
-	u32 thdid = std::stol(opts[type]["thread"] = opts["thread"].value(1));
-	while (std::stol(opts[type]["thread#"] = (--thdid)))
+	while ((opts[type]["thread#"] = (--thdid)).value(0))
 		thdpool.push_back(std::async(std::launch::async, run, opts, type));
 	statistic stat = run(opts, type);
 	for (std::future<statistic>& thd : thdpool) stat += thd.get();
 	return stat;
 }
 
-std::map<std::string, std::string> aliases() {
+std::string resolve(const std::string& token) {
 	std::map<std::string, std::string> alias;
 
 	alias["4x6patt/khyeh"]       = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
@@ -911,7 +898,8 @@ std::map<std::string, std::string> aliases() {
 	alias["default"]   = alias["4x6patt"];
 	alias["none"]      = "";
 
-	return alias;
+	try { return alias.at(token);
+	} catch (std::out_of_range&) { return token; }
 }
 
 void make_network(utils::options::option opt) {
@@ -922,14 +910,12 @@ void make_network(utils::options::option opt) {
 	const auto npos = std::string::npos;
 	for (size_t i; (i = tokens.find(" norm")) != npos; tokens[i] = '/');
 
-	auto aliases = utils::aliases();
 	std::stringstream unalias(tokens); tokens.clear();
 	for (std::string token; unalias >> token; tokens += (token + ' ')) {
 		if (token.find(':') != npos) continue;
 		std::string name = token.substr(0, token.find_first_of("&|="));
 		std::string info = token != name ? token.substr(name.size()) : "";
-		if (aliases.find(name) != aliases.end()) token = aliases[name];
-		if (info.empty()) continue;
+		if ((token = utils::resolve(name)).empty() || info.empty()) continue;
 
 		std::string winfo, iinfo, buff;
 		for (char set : std::string("&|=")) {
@@ -1157,19 +1143,18 @@ void list_network() {
 }
 
 void init_cache(utils::options::option opt) {
-	std::string res(opt);
+	if (opt.value(0) == 0) return;
 
-	if (res.size()) {
-		size_t unit = 0, size = std::stoull(res, &unit);
-		if (unit < res.size())
-			switch (std::toupper(res[unit])) {
-			case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
-			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
-			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
-			}
-		bool peek = !opt("nopeek");
-		cache::make(size, peek);
-	}
+	std::string res(opt);
+	size_t unit = 0, size = std::stoull(res, &unit);
+	if (unit < res.size())
+		switch (std::toupper(res[unit])) {
+		case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
+		case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
+		case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
+		}
+	bool peek = opt("peek") & !opt("nopeek");
+	cache::make(size, peek);
 }
 
 } // utils
@@ -1276,17 +1261,14 @@ struct method {
 	template<typename source = method>
 	struct expectimax {
 		constexpr inline operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
-		constexpr inline expectimax(utils::options::option depth) {
-			u32 n = expectimax<source>::depth(depth);
-			std::stringstream in(({
-				std::string limit = depth.find("limit", depth.value());
-				while (limit.find(',') != std::string::npos) limit[limit.find(',')] = ' ';
-				limit;
-			}));
-			for (u32& lim : expectimax<source>::limit()) {
-				in >> n;
-				lim = n & -2u;
-			}
+		constexpr inline expectimax(utils::options::option opt) {
+			u32 n = expectimax<source>::depth(opt.value(1));
+			std::string limit = opt["limit"].value("");
+			while (limit.find(',') != std::string::npos)
+				limit[limit.find(',')] = ' ';
+			std::stringstream in(limit);
+			for (u32& lim : expectimax<source>::limit())
+				in >> n, lim = n & -2u;
 		}
 
 		static inline numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
@@ -1386,19 +1368,19 @@ struct method {
 			spec = spec.substr(0, spec.find_first_of("&|="));
 		}
 
-		if (opts["depth"].value(1) > 1) {
+		if (opts["search"].value(1) > 1) {
 			switch (to_hash(spec)) {
-			default:                    return method::expectimax<method>(opts["depth"]);
-			case to_hash("isomorphic"): return method::expectimax<method::isomorphic>(opts["depth"]);
-			case to_hash("4x6patt"):    return method::expectimax<method::iso4x6patt>(opts["depth"]);
-			case to_hash("5x6patt"):    return method::expectimax<method::iso5x6patt>(opts["depth"]);
-			case to_hash("6x6patt"):    return method::expectimax<method::iso6x6patt>(opts["depth"]);
-			case to_hash("7x6patt"):    return method::expectimax<method::iso7x6patt>(opts["depth"]);
-			case to_hash("8x6patt"):    return method::expectimax<method::iso8x6patt>(opts["depth"]);
-			case to_hash("2x7patt"):    return method::expectimax<method::iso2x7patt>(opts["depth"]);
-			case to_hash("3x7patt"):    return method::expectimax<method::iso3x7patt>(opts["depth"]);
-			case to_hash("1x8patt"):    return method::expectimax<method::iso1x8patt>(opts["depth"]);
-			case to_hash("2x8patt"):    return method::expectimax<method::iso2x8patt>(opts["depth"]);
+			default:                    return method::expectimax<method>(opts["search"]);
+			case to_hash("isomorphic"): return method::expectimax<method::isomorphic>(opts["search"]);
+			case to_hash("4x6patt"):    return method::expectimax<method::iso4x6patt>(opts["search"]);
+			case to_hash("5x6patt"):    return method::expectimax<method::iso5x6patt>(opts["search"]);
+			case to_hash("6x6patt"):    return method::expectimax<method::iso6x6patt>(opts["search"]);
+			case to_hash("7x6patt"):    return method::expectimax<method::iso7x6patt>(opts["search"]);
+			case to_hash("8x6patt"):    return method::expectimax<method::iso8x6patt>(opts["search"]);
+			case to_hash("2x7patt"):    return method::expectimax<method::iso2x7patt>(opts["search"]);
+			case to_hash("3x7patt"):    return method::expectimax<method::iso3x7patt>(opts["search"]);
+			case to_hash("1x8patt"):    return method::expectimax<method::iso1x8patt>(opts["search"]);
+			case to_hash("2x8patt"):    return method::expectimax<method::iso2x8patt>(opts["search"]);
 			}
 		}
 
@@ -1522,7 +1504,7 @@ struct statistic {
 		u32 thdnum;
 	} info;
 
-	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}), info({0, 1}) {}
+	statistic() : limit(0), loop(0), unit(0), winv(0), total{}, local{}, every{}, info{0, 1} {}
 	statistic(const utils::options::option& opt) : statistic() { init(opt); }
 	statistic(const statistic&) = default;
 
@@ -1702,13 +1684,14 @@ statistic run(utils::options opts, std::string type) {
 
 	method spec = method::parse(opts, type);
 	clip<feature> feats = feature::feats();
-	numeric alpha = method::alpha(opts["alpha"] / (opts("alpha", "norm") ? opts["alpha"]["norm"].value(feats.size()) : 1));
-	numeric lambda = method::lambda(opts["lambda"]);
-	u32 step = method::step(opts["step"]);
+	numeric alpha = method::alpha(opts[type]["alpha"].value(opts["alpha"].value(0.1))
+			/ (opts["alpha"]("norm") ? opts["alpha"]["norm"].value(feats.size()) : 1));
+	numeric lambda = method::lambda(opts[type]["lambda"].value(opts["lambda"].value(0)));
+	u32 step = method::step(opts[type]["step"].value(opts["step"].value(lambda ? 5 : 1)));
 
 	switch (to_hash(opts[type]["mode"].value(type))) {
 	case to_hash("optimize"):
-	case to_hash("optimize:forward"):
+	case to_hash("optimize:forward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1733,9 +1716,9 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("optimize:backward"):
+	case to_hash("optimize:backward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1755,16 +1738,92 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("optimize:forward-lambda"):
+	case to_hash("optimize:step"):
+	case to_hash("optimize:step-forward"): [&]() {
+		for (stats.init(opts[type]); stats; stats++) {
+			board b;
+			u32 score = 0;
+			u32 opers = 0;
+			u32 rsum = 0;
+
+			b.init();
+			while (best(b, feats, spec) && opers < step) {
+				rsum += best.score();
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			while (best(b, feats, spec)) {
+				state& update = path[opers - step];
+				rsum -= update.info();
+				update.estimate(feats, spec);
+				update.optimize(rsum + best.esti(), alpha, feats, spec);
+				rsum += best.score();
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			for (u32 i = opers - std::min(step, opers); i < opers; i++) {
+				state& update = path[i];
+				rsum -= update.info();
+				update.estimate(feats, spec);
+				update.optimize(rsum, alpha, feats, spec);
+			}
+			path.clear();
+
+			stats.update(score, b.hash(), opers);
+		}
+		}(); break;
+
+	case to_hash("optimize:step-backward"): [&]() {
+		for (stats.init(opts[type]); stats; stats++) {
+			board b;
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, spec); b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			u32 rsum = 0;
+			for (u32 i = opers - 1; i >= opers - std::min(step, opers); i--) {
+				state& update = path[i];
+				update.estimate(feats, spec);
+				update.optimize(rsum, alpha, feats, spec);
+				rsum += update.info();
+			}
+			for (u32 i = opers - 1; i >= step; i--) {
+				state& source = path[i];
+				rsum -= source.info();
+				numeric esti = source.estimate(feats, spec);
+				state& update = path[i - step];
+				update.estimate(feats, spec);
+				update.optimize(rsum + esti, alpha, feats, spec);
+				rsum += update.info();
+			}
+			path.clear();
+
+			stats.update(score, b.hash(), opers);
+		}
+		}(); break;
+
+	case to_hash("optimize:lambda-forward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
 			b.init();
-			for (u32 i = 0; i < step && best(b, feats, spec); i++) {
+			while (best(b, feats, spec) && opers < step) {
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -1773,13 +1832,12 @@ statistic run(utils::options opts, std::string type) {
 			}
 			while (best(b, feats, spec)) {
 				numeric z = best.esti();
-				numeric retain = 1 - lambda;
 				for (u32 k = 1; k < step; k++) {
 					state& source = path[opers - k];
 					source.estimate(feats, spec);
 					numeric r = source.reward();
 					numeric v = source.value();
-					z = r + (lambda * z + retain * v);
+					z = r + (lambda * z + (1 - lambda) * v);
 				}
 				state& update = path[opers - step];
 				update.estimate(feats, spec);
@@ -1790,17 +1848,16 @@ statistic run(utils::options opts, std::string type) {
 				best >> b;
 				b.next();
 			}
-			for (u32 tail = std::min(step, opers), i = 0; i < tail; i++) {
-				numeric z = 0;
-				numeric retain = 1 - lambda;
-				for (u32 k = i + 1; k < tail; k++) {
-					state& source = path[opers + i - k];
+			for (u32 i = std::min(step, opers); i > 0; i--) {
+				numeric z = best.esti();
+				for (u32 k = 1; k < i; k++) {
+					state& source = path[opers - k];
 					source.estimate(feats, spec);
 					numeric r = source.reward();
 					numeric v = source.value();
-					z = r + (lambda * z + retain * v);
+					z = r + (lambda * z + (1 - lambda) * v);
 				}
-				state& update = path[opers + i - tail];
+				state& update = path[opers - i];
 				update.estimate(feats, spec);
 				update.optimize(z, alpha, feats, spec);
 			}
@@ -1808,10 +1865,10 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
 	case to_hash("optimize:lambda"):
-	case to_hash("optimize:backward-lambda"):
+	case to_hash("optimize:lambda-backward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1827,20 +1884,19 @@ statistic run(utils::options opts, std::string type) {
 			numeric z = 0;
 			numeric r = path.back().reward();
 			numeric v = path.back().optimize(0, alpha, feats, spec) - r;
-			numeric retain = 1 - lambda;
 			for (path.pop_back(); path.size(); path.pop_back()) {
 				path.back().estimate(feats, spec);
-				z = r + (lambda * z + retain * v);
+				z = r + (lambda * z + (1 - lambda) * v);
 				r = path.back().reward();
 				v = path.back().optimize(z, alpha, feats, spec) - r;
 			}
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
 	case to_hash("evaluate"):
-	case to_hash("evaluate:best"):
+	case to_hash("evaluate:best"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1854,27 +1910,25 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("evaluate:random"):
+	case to_hash("evaluate:random"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
-			u64 rbuf;
 			hex a;
 
 			for (b.init(); (a = b.actions()).size(); b.next()) {
-				if (opers % 8 == 0) rbuf = moporgic::rand64();
-				score += b.operate(a[raw_cast<u8>(rbuf, opers % 8) % a.size()]);
+				score += b.operate(a[moporgic::rand() % a.size()]);
 				opers += 1;
 			}
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("evaluate:greedy"):
+	case to_hash("evaluate:reward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			struct state : board {
@@ -1890,7 +1944,7 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 	}
 
 	return stats;
@@ -1900,39 +1954,37 @@ utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
 	for (int i = 1; i < argc; i++) {
 		std::string label = argv[i];
-		auto next_opt = [&](const std::string& v) -> std::string {
+		auto next_opt = [&](std::string v = "") -> std::string {
 			return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
 		};
-		auto next_opts = [&]() -> utils::options::list {
+		auto next_opts = [&](std::string v = "") -> utils::options::list {
 			utils::options::list args;
-			for (std::string v; (v = next_opt("")).size(); ) args.push_back(v);
+			if (v.size()) args.push_back(next_opt(v));
+			while ((v = next_opt()).size()) args.push_back(v);
 			return args;
 		};
 		switch (to_hash(label)) {
 		case to_hash("-a"): case to_hash("--alpha"):
-			opts[""] = next_opts();
-			if (opts[""].empty()) (opts[""] += "0.1") += "norm";
-			opts["alpha"] = opts[""];
+			opts["alpha"] = next_opts();
+			if (opts["alpha"].empty()) (opts["alpha"] = "0.1") += "norm";
 			break;
 		case to_hash("-l"): case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
-			opts["step"] = next_opt(numeric(opts["lambda"]) ? "5" : "1");
+			// no break: lambda may also come with step
+		case to_hash("--step"): case to_hash("--n-step"):
+			opts["step"] = next_opt(opts["lambda"].value(0) ? "5" : "1");
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
 			break;
 		case to_hash("-r"): case to_hash("--recipe"):
-			label = next_opt("");
-			if (label == "") break;
+			label = next_opt("optimize");
 			// no break: optimize and evaluate are also handled by the same recipe logic
-		case to_hash("-t"): case to_hash("--train"): case to_hash("--optimize"):
-		case to_hash("-e"): case to_hash("--test"):  case to_hash("--evaluate"):
-			opts["recipe"] = label.substr(label.find_first_not_of('-'));
-			if (opts["recipe"] == "t" || opts["recipe"] == "train") opts["recipe"] = "optimize";
-			if (opts["recipe"] == "e" || opts["recipe"] == "test")  opts["recipe"] = "evaluate";
-			opts[""] = next_opts();
-			if (opts[""].size()) opts[opts["recipe"]] = opts[""];
-			if (opts[opts["recipe"]].size()) opts["recipes"] += opts["recipe"];
+		case to_hash("-t"): case to_hash("--optimize"):
+		case to_hash("-e"): case to_hash("--evaluate"):
+			label = label[label.find_first_not_of('-')] != 'e' ? "optimize" : "evaluate";
+			if ((opts[""] = next_opts()).size()) opts[label] = opts[""];
+			if (opts[label].size()) opts["recipes"] += label;
 			break;
 		case to_hash("--recipes"):
 			opts["recipes"] = next_opts();
@@ -1940,39 +1992,32 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-io"):  case to_hash("--input-output"):
 		case to_hash("-nio"): case to_hash("--network-input-output"):
 		case to_hash("-wio"): case to_hash("--weight-input-output"):
-		case to_hash("-fio"): case to_hash("--feature-input-output"):
 		case to_hash("-i"):   case to_hash("--input"):
 		case to_hash("-wi"):  case to_hash("--weight-input"):
-		case to_hash("-fi"):  case to_hash("--feature-input"):
 		case to_hash("-ni"):  case to_hash("--network-input"):
 		case to_hash("-o"):   case to_hash("--output"):
 		case to_hash("-wo"):  case to_hash("--weight-output"):
-		case to_hash("-fo"):  case to_hash("--feature-output"):
 		case to_hash("-no"):  case to_hash("--network-output"):
-			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
-			opts[""] += next_opts();
+			opts[""] = next_opts(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			if (label.find(label[1] != '-' ? "i" : "input")  != std::string::npos) opts["load"] += opts[""];
 			if (label.find(label[1] != '-' ? "o" : "output") != std::string::npos) opts["save"] += opts[""];
 			break;
-		case to_hash("-w"):  case to_hash("--weight"):
-		case to_hash("-f"):  case to_hash("--feature"):
-		case to_hash("-n"):  case to_hash("--network"):
-		case to_hash("-wf"): case to_hash("--weight-feature"):
-		case to_hash("-fw"): case to_hash("--feature-weight"):
-			opts[""] = next_opt("default");
-			opts[""] += next_opts();
-			opts["make"] += opts[""];
+		case to_hash("-w"): case to_hash("--weight"):
+		case to_hash("-f"): case to_hash("--feature"):
+		case to_hash("-n"): case to_hash("--network"):
+			opts["make"] += next_opts("default");
 			break;
-		case to_hash("-m"): case to_hash("--mode"):
-			opts["mode"] = next_opt("bias");
+		case to_hash("-tt"): case to_hash("--optimize-type"):
+		case to_hash("-tm"): case to_hash("--optimize-mode"):
+		case to_hash("-et"): case to_hash("--evaluate-type"):
+		case to_hash("-em"): case to_hash("--evaluate-mode"):
+			label = label[label.find_first_not_of('-')] != 'e' ? "optimize" : "evaluate";
+			opts[label]["mode"] = next_opt(label);
+			if (!opts["recipes"](label)) opts["recipes"] += label;
 			break;
-		case to_hash("-tt"): case to_hash("--train-type"): case to_hash("--optimize-type"):
-		case to_hash("-tm"): case to_hash("--train-mode"): case to_hash("--optimize-mode"):
-			opts["optimize"]["mode"] = next_opt("optimize");
-			break;
-		case to_hash("-et"): case to_hash("--test-type"): case to_hash("--evaluate-type"):
-		case to_hash("-em"): case to_hash("--test-mode"): case to_hash("--evaluate-mode"):
-			opts["evaluate"]["mode"] = next_opt("evaluate");
+		case to_hash("-m"):  case to_hash("--mode"):
+			if (opts["recipes"].empty()) opts["recipes"] += "optimize";
+			opts[opts["recipes"].back()]["mode"] = next_opt(opts["recipes"].back());
 			break;
 		case to_hash("-u"): case to_hash("--unit"):
 			opts["unit"] = next_opt("1000");
@@ -1981,27 +2026,25 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["win"] = next_opt("2048");
 			break;
 		case to_hash("-%"): case to_hash("-I"): case to_hash("--info"):
-			opts["info"] = next_opt("full");
+			opts["info"] = next_opt();
 			break;
 		case to_hash("-d"): case to_hash("--depth"):
-			opts["depth"] = next_opts();
+		case to_hash("-S"): case to_hash("--search"):
+			opts["search"] = next_opts("3");
 			break;
 		case to_hash("-c"): case to_hash("--cache"):
-			opts[""] = next_opt("2048M");
-			opts[""] += next_opts();
-			opts["cache"] += opts[""];
+			opts["cache"] = next_opts("2048M");
 			break;
 		case to_hash("-p"): case to_hash("--parallel"): case to_hash("--thread"):
 			opts["thread"] = std::thread::hardware_concurrency();
-			opts[""] = next_opts();
-			if (opts[""].value(0)) opts["thread"].clear();
+			if ((opts[""] = next_opts()).value(0)) opts["thread"].clear();
 			opts["thread"] += opts[""];
 			break;
-		case to_hash("-x"): case to_hash("-opt"): case to_hash("--options"):
+		case to_hash("-x"): case to_hash("--options"):
 			opts["options"] += next_opts();
 			break;
 		case to_hash("-#"): case to_hash("--comment"):
-			opts["comment"] = next_opts();
+			opts["comment"] += next_opts();
 			break;
 		case to_hash("-|"):
 			opts = {};
@@ -2011,29 +2054,35 @@ utils::options parse(int argc, const char* argv[]) {
 			break;
 		}
 	}
-	for (auto recipe : opts["recipes"]) {
-		for (auto item : {"mode", "unit", "win", "info"})
-			if (!opts(recipe, item) && opts(item))
-				opts[recipe][item] = opts[item];
-		for (auto mode : {"optimize", "evaluate"})
-			if (recipe == mode && opts[recipe].find("mode", recipe).find(recipe) != 0)
-				opts[recipe]["mode"] = recipe + ":" + opts[recipe]["mode"];
-		if (!opts(recipe, "info") && opts[recipe].find("mode", recipe).find("evaluate") == 0)
-			opts[recipe]["info"] = "auto";
-		for (auto item : {"info=none", "info=off"})
-			opts[recipe].remove(item);
+	for (std::string recipe : opts["recipes"]) {
+		utils::options::option& ropt = opts[recipe];
+		for (auto item : {"unit", "win", "info"})
+			if (opts(item) && !ropt(item))
+				ropt[item] = opts[item];
+
+		if (recipe.find("optimize") == 0 && !ropt("mode")) {
+			if (ropt("lambda") || opts("lambda"))  ropt["mode"] = "lambda";
+			else if (ropt("step") || opts("step")) ropt["mode"] = "step";
+		}
+		if (recipe.find("optimize") == 0 || recipe.find("evaluate") == 0)
+			if (ropt.find("mode", recipe).find(recipe) != 0)
+				ropt["mode"] = recipe + ":" + ropt["mode"];
+		ropt.remove("mode");
+
+		if (!ropt("info") && ropt.find("mode", recipe).find("evaluate") == 0)
+			ropt["info"];
+		ropt.remove("info=none");
 	}
 	return opts;
 }
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts["recipes"].size()) opts["recipes"] += "optimize", opts["optimize"] = 1000;
+	if (!opts("recipes")) opts["recipes"] = "optimize", opts["optimize"] = 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
-	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
-	if (!opts("depth")) opts["depth"] = 1;
+	if (!opts("step")) opts["step"] = opts["lambda"].value(0) ? 5 : 1;
 
 	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
@@ -2045,8 +2094,8 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"] << std::endl;
 	std::cout << "alpha = " << opts["alpha"] << std::endl;
 	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
-	std::cout << "search = " << opts["depth"] << ", cache = " << opts["cache"].value("none") << std::endl;
-	std::cout << "concurrent = " << opts["thread"].value(1) << "x" << std::endl;
+	std::cout << "search = " << opts["search"].value("1") << ", cache = " << opts["cache"].value("none") << std::endl;
+	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
 
 	moporgic::srand(to_hash(opts["seed"]));
