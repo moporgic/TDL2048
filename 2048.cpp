@@ -1464,10 +1464,14 @@ struct select {
 	inline state* end() { return move + 4; }
 };
 struct statistic {
-	u64 limit;
-	u64 loop;
-	u64 unit;
-	u32 winv;
+	struct execinfo {
+		u64 limit;
+		u64 loop;
+		u64 unit;
+		u32 win;
+		u32 thdid;
+		u32 thdnum;
+	} info;
 
 	struct record {
 		u64 score;
@@ -1487,100 +1491,72 @@ struct statistic {
 		}
 	} total, local;
 
-	struct each {
+	struct counter {
 		std::array<u64, 32> score;
 		std::array<u64, 32> opers;
 		std::array<u64, 32> count;
-		each& operator +=(const each& ea) {
+		counter& operator +=(const counter& ea) {
 			std::transform(count.begin(), count.end(), ea.count.begin(), count.begin(), std::plus<u64>());
 			std::transform(score.begin(), score.end(), ea.score.begin(), score.begin(), std::plus<u64>());
 			std::transform(opers.begin(), opers.end(), ea.opers.begin(), opers.begin(), std::plus<u64>());
 			return (*this);
 		}
-	} every;
+	} accum;
 
-	struct execinfo {
-		u32 thdid;
-		u32 thdnum;
-	} info;
-
-	statistic() : limit(0), loop(0), unit(0), winv(0), total{}, local{}, every{}, info{0, 1} {}
-	statistic(const utils::options::option& opt) : statistic() { init(opt); }
+	statistic() : info{}, total{}, local{}, accum{} {}
 	statistic(const statistic&) = default;
 
-	bool init(const utils::options::option& opt = {}) {
-		loop = 1000;
-		unit = 1000;
-		winv = 2048;
+	bool init(utils::options::option opt = {}) {
+		std::string conf = opt.value().substr(0, opt.value().find(' ')) + "x:";
+		info.loop = opt["loop"].value((opt["-"] = conf).value(1000));
+		info.unit = opt["unit"].value((opt["-"] = conf.substr(conf.find('x') + 1)).value(1000));
+		info.win  = opt["win"].value((opt["-"] = conf.substr(conf.find(':') + 1)).value(2048));
 
-		auto npos = std::string::npos;
-		auto it = std::find_if(opt.begin(), opt.end(), [=](std::string v) { return v.find('=') == npos; });
-		std::string res = (it != opt.end()) ? *it : (opt.empty() ? "1000" : "0");
-		try {
-			loop = std::stol(res);
-			if (res.find('x') != npos) unit = std::stol(res.substr(res.find('x') + 1));
-			if (res.find(':') != npos) winv = std::stol(res.substr(res.find(':') + 1));
-		} catch (std::invalid_argument&) {}
-
-		loop = std::stol(opt.find("loop", std::to_string(loop)));
-		unit = std::stol(opt.find("unit", std::to_string(unit)));
-		winv = std::stol(opt.find("win",  std::to_string(winv)));
-
-		info.thdid = std::stol(opt.find("thread#", "0"));
-		info.thdnum = std::stol(opt.find("thread", "1"));
-		loop = loop / info.thdnum + (loop % info.thdnum && info.thdid < (loop % info.thdnum) ? 1 : 0);
-		limit = loop * unit;
+		info.thdid  = opt["thread#"].value(0);
+		info.thdnum = opt["thread"].value(1);
+		info.loop  = info.loop / info.thdnum + (info.loop % info.thdnum && info.thdid < (info.loop % info.thdnum) ? 1 : 0);
+		info.limit = info.loop * info.unit;
 		format(0, (info.thdnum > 1) ? (" [" + std::to_string(info.thdid) + "]") : "");
 
-		every = {};
 		total = {};
 		local = {};
+		accum = {};
 		for (u32 i = 0; i < info.thdid; i++) moporgic::rand();
 		local.time = moporgic::millisec();
-		loop = 1;
+		info.loop = 1;
 
-		return limit;
+		return info.limit;
 	}
 
-	class format_t : public std::array<char, 64> {
-	public:
+	struct string : std::array<char, 64> {
 		inline void operator =(const std::string& s) { std::copy_n(s.begin(), s.size() + 1, begin()); }
 		inline operator const char*() const { return data(); }
-	};
-
-	format_t indexf;
-	format_t localf;
-	format_t totalf;
-	format_t summaf;
+	} indexf, localf, totalf, summaf;
 
 	void format(u32 dec = 0, const std::string& suffix = "") {
-//		indexf = "%03llu/%03llu %llums %.2fops";
-//		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
-//		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
-//		summaf = "summary %llums %.2fops";
-		if (!dec) dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
+		if (!dec) dec = std::max(std::floor(std::log10(info.limit / info.unit)) + 1, 3.0);
 		indexf = "%0" + std::to_string(dec) + PRIu64 "/%0" + std::to_string(dec) + PRIu64 " %" PRIu64 "ms %.2fops" + suffix;
 		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
 		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
 		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%" PRIu64 "ms %.2fops" + suffix;
 	}
 
-	inline u64 operator++(int) { return (++loop) - 1; }
-	inline u64 operator++() { return (++loop); }
-	inline operator bool() const { return loop <= limit; }
-	inline bool checked() const { return (loop % unit) == 0; }
+	inline void operator++(int) { ++info.loop; }
+	inline void operator++() { ++info.loop; }
+	inline operator bool() const { return info.loop <= info.limit; }
+	inline bool checked() const { return (info.loop % info.unit) == 0; }
 
 	void update(u32 score, u32 hash, u32 opers) {
 		local.score += score;
 		local.hash |= hash;
 		local.opers += opers;
-		local.win += (hash >= winv ? 1 : 0);
+		local.win += (hash >= info.win ? 1 : 0);
 		local.max = std::max(local.max, score);
-		every.count[math::log2(hash)] += 1;
-		every.score[math::log2(hash)] += score;
-		every.opers[math::log2(hash)] += opers;
+		accum.count[math::log2(hash)] += 1;
+		accum.score[math::log2(hash)] += score;
+		accum.opers[math::log2(hash)] += opers;
 
-		if ((loop % unit) != 0) return;
+		if ((info.loop % info.unit) != 0) return;
 
 		u64 tick = moporgic::millisec();
 		local.time = tick - local.time;
@@ -1595,22 +1571,22 @@ struct statistic {
 		u32 size = 0;
 
 		size += snprintf(buf + size, sizeof(buf) - size, indexf, // "%03llu/%03llu %llums %.2fops",
-				loop / unit,
-				limit / unit,
+				info.loop / info.unit,
+				info.limit / info.unit,
 				local.time,
 				local.opers * 1000.0 / local.time);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, localf, // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
-				local.score / unit,
+				local.score / info.unit,
 				local.max,
 				math::msb32(local.hash),
-				local.win * 100.0 / unit);
+				local.win * 100.0 / info.unit);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
-				total.score / loop,
+				total.score / info.loop,
 				total.max,
 				math::msb32(total.hash),
-				total.win * 100.0 / loop);
+				total.win * 100.0 / info.loop);
 		buf[size++] = '\n';
 		buf[size++] = '\n';
 		buf[size++] = '\0';
@@ -1622,7 +1598,7 @@ struct statistic {
 	}
 
 	void summary() const {
-		if (limit == 0) return;
+		if (info.limit == 0) return;
 		char buf[1024];
 		size_t size = 0;
 
@@ -1631,18 +1607,18 @@ struct statistic {
 				total.opers * 1000.0 * info.thdnum / total.time);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
-				total.score / limit,
+				total.score / info.limit,
 				total.max,
 				math::msb32(total.hash),
-				total.win * 100.0 / limit);
+				total.win * 100.0 / info.limit);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size,
 		        "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
 		        "tile", "count", "score", "move", "rate", "win");
 		buf[size++] = '\n';
-		const auto& count = every.count;
-		const auto& score = every.score;
-		const auto& opers = every.opers;
+		const auto& count = accum.count;
+		const auto& score = accum.score;
+		const auto& opers = accum.opers;
 		auto total = std::accumulate(count.begin(), count.end(), 0);
 		for (auto left = total, i = 0; left; left -= count[i++]) {
 			if (count[i] == 0) continue;
@@ -1663,13 +1639,13 @@ struct statistic {
 		return statistic(*this) += stat;
 	}
 	statistic& operator +=(const statistic& stat) {
-		limit += stat.limit;
-		loop += stat.loop;
-		if (!unit) unit = stat.unit;
-		if (!winv) winv = stat.winv;
+		info.limit += stat.info.limit;
+		info.loop += stat.info.loop;
+		if (!info.unit) info.unit = stat.info.unit;
+		if (!info.win)  info.win = stat.info.win;
 		total += stat.total;
 		local += stat.local;
-		every += stat.every;
+		accum += stat.accum;
 		u32 dec = (std::string(summaf).find('%') - std::string(summaf).find('y') + 5) / 2;
 		format(dec, (info.thdnum > 1) ? (" (" + std::to_string(info.thdnum) + "x)") : "");
 		return *this;
