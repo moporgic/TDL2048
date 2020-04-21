@@ -1475,17 +1475,17 @@ struct statistic {
 
 	struct record {
 		u64 score;
-		u64 win;
-		u64 time;
 		u64 opers;
+		u64 time;
+		u64 win;
+		u32 scale;
 		u32 max;
-		u32 hash;
 		record& operator +=(const record& rec) {
 			score += rec.score;
-			win += rec.win;
-			time += rec.time;
 			opers += rec.opers;
-			hash |= rec.hash;
+			time += rec.time;
+			win += rec.win;
+			scale |= rec.scale;
 			max = std::max(max, rec.max);
 			return (*this);
 		}
@@ -1546,26 +1546,21 @@ struct statistic {
 	inline operator bool() const { return info.loop <= info.limit; }
 	inline bool checked() const { return (info.loop % info.unit) == 0; }
 
-	void update(u32 score, u32 hash, u32 opers) {
+	void update(u32 score, u32 scale, u32 opers) {
 		local.score += score;
-		local.hash |= hash;
+		local.scale |= scale;
 		local.opers += opers;
-		local.win += (hash >= info.win ? 1 : 0);
+		local.win += (scale >= info.win ? 1 : 0);
 		local.max = std::max(local.max, score);
-		accum.count[math::log2(hash)] += 1;
-		accum.score[math::log2(hash)] += score;
-		accum.opers[math::log2(hash)] += opers;
+		accum.count[math::log2(scale)] += 1;
+		accum.score[math::log2(scale)] += score;
+		accum.opers[math::log2(scale)] += opers;
 
 		if ((info.loop % info.unit) != 0) return;
 
 		u64 tick = moporgic::millisec();
 		local.time = tick - local.time;
-		total.score += local.score;
-		total.win += local.win;
-		total.time += local.time;
-		total.opers += local.opers;
-		total.hash |= local.hash;
-		total.max = std::max(total.max, local.max);
+		total += local;
 
 		char buf[256];
 		u32 size = 0;
@@ -1579,13 +1574,13 @@ struct statistic {
 		size += snprintf(buf + size, sizeof(buf) - size, localf, // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
 				local.score / info.unit,
 				local.max,
-				math::msb32(local.hash),
+				math::msb32(local.scale),
 				local.win * 100.0 / info.unit);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / info.loop,
 				total.max,
-				math::msb32(total.hash),
+				math::msb32(total.scale),
 				total.win * 100.0 / info.loop);
 		buf[size++] = '\n';
 		buf[size++] = '\n';
@@ -1609,7 +1604,7 @@ struct statistic {
 		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
 				total.score / info.limit,
 				total.max,
-				math::msb32(total.hash),
+				math::msb32(total.scale),
 				total.win * 100.0 / info.limit);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size,
