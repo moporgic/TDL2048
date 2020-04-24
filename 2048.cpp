@@ -2026,28 +2026,25 @@ utils::options parse(int argc, const char* argv[]) {
 		}
 	}
 	for (std::string recipe : opts["recipes"]) {
-		utils::options::option& ropt = opts[recipe];
-		bool optimize = recipe.find("optimize") == 0;
-		bool evaluate = recipe.find("evaluate") == 0;
-		if (!optimize && !evaluate) {
-			optimize = ropt["mode"].value().find("optimize") == 0;
-			evaluate = ropt["mode"].value().find("evaluate") == 0;
-		}
-		for (auto item : {"unit", "win", "info"})
-			if (opts(item) && !ropt(item)) ropt[item] = opts[item];
+		std::string mode = recipe.substr(0, 8);
+		if (mode != "optimize" && mode != "evaluate")
+			mode = opts[recipe].find("mode").substr(0, 8);
+		if (mode != "optimize" && mode != "evaluate")
+			continue;
 
-		if (optimize && ropt["mode"].value().empty()) {
-			if (ropt("lambda") || opts("lambda"))  ropt["mode"] = "lambda";
-			else if (ropt("step") || opts("step")) ropt["mode"] = "step";
-		}
-		if (optimize && ropt["mode"].value(recipe).find("optimize") != 0)
-			ropt["mode"] = "optimize:" + ropt["mode"];
-		if (evaluate && ropt["mode"].value(recipe).find("evaluate") != 0)
-			ropt["mode"] = "evaluate:" + ropt["mode"];
-		ropt.remove("mode");
+		for (std::string flag : {"lambda", "step"})
+			if (mode == "optimize" && (opts[recipe](flag) || opts(flag)))
+				opts[recipe]["mode"] = opts[recipe]["mode"].value(flag);
+		if (opts[recipe].find("mode", recipe).find(mode) != 0)
+			opts[recipe]["mode"] = mode + ":" + opts[recipe]["mode"];
+		if (opts[recipe].find("mode") == "" && recipe != mode)
+			opts[recipe]["mode"] = mode;
 
-		if (evaluate && !ropt("info")) ropt["info"];
-		ropt.remove("info=none");
+		for (std::string item : {"loop", "unit", "win", "info"})
+			if (opts(item) && !opts[recipe](item))
+				opts[recipe][item] = opts[item];
+		if (mode == "evaluate") opts[recipe]["info"];
+		opts[recipe].remove("info=none");
 	}
 	return opts;
 }
