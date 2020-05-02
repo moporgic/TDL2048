@@ -460,10 +460,8 @@ inline constexpr u32 order() {
 
 template<u32... patt>
 inline constexpr typename std::enable_if<order<patt...>() == 0, u64>::type indexpt(const board& b) {
-	constexpr u32 x[] = { patt... };
-	register u32 index = 0;
-	for (register u32 i = 0; i < sizeof...(patt); i++)
-		index += b.at(x[i]) << (i << 2);
+	u32 index = 0, n = 0;
+	for (u32 p : { patt... }) index += b.at(p) << (n++ << 2);
 	return index;
 }
 template<u32... patt>
