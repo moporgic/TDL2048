@@ -1654,7 +1654,7 @@ statistic run(utils::options opts, std::string type) {
 	method spec = method::parse(opts, type);
 	clip<feature> feats = feature::feats();
 	numeric alpha = method::alpha(opts[type]["alpha"].value(opts["alpha"].value(0.1))
-			/ (opts["alpha"]("norm") ? opts["alpha"]["norm"].value(feats.size()) : 1));
+			/ opts[type]["norm"].value(opts["alpha"]["norm"].value(feats.size())));
 	numeric lambda = method::lambda(opts[type]["lambda"].value(opts["lambda"].value(0)));
 	u32 step = method::step(opts[type]["step"].value(opts["step"].value(lambda ? 5 : 1)));
 
@@ -1934,8 +1934,7 @@ utils::options parse(int argc, const char* argv[]) {
 		};
 		switch (to_hash(label)) {
 		case to_hash("-a"): case to_hash("--alpha"):
-			opts["alpha"] = next_opts();
-			if (opts["alpha"].empty()) (opts["alpha"] = "0.1") += "norm";
+			opts["alpha"] = next_opts("0.1");
 			break;
 		case to_hash("-l"): case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
@@ -2050,7 +2049,7 @@ utils::options parse(int argc, const char* argv[]) {
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (!opts("recipes")) opts["recipes"] = "optimize", opts["optimize"] = 1000;
-	if (!opts("alpha")) opts["alpha"] = 0.1, opts["alpha"] += "norm";
+	if (!opts("alpha")) opts["alpha"] = 0.1;
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
 	if (!opts("step")) opts["step"] = opts["lambda"].value(0) ? 5 : 1;
@@ -2063,7 +2062,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << std::endl;
 	std::cout << "time = " << millisec() << " (" << moporgic::put_time(millisec()) << ")" << std::endl;
 	std::cout << "seed = " << opts["seed"].value() << std::endl;
-	std::cout << "alpha = " << opts["alpha"].value("auto") << std::endl;
+	std::cout << "alpha = " << opts["alpha"].value("0.1") << std::endl;
 	std::cout << "lambda = " << opts["lambda"].value(0) << ", step = " << opts["step"].value(1) << std::endl;
 	std::cout << "search = " << opts["search"].value("1") << ", cache = " << opts["cache"].value("none") << std::endl;
 	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
