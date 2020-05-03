@@ -1941,7 +1941,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["lambda"] = next_opt("0.5");
 			// no break: lambda may also come with step
 		case to_hash("--step"): case to_hash("--n-step"):
-			opts["step"] = next_opt(opts["lambda"].value(0) ? "5" : "1");
+			opts["step"] = next_opt(opts("lambda") && opts["lambda"].value(0) ? "5" : "1");
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
@@ -2062,9 +2062,9 @@ int main(int argc, const char* argv[]) {
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 	std::cout << "time = " << millisec() << " (" << moporgic::put_time(millisec()) << ")" << std::endl;
-	std::cout << "seed = " << opts["seed"] << std::endl;
-	std::cout << "alpha = " << opts["alpha"] << std::endl;
-	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
+	std::cout << "seed = " << opts["seed"].value() << std::endl;
+	std::cout << "alpha = " << opts["alpha"].value("auto") << std::endl;
+	std::cout << "lambda = " << opts["lambda"].value(0) << ", step = " << opts["step"].value(1) << std::endl;
 	std::cout << "search = " << opts["search"].value("1") << ", cache = " << opts["cache"].value("none") << std::endl;
 	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
