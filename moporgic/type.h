@@ -195,16 +195,14 @@ private:
 
 namespace moporgic {
 namespace endian {
-static inline constexpr bool is_le() noexcept { register u32 v = 0x01; return raw_cast<u8, 0>(v); }
-static inline constexpr bool is_be() noexcept { register u32 v = 0x01; return raw_cast<u8, 3>(v); }
-template<typename T> static inline constexpr T repos(T v, int i, int p) noexcept { return ((v >> (i << 3)) & 0xff) << (p << 3); }
-template<typename T> static inline constexpr T swpos(T v, int i, int p) noexcept { return repos(v, i, p) | repos(v, p, i); }
-static inline constexpr u16 to_le(u16 v) noexcept { return is_le() ? v : swpos(v, 0, 1); }
-static inline constexpr u32 to_le(u32 v) noexcept { return is_le() ? v : swpos(v, 0, 3) | swpos(v, 1, 2); }
-static inline constexpr u64 to_le(u64 v) noexcept { return is_le() ? v : swpos(v, 0, 7) | swpos(v, 1, 6) | swpos(v, 2, 5) | swpos(v, 3, 4); }
-static inline constexpr u16 to_be(u16 v) noexcept { return is_be() ? v : swpos(v, 0, 1); }
-static inline constexpr u32 to_be(u32 v) noexcept { return is_be() ? v : swpos(v, 0, 3) | swpos(v, 1, 2); }
-static inline constexpr u64 to_be(u64 v) noexcept { return is_be() ? v : swpos(v, 0, 7) | swpos(v, 1, 6) | swpos(v, 2, 5) | swpos(v, 3, 4); }
+static inline constexpr bool is_le() noexcept { const u32 v = 0x01; return raw_cast<u8, 0>(v); }
+static inline constexpr bool is_be() noexcept { const u32 v = 0x01; return raw_cast<u8, 3>(v); }
+static inline constexpr u16 to_le(u16 v) noexcept { return is_le() ? v : __builtin_bswap16(v); }
+static inline constexpr u32 to_le(u32 v) noexcept { return is_le() ? v : __builtin_bswap32(v); }
+static inline constexpr u64 to_le(u64 v) noexcept { return is_le() ? v : __builtin_bswap64(v); }
+static inline constexpr u16 to_be(u16 v) noexcept { return is_be() ? v : __builtin_bswap16(v); }
+static inline constexpr u32 to_be(u32 v) noexcept { return is_be() ? v : __builtin_bswap32(v); }
+static inline constexpr u64 to_be(u64 v) noexcept { return is_be() ? v : __builtin_bswap64(v); }
 } // namespace endian
 } // namespace moporgic
 
