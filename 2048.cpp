@@ -180,8 +180,8 @@ public:
 private:
 	inline weight(sign_t sign, size_t size) : name(sign), length(size), raw(alloc(size)) {}
 
-	static inline segment* alloc(size_t size) { return shm::enable() ? shm::alloc<segment>(size) : new segment[size](); }
-	static inline void free(segment* v) { shm::enable() ? shm::free(v) : delete[] v; }
+	static inline segment* alloc(size_t size) { return shm::enable<segment>() ? shm::alloc<segment>(size) : new segment[size](); }
+	static inline void free(segment* v) { shm::enable<segment>() ? shm::free<segment>(v) : delete[] v; }
 
 	sign_t name;
 	size_t length;
@@ -412,8 +412,8 @@ public:
 	static inline cache& instance() { static cache tp; return tp; }
 
 private:
-	static inline block* alloc(size_t len) { return shm::enable() ? shm::alloc<block>(len) : new block[len](); }
-	static inline void free(block* alloc) { shm::enable() ? shm::free(alloc) : delete[] alloc; }
+	static inline block* alloc(size_t len) { return shm::enable<block>() ? shm::alloc<block>(len) : new block[len](); }
+	static inline void free(block* alloc) { shm::enable<block>() ? shm::free<block>(alloc) : delete[] alloc; }
 
 	cache& init(size_t len, bool peek = false) {
 		length = (1ull << (math::lg64(len)));
@@ -824,8 +824,10 @@ void init_logging(utils::options::option opt) {
 	static moporgic::redirector redirect(tee, std::cout);
 }
 
-void config_thread(utils::options::option opt) {
+void config_shm(utils::options::option opt) {
 	shm::enable(shm::support() && !opt("noshm") && (opt("shm") || opt.value(1) > 1));
+	shm::enable<weight::segment>(shm::enable() && !opt("noshm:weight") && (opt("shm") || opt("shm:weight") || opt("optimize")));
+	shm::enable<cache::block>(shm::enable() && !opt("noshm:cache") && (opt("shm") || opt("shm:cache") || opt("evaluate")));
 }
 
 template<typename statistic>
@@ -2037,6 +2039,7 @@ utils::options parse(int argc, const char* argv[]) {
 		if (opts[recipe].find("mode") == "" && recipe != mode)
 			opts[recipe]["mode"] = mode;
 
+		if (opts("thread")) opts["thread"][mode];
 		for (std::string item : {"loop", "unit", "win", "info"})
 			if (opts(item) && !opts[recipe](item))
 				opts[recipe][item] = opts[item];
@@ -2069,7 +2072,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << std::endl;
 
 	moporgic::srand(to_hash(opts["seed"]));
-	utils::config_thread(opts["thread"]);
+	utils::config_shm(opts["thread"]);
 	utils::init_cache(opts["cache"]);
 
 	utils::load_network(opts["load"]);

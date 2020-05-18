@@ -550,5 +550,17 @@ private:
 	u32 pass;
 };
 
+template<typename type, typename scope = void>
+class static_store {
+public:
+	constexpr inline static_store() {}
+	constexpr inline static_store(const type& v) { instance() = v; }
+	constexpr inline static_store(const static_store& s) = default;
+	constexpr inline operator type&() { return instance(); }
+	constexpr inline operator const type&() const { return instance(); }
+	constexpr inline type& operator =(const type& v) { return instance() = v; }
+	static inline type& instance() { static type v; return v;}
+};
+
 } /* namespace moporgic */
 
