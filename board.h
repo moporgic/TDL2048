@@ -746,7 +746,7 @@ public:
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves(btype move[]) const   { moves(move[0], move[1], move[2], move[3]); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline void moves64(btype move[]) const { moves64x(move[0], move[1], move[2], move[3]); /* use AVX2 instead of lookup */ }
+	inline void moves64(btype move[]) const { moves64(move[0], move[1], move[2], move[3]); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves80(btype move[]) const { moves80(move[0], move[1], move[2], move[3]); }
 
@@ -797,9 +797,9 @@ public:
 	};
 
 	inline i32 operate(u32 op) {
-		if (op & action::x64) return operate64(op);
+		if (op & action::x64) return operate64x(op); /* use AVX2 instead of lookup */
 		if (op & action::x80) return operate80(op);
-		return operate64(op);
+		return operate64x(op);
 	}
 	inline i32 operate64(u32 op) {
 		switch (op & 0x0fu) {
@@ -836,7 +836,7 @@ public:
 	}
 
 	inline i32 move(u32 op)   { return operate(op); }
-	inline i32 move64(u32 op) { return operate64x(op); /* use AVX2 instead of lookup */ }
+	inline i32 move64(u32 op) { return operate64(op); }
 	inline i32 move80(u32 op) { return operate80(op); }
 
 	inline constexpr u32 shift(u32 k = 0, u32 u = 0) { return shift64(k, u); }
