@@ -824,6 +824,21 @@ void init_logging(utils::options::option opt) {
 	static moporgic::redirector redirect(tee, std::cout);
 }
 
+void init_cache(utils::options::option opt) {
+	if (opt.value(0) == 0) return;
+
+	std::string res(opt);
+	size_t unit = 0, size = std::stoull(res, &unit);
+	if (unit < res.size())
+		switch (std::toupper(res[unit])) {
+		case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
+		case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
+		case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
+		}
+	bool peek = opt("peek") & !opt("nopeek");
+	cache::make(size, peek);
+}
+
 void config_shm(utils::options::option opt) {
 	shm::enable(shm::support() && !opt("noshm") && (opt("shm") || opt.value(1) > 1));
 	shm::enable<weight::segment>(shm::enable() && !opt("noshm:weight") && (opt("shm") || opt("shm:weight") || opt("optimize")));
@@ -1140,21 +1155,6 @@ void list_network() {
 		std::cout << buf.rdbuf() << std::endl;
 	}
 	std::cout << std::endl;
-}
-
-void init_cache(utils::options::option opt) {
-	if (opt.value(0) == 0) return;
-
-	std::string res(opt);
-	size_t unit = 0, size = std::stoull(res, &unit);
-	if (unit < res.size())
-		switch (std::toupper(res[unit])) {
-		case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
-		case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
-		case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
-		}
-	bool peek = opt("peek") & !opt("nopeek");
-	cache::make(size, peek);
 }
 
 } // utils
