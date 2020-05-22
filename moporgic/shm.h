@@ -7,11 +7,13 @@
 
 #include <cstdlib>
 #include <cstdint>
+#include <memory>
 #if defined(__linux__)
 #include <sys/shm.h>
 #include <signal.h>
 #include <string>
 #include <fstream>
+#include <utility>
 #include <map>
 #endif
 
@@ -20,10 +22,9 @@ class shm {
 #if defined(__linux__) && !defined(NOSHM)
 public:
 	static constexpr bool support() { return true; }
-	static void enable(bool use) { if (!use) clear(); shm::use() = use; }
-	static void auto_cleanup(bool use) { shm::cleanup() = use; }
 
 	template<typename type = void> static type* alloc(size_t size) {
+		if (!enable<type>()) throw std::invalid_argument("shm is disabled");
 		static uint8_t seq = 0;
 		static std::string hook = ({
 			std::string path = ".";
@@ -39,29 +40,41 @@ public:
 			if (errno & EEXIST) return alloc<type>(size);
 			throw std::bad_alloc();
 		}
-		info().emplace(shm, id);
-		std::fill_n((type*) shm, size, type());
-		return (type*) shm;
+		info().emplace(shm, std::make_pair(id, size));
+		try {
+			new (cast<type*>(shm)) type[size]();
+		} catch (...) {}
+		return cast<type*>(shm);
 	}
 
 	template<typename type = void> static void free(type* shm) {
-		shmdt(shm);
-		shmctl(info().at(shm), IPC_RMID, nullptr);
+		if (!enable<type>()) throw std::invalid_argument("shm is disabled");
+		auto inf = info().at(shm);
+		int id = inf.first;
+		size_t size = inf.second;
 		info().erase(shm);
+		try {
+			for (size_t i = 0; i < size; i++) cast<type*>(shm)[i].~type();
+		} catch (...) {}
+		shmdt(shm);
+		shmctl(id, IPC_RMID, nullptr);
 	}
 
+protected:
 	static void clear() {
 		if (&info(false) == nullptr) return;
 		for (auto blk : info()) {
-			shmdt(blk.first);
-			shmctl(blk.second, IPC_RMID, nullptr);
+			void* shm = blk.first;
+			int id = blk.second.first;
+			shmdt(shm);
+			shmctl(id, IPC_RMID, nullptr);
 		}
 		info().clear();
 	}
 
-protected:
 	static __attribute__((constructor)) void init() {
-		signal(SIGINT, shm::interrupt_handler);
+		signal(SIGTERM, shm::cleanup_handler);
+		signal(SIGINT,  shm::cleanup_handler);
 	//	signal(SIGSEGV, [](int i) { std::exit(i); });
 	//	std::set_terminate([]() { clear(); __gnu_cxx::__verbose_terminate_handler(); });
 	//	std::atexit(shm::clear);
@@ -70,32 +83,49 @@ protected:
 		if (cleanup()) clear();
 		if (&info(false)) delete &info();
 	}
-
-	static void interrupt_handler(int i) {
+	static void cleanup_handler(int i) {
 		if (cleanup()) clear();
 		std::quick_exit(i);
 	}
 
-private:
-	static std::map<void*, int>& info(bool try_init = true) {
-		static std::map<void*, int> *p = nullptr;
-		if (try_init && !p) p = new std::map<void*, int>;
+	static std::map<void*, std::pair<int, size_t>>& info(bool try_init = true) {
+		static std::map<void*, std::pair<int, size_t>> *p = nullptr;
+		if (try_init && !p) p = new std::map<void*, std::pair<int, size_t>>;
 		return *p;
 	}
+
 #else /* if shm is not supported */
 public:
 	static constexpr bool support() { return false; }
-	static void enable(bool use) { if (use) throw std::invalid_argument("shm is not supported"); }
-	static void auto_cleanup(bool use) { if (use) throw std::invalid_argument("shm is not supported"); }
 	template<typename type = void> static type* alloc(size_t size) { throw std::bad_alloc(); }
 	template<typename type = void> static void free(type* shm) { throw std::bad_alloc(); }
-#endif
+protected:
+	static void clear() {}
+#endif /* end if */
+
 public:
-	static bool enable() { return shm::use(); }
+	template<typename type = void> static bool enable() { return shm::use() && shm::use<type>(); }
+	template<typename type = void> static void enable(bool use) {
+		if (!support() && use) throw std::invalid_argument("shm is not supported");
+		if (!use) clear();
+		shm::use<type>() = use;
+	}
 	static bool auto_cleanup() { return shm::cleanup(); }
+	static void auto_cleanup(bool use) {
+		if (!support() && use) throw std::invalid_argument("shm is not supported");
+		shm::cleanup() = use;
+	}
 private:
-	static bool& use() { static bool use = support(); return use; }
+	template<typename type = void> static bool& use() { static bool use = support(); return use; }
 	static bool& cleanup() { static bool use = support(); return use; }
+
+public:
+	template<typename type>
+	class allocator : std::allocator<type> {
+	public:
+		inline type* allocate(std::size_t n) { return shm::alloc<type>(n); }
+		inline void  deallocate(type* p, std::size_t n) { shm::free<type>(p); }
+	};
 };
 
 } // namespace moporgic
