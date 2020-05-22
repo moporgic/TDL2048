@@ -497,7 +497,7 @@ public:
 	}
 
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline void moves(btype move[]) const { return moves64(move); }
+	inline void moves(btype move[]) const   { moves(move[0], move[1], move[2], move[3]); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves64(btype move[]) const { moves64(move[0], move[1], move[2], move[3]); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
