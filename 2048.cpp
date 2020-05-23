@@ -1411,12 +1411,12 @@ struct state : board {
 	numeric esti;
 	inline state() : board(0ull, 0u, -1u), esti(0) {}
 	inline state(const state& s) = default;
-
-	inline operator bool() const { return info() != -1u; }
 	declare_comparators(const state&, esti, inline);
 
+	inline operator bool() const { return info() != -1u; }
 	inline numeric value() const { return esti - info(); }
-	inline i32 reward() const { return info(); }
+	inline u32 reward() const { return std::max(i32(info()), 0); }
+	inline i32 score() const { return info(); }
 
 	inline void assign(const board& b, u32 op = -1) {
 		set(b);
@@ -1426,20 +1426,19 @@ struct state : board {
 			clip<feature> range = feature::feats(),
 			method::estimator estim = method::estimate) {
 		estim = info() != -1u ? estim : method::illegal;
-		esti = state::reward() + estim(*this, range);
+		esti = score() + estim(*this, range);
 		return esti;
 	}
 	inline numeric optimize(numeric exact, numeric alpha = method::alpha(),
 			clip<feature> range = feature::feats(),
 			method::optimizer optim = method::optimize) {
-		numeric update = (exact - state::value()) * alpha;
-		esti = state::reward() + optim(*this, update, range);
+		numeric update = (exact - value()) * alpha;
+		esti = score() + optim(*this, update, range);
 		return esti;
 	}
 };
 struct select {
-	state move[4];
-	state *best;
+	state move[4], *best;
 	inline select() : best(move) {}
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
 		b.moves(move[0], move[1], move[2], move[3]);
@@ -1455,9 +1454,9 @@ struct select {
 	inline void operator >>(state& s) const { s = (*best); }
 	inline void operator >>(board& b) const { b.set(*best); }
 
-	inline operator bool() const { return score() != -1; }
-	inline i32 score() const { return best->info(); }
+	inline operator bool() const { return best->operator bool(); }
 	inline numeric esti() const { return best->esti; }
+	inline i32 score() const { return best->score(); }
 	inline u32 opcode() const { return best - move; }
 
 	inline state* begin() { return move; }
@@ -1806,7 +1805,7 @@ statistic run(utils::options opts, std::string type) {
 				for (u32 k = 1; k < step; k++) {
 					state& source = path[opers - k];
 					source.estimate(feats, spec);
-					numeric r = source.reward();
+					numeric r = source.score();
 					numeric v = source.value();
 					z = r + (lambda * z + (1 - lambda) * v);
 				}
@@ -1824,7 +1823,7 @@ statistic run(utils::options opts, std::string type) {
 				for (u32 k = 1; k < i; k++) {
 					state& source = path[opers - k];
 					source.estimate(feats, spec);
-					numeric r = source.reward();
+					numeric r = source.score();
 					numeric v = source.value();
 					z = r + (lambda * z + (1 - lambda) * v);
 				}
@@ -1853,12 +1852,12 @@ statistic run(utils::options opts, std::string type) {
 			}
 
 			numeric z = 0;
-			numeric r = path.back().reward();
+			numeric r = path.back().score();
 			numeric v = path.back().optimize(0, alpha, feats, spec) - r;
 			for (path.pop_back(); path.size(); path.pop_back()) {
 				path.back().estimate(feats, spec);
 				z = r + (lambda * z + (1 - lambda) * v);
-				r = path.back().reward();
+				r = path.back().score();
 				v = path.back().optimize(z, alpha, feats, spec) - r;
 			}
 
