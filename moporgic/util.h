@@ -26,7 +26,8 @@
 #define inline_always inline
 #endif
 
-#define VA_ARG_1(V, ...) V
+#define VA_ARG_0(V, ...) V
+#define VA_ARG_1(V, ...) VA_ARG_0(__VA_ARGS__)
 #define VA_ARG_2(V, ...) VA_ARG_1(__VA_ARGS__)
 #define VA_ARG_3(V, ...) VA_ARG_2(__VA_ARGS__)
 #define VA_ARG_4(V, ...) VA_ARG_3(__VA_ARGS__)
@@ -128,62 +129,56 @@ static __attribute__((unused)) std::string put_time(std::time_t t) {
 #define __DATE_ISO__ ({ std::tm t = {}; std::string DATE(__DATE__); if (DATE[4] == ' ') DATE[4] = '0'; \
 std::istringstream(DATE) >> std::get_time(&t, "%b %d %Y"); std::put_time(&t, "%Y-%m-%d");})
 
-static inline constexpr
-uint32_t to_hash_tail(const char* str, const uint32_t& hash) noexcept {
-	if (*str) return to_hash_tail(str + 1, (hash << 5) - hash + (*str));
+static inline constexpr uint32_t to_hash(const char* str) noexcept {
+	uint32_t hash = 0;
+	for (const char* c = str; (*c) != 0; c++)
+		hash = (hash << 5) - hash + (*c); // i' = 31 * i + c
 	return hash;
 }
-static inline constexpr
-uint32_t to_hash(const char* str) noexcept {
-	return to_hash_tail(str, 0); // i' = 31 * i + c
-}
-
-static inline
-uint32_t to_hash(const std::string& str) noexcept {
+static inline uint32_t to_hash(const std::string& str) noexcept {
 	return to_hash(str.c_str());
 }
 
 class random {
 public:
 	template<typename engine_t = std::mt19937>
-	inline_always operator uint16_t() const { return (engine<engine_t>())(); }
+	inline operator uint16_t() const { return next<engine_t>(); }
 	template<typename engine_t = std::mt19937>
-	inline_always operator uint32_t() const { return (engine<engine_t>())(); }
+	inline operator uint32_t() const { return next<engine_t>(); }
 	template<typename engine_t = std::mt19937_64>
-	inline_always operator uint64_t() const { return (engine<engine_t>())(); }
+	inline operator uint64_t() const { return next<engine_t>(); }
 	template<typename engine_t = std::mt19937>
-	inline_always operator float() const { return std::uniform_real_distribution<float>(0.0f, 1.0f)(engine<engine_t>()); }
+	inline operator float() const { return std::uniform_real_distribution<float>(0.0f, 1.0f)(engine_ref<engine_t>()); }
 	template<typename engine_t = std::mt19937_64>
-	inline_always operator double() const { return std::uniform_real_distribution<double>(0.0, 1.0)(engine<engine_t>()); }
+	inline operator double() const { return std::uniform_real_distribution<double>(0.0, 1.0)(engine_ref<engine_t>()); }
 
 	template<typename engine_t = std::mt19937>
-	static inline_always engine_t& engine(engine_t* e = nullptr) {
-		static engine_t* p = nullptr;
-		if (e) { delete p; p = e; }
-		return (*p);
-	}
+	static inline auto& engine_ref() { return *(engine_ptr<engine_t>()); }
 	template<typename engine_t = std::mt19937>
-	static inline_always auto next() { return (engine<engine_t>())(); }
+	static inline auto& engine_ptr() { static engine_t* engine = nullptr; return engine; }
+	template<typename engine_t = std::mt19937>
+	static inline auto next() { return (engine_ref<engine_t>())(); }
 
 	template<typename engine_t = std::mt19937, typename seed_t = decltype(engine_t::default_seed)>
 	static inline void init(seed_t seed = engine_t::default_seed) {
-		engine<engine_t>(new engine_t(seed));
+		delete std::exchange(engine_ptr<engine_t>(), new engine_t(seed));
 	}
 	template<typename engine_t = std::mt19937, typename seed_t = decltype(engine_t::default_seed)>
 	static inline void seed(seed_t seed = engine_t::default_seed) {
-		if (&engine<engine_t>()) engine<engine_t>().seed(seed);
-		else                     init<engine_t>(seed);
+		if (engine_ptr<engine_t>()) engine_ref<engine_t>().seed(seed);
+		else                        init<engine_t>(seed);
 	}
 protected:
 	static __attribute__((constructor)) void __init__(void) {
-		init<std::mt19937>(moporgic::to_hash("moporgic::mt19937"));
-		init<std::mt19937_64>(moporgic::to_hash("moporgic::mt19937_64"));
+		init<std::mt19937>(std::mt19937::default_seed);
+		init<std::mt19937_64>(std::mt19937_64::default_seed);
 	}
+	static __attribute__((destructor))  void __exit__(void) {}
 };
 
-static inline void srand(uint32_t seed = std::mt19937::default_seed, uint32_t seed64 = std::mt19937_64::default_seed) {
+static inline void srand(uint32_t seed = to_hash("moporgic")) {
 	random::seed<std::mt19937>(seed);
-	random::seed<std::mt19937_64>(seed64);
+	random::seed<std::mt19937_64>(seed);
 }
 static inline uint32_t rand()   { return uint32_t(random()); }
 static inline uint32_t rand16() { return uint32_t(random()) & 0xffffu; }
@@ -194,14 +189,13 @@ static inline uint64_t rand63() { return uint64_t(random()) & 0x7fffffffffffffff
 static inline uint32_t rand24() { return uint32_t(random()) & 0x00ffffffu; }
 static inline uint32_t randx()  { return rand32(); }
 
-static inline
-unsigned long long rdtsc() {
+static inline auto rdtsc() {
 #if defined __GNUC__ && defined __x86_64__
-	register unsigned int lo, hi;
+	register uint32_t lo, hi;
 	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
-	return ((unsigned long long) hi << 32) | lo;
+	return ((uint64_t) hi << 32) | lo;
 #elif defined __GNUC__ && defined __i386__
-	register unsigned int lo;
+	register uint32_t lo;
     __asm__ __volatile__ ("rdtsc" : "=a" (lo));
     return lo;
 #elif defined _MSC_VER
@@ -215,155 +209,6 @@ unsigned long long rdtsc() {
 } /* moporgic */
 
 namespace moporgic {
-
-#ifdef DIRECTIO
-
-//#define putln()			putchar('\n')
-//#define putsp()			putchar(' ')
-//#define puttab()		putchar('\t')
-//#define print(...)		printf(__VA_ARGS__)
-//#define println(...)	printf(__VA_ARGS__); putchar('\n')
-#define removebuf()		setvbuf(stdout, NULL, _IONBF, 0)
-//#define randinit()		srand(time(nullptr))
-//#define mallof(T, size) ((T*) malloc(sizeof(T) * size))
-//#define callof(T, size) ((T*) calloc(size, sizeof(T))
-
-#define _getch(ch)				(ch = getchar())
-#define _appendn(val, ch)		val = (val * 10) + (ch - '0')
-#define _appendf(val, ch, f)	val += (ch - '0') / f
-#define _appif_avail(v, ch)		while (_getch(ch) >= '0') {_appendn(v, ch);}
-#define _appif_avifp(v, ch, f)	while (_getch(ch) >= '0') {_appendf(v, ch, f); f = f * 10;}
-#define _flushbuf(ipt, fpt)		while (ipt < fpt) putchar((*ipt++));
-#define _flushbufn(ipt, fpt)	while (ipt < fpt) putchar((*ipt++) + '0');
-#define _post_lt0(v) 			if (v < 0) { v = -v; putchar('-'); }
-#define _post_procn(u, b, i, p, f)  for (i = p = f - 1; i >= b; u /= 10, i--) if ( (*i = u % 10) != 0) p = i;
-
-#define _postu_fptoff	32
-#define _postlu_fptoff	64
-#define _postf_fptoff	64
-#define _postf_vtype	unsigned long long
-#define _postf_defprec	6
-#define _moporgic_buf_size		64
-char _buf[_moporgic_buf_size];
-
-static inline void skipch(unsigned n) {
-	while (n--) getchar();
-}
-static inline unsigned nextu() {
-	unsigned v = 0;
-	int ch;
-	_appif_avail(v, ch);
-	return v;
-}
-static inline long long unsigned int nextlu() {
-	int ch;
-	long long unsigned int v = 0;
-	_appif_avail(v, ch);
-	return v;
-}
-static inline int nextd() {
-	int v = 0, ch;
-	_appif_avail(v, ch);
-	if (ch != '-') return v;
-	_appif_avail(v, ch);
-	return -v;
-}
-static inline long long int nextld() {
-	int ch;
-	long long int v = 0;
-	_appif_avail(v, ch);
-	if (ch != '-') return v;
-	_appif_avail(v, ch);
-	return -v;
-}
-static inline float nextf() {
-	int ch;
-	float v = 0, f = 10;
-	_appif_avail(v, ch);
-	if (ch == '.') {
-		_appif_avifp(v, ch, f);
-		return v;
-	}
-	if (ch != '-') return v;
-	_appif_avail(v, ch);
-	if (ch != '.') return -v;
-	_appif_avifp(v, ch, f);
-	return v;
-}
-static inline double nextlf() {
-	int ch;
-	double v = 0, f = 10;
-	_appif_avail(v, ch);
-	if (ch == '.') {
-		_appif_avifp(v, ch, f);
-		return v;
-	}
-	if (ch != '-') return v;
-	_appif_avail(v, ch);
-	if (ch != '.') return -v;
-	_appif_avifp(v, ch, f);
-	return -v;
-}
-static inline int next(char buf[], unsigned len) {
-	int ch;
-	if ( _getch(ch) == EOF) return EOF;
-	unsigned idx = 0;
-	for (; idx < len && ch != EOF && ch > ' '; _getch(ch)) buf[idx++] = ch;
-	if (idx < len) buf[idx] = '\0';
-	return idx;
-}
-static inline int nextln(char buf[], unsigned len) {
-	int ch;
-	if ( _getch(ch) == EOF) return EOF;
-	unsigned idx = 0;
-	for (; idx < len && ch != EOF && ch != '\n'; _getch(ch)) buf[idx++] = ch;
-	if (idx < len) buf[idx] = '\0';
-	return idx;
-}
-static inline void postu(unsigned u) {
-	char *ipt, *bpt, *fpt = _buf + _postu_fptoff;
-	_post_procn(u, _buf, ipt, bpt, fpt);
-	_flushbufn(bpt, fpt);
-}
-static inline void postlu(unsigned long long u) {
-	char *ipt, *bpt, *fpt = _buf + _postlu_fptoff;
-	_post_procn(u, _buf, ipt, bpt, fpt);
-	_flushbufn(bpt, fpt);
-}
-static inline void postd(int d) {
-	_post_lt0(d);
-	postu(d);
-}
-static inline void postld(long long d) {
-	_post_lt0(d);
-	postlu(d);
-}
-static inline void postlf(double v, unsigned prec = _postf_defprec) {
-	_post_lt0(v);
-	_postf_vtype f, u, p = 1;
-	unsigned int t = prec;
-	char *ipt, *bpt, *fpt = _buf + _postf_fptoff;
-	while (t--) p = (p << 3) + (p << 1);
-	u = (_postf_vtype) (v = v * p);
-	f = (v - u >= 0.5) ? (_postf_vtype) (v + 1) : u;
-	u = f / p;
-	_post_procn(u, _buf, ipt, bpt, fpt);
-	_flushbufn(bpt, fpt);
-	if (prec == 0) return;
-	putchar('.');
-	u = f % p;
-	_post_procn(u, _buf, ipt, bpt, fpt);
-	for (t = fpt - bpt; t < prec; t++) putchar('0');
-	_flushbufn(bpt, fpt);
-}
-static inline void postf(float v, unsigned prec = _postf_defprec) {
-	postlf(v, prec);
-}
-static inline void post(const char *buf, unsigned len) {
-	for (const char *lim = buf + len; buf < lim; buf++) putchar(*buf);
-}
-
-#endif /* DIRECTIO */
 
 template<typename type> static inline
 std::ostream& write(std::ostream& out, const type& v, const size_t& len = sizeof(type)) {

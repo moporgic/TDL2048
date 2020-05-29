@@ -285,8 +285,8 @@ public:
 private:
 	inline weight(sign_t sign, size_t size) : name(sign), length(size), raw(alloc(size)) {}
 
-	static inline segment* alloc(size_t size) { return shm::enable() ? shm::alloc<segment>(size) : new segment[size](); }
-	static inline void free(segment* v) { shm::enable() ? shm::free(v) : delete[] v; }
+	static inline segment* alloc(size_t size) { return shm::enable<segment>() ? shm::alloc<segment>(size) : new segment[size](); }
+	static inline void free(segment* v) { shm::enable<segment>() ? shm::free<segment>(v) : delete[] v; }
 
 	sign_t name;
 	size_t length;
@@ -429,16 +429,6 @@ public:
 		constexpr u16 hold() const { return raw_cast<u16, 2>(info); }
 		constexpr u16 hits() const { return raw_cast<u16, 3>(info); }
 
-	    friend std::ostream& operator <<(std::ostream& out, const block& blk) {
-	    	write_cast<u64>(out, blk.hash);
-	    	write_cast<u64>(out, blk.info);
-	    	return out;
-	    }
-		friend std::istream& operator >>(std::istream& in, block& blk) {
-			read_cast<u64>(in, blk.hash);
-			read_cast<u64>(in, blk.info);
-			return in;
-		}
 	private:
 		u64 hash;
 		u64 info; // f32 esti; u16 hold; u16 hits;
@@ -466,10 +456,9 @@ public:
 			write_cast<u16>(out, 0);
 			write_cast<u64>(out, 0);
 			// write blocks
-			write_cast<u16>(out, sizeof(cache::block));
+			write_cast<u16>(out, sizeof(block));
 			write_cast<u64>(out, c.size());
-			for (size_t i = 0; i < c.size(); i++)
-				out << c[i];
+			write<block>(out, c.cached, c.cached + c.size());
 			// write depth-map (nmap)
 			write_cast<u16>(out, sizeof(size_t));
 			write_cast<u64>(out, c.nmap.size());
@@ -490,8 +479,7 @@ public:
 			in.ignore(read<u16>(in) * read<u64>(in));
 			// read blocks
 			c.init(read<u64>(in.ignore(2)));
-			for (size_t i = 0; i < c.size(); i++)
-				in >> c[i];
+			read<block>(in, c.cached, c.cached + c.size());
 			// read depth-map (nmap)
 			read_cast<u64>(in, c.nmap.begin(), c.nmap.begin() + read<u64>(in.ignore(2)));
 			// ignore unrecognized fields
@@ -529,8 +517,8 @@ public:
 	static inline cache& instance() { static cache tp; return tp; }
 
 private:
-	static inline block* alloc(size_t len) { return shm::enable() ? shm::alloc<block>(len) : new block[len](); }
-	static inline void free(block* alloc) { shm::enable() ? shm::free(alloc) : delete[] alloc; }
+	static inline block* alloc(size_t len) { return shm::enable<block>() ? shm::alloc<block>(len) : new block[len](); }
+	static inline void free(block* alloc) { shm::enable<block>() ? shm::free<block>(alloc) : delete[] alloc; }
 
 	cache& init(size_t len, bool peek = false) {
 		length = (1ull << (math::lg64(len)));
@@ -577,10 +565,8 @@ inline constexpr u32 order() {
 
 template<u32... patt>
 inline constexpr typename std::enable_if<order<patt...>() == 0, u64>::type indexpt(const board& b) {
-	constexpr u32 x[] = { patt... };
-	register u32 index = 0;
-	for (register u32 i = 0; i < sizeof...(patt); i++)
-		index += b.at(x[i]) << (i << 2);
+	u32 index = 0, n = 0;
+	for (u32 p : { patt... }) index += b.at(p) << (n++ << 2);
 	return index;
 }
 template<u32... patt>
@@ -943,17 +929,35 @@ void init_logging(utils::options::option opt) {
 	static moporgic::redirector redirect(tee, std::cout);
 }
 
-void config_thread(utils::options::option opt) {
+void init_cache(utils::options::option opt) {
+	if (opt.value(0) == 0) return;
+
+	std::string res(opt);
+	size_t unit = 0, size = std::stoull(res, &unit);
+	if (unit < res.size())
+		switch (std::toupper(res[unit])) {
+		case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
+		case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
+		case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
+		}
+	bool peek = opt("peek") & !opt("nopeek");
+	cache::make(size, peek);
+}
+
+void config_shm(utils::options::option opt) {
 	shm::enable(shm::support() && !opt("noshm") && (opt("shm") || opt.value(1) > 1));
+	shm::enable<weight::segment>(shm::enable() && !opt("noshm:weight") && (opt("shm") || opt("shm:weight") || opt("optimize")));
+	shm::enable<cache::block>(shm::enable() && !opt("noshm:cache") && (opt("shm") || opt("shm:cache") || opt("evaluate")));
 }
 
 template<typename statistic>
 statistic invoke(statistic(*run)(utils::options,std::string), utils::options opts, std::string type) {
+	opts[type]["thread"] = opts[type]["thread"].value(opts["thread"].value(1));
+	u32 thdnum = opts[type]["thread"].value(1), thdid = thdnum;
 #if defined(__linux__)
 	if (shm::enable()) {
-		u32 thdnum = std::stol(opts[type]["thread"] = opts["thread"].value(1)), thdid = thdnum;
 		statistic* stats = shm::alloc<statistic>(thdnum);
-		while (std::stol(opts[type]["thread#"] = --thdid) && fork());
+		while ((opts[type]["thread#"] = (--thdid)).value(0) && fork());
 		statistic stat = stats[thdid] = run(opts, type);
 		if (thdid == 0) while (wait(nullptr) > 0); else std::quick_exit(0);
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
@@ -962,15 +966,14 @@ statistic invoke(statistic(*run)(utils::options,std::string), utils::options opt
 	}
 #endif
 	std::list<std::future<statistic>> thdpool;
-	u32 thdid = std::stol(opts[type]["thread"] = opts["thread"].value(1));
-	while (std::stol(opts[type]["thread#"] = (--thdid)))
+	while ((opts[type]["thread#"] = (--thdid)).value(0))
 		thdpool.push_back(std::async(std::launch::async, run, opts, type));
 	statistic stat = run(opts, type);
 	for (std::future<statistic>& thd : thdpool) stat += thd.get();
 	return stat;
 }
 
-std::map<std::string, std::string> aliases() {
+std::string resolve(const std::string& token) {
 	std::map<std::string, std::string> alias;
 
 	alias["4x6patt/khyeh"]       = "012345:012345! 456789:456789! 012456:012456! 45689a:45689a! ";
@@ -1015,7 +1018,8 @@ std::map<std::string, std::string> aliases() {
 	alias["default"]   = alias["4x6patt"];
 	alias["none"]      = "";
 
-	return alias;
+	try { return alias.at(token);
+	} catch (std::out_of_range&) { return token; }
 }
 
 void make_network(utils::options::option opt) {
@@ -1026,14 +1030,12 @@ void make_network(utils::options::option opt) {
 	const auto npos = std::string::npos;
 	for (size_t i; (i = tokens.find(" norm")) != npos; tokens[i] = '/');
 
-	auto aliases = utils::aliases();
 	std::stringstream unalias(tokens); tokens.clear();
 	for (std::string token; unalias >> token; tokens += (token + ' ')) {
 		if (token.find(':') != npos) continue;
 		std::string name = token.substr(0, token.find_first_of("&|="));
 		std::string info = token != name ? token.substr(name.size()) : "";
-		if (aliases.find(name) != aliases.end()) token = aliases[name];
-		if (info.empty()) continue;
+		if ((token = utils::resolve(name)).empty() || info.empty()) continue;
 
 		std::string winfo, iinfo, buff;
 		for (char set : std::string("&|=")) {
@@ -1260,22 +1262,6 @@ void list_network() {
 	std::cout << std::endl;
 }
 
-void init_cache(utils::options::option opt) {
-	std::string res(opt);
-
-	if (res.size()) {
-		size_t unit = 0, size = std::stoull(res, &unit);
-		if (unit < res.size())
-			switch (std::toupper(res[unit])) {
-			case 'K': size *= ((1ULL << 10) / sizeof(cache::block)); break;
-			case 'M': size *= ((1ULL << 20) / sizeof(cache::block)); break;
-			case 'G': size *= ((1ULL << 30) / sizeof(cache::block)); break;
-			}
-		bool peek = !opt("nopeek");
-		cache::make(size, peek);
-	}
-}
-
 } // utils
 
 
@@ -1380,17 +1366,14 @@ struct method {
 	template<typename source = method>
 	struct expectimax {
 		constexpr inline operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
-		constexpr inline expectimax(utils::options::option depth) {
-			u32 n = expectimax<source>::depth(depth);
-			std::stringstream in(({
-				std::string limit = depth.find("limit", depth.value());
-				while (limit.find(',') != std::string::npos) limit[limit.find(',')] = ' ';
-				limit;
-			}));
-			for (u32& lim : expectimax<source>::limit()) {
-				in >> n;
-				lim = n & -2u;
-			}
+		constexpr inline expectimax(utils::options::option opt) {
+			u32 n = expectimax<source>::depth(opt.value(1));
+			std::string limit = opt["limit"].value("");
+			while (limit.find(',') != std::string::npos)
+				limit[limit.find(',')] = ' ';
+			std::stringstream in(limit);
+			for (u32& lim : expectimax<source>::limit())
+				in >> n, lim = n & -2u;
 		}
 
 		static inline numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
@@ -1490,19 +1473,19 @@ struct method {
 			spec = spec.substr(0, spec.find_first_of("&|="));
 		}
 
-		if (opts["depth"].value(1) > 1) {
+		if (opts["search"].value(1) > 1) {
 			switch (to_hash(spec)) {
-			default:                    return method::expectimax<method>(opts["depth"]);
-			case to_hash("isomorphic"): return method::expectimax<method::isomorphic>(opts["depth"]);
-			case to_hash("4x6patt"):    return method::expectimax<method::iso4x6patt>(opts["depth"]);
-			case to_hash("5x6patt"):    return method::expectimax<method::iso5x6patt>(opts["depth"]);
-			case to_hash("6x6patt"):    return method::expectimax<method::iso6x6patt>(opts["depth"]);
-			case to_hash("7x6patt"):    return method::expectimax<method::iso7x6patt>(opts["depth"]);
-			case to_hash("8x6patt"):    return method::expectimax<method::iso8x6patt>(opts["depth"]);
-			case to_hash("2x7patt"):    return method::expectimax<method::iso2x7patt>(opts["depth"]);
-			case to_hash("3x7patt"):    return method::expectimax<method::iso3x7patt>(opts["depth"]);
-			case to_hash("1x8patt"):    return method::expectimax<method::iso1x8patt>(opts["depth"]);
-			case to_hash("2x8patt"):    return method::expectimax<method::iso2x8patt>(opts["depth"]);
+			default:                    return method::expectimax<method>(opts["search"]);
+			case to_hash("isomorphic"): return method::expectimax<method::isomorphic>(opts["search"]);
+			case to_hash("4x6patt"):    return method::expectimax<method::iso4x6patt>(opts["search"]);
+			case to_hash("5x6patt"):    return method::expectimax<method::iso5x6patt>(opts["search"]);
+			case to_hash("6x6patt"):    return method::expectimax<method::iso6x6patt>(opts["search"]);
+			case to_hash("7x6patt"):    return method::expectimax<method::iso7x6patt>(opts["search"]);
+			case to_hash("8x6patt"):    return method::expectimax<method::iso8x6patt>(opts["search"]);
+			case to_hash("2x7patt"):    return method::expectimax<method::iso2x7patt>(opts["search"]);
+			case to_hash("3x7patt"):    return method::expectimax<method::iso3x7patt>(opts["search"]);
+			case to_hash("1x8patt"):    return method::expectimax<method::iso1x8patt>(opts["search"]);
+			case to_hash("2x8patt"):    return method::expectimax<method::iso2x8patt>(opts["search"]);
 			}
 		}
 
@@ -1533,12 +1516,12 @@ struct state : board {
 	numeric esti;
 	inline state() : board(0ull, 0u, -1u), esti(0) {}
 	inline state(const state& s) = default;
-
-	inline operator bool() const { return info() != -1u; }
 	declare_comparators(const state&, esti, inline);
 
+	inline operator bool() const { return info() != -1u; }
 	inline numeric value() const { return esti - info(); }
-	inline i32 reward() const { return info(); }
+	inline u32 reward() const { return std::max(i32(info()), 0); }
+	inline i32 score() const { return info(); }
 
 	inline void assign(const board& b, u32 op = -1) {
 		set(b);
@@ -1548,20 +1531,19 @@ struct state : board {
 			clip<feature> range = feature::feats(),
 			method::estimator estim = method::estimate) {
 		estim = info() != -1u ? estim : method::illegal;
-		esti = state::reward() + estim(*this, range);
+		esti = score() + estim(*this, range);
 		return esti;
 	}
 	inline numeric optimize(numeric exact, numeric alpha = method::alpha(),
 			clip<feature> range = feature::feats(),
 			method::optimizer optim = method::optimize) {
-		numeric update = (exact - state::value()) * alpha;
-		esti = state::reward() + optim(*this, update, range);
+		numeric update = (exact - value()) * alpha;
+		esti = score() + optim(*this, update, range);
 		return esti;
 	}
 };
 struct select {
-	state move[4];
-	state *best;
+	state move[4], *best;
 	inline select() : best(move) {}
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
 		b.moves(move[0], move[1], move[2], move[3]);
@@ -1577,162 +1559,133 @@ struct select {
 	inline void operator >>(state& s) const { s = (*best); }
 	inline void operator >>(board& b) const { b.set(*best); }
 
-	inline operator bool() const { return score() != -1; }
-	inline i32 score() const { return best->info(); }
+	inline operator bool() const { return best->operator bool(); }
 	inline numeric esti() const { return best->esti; }
+	inline i32 score() const { return best->score(); }
 	inline u32 opcode() const { return best - move; }
 
 	inline state* begin() { return move; }
 	inline state* end() { return move + 4; }
 };
 struct statistic {
-	u64 limit;
-	u64 loop;
-	u64 unit;
-	u32 winv;
+	struct execinfo {
+		u64 limit;
+		u64 loop;
+		u64 unit;
+		u32 win;
+		u32 thdid;
+		u32 thdnum;
+	} info;
 
 	struct record {
 		u64 score;
-		u64 win;
-		u64 time;
 		u64 opers;
+		u64 time;
+		u64 win;
+		u32 scale;
 		u32 max;
-		u32 hash;
 		record& operator +=(const record& rec) {
 			score += rec.score;
-			win += rec.win;
-			time += rec.time;
 			opers += rec.opers;
-			hash |= rec.hash;
+			time += rec.time;
+			win += rec.win;
+			scale |= rec.scale;
 			max = std::max(max, rec.max);
 			return (*this);
 		}
 	} total, local;
 
-	struct each {
+	struct counter {
 		std::array<u64, 32> score;
 		std::array<u64, 32> opers;
 		std::array<u64, 32> count;
-		each& operator +=(const each& ea) {
+		counter& operator +=(const counter& ea) {
 			std::transform(count.begin(), count.end(), ea.count.begin(), count.begin(), std::plus<u64>());
 			std::transform(score.begin(), score.end(), ea.score.begin(), score.begin(), std::plus<u64>());
 			std::transform(opers.begin(), opers.end(), ea.opers.begin(), opers.begin(), std::plus<u64>());
 			return (*this);
 		}
-	} every;
+	} accum;
 
-	struct execinfo {
-		u32 thdid;
-		u32 thdnum;
-	} info;
-
-	statistic() : limit(0), loop(0), unit(0), winv(0), total({}), local({}), every({}), info({0, 1}) {}
-	statistic(const utils::options::option& opt) : statistic() { init(opt); }
+	statistic() : info{}, total{}, local{}, accum{} {}
 	statistic(const statistic&) = default;
 
-	bool init(const utils::options::option& opt = {}) {
-		loop = 1000;
-		unit = 1000;
-		winv = 2048;
+	bool init(utils::options::option opt = {}) {
+		std::string conf = opt.value().substr(0, opt.value().find(' ')) + "x:";
+		info.loop = opt["loop"].value((opt["-"] = conf).value(1000));
+		info.unit = opt["unit"].value((opt["-"] = conf.substr(conf.find('x') + 1)).value(1000));
+		info.win  = opt["win"].value((opt["-"] = conf.substr(conf.find(':') + 1)).value(2048));
 
-		auto npos = std::string::npos;
-		auto it = std::find_if(opt.begin(), opt.end(), [=](std::string v) { return v.find('=') == npos; });
-		std::string res = (it != opt.end()) ? *it : (opt.empty() ? "1000" : "0");
-		try {
-			loop = std::stol(res);
-			if (res.find('x') != npos) unit = std::stol(res.substr(res.find('x') + 1));
-			if (res.find(':') != npos) winv = std::stol(res.substr(res.find(':') + 1));
-		} catch (std::invalid_argument&) {}
-
-		loop = std::stol(opt.find("loop", std::to_string(loop)));
-		unit = std::stol(opt.find("unit", std::to_string(unit)));
-		winv = std::stol(opt.find("win",  std::to_string(winv)));
-
-		info.thdid = std::stol(opt.find("thread#", "0"));
-		info.thdnum = std::stol(opt.find("thread", "1"));
-		loop = loop / info.thdnum + (loop % info.thdnum && info.thdid < (loop % info.thdnum) ? 1 : 0);
-		limit = loop * unit;
+		info.thdid  = opt["thread#"].value(0);
+		info.thdnum = opt["thread"].value(1);
+		info.loop  = info.loop / info.thdnum + (info.loop % info.thdnum && info.thdid < (info.loop % info.thdnum) ? 1 : 0);
+		info.limit = info.loop * info.unit;
 		format(0, (info.thdnum > 1) ? (" [" + std::to_string(info.thdid) + "]") : "");
 
-		every = {};
 		total = {};
 		local = {};
+		accum = {};
 		for (u32 i = 0; i < info.thdid; i++) moporgic::rand();
 		local.time = moporgic::millisec();
-		loop = 1;
+		info.loop = 1;
 
-		return limit;
+		return info.limit;
 	}
 
-	class format_t : public std::array<char, 64> {
-	public:
+	struct string : std::array<char, 64> {
 		inline void operator =(const std::string& s) { std::copy_n(s.begin(), s.size() + 1, begin()); }
 		inline operator const char*() const { return data(); }
-	};
-
-	format_t indexf;
-	format_t localf;
-	format_t totalf;
-	format_t summaf;
+	} indexf, localf, totalf, summaf;
 
 	void format(u32 dec = 0, const std::string& suffix = "") {
-//		indexf = "%03llu/%03llu %llums %.2fops";
-//		localf = "local:  avg=%llu max=%u tile=%u win=%.2f%%";
-//		totalf = "total:  avg=%llu max=%u tile=%u win=%.2f%%";
-//		summaf = "summary %llums %.2fops";
-		if (!dec) dec = std::max(std::floor(std::log10(limit / unit)) + 1, 3.0);
+		if (!dec) dec = std::max(std::floor(std::log10(info.limit / info.unit)) + 1, 3.0);
 		indexf = "%0" + std::to_string(dec) + PRIu64 "/%0" + std::to_string(dec) + PRIu64 " %" PRIu64 "ms %.2fops" + suffix;
 		localf = "local: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
 		totalf = "total: " + std::string(dec * 2 - 5, ' ') + "avg=%" PRIu64 " max=%u tile=%u win=%.2f%%";
 		summaf = "summary" + std::string(dec * 2 - 5, ' ') + "%" PRIu64 "ms %.2fops" + suffix;
 	}
 
-	inline u64 operator++(int) { return (++loop) - 1; }
-	inline u64 operator++() { return (++loop); }
-	inline operator bool() const { return loop <= limit; }
-	inline bool checked() const { return (loop % unit) == 0; }
+	inline void operator++(int) { ++info.loop; }
+	inline void operator++() { ++info.loop; }
+	inline operator bool() const { return info.loop <= info.limit; }
+	inline bool checked() const { return (info.loop % info.unit) == 0; }
 
-	void update(u32 score, u32 hash, u32 opers) {
+	void update(u32 score, u32 scale, u32 opers) {
 		local.score += score;
-		local.hash |= hash;
+		local.scale |= scale;
 		local.opers += opers;
-		local.win += (hash >= winv ? 1 : 0);
+		local.win += (scale >= info.win ? 1 : 0);
 		local.max = std::max(local.max, score);
-		every.count[math::log2(hash)] += 1;
-		every.score[math::log2(hash)] += score;
-		every.opers[math::log2(hash)] += opers;
+		accum.count[math::log2(scale)] += 1;
+		accum.score[math::log2(scale)] += score;
+		accum.opers[math::log2(scale)] += opers;
 
-		if ((loop % unit) != 0) return;
+		if ((info.loop % info.unit) != 0) return;
 
 		u64 tick = moporgic::millisec();
 		local.time = tick - local.time;
-		total.score += local.score;
-		total.win += local.win;
-		total.time += local.time;
-		total.opers += local.opers;
-		total.hash |= local.hash;
-		total.max = std::max(total.max, local.max);
+		total += local;
 
 		char buf[256];
 		u32 size = 0;
 
 		size += snprintf(buf + size, sizeof(buf) - size, indexf, // "%03llu/%03llu %llums %.2fops",
-				loop / unit,
-				limit / unit,
+				info.loop / info.unit,
+				info.limit / info.unit,
 				local.time,
 				local.opers * 1000.0 / local.time);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, localf, // "local:  avg=%llu max=%u tile=%u win=%.2f%%",
-				local.score / unit,
+				local.score / info.unit,
 				local.max,
-				math::msb32(local.hash),
-				local.win * 100.0 / unit);
+				math::msb32(local.scale),
+				local.win * 100.0 / info.unit);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
-				total.score / loop,
+				total.score / info.loop,
 				total.max,
-				math::msb32(total.hash),
-				total.win * 100.0 / loop);
+				math::msb32(total.scale),
+				total.win * 100.0 / info.loop);
 		buf[size++] = '\n';
 		buf[size++] = '\n';
 		buf[size++] = '\0';
@@ -1744,7 +1697,7 @@ struct statistic {
 	}
 
 	void summary() const {
-		if (limit == 0) return;
+		if (info.limit == 0) return;
 		char buf[1024];
 		size_t size = 0;
 
@@ -1753,18 +1706,18 @@ struct statistic {
 				total.opers * 1000.0 * info.thdnum / total.time);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size, totalf, // "total:  avg=%llu max=%u tile=%u win=%.2f%%",
-				total.score / limit,
+				total.score / info.limit,
 				total.max,
-				math::msb32(total.hash),
-				total.win * 100.0 / limit);
+				math::msb32(total.scale),
+				total.win * 100.0 / info.limit);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size,
 		        "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
 		        "tile", "count", "score", "move", "rate", "win");
 		buf[size++] = '\n';
-		const auto& count = every.count;
-		const auto& score = every.score;
-		const auto& opers = every.opers;
+		const auto& count = accum.count;
+		const auto& score = accum.score;
+		const auto& opers = accum.opers;
 		auto total = std::accumulate(count.begin(), count.end(), 0);
 		for (auto left = total, i = 0; left; left -= count[i++]) {
 			if (count[i] == 0) continue;
@@ -1785,13 +1738,13 @@ struct statistic {
 		return statistic(*this) += stat;
 	}
 	statistic& operator +=(const statistic& stat) {
-		limit += stat.limit;
-		loop += stat.loop;
-		if (!unit) unit = stat.unit;
-		if (!winv) winv = stat.winv;
+		info.limit += stat.info.limit;
+		info.loop += stat.info.loop;
+		if (!info.unit) info.unit = stat.info.unit;
+		if (!info.win)  info.win = stat.info.win;
 		total += stat.total;
 		local += stat.local;
-		every += stat.every;
+		accum += stat.accum;
 		u32 dec = (std::string(summaf).find('%') - std::string(summaf).find('y') + 5) / 2;
 		format(dec, (info.thdnum > 1) ? (" (" + std::to_string(info.thdnum) + "x)") : "");
 		return *this;
@@ -1806,13 +1759,14 @@ statistic run(utils::options opts, std::string type) {
 
 	method spec = method::parse(opts, type);
 	clip<feature> feats = feature::feats();
-	numeric alpha = method::alpha(opts["alpha"] / (opts("alpha", "norm") ? opts["alpha"]["norm"].value(feats.size()) : 1));
-	numeric lambda = method::lambda(opts["lambda"]);
-	u32 step = method::step(opts["step"]);
+	numeric alpha = method::alpha(opts[type]["alpha"].value(opts["alpha"].value(0.1))
+			/ opts[type]["norm"].value(opts["alpha"]["norm"].value(feats.size())));
+	numeric lambda = method::lambda(opts[type]["lambda"].value(opts["lambda"].value(0)));
+	u32 step = method::step(opts[type]["step"].value(opts["step"].value(lambda ? 5 : 1)));
 
 	switch (to_hash(opts[type]["mode"].value(type))) {
 	case to_hash("optimize"):
-	case to_hash("optimize:forward"):
+	case to_hash("optimize:forward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1837,9 +1791,9 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("optimize:backward"):
+	case to_hash("optimize:backward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1859,16 +1813,92 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("optimize:forward-lambda"):
+	case to_hash("optimize:step"):
+	case to_hash("optimize:step-forward"): [&]() {
+		for (stats.init(opts[type]); stats; stats++) {
+			board b;
+			u32 score = 0;
+			u32 opers = 0;
+			u32 rsum = 0;
+
+			b.init();
+			while (best(b, feats, spec) && opers < step) {
+				rsum += best.score();
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			while (best(b, feats, spec)) {
+				state& update = path[opers - step];
+				rsum -= update.info();
+				update.estimate(feats, spec);
+				update.optimize(rsum + best.esti(), alpha, feats, spec);
+				rsum += best.score();
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+				b.next();
+			}
+			for (u32 i = opers - std::min(step, opers); i < opers; i++) {
+				state& update = path[i];
+				rsum -= update.info();
+				update.estimate(feats, spec);
+				update.optimize(rsum, alpha, feats, spec);
+			}
+			path.clear();
+
+			stats.update(score, b.hash(), opers);
+		}
+		}(); break;
+
+	case to_hash("optimize:step-backward"): [&]() {
+		for (stats.init(opts[type]); stats; stats++) {
+			board b;
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, spec); b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path;
+				best >> b;
+			}
+
+			u32 rsum = 0;
+			for (u32 i = opers - 1; i >= opers - std::min(step, opers); i--) {
+				state& update = path[i];
+				update.estimate(feats, spec);
+				update.optimize(rsum, alpha, feats, spec);
+				rsum += update.info();
+			}
+			for (u32 i = opers - 1; i >= step; i--) {
+				state& source = path[i];
+				rsum -= source.info();
+				numeric esti = source.estimate(feats, spec);
+				state& update = path[i - step];
+				update.estimate(feats, spec);
+				update.optimize(rsum + esti, alpha, feats, spec);
+				rsum += update.info();
+			}
+			path.clear();
+
+			stats.update(score, b.hash(), opers);
+		}
+		}(); break;
+
+	case to_hash("optimize:lambda-forward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
 
 			b.init();
-			for (u32 i = 0; i < step && best(b, feats, spec); i++) {
+			while (best(b, feats, spec) && opers < step) {
 				score += best.score();
 				opers += 1;
 				best >> path;
@@ -1877,13 +1907,12 @@ statistic run(utils::options opts, std::string type) {
 			}
 			while (best(b, feats, spec)) {
 				numeric z = best.esti();
-				numeric retain = 1 - lambda;
 				for (u32 k = 1; k < step; k++) {
 					state& source = path[opers - k];
 					source.estimate(feats, spec);
-					numeric r = source.reward();
+					numeric r = source.score();
 					numeric v = source.value();
-					z = r + (lambda * z + retain * v);
+					z = r + (lambda * z + (1 - lambda) * v);
 				}
 				state& update = path[opers - step];
 				update.estimate(feats, spec);
@@ -1894,17 +1923,16 @@ statistic run(utils::options opts, std::string type) {
 				best >> b;
 				b.next();
 			}
-			for (u32 tail = std::min(step, opers), i = 0; i < tail; i++) {
-				numeric z = 0;
-				numeric retain = 1 - lambda;
-				for (u32 k = i + 1; k < tail; k++) {
-					state& source = path[opers + i - k];
+			for (u32 i = std::min(step, opers); i > 0; i--) {
+				numeric z = best.esti();
+				for (u32 k = 1; k < i; k++) {
+					state& source = path[opers - k];
 					source.estimate(feats, spec);
-					numeric r = source.reward();
+					numeric r = source.score();
 					numeric v = source.value();
-					z = r + (lambda * z + retain * v);
+					z = r + (lambda * z + (1 - lambda) * v);
 				}
-				state& update = path[opers + i - tail];
+				state& update = path[opers - i];
 				update.estimate(feats, spec);
 				update.optimize(z, alpha, feats, spec);
 			}
@@ -1912,10 +1940,10 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
 	case to_hash("optimize:lambda"):
-	case to_hash("optimize:backward-lambda"):
+	case to_hash("optimize:lambda-backward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1929,22 +1957,21 @@ statistic run(utils::options opts, std::string type) {
 			}
 
 			numeric z = 0;
-			numeric r = path.back().reward();
+			numeric r = path.back().score();
 			numeric v = path.back().optimize(0, alpha, feats, spec) - r;
-			numeric retain = 1 - lambda;
 			for (path.pop_back(); path.size(); path.pop_back()) {
 				path.back().estimate(feats, spec);
-				z = r + (lambda * z + retain * v);
-				r = path.back().reward();
+				z = r + (lambda * z + (1 - lambda) * v);
+				r = path.back().score();
 				v = path.back().optimize(z, alpha, feats, spec) - r;
 			}
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
 	case to_hash("evaluate"):
-	case to_hash("evaluate:best"):
+	case to_hash("evaluate:best"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
@@ -1958,27 +1985,25 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("evaluate:random"):
+	case to_hash("evaluate:random"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
-			u64 rbuf;
 			hex a;
 
 			for (b.init(); (a = b.actions()).size(); b.next()) {
-				if (opers % 8 == 0) rbuf = moporgic::rand64();
-				score += b.operate(a[raw_cast<u8>(rbuf, opers % 8) % a.size()]);
+				score += b.operate(a[moporgic::rand() % a.size()]);
 				opers += 1;
 			}
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 
-	case to_hash("evaluate:greedy"):
+	case to_hash("evaluate:reward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
 			board b;
 			struct state : board {
@@ -1994,7 +2019,7 @@ statistic run(utils::options opts, std::string type) {
 
 			stats.update(score, b.hash(), opers);
 		}
-		break;
+		}(); break;
 	}
 
 	return stats;
@@ -2004,39 +2029,36 @@ utils::options parse(int argc, const char* argv[]) {
 	utils::options opts;
 	for (int i = 1; i < argc; i++) {
 		std::string label = argv[i];
-		auto next_opt = [&](const std::string& v) -> std::string {
+		auto next_opt = [&](std::string v = "") -> std::string {
 			return (i + 1 < argc && *(argv[i + 1]) != '-') ? argv[++i] : v;
 		};
-		auto next_opts = [&]() -> utils::options::list {
+		auto next_opts = [&](std::string v = "") -> utils::options::list {
 			utils::options::list args;
-			for (std::string v; (v = next_opt("")).size(); ) args.push_back(v);
+			if (v.size()) args.push_back(next_opt(v));
+			while ((v = next_opt()).size()) args.push_back(v);
 			return args;
 		};
 		switch (to_hash(label)) {
 		case to_hash("-a"): case to_hash("--alpha"):
-			opts[""] = next_opts();
-			if (opts[""].empty()) (opts[""] += "1.0") += "norm";
-			opts["alpha"] = opts[""];
+			opts["alpha"] = next_opts("1.0");
 			break;
 		case to_hash("-l"): case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
-			opts["step"] = next_opt(numeric(opts["lambda"]) ? "5" : "1");
+			// no break: lambda may also come with step
+		case to_hash("--step"): case to_hash("--n-step"):
+			opts["step"] = next_opt(opts("lambda") && opts["lambda"].value(0) ? "5" : "1");
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
 			break;
 		case to_hash("-r"): case to_hash("--recipe"):
-			label = next_opt("");
-			if (label == "") break;
+			label = next_opt("optimize");
 			// no break: optimize and evaluate are also handled by the same recipe logic
-		case to_hash("-t"): case to_hash("--train"): case to_hash("--optimize"):
-		case to_hash("-e"): case to_hash("--test"):  case to_hash("--evaluate"):
-			opts["recipe"] = label.substr(label.find_first_not_of('-'));
-			if (opts["recipe"] == "t" || opts["recipe"] == "train") opts["recipe"] = "optimize";
-			if (opts["recipe"] == "e" || opts["recipe"] == "test")  opts["recipe"] = "evaluate";
-			opts[""] = next_opts();
-			if (opts[""].size()) opts[opts["recipe"]] = opts[""];
-			if (opts[opts["recipe"]].size()) opts["recipes"] += opts["recipe"];
+		case to_hash("-t"): case to_hash("--optimize"):
+		case to_hash("-e"): case to_hash("--evaluate"):
+			label = label[label.find_first_not_of('-')] != 'e' ? "optimize" : "evaluate";
+			if ((opts[""] = next_opts()).size()) opts[label] = opts[""];
+			if (opts[label].size()) opts["recipes"] += label;
 			break;
 		case to_hash("--recipes"):
 			opts["recipes"] = next_opts();
@@ -2044,39 +2066,32 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-io"):  case to_hash("--input-output"):
 		case to_hash("-nio"): case to_hash("--network-input-output"):
 		case to_hash("-wio"): case to_hash("--weight-input-output"):
-		case to_hash("-fio"): case to_hash("--feature-input-output"):
 		case to_hash("-i"):   case to_hash("--input"):
 		case to_hash("-wi"):  case to_hash("--weight-input"):
-		case to_hash("-fi"):  case to_hash("--feature-input"):
 		case to_hash("-ni"):  case to_hash("--network-input"):
 		case to_hash("-o"):   case to_hash("--output"):
 		case to_hash("-wo"):  case to_hash("--weight-output"):
-		case to_hash("-fo"):  case to_hash("--feature-output"):
 		case to_hash("-no"):  case to_hash("--network-output"):
-			opts[""] = next_opt(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
-			opts[""] += next_opts();
+			opts[""] = next_opts(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			if (label.find(label[1] != '-' ? "i" : "input")  != std::string::npos) opts["load"] += opts[""];
 			if (label.find(label[1] != '-' ? "o" : "output") != std::string::npos) opts["save"] += opts[""];
 			break;
-		case to_hash("-w"):  case to_hash("--weight"):
-		case to_hash("-f"):  case to_hash("--feature"):
-		case to_hash("-n"):  case to_hash("--network"):
-		case to_hash("-wf"): case to_hash("--weight-feature"):
-		case to_hash("-fw"): case to_hash("--feature-weight"):
-			opts[""] = next_opt("default");
-			opts[""] += next_opts();
-			opts["make"] += opts[""];
+		case to_hash("-w"): case to_hash("--weight"):
+		case to_hash("-f"): case to_hash("--feature"):
+		case to_hash("-n"): case to_hash("--network"):
+			opts["make"] += next_opts("default");
 			break;
-		case to_hash("-m"): case to_hash("--mode"):
-			opts["mode"] = next_opt("bias");
+		case to_hash("-tt"): case to_hash("--optimize-type"):
+		case to_hash("-tm"): case to_hash("--optimize-mode"):
+		case to_hash("-et"): case to_hash("--evaluate-type"):
+		case to_hash("-em"): case to_hash("--evaluate-mode"):
+			label = label[label.find_first_not_of('-')] != 'e' ? "optimize" : "evaluate";
+			opts[label]["mode"] = next_opt(label);
+			if (!opts["recipes"](label)) opts["recipes"] += label;
 			break;
-		case to_hash("-tt"): case to_hash("--train-type"): case to_hash("--optimize-type"):
-		case to_hash("-tm"): case to_hash("--train-mode"): case to_hash("--optimize-mode"):
-			opts["optimize"]["mode"] = next_opt("optimize");
-			break;
-		case to_hash("-et"): case to_hash("--test-type"): case to_hash("--evaluate-type"):
-		case to_hash("-em"): case to_hash("--test-mode"): case to_hash("--evaluate-mode"):
-			opts["evaluate"]["mode"] = next_opt("evaluate");
+		case to_hash("-m"):  case to_hash("--mode"):
+			if (opts["recipes"].empty()) opts["recipes"] += "optimize";
+			opts[opts["recipes"].back()]["mode"] = next_opt(opts["recipes"].back());
 			break;
 		case to_hash("-u"): case to_hash("--unit"):
 			opts["unit"] = next_opt("1000");
@@ -2085,27 +2100,25 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["win"] = next_opt("2048");
 			break;
 		case to_hash("-%"): case to_hash("-I"): case to_hash("--info"):
-			opts["info"] = next_opt("full");
+			opts["info"] = next_opt();
 			break;
 		case to_hash("-d"): case to_hash("--depth"):
-			opts["depth"] = next_opts();
+		case to_hash("-S"): case to_hash("--search"):
+			opts["search"] = next_opts("3");
 			break;
 		case to_hash("-c"): case to_hash("--cache"):
-			opts[""] = next_opt("2048M");
-			opts[""] += next_opts();
-			opts["cache"] += opts[""];
+			opts["cache"] = next_opts("2048M");
 			break;
 		case to_hash("-p"): case to_hash("--parallel"): case to_hash("--thread"):
 			opts["thread"] = std::thread::hardware_concurrency();
-			opts[""] = next_opts();
-			if (opts[""].value(0)) opts["thread"].clear();
+			if ((opts[""] = next_opts()).value(0)) opts["thread"].clear();
 			opts["thread"] += opts[""];
 			break;
-		case to_hash("-x"): case to_hash("-opt"): case to_hash("--options"):
+		case to_hash("-x"): case to_hash("--options"):
 			opts["options"] += next_opts();
 			break;
 		case to_hash("-#"): case to_hash("--comment"):
-			opts["comment"] = next_opts();
+			opts["comment"] += next_opts();
 			break;
 		case to_hash("-|"):
 			opts = {};
@@ -2115,29 +2128,38 @@ utils::options parse(int argc, const char* argv[]) {
 			break;
 		}
 	}
-	for (auto recipe : opts["recipes"]) {
-		for (auto item : {"mode", "unit", "win", "info"})
-			if (!opts(recipe, item) && opts(item))
+	for (std::string recipe : opts["recipes"]) {
+		std::string mode = recipe.substr(0, 8);
+		if (mode != "optimize" && mode != "evaluate")
+			mode = opts[recipe].find("mode").substr(0, 8);
+		if (mode != "optimize" && mode != "evaluate")
+			continue;
+
+		for (std::string flag : {"lambda", "step"})
+			if (mode == "optimize" && (opts[recipe](flag) || opts(flag)))
+				opts[recipe]["mode"] = opts[recipe]["mode"].value(flag);
+		if (opts[recipe].find("mode", recipe).find(mode) != 0)
+			opts[recipe]["mode"] = mode + ":" + opts[recipe]["mode"];
+		if (opts[recipe].find("mode") == "" && recipe != mode)
+			opts[recipe]["mode"] = mode;
+
+		if (opts("thread")) opts["thread"][mode];
+		for (std::string item : {"loop", "unit", "win", "info"})
+			if (opts(item) && !opts[recipe](item))
 				opts[recipe][item] = opts[item];
-		for (auto mode : {"optimize", "evaluate"})
-			if (recipe == mode && opts[recipe].find("mode", recipe).find(recipe) != 0)
-				opts[recipe]["mode"] = recipe + ":" + opts[recipe]["mode"];
-		if (!opts(recipe, "info") && opts[recipe].find("mode", recipe).find("evaluate") == 0)
-			opts[recipe]["info"] = "auto";
-		for (auto item : {"info=none", "info=off"})
-			opts[recipe].remove(item);
+		if (mode == "evaluate") opts[recipe]["info"];
+		opts[recipe].remove("info=none");
 	}
 	return opts;
 }
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts["recipes"].size()) opts["recipes"] += "optimize", opts["optimize"] = 1000;
-	if (!opts("alpha")) opts["alpha"] = 1.0, opts["alpha"] += "norm";
+	if (!opts("recipes")) opts["recipes"] = "optimize", opts["optimize"] = 1000;
+	if (!opts("alpha")) opts["alpha"] = 1.0;
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
-	if (!opts("step")) opts["step"] = numeric(opts["lambda"]) ? 5 : 1;
-	if (!opts("depth")) opts["depth"] = 1;
+	if (!opts("step")) opts["step"] = opts["lambda"].value(0) ? 5 : 1;
 
 	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
@@ -2146,15 +2168,15 @@ int main(int argc, const char* argv[]) {
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 	std::cout << "time = " << millisec() << " (" << moporgic::put_time(millisec()) << ")" << std::endl;
-	std::cout << "seed = " << opts["seed"] << std::endl;
-	std::cout << "alpha = " << opts["alpha"] << " coherence" << std::endl;
-	std::cout << "lambda = " << opts["lambda"] << ", step = " << opts["step"] << std::endl;
-	std::cout << "search = " << opts["depth"] << ", cache = " << opts["cache"].value("none") << std::endl;
-	std::cout << "concurrent = " << opts["thread"].value(1) << "x" << std::endl;
+	std::cout << "seed = " << opts["seed"].value() << std::endl;
+	std::cout << "alpha = " << opts["alpha"].value("1.0") << " coherence" << std::endl;
+	std::cout << "lambda = " << opts["lambda"].value(0) << ", step = " << opts["step"].value(1) << std::endl;
+	std::cout << "search = " << opts["search"].value("1") << ", cache = " << opts["cache"].value("none") << std::endl;
+	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
 
 	moporgic::srand(to_hash(opts["seed"]));
-	utils::config_thread(opts["thread"]);
+	utils::config_shm(opts["thread"]);
 	utils::init_cache(opts["cache"]);
 
 	utils::load_network(opts["load"]);

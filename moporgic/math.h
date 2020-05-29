@@ -123,41 +123,6 @@ static inline constexpr int32_t avg(register int32_t x, register int32_t y) noex
 static inline constexpr int64_t avg(register int64_t x, register int64_t y) noexcept    { return (x&y)+((x^y)>>1); }
 
 /**
- * Bit Reversal
- * Reversing the bits in an integer x is somewhat painful, but here's a SWAR algorithm for a 32-bit value
- */
-static inline constexpr uint32_t reverse(register uint32_t x) noexcept {
-	x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1));
-	x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2));
-	x = (((x & 0xf0f0f0f0) >> 4) | ((x & 0x0f0f0f0f) << 4));
-	x = (((x & 0xff00ff00) >> 8) | ((x & 0x00ff00ff) << 8));
-	return ((x >> 16) | (x << 16));
-}
-static inline constexpr uint64_t reverse(register uint64_t x) noexcept {
-	x = (((x & 0xaaaaaaaaaaaaaaaaULL) >> 1) | ((x & 0x5555555555555555ULL) << 1));
-	x = (((x & 0xccccccccccccccccULL) >> 2) | ((x & 0x3333333333333333ULL) << 2));
-	x = (((x & 0xf0f0f0f0f0f0f0f0ULL) >> 4) | ((x & 0x0f0f0f0f0f0f0f0fULL) << 4));
-	x = (((x & 0xff00ff00ff00ff00ULL) >> 8) | ((x & 0x00ff00ff00ff00ffULL) << 8));
-	x = (((x & 0xffff0000ffff0000ULL) >>16) | ((x & 0x0000ffff0000ffffULL) <<16));
-	return ((x >> 32) | (x << 32));
-}
-/**
- * Bit Reversal (re-write Bit Reversal algorithm to use 4 instead of 8 constants)
- * Reversing the bits in an integer x is somewhat painful, but here's a SWAR algorithm for a 32-bit value
- */
-//static inline constexpr uint32_t reverse_v2(register uint32_t x) noexcept {
-//	register unsigned int y = 0x55555555;
-//	x = (((x >> 1) & y) | ((x & y) << 1));
-//	y = 0x33333333;
-//	x = (((x >> 2) & y) | ((x & y) << 2));
-//	y = 0x0f0f0f0f;
-//	x = (((x >> 4) & y) | ((x & y) << 4));
-//	y = 0x00ff00ff;
-//	x = (((x >> 8) & y) | ((x & y) << 8));
-//	return ((x >> 16) | (x << 16));
-//}
-
-/**
  * instruction based count: popcnt, lzcnt, tzcnt
  * to optimize these functions, enable compile flags -mabm -mbmi -mbmi2
  */
@@ -619,6 +584,52 @@ static inline constexpr uint64_t nthset64(register uint64_t x, register uint32_t
 static inline constexpr uint32_t nthset32(register uint32_t x, register uint32_t n) noexcept { return pdep32(1U << n, x); }
 static inline constexpr uint64_t nthset(register uint64_t x, register uint32_t n) noexcept { return nthset64(x, n); }
 static inline constexpr uint32_t nthset(register uint32_t x, register uint32_t n) noexcept { return nthset32(x, n); }
+
+/**
+ * Bit Reversal
+ * Reversing the bits in an integer x is somewhat painful, but here's a SWAR algorithm for a 32-bit value
+ */
+static inline constexpr uint32_t reverse(register uint32_t x) noexcept {
+	x = (((x & 0xaaaaaaaa) >> 1) | ((x & 0x55555555) << 1));
+	x = (((x & 0xcccccccc) >> 2) | ((x & 0x33333333) << 2));
+	x = (((x & 0xf0f0f0f0) >> 4) | ((x & 0x0f0f0f0f) << 4));
+	x = (((x & 0xff00ff00) >> 8) | ((x & 0x00ff00ff) << 8));
+	return ((x >> 16) | (x << 16));
+}
+static inline constexpr uint64_t reverse(register uint64_t x) noexcept {
+	x = (((x & 0xaaaaaaaaaaaaaaaaULL) >> 1) | ((x & 0x5555555555555555ULL) << 1));
+	x = (((x & 0xccccccccccccccccULL) >> 2) | ((x & 0x3333333333333333ULL) << 2));
+	x = (((x & 0xf0f0f0f0f0f0f0f0ULL) >> 4) | ((x & 0x0f0f0f0f0f0f0f0fULL) << 4));
+	x = (((x & 0xff00ff00ff00ff00ULL) >> 8) | ((x & 0x00ff00ff00ff00ffULL) << 8));
+	x = (((x & 0xffff0000ffff0000ULL) >>16) | ((x & 0x0000ffff0000ffffULL) <<16));
+	return ((x >> 32) | (x << 32));
+}
+/**
+ * Bit Reversal (re-write Bit Reversal algorithm to use 4 instead of 8 constants)
+ * Reversing the bits in an integer x is somewhat painful, but here's a SWAR algorithm for a 32-bit value
+ */
+//static inline constexpr uint32_t reverse_v2(register uint32_t x) noexcept {
+//	register unsigned int y = 0x55555555;
+//	x = (((x >> 1) & y) | ((x & y) << 1));
+//	y = 0x33333333;
+//	x = (((x >> 2) & y) | ((x & y) << 2));
+//	y = 0x0f0f0f0f;
+//	x = (((x >> 4) & y) | ((x & y) << 4));
+//	y = 0x00ff00ff;
+//	x = (((x >> 8) & y) | ((x & y) << 8));
+//	return ((x >> 16) | (x << 16));
+//}
+
+/**
+ * reverse the byte order
+ * This intrinsic is provided for conversion between LE and BE values.
+ */
+static inline constexpr uint64_t bswap64(register uint64_t x) noexcept { return __builtin_bswap64(x); }
+static inline constexpr uint32_t bswap32(register uint32_t x) noexcept { return __builtin_bswap32(x); }
+static inline constexpr uint32_t bswap16(register uint32_t x) noexcept { return __builtin_bswap16(x); }
+static inline constexpr uint64_t bswap(register uint64_t x) noexcept { return bswap64(x); }
+static inline constexpr uint32_t bswap(register uint32_t x) noexcept { return bswap32(x); }
+static inline constexpr uint16_t bswap(register uint16_t x) noexcept { return bswap16(x); }
 
 /**
  * Tail recursive pow
