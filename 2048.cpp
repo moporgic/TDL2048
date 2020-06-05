@@ -140,25 +140,47 @@ public:
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
-		default:
-		case 0:
-			write_cast<u32>(out, wghts().size());
-			for (weight w : wghts()) out << w;
-			break;
+		case 0: [&]() {
+			std::vector<u32> idxes = idx_select(opt);
+			write_cast<u32>(out, idxes.size());
+			for (u32 idx : idxes) out << wghts()[idx];
+		}(); break;
 		}
 	}
 	static void load(std::istream& in, std::string opt = {}) {
 		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
-		default:
-		case 0:
+		case 0: [&]() {
+			weight::container buf;
 			for (read_cast<u32>(in, code); code; code--)
-				in >> list<weight>::as(wghts()).emplace_back();
-			break;
+				in >> list<weight>::as(buf).emplace_back();
+			for (u32 idx : idx_select(opt + format("[0:%u]", u32(buf.size()))))
+				list<weight>::as(wghts()).push_back(buf[idx]);
+			for (weight w : buf)
+				if (!weight(w.sign())) free(w.data());
+		}(); break;
 		}
 	}
+private:
+	static std::vector<u32> idx_select(std::string opt = {}) {
+		std::vector<u32> idxes;
+		std::stringstream tokens((opt += "[]").substr(0, opt.find(']')).substr(opt.find('[') + 1));
+		for (std::string token; std::getline(tokens, token, ',');) {
+			u32 i = -1u, n = -1u; char x = '.';
+			std::stringstream(token) >> i >> x >> n;
+			if (i != -1u) idxes.push_back(i);
+			if (x == ':' && n != -1u) x = '-', n = i + n - 1;
+			if (x == '-' && n != -1u) while (++i <= n) idxes.push_back(i);
+		}
+		if (idxes.empty()) {
+			idxes.resize(wghts().size());
+			std::iota(idxes.begin(), idxes.end(), 0);
+		}
+		return idxes;
+	}
 
+public:
 	class container : public clip<weight> {
 	public:
 		constexpr container() noexcept : clip<weight>() {}
