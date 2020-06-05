@@ -136,7 +136,7 @@ public:
 		return in;
 	}
 
-	static void save(std::ostream& out) {
+	static void save(std::ostream& out, std::string opt = {}) {
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
@@ -147,7 +147,7 @@ public:
 			break;
 		}
 	}
-	static void load(std::istream& in) {
+	static void load(std::istream& in, std::string opt = {}) {
 		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
@@ -385,7 +385,7 @@ public:
 		return in;
 	}
 
-	static void save(std::ostream& out) {
+	static void save(std::ostream& out, std::string opt = {}) {
 		u32 code = 0;
 		write_cast<byte>(out, code);
 		switch (code) {
@@ -396,7 +396,7 @@ public:
 		}
 		out.flush();
 	}
-	static void load(std::istream& in) {
+	static void load(std::istream& in, std::string opt = {}) {
 		u32 code;
 		read_cast<byte>(in, code);
 		switch (code) {
@@ -812,9 +812,11 @@ private:
 	}
 };
 
-void init_logging(utils::options::option opt) {
+void init_logging(utils::options::option files) {
 	static std::ofstream logout;
-	for (std::string path : opt) {
+	for (std::string file : files) {
+		std::string path = file.substr(file.find('|') + 1);
+//		std::string opt = path != file ? file.substr(0, file.find('|')) : "";
 		char type = path[path.find_last_of(".") + 1];
 		if (logout.is_open() || (type != 'x' && type != 'l')) continue; // .x and .log are suffix for log files
 		logout.open(path, std::ios::out | std::ios::app);
@@ -1089,8 +1091,10 @@ void make_network(utils::options::option opt) {
 		if (wght.size() && idxr.size() && !feature(wght, idxr)) feature::make(wght, idxr);
 	}
 }
-void load_network(utils::options::option opt) {
-	for (std::string path : opt) {
+void load_network(utils::options::option files) {
+	for (std::string file : files) {
+		std::string path = file.substr(file.find('|') + 1);
+		std::string opt = path != file ? file.substr(0, file.find('|')) : "";
 		std::ifstream in;
 		in.open(path, std::ios::in | std::ios::binary);
 		while (in.peek() != -1) {
@@ -1100,15 +1104,17 @@ void load_network(utils::options::option opt) {
 			} else { // legacy binaries always beginning with 0, so use name suffix to determine the type
 				type = path[path.find_last_of(".") + 1];
 			}
-			if (type == 'w')  weight::load(in);
-			if (type == 'c')   cache::load(in);
+			if (type == 'w')  weight::load(in, opt);
+			if (type == 'c')   cache::load(in, opt);
 		}
 		in.close();
 	}
 }
-void save_network(utils::options::option opt) {
+void save_network(utils::options::option files) {
 	char buf[1 << 20];
-	for (std::string path : opt) {
+	for (std::string file : files) {
+		std::string path = file.substr(file.find('|') + 1);
+		std::string opt = path != file ? file.substr(0, file.find('|')) : "";
 		char type = path[path.find_last_of(".") + 1];
 		if (type == 'x' || type == 'l') continue; // .x and .log are suffix for log files
 		std::ofstream out;
@@ -1117,9 +1123,9 @@ void save_network(utils::options::option opt) {
 		if (!out.is_open()) continue;
 		// for upward compatibility, we still write legacy binaries for traditional suffixes
 		if (type != 'c') {
-			weight::save(type != 'w' ? out.write("w", 1) : out);
+			weight::save(type != 'w' ? out.write("w", 1) : out, opt);
 		} else { // .c is reserved for cache binary
-			cache::save(type != 'c' ? out.write("c", 1) : out);
+			cache::save(type != 'c' ?  out.write("c", 1) : out, opt);
 		}
 		out.flush();
 		out.close();
