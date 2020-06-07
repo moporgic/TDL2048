@@ -63,25 +63,24 @@ public:
 		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
-		default:
-		case 4:
+		case 4: [&]() {
 			try { // write sign as 32-bit integer if possible
 				size_t idx = 0;
 				u32 sign = std::stoul(w.sign(), &idx, 16);
 				if (idx != w.sign().size()) throw std::invalid_argument("unresolved");
 				write_cast<u32>(out, sign);
-				write_cast<u16>(out, w.sign().size());
+				write_cast<u16>(out, w.sign().size()); // note: legacy serial 4 stores u16(0)
 				write_cast<u16>(out, 0);
-			} catch (std::logic_error&) { // otherwise, write it as raw string
+			} catch (std::logic_error&) { // otherwise, write it as string
 				out.write(w.sign().append(8, ' ').c_str(), 8);
 			}
 			// write value table
-			write_cast<u16>(out, sizeof(weight::numeric));
+			write_cast<u16>(out, sizeof(numeric));
 			write_cast<u64>(out, w.size());
 			write_cast<numeric>(out, w.value().begin(), w.value().end());
-			// reserved for fields
+			// reserved for additional fields
 			write_cast<u16>(out, 0);
-			break;
+		}(); break;
 		}
 		return out;
 	}
@@ -91,47 +90,43 @@ public:
 		switch (code) {
 		case 0:
 		case 1:
-		case 2:
-			// read name and size
+		case 2: [&]() {
+			// read name, length, and value table
 			w.name = format("%08x", read<u32>(in));
-			w.length = read<u64>(in);
-			if (math::ones64(w.length) == 1) // remove extra beginning '0'
-				w.name = w.name.substr(8 - (math::lg64(w.length) >> 2));
-			// read value table
-			w.raw = weight::alloc(w.length);
+			w.raw = weight::alloc(w.length = read<u64>(in));
 			switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
-			break;
+			// adjust display width, remove redundant padding '0'
+			u32 padz = 8 - (math::lg64(w.length) >> 2);
+			while (padz && w.name.substr(0, padz) != std::string(padz, '0')) padz--;
+			w.name = w.name.substr(padz);
+		}(); break;
 		default:
-		case 4:
-			// read name
+		case 4: [&]() {
+			// read name (raw), block size, length, and value table
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
-			if (raw_cast<u16>(w.name[6]) == 0) { // name is written as integer
-				u32 width = raw_cast<u16>(w.name[4]);
-				if (width == 0) { // name display width is missing, try recalculate it
-					read_cast<u64>(in.ignore(2), w.length).seekg(-10, std::ios::cur);
-					width = (math::ones64(w.length) == 1) ? (math::lg64(w.length) >> 2) : 8;
-					if (format("%x", raw_cast<u32>(w.name[0])).size() > width) width = 8;
-				}
-				w.name = format(format("%%0%ux", width), raw_cast<u32>(w.name[0]));
-			} else { // name is written as string
-				w.name = w.name.substr(0, w.name.find(' '));
-			}
-			// read value table
-			read_cast<u16>(in, code);
-			read_cast<u64>(in, w.length);
-			w.raw = weight::alloc(w.length);
+			code = read<u16>(in);
+			w.raw = weight::alloc(w.length = read<u64>(in));
 			switch (code) {
 			case 2: read_cast<f16>(in, w.value().begin(), w.value().end()); break;
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
-			// ignore unrecognized extra fields
-			while (read_cast<u16>(in, code) && code)
-				in.ignore(code * read<u64>(in));
-			break;
+			// skip unrecognized fields
+			while ((code = read<u16>(in)) != 0) in.ignore(code * read<u64>(in));
+			// finalize name and display width
+			if (raw_cast<u16>(w.name[6]) == 0) { // name is serialized as integer
+				u32 sign = raw_cast<u32>(w.name[0]);
+				u32 width = raw_cast<u16>(w.name[4]);
+				if (width == 0) width = math::lg64(w.length) >> 2;
+				if (width < format("%x", sign).size()) width = 8;
+				w.name = format(format("%%0%ux", width), sign);
+			} else { // name is serialized as string
+				w.name = w.name.substr(0, w.name.find(' '));
+			}
+		}(); break;
 		}
 		return in;
 	}
@@ -153,7 +148,7 @@ public:
 		switch (code) {
 		case 0: [&]() {
 			weight::container buf;
-			for (read_cast<u32>(in, code); code; code--)
+			for (code = 0, read_cast<u32>(in, code); code; code--)
 				in >> list<weight>::as(buf).emplace_back();
 			for (u32 idx : idx_select(opt + format("[0:%u]", u32(buf.size()))))
 				list<weight>::as(wghts()).push_back(buf[idx]);
@@ -166,7 +161,7 @@ private:
 	static std::vector<u32> idx_select(std::string opt = {}) {
 		std::vector<u32> idxes;
 		std::stringstream tokens((opt += "[]").substr(0, opt.find(']')).substr(opt.find('[') + 1));
-		for (std::string token; std::getline(tokens, token, ',');) {
+		for (std::string token; std::getline(tokens, token, ',');) { // idx,idx-lim,idx:len
 			u32 i = -1u, n = -1u; char x = '.';
 			std::stringstream(token) >> i >> x >> n;
 			if (i != -1u) idxes.push_back(i);
@@ -368,7 +363,7 @@ public:
 		write_cast<byte>(out, code);
 		switch (code) {
 		default:
-		case 4:
+		case 4: [&]() {
 			// reserved for header
 			write_cast<u16>(out, 0);
 			write_cast<u64>(out, 0);
@@ -382,7 +377,7 @@ public:
 			write_cast<u64>(out, c.nmap.begin(), c.nmap.end());
 			// reserved for fields
 			write_cast<u16>(out, 0);
-			break;
+		}(); break;
 		}
 		return out;
 	}
@@ -391,18 +386,17 @@ public:
 		read_cast<byte>(in, code);
 		switch (code) {
 		default:
-		case 4:
+		case 4: [&]() {
 			// ignore unused header
 			in.ignore(read<u16>(in) * read<u64>(in));
-			// read blocks
+			// read blocks (block size is ignored)
 			c.init(read<u64>(in.ignore(2)));
 			read<block>(in, c.cached, c.cached + c.size());
 			// read depth-map (nmap)
 			read_cast<u64>(in, c.nmap.begin(), c.nmap.begin() + read<u64>(in.ignore(2)));
 			// ignore unrecognized fields
-			while ((code = read<u16>(in)) != 0)
-				in.ignore(code * read<u64>(in));
-			break;
+			while ((code = read<u16>(in)) != 0) in.ignore(code * read<u64>(in));
+		}(); break;
 		}
 		return in;
 	}
@@ -411,7 +405,6 @@ public:
 		u32 code = 0;
 		write_cast<byte>(out, code);
 		switch (code) {
-		default:
 		case 0:
 			out << instance();
 			break;
@@ -419,10 +412,9 @@ public:
 		out.flush();
 	}
 	static void load(std::istream& in, std::string opt = {}) {
-		u32 code;
+		u32 code = 0;
 		read_cast<byte>(in, code);
 		switch (code) {
-		default:
 		case 0:
 			in >> instance();
 			break;
