@@ -347,15 +347,15 @@ public:
 	};
 
 	constexpr cache() : cached(&initial), length(1), mask(0), nmap{} {}
-	cache(const cache& tp) = default;
-	~cache() {}
 	constexpr inline size_t size() const { return length; }
 	constexpr inline block& operator[] (size_t i) { return cached[i]; }
 	constexpr inline const block& operator[] (size_t i) const { return cached[i]; }
-	inline block::access operator() (const board& b, u32 n) {
-		u64 x = min_isomorphic(b);
-		block& blk = operator[]((math::fmix64(x) ^ nmap[n >> 1]) & mask);
-		return blk(x, n);
+	constexpr inline block::access operator() (const board& b, u32 n) {
+		u64 x = b.min_isomorphic64();
+		return (*this)[indexof(x, n)](x, n);
+	}
+	constexpr inline size_t indexof(u64 x, u32 n) const {
+		return (math::fmix64(x) ^ nmap[n >> 1]) & mask;
 	}
 
     friend std::ostream& operator <<(std::ostream& out, const cache& c) {
@@ -372,7 +372,7 @@ public:
 			write_cast<u64>(out, c.size());
 			write<block>(out, c.cached, c.cached + c.size());
 			// write depth-map (nmap)
-			write_cast<u16>(out, sizeof(size_t));
+			write_cast<u16>(out, sizeof(u64));
 			write_cast<u64>(out, c.nmap.size());
 			write_cast<u64>(out, c.nmap.begin(), c.nmap.end());
 			// reserved for fields
@@ -393,7 +393,9 @@ public:
 			c.init(read<u64>(in.ignore(2)));
 			read<block>(in, c.cached, c.cached + c.size());
 			// read depth-map (nmap)
-			read_cast<u64>(in, c.nmap.begin(), c.nmap.begin() + read<u64>(in.ignore(2)));
+			size_t nmnum = read<u64>(in.ignore(2));
+			read_cast<u64>(in, c.nmap.begin(), c.nmap.begin() + std::min(c.nmap.size(), nmnum));
+			if (nmnum > c.nmap.size()) in.ignore(sizeof(u64) * (nmnum - c.nmap.size()));
 			// ignore unrecognized fields
 			while ((code = read<u16>(in)) != 0) in.ignore(code * read<u64>(in));
 		}(); break;
@@ -437,18 +439,6 @@ private:
 		for (size_t i = 0; i < nmap.size(); i++)
 			nmap[i] = peek ? 0 : math::fmix64(i);
 		return *this;
-	}
-
-	constexpr inline u64 min_isomorphic(board t) const {
-		u64 x = u64(t);
-		t.mirror64();    x = std::min(x, u64(t));
-		t.transpose64(); x = std::min(x, u64(t));
-		t.mirror64();    x = std::min(x, u64(t));
-		t.transpose64(); x = std::min(x, u64(t));
-		t.mirror64();    x = std::min(x, u64(t));
-		t.transpose64(); x = std::min(x, u64(t));
-		t.mirror64();    x = std::min(x, u64(t));
-		return x;
 	}
 
 private:
