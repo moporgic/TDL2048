@@ -637,6 +637,68 @@ public:
 	inline u32 max64() const { return math::log2(scale64()); }
 	inline u32 max80() const { return math::log2(scale80()); }
 
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline constexpr void isomorphisms(btype iso[8]) const { return isomorphisms64(iso); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline constexpr void isomorphisms64(btype iso[8]) const {
+		iso[7] = *this;       iso[0] = iso[7];
+		iso[7].mirror64();    iso[4] = iso[7];
+		iso[7].transpose64(); iso[3] = iso[7];
+		iso[7].mirror64();    iso[5] = iso[7];
+		iso[7].transpose64(); iso[2] = iso[7];
+		iso[7].mirror64();    iso[6] = iso[7];
+		iso[7].transpose64(); iso[1] = iso[7];
+		iso[7].mirror64();
+	}
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline constexpr void isomorphisms80(btype iso[8]) const {
+		iso[7] = *this;       iso[0] = iso[7];
+		iso[7].mirror80();    iso[4] = iso[7];
+		iso[7].transpose80(); iso[3] = iso[7];
+		iso[7].mirror80();    iso[5] = iso[7];
+		iso[7].transpose80(); iso[2] = iso[7];
+		iso[7].mirror80();    iso[6] = iso[7];
+		iso[7].transpose80(); iso[1] = iso[7];
+		iso[7].mirror80();
+	}
+
+	inline std::array<board, 8> isomorphisms() const { return isomorphisms64(); }
+	inline std::array<board, 8> isomorphisms64() const {
+		std::array<board, 8> iso;
+		isomorphisms64(iso.data());
+		return iso;
+	}
+	inline std::array<board, 8> isomorphisms80() const {
+		std::array<board, 8> iso;
+		isomorphisms80(iso.data());
+		return iso;
+	}
+
+	inline constexpr board min_isomorphic() const { return min_isomorphic64(); }
+	inline constexpr board max_isomorphic() const { return max_isomorphic64(); }
+	inline constexpr board min_isomorphic64() const {
+		board b = raw;   u64 x = u64(b);
+		b.mirror64();    x = std::min(x, u64(b));
+		b.transpose64(); x = std::min(x, u64(b));
+		b.mirror64();    x = std::min(x, u64(b));
+		b.transpose64(); x = std::min(x, u64(b));
+		b.mirror64();    x = std::min(x, u64(b));
+		b.transpose64(); x = std::min(x, u64(b));
+		b.mirror64();    x = std::min(x, u64(b));
+		return x;
+	}
+	inline constexpr board max_isomorphic64() const {
+		board b = raw;   u64 x = u64(b);
+		b.mirror64();    x = std::max(x, u64(b));
+		b.transpose64(); x = std::max(x, u64(b));
+		b.mirror64();    x = std::max(x, u64(b));
+		b.transpose64(); x = std::max(x, u64(b));
+		b.mirror64();    x = std::max(x, u64(b));
+		b.transpose64(); x = std::max(x, u64(b));
+		b.mirror64();    x = std::max(x, u64(b));
+		return x;
+	}
+
 	inline hex numof() const {
 		return query(0).numof + query(1).numof + query(2).numof + query(3).numof;
 	}
