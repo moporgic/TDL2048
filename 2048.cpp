@@ -351,7 +351,7 @@ public:
 	constexpr inline block& operator[] (size_t i) { return cached[i]; }
 	constexpr inline const block& operator[] (size_t i) const { return cached[i]; }
 	constexpr inline block::access operator() (const board& b, u32 n) {
-		u64 x = b.min_isomorphic64();
+		u64 x = b.minisom64();
 		return (*this)[indexof(x, n)](x, n);
 	}
 	constexpr inline size_t indexof(u64 x, u32 n) const {
@@ -553,14 +553,14 @@ u64 indexmono(const board& b) { // 24-bit
 template<u32 tile, u32 isomorphic>
 u64 indexmask(const board& b) { // 16-bit
 	board k = b;
-	k.isomorphic(isomorphic);
+	k.isom(isomorphic);
 	return k.mask(tile);
 }
 
 template<u32 isomorphic>
 u64 indexmax(const board& b) { // 16-bit
 	board k = b;
-	k.isomorphic(isomorphic);
+	k.isom(isomorphic);
 	return k.mask(k.max());
 }
 
@@ -605,7 +605,7 @@ struct make {
 
 		static constexpr board isoindex(u32 i) {
 			board x = 0xfedcba9876543210ull;
-			x.isomorphic((i & 4) + (8 - i) % 4);
+			x.isom((i & 4) + (8 - i) % 4);
 			return x;
 		}
 		static std::string vtos(const std::initializer_list<u32>& v) {
@@ -969,7 +969,7 @@ void make_network(utils::options::option opt) {
 
 	auto stov = [](std::string hash, u32 iso = 0) -> std::vector<u32> {
 		std::vector<u32> patt;
-		board x(0xfedcba9876543210ull); x.isomorphic(-iso);
+		board x(0xfedcba9876543210ull); x.isom(-iso);
 		for (char tile : hash) patt.push_back(x.at((tile & 15) + (tile & 64 ? 9 : 0)));
 		return patt;
 	};
@@ -1299,7 +1299,7 @@ struct method {
 
 		static inline numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
 			numeric best = 0;
-			for (const board& after : before.afters()) {
+			for (const board& after : before.moves()) {
 				auto search = after.info() != -1u ? search_expt : search_illegal;
 				best = std::max(best, after.info() + search(after, depth - 1, range));
 			}

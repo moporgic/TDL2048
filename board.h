@@ -252,10 +252,6 @@ public:
 			| ((ext & 0x0f000000) >> 4) | ((ext & 0xf0000000) >> 12);
 	}
 
-	inline constexpr void reverse() { reverse64(); }
-	inline constexpr void reverse64() { mirror64(); flip64(); }
-	inline constexpr void reverse80() { mirror80(); flip80(); }
-
 	inline constexpr void transpose() { transpose64(); }
 	inline constexpr void transpose64() {
 		raw = (math::pext64(raw, 0x000f000f000f000full) <<  0) | (math::pext64(raw, 0x00f000f000f000f0ull) << 16)
@@ -265,6 +261,36 @@ public:
 		transpose64();
 		ext = (math::pext32(ext, 0x11110000u) << 16) | (math::pext32(ext, 0x22220000u) << 20)
 			| (math::pext32(ext, 0x44440000u) << 24) | (math::pext32(ext, 0x88880000u) << 28);
+	}
+
+	inline constexpr void rotate(u32 r = 1) { rotate64(r); }
+	inline constexpr void rotate64(u32 r = 1) {
+		switch (r % 4) {
+		default:
+		case 0: break;
+		case 1: transpose64(); mirror64(); break;
+		case 2: mirror64(); flip64(); break;
+		case 3: transpose64(); flip64(); break;
+		}
+	}
+	inline constexpr void rotate80(u32 r = 1) {
+		switch (r % 4) {
+		default:
+		case 0: break;
+		case 1: transpose80(); mirror80(); break;
+		case 2: mirror80(); flip80(); break;
+		case 3: transpose80(); flip80(); break;
+		}
+	}
+
+	inline constexpr void isom(u32 i = 0) { return isom64(i); }
+	inline constexpr void isom64(u32 i = 0) {
+		if ((i % 8) / 4) mirror64();
+		rotate64(i);
+	}
+	inline constexpr void isom80(u32 i = 0) {
+		if ((i % 8) / 4) mirror80();
+		rotate80(i);
 	}
 
 	inline constexpr u32 empty() const { return empty64(); }
@@ -327,48 +353,6 @@ public:
 	inline constexpr void clear() {
 		raw = 0;
 		ext = 0;
-	}
-
-	inline constexpr void rotright()   { rotright64(); }
-	inline constexpr void rotright64() { transpose64(); mirror64(); }
-	inline constexpr void rotright80() { transpose80(); mirror80(); }
-
-	inline constexpr void rotleft()   { rotleft64(); }
-	inline constexpr void rotleft64() { transpose64(); flip64(); }
-	inline constexpr void rotleft80() { transpose80(); flip80(); }
-
-	inline constexpr void rotate(int r = 1) {
-		rotate64(r);
-	}
-	inline constexpr void rotate64(int r = 1) {
-		switch (((r % 4) + 4) % 4) {
-		default:
-		case 0: break;
-		case 1: rotright64(); break;
-		case 2: reverse64(); break;
-		case 3: rotleft64(); break;
-		}
-	}
-	inline constexpr void rotate80(int r = 1) {
-		switch (((r % 4) + 4) % 4) {
-		default:
-		case 0: break;
-		case 1: rotright80(); break;
-		case 2: reverse80(); break;
-		case 3: rotleft80(); break;
-		}
-	}
-
-	inline constexpr void isomorphic(int i = 0) {
-		return isomorphic64(i);
-	}
-	inline constexpr void isomorphic64(int i = 0) {
-		if ((i % 8) / 4) mirror64();
-		rotate64(i);
-	}
-	inline constexpr void isomorphic80(int i = 0) {
-		if ((i % 8) / 4) mirror80();
-		rotate80(i);
 	}
 
 	inline i32 left()  { return left64(); }
@@ -503,15 +487,15 @@ public:
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves80(btype move[]) const { moves80(move[0], move[1], move[2], move[3]); }
 
-	inline std::array<board, 4> afters() const {
-		return afters64();
+	inline std::array<board, 4> moves() const {
+		return moves64();
 	}
-	inline std::array<board, 4> afters64() const {
+	inline std::array<board, 4> moves64() const {
 		std::array<board, 4> after;
 		moves64(after.data());
 		return after;
 	}
-	inline std::array<board, 4> afters80() const {
+	inline std::array<board, 4> moves80() const {
 		std::array<board, 4> after;
 		moves80(after.data());
 		return after;
@@ -638,9 +622,9 @@ public:
 	inline u32 max80() const { return math::log2(scale80()); }
 
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr void isomorphisms(btype iso[8]) const { return isomorphisms64(iso); }
+	inline constexpr void isoms(btype iso[]) const { return isoms64(iso); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr void isomorphisms64(btype iso[8]) const {
+	inline constexpr void isoms64(btype iso[]) const {
 		iso[7] = *this;       iso[0] = iso[7];
 		iso[7].mirror64();    iso[4] = iso[7];
 		iso[7].transpose64(); iso[3] = iso[7];
@@ -651,7 +635,7 @@ public:
 		iso[7].mirror64();
 	}
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr void isomorphisms80(btype iso[8]) const {
+	inline constexpr void isoms80(btype iso[]) const {
 		iso[7] = *this;       iso[0] = iso[7];
 		iso[7].mirror80();    iso[4] = iso[7];
 		iso[7].transpose80(); iso[3] = iso[7];
@@ -662,21 +646,21 @@ public:
 		iso[7].mirror80();
 	}
 
-	inline std::array<board, 8> isomorphisms() const { return isomorphisms64(); }
-	inline std::array<board, 8> isomorphisms64() const {
+	inline std::array<board, 8> isoms() const { return isoms64(); }
+	inline std::array<board, 8> isoms64() const {
 		std::array<board, 8> iso;
-		isomorphisms64(iso.data());
+		isoms64(iso.data());
 		return iso;
 	}
-	inline std::array<board, 8> isomorphisms80() const {
+	inline std::array<board, 8> isoms80() const {
 		std::array<board, 8> iso;
-		isomorphisms80(iso.data());
+		isoms80(iso.data());
 		return iso;
 	}
 
-	inline constexpr board min_isomorphic() const { return min_isomorphic64(); }
-	inline constexpr board max_isomorphic() const { return max_isomorphic64(); }
-	inline constexpr board min_isomorphic64() const {
+	inline constexpr board minisom() const { return minisom64(); }
+	inline constexpr board maxisom() const { return maxisom64(); }
+	inline constexpr board minisom64() const {
 		board b = raw;   u64 x = u64(b);
 		b.mirror64();    x = std::min(x, u64(b));
 		b.transpose64(); x = std::min(x, u64(b));
@@ -687,7 +671,7 @@ public:
 		b.mirror64();    x = std::min(x, u64(b));
 		return x;
 	}
-	inline constexpr board max_isomorphic64() const {
+	inline constexpr board maxisom64() const {
 		board b = raw;   u64 x = u64(b);
 		b.mirror64();    x = std::max(x, u64(b));
 		b.transpose64(); x = std::max(x, u64(b));
@@ -821,9 +805,9 @@ public:
 		return mono;
 	}
 
-	inline u64 monotonic(bool left = true) const   { return left ? monoleft() : monoright(); }
-	inline u64 monotonic64(bool left = true) const { return left ? monoleft64() : monoright64(); }
-	inline u64 monotonic80(bool left = true) const { return left ? monoleft80() : monoright80(); }
+	inline u64 mono(bool left = true) const   { return left ? monoleft() : monoright(); }
+	inline u64 mono64(bool left = true) const { return left ? monoleft64() : monoright64(); }
+	inline u64 mono80(bool left = true) const { return left ? monoleft80() : monoright80(); }
 
 	inline u32 operations() const { return operations64(); }
 	inline u32 operations64() const {
