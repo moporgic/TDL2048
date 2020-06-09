@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 5.0
+// Version     : 5.5
 // Description : bitboard of 2048
 //============================================================================
 
@@ -686,7 +686,6 @@ public:
 	inline hex numof() const {
 		return query(0).numof + query(1).numof + query(2).numof + query(3).numof;
 	}
-
 	inline u32 numof(u32 t) const { return numof64(t); }
 	inline u32 numof64(u32 t) const {
 		return query16(0).numof[t] + query16(1).numof[t] + query16(2).numof[t] + query16(3).numof[t];
@@ -694,75 +693,84 @@ public:
 	inline u32 numof80(u32 t) const {
 		return query20(0).numof[t] + query20(1).numof[t] + query20(2).numof[t] + query20(3).numof[t];
 	}
-
 	inline void numof(u32 num[], u32 min, u32 max) const { return numof64(num, min, max); }
 	inline void numof64(u32 num[], u32 min, u32 max) const {
 		hexa numof0 = query16(0).numof;
 		hexa numof1 = query16(1).numof;
 		hexa numof2 = query16(2).numof;
 		hexa numof3 = query16(3).numof;
-		for (u32 i = min; i < max; i++) {
-			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
-		}
+		for (u32 i = min; i < max; i++) num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 	}
 	inline void numof80(u32 num[], u32 min, u32 max) const {
 		hexa numof0 = query20(0).numof;
 		hexa numof1 = query20(1).numof;
 		hexa numof2 = query20(2).numof;
 		hexa numof3 = query20(3).numof;
-		for (u32 i = min; i < max; i++) {
-			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
-		}
+		for (u32 i = min; i < max; i++) num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 	}
 
+	inline constexpr hex count() const {
+		return ((count64(0)  <<  0) | (count64(1)  <<  4) | (count64(2)  <<  8) | (count64(3)  << 12)
+		      | (count64(4)  << 16) | (count64(5)  << 20) | (count64(6)  << 24) | (count64(7)  << 28))
+		 | (u64((count64(8)  <<  0) | (count64(9)  <<  4) | (count64(10) <<  8) | (count64(11) << 12)
+		      | (count64(12) << 16) | (count64(13) << 20) | (count64(14) << 24) | (count64(15) << 28)) << 32);
+	}
 	inline constexpr u32 count(u32 t) const { return count64(t); }
 	inline constexpr u32 count64(u32 t) const {
-		register u32 num = 0;
-		for (u32 i = 0; i < 16; i++)
-			if (at4(i) == t) num++;
-		return num;
+		u64 x = t;
+		x |= (x << 4);
+		x |= (x << 8);
+		x |= (x << 16);
+		x |= (x << 32);
+		x ^= raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		x = ~x & 0x1111111111111111ull;
+		return math::popcnt(x);
 	}
 	inline constexpr u32 count80(u32 t) const {
-		register u32 num = 0;
-		for (u32 i = 0; i < 16; i++)
-			if (at5(i) == t) num++;
-		return num;
+		u64 x = t & 0x0f;
+		x |= (x << 4);
+		x |= (x << 8);
+		x |= (x << 16);
+		x |= (x << 32);
+		x ^= raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		u32 e = t & 0x10 ? 0xffff0000 : 0x00000000;
+		e ^= ext;
+		x = ~x & math::pdep64(~e >> 16, 0x1111111111111111ull);
+		return math::popcnt(x);
 	}
-
 	inline constexpr void count(u32 num[], u32 min, u32 max) const { return count64(num, min, max); }
 	inline constexpr void count64(u32 num[], u32 min, u32 max) const {
-		for (u32 i = 0; i < 16; i++) num[at4(i)]++;
+		for (u32 i = min; i < max; i++) num[i] = count64(i);
 	}
 	inline constexpr void count80(u32 num[], u32 min, u32 max) const {
-		for (u32 i = 0; i < 16; i++) num[at5(i)]++;
+		for (u32 i = min; i < max; i++) num[i] = count80(i);
 	}
 
-	inline u32 mask(u32 t) const { return mask64(t); }
-	inline u32 mask64(u32 t) const {
-		return (query16(0).mask[t] << 0) | (query16(1).mask[t] << 4) | (query16(2).mask[t] << 8) | (query16(3).mask[t] << 12);
+	inline constexpr u32 mask(u32 t) const { return mask64(t); }
+	inline constexpr u32 mask64(u32 t) const {
+		u64 x = t;
+		x |= (x << 4);
+		x |= (x << 8);
+		x |= (x << 16);
+		x |= (x << 32);
+		x ^= raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		return math::pext(~x, 0x1111111111111111ull);
 	}
-	inline u32 mask80(u32 t) const {
-		return (query20(0).mask[t] << 0) | (query20(1).mask[t] << 4) | (query20(2).mask[t] << 8) | (query20(3).mask[t] << 12);
+	inline constexpr u32 mask80(u32 t) const {
+		return mask64(t & 0x0f) & (~((t & 0x10 ? 0xffff0000 : 0x00000000) ^ ext) >> 16);
 	}
-
-	inline void mask(u32 msk[], u32 min, u32 max) const { return mask64(msk, min, max); }
-	inline void mask64(u32 msk[], u32 min, u32 max) const {
-		hexa mask0 = query16(0).mask;
-		hexa mask1 = query16(1).mask;
-		hexa mask2 = query16(2).mask;
-		hexa mask3 = query16(3).mask;
-		for (u32 i = min; i < max; i++) {
-			msk[i] = (mask0[i] << 0) | (mask1[i] << 4) | (mask2[i] << 8) | (mask3[i] << 12);
-		}
+	inline constexpr void mask(u32 msk[], u32 min, u32 max) const { return mask64(msk, min, max); }
+	inline constexpr void mask64(u32 msk[], u32 min, u32 max) const {
+		for (u32 i = min; i < max; i++) msk[i] = mask64(i);
 	}
-	inline void mask80(u32 msk[], u32 min, u32 max) const {
-		hexa mask0 = query20(0).mask;
-		hexa mask1 = query20(1).mask;
-		hexa mask2 = query20(2).mask;
-		hexa mask3 = query20(3).mask;
-		for (u32 i = min; i < max; i++) {
-			msk[i] = (mask0[i] << 0) | (mask1[i] << 4) | (mask2[i] << 8) | (mask3[i] << 12);
-		}
+	inline constexpr void mask80(u32 msk[], u32 min, u32 max) const {
+		for (u32 i = min; i < max; i++) msk[i] = mask80(i);
 	}
 
 	inline hexa find(u32 t) const { return find64(t); }
