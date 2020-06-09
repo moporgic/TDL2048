@@ -947,12 +947,12 @@ public:
 	public:
 		style() = delete;
 		enum fmtcode : u32 {
-			index  = 0x00000000u,
-			exact  = 0x10000000u,
-			alter  = 0x20000000u,
-			binary = 0x40000000u,
-			extend = 0x80000000u,
-			full   = 0xf0000000u,
+			index  = 0x00000000u, /* print (or write) tile indexes, this is the default option */
+			exact  = 0x10000000u, /* print tile values (string); write with board info (binary) */
+			alter  = 0x20000000u, /* use alternative: print board as hex string (string); write with extension placeholder (binary) */
+			binary = 0x40000000u, /* switch between string and binary mode */
+			extend = 0x80000000u, /* print (or write) with 16-bit extension */
+			full   = 0xf0000000u, /* enable all flags: will write the whole data structure (128-bit) */
 
 			at     = index,
 			at4    = index,
@@ -960,7 +960,6 @@ public:
 			ext    = extend,
 			exact4 = index | exact,
 			exact5 = index | exact | extend,
-			actual = index | exact | extend,
 			lite   = alter,
 			lite64 = alter,
 			lite80 = alter | extend,
