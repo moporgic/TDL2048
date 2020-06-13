@@ -351,7 +351,7 @@ public:
 	constexpr inline block& operator[] (size_t i) { return cached[i]; }
 	constexpr inline const block& operator[] (size_t i) const { return cached[i]; }
 	constexpr inline block::access operator() (const board& b, u32 n) {
-		u64 x = b.minisom64();
+		u64 x = ({ board x(b); x.isomin64(); x; });
 		return (*this)[indexof(x, n)](x, n);
 	}
 	constexpr inline size_t indexof(u64 x, u32 n) const {

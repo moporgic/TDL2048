@@ -293,6 +293,43 @@ public:
 		rotate80(i);
 	}
 
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline constexpr void isoms(btype iso[]) const { return isoms64(iso); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline constexpr void isoms64(btype iso[]) const {
+		iso[7] = *this;       iso[0] = iso[7];
+		iso[7].mirror64();    iso[4] = iso[7];
+		iso[7].transpose64(); iso[3] = iso[7];
+		iso[7].mirror64();    iso[5] = iso[7];
+		iso[7].transpose64(); iso[2] = iso[7];
+		iso[7].mirror64();    iso[6] = iso[7];
+		iso[7].transpose64(); iso[1] = iso[7];
+		iso[7].mirror64();
+	}
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline constexpr void isoms80(btype iso[]) const {
+		iso[7] = *this;       iso[0] = iso[7];
+		iso[7].mirror80();    iso[4] = iso[7];
+		iso[7].transpose80(); iso[3] = iso[7];
+		iso[7].mirror80();    iso[5] = iso[7];
+		iso[7].transpose80(); iso[2] = iso[7];
+		iso[7].mirror80();    iso[6] = iso[7];
+		iso[7].transpose80(); iso[1] = iso[7];
+		iso[7].mirror80();
+	}
+
+	inline std::array<board, 8> isoms() const { return isoms64(); }
+	inline std::array<board, 8> isoms64() const {
+		std::array<board, 8> iso;
+		isoms64(iso.data());
+		return iso;
+	}
+	inline std::array<board, 8> isoms80() const {
+		std::array<board, 8> iso;
+		isoms80(iso.data());
+		return iso;
+	}
+
 	inline constexpr u32 empty() const { return empty64(); }
 	inline constexpr u32 empty64() const {
 		register u64 x = raw;
@@ -593,6 +630,61 @@ public:
 		return h;
 	}
 
+	inline constexpr u32 isomax() { return isomax64(); }
+	inline constexpr u32 isomax64() {
+		u32 i = 0;
+		u64 x = raw;
+		mirror64();    i = (raw > x) ? 4 : i; x = std::max(x, raw);
+		transpose64(); i = (raw > x) ? 3 : i; x = std::max(x, raw);
+		mirror64();    i = (raw > x) ? 5 : i; x = std::max(x, raw);
+		transpose64(); i = (raw > x) ? 2 : i; x = std::max(x, raw);
+		mirror64();    i = (raw > x) ? 6 : i; x = std::max(x, raw);
+		transpose64(); i = (raw > x) ? 1 : i; x = std::max(x, raw);
+		mirror64();    i = (raw > x) ? 7 : i; x = std::max(x, raw);
+		raw = x;
+		return i;
+	}
+	inline constexpr u32 isomax80() {
+		u32 i = 0;
+		board x(*this);
+		mirror80();    i = (raw > x) ? 4 : i; x = std::max(x, *this);
+		transpose80(); i = (raw > x) ? 3 : i; x = std::max(x, *this);
+		mirror80();    i = (raw > x) ? 5 : i; x = std::max(x, *this);
+		transpose80(); i = (raw > x) ? 2 : i; x = std::max(x, *this);
+		mirror80();    i = (raw > x) ? 6 : i; x = std::max(x, *this);
+		transpose80(); i = (raw > x) ? 1 : i; x = std::max(x, *this);
+		mirror80();    i = (raw > x) ? 7 : i; x = std::max(x, *this);
+		operator =(x);
+		return i;
+	}
+	inline constexpr u32 isomin() { return isomin64(); }
+	inline constexpr u32 isomin64() {
+		u32 i = 0;
+		u64 x = raw;
+		mirror64();    i = (raw < x) ? 4 : i; x = std::min(x, raw);
+		transpose64(); i = (raw < x) ? 3 : i; x = std::min(x, raw);
+		mirror64();    i = (raw < x) ? 5 : i; x = std::min(x, raw);
+		transpose64(); i = (raw < x) ? 2 : i; x = std::min(x, raw);
+		mirror64();    i = (raw < x) ? 6 : i; x = std::min(x, raw);
+		transpose64(); i = (raw < x) ? 1 : i; x = std::min(x, raw);
+		mirror64();    i = (raw < x) ? 7 : i; x = std::min(x, raw);
+		raw = x;
+		return i;
+	}
+	inline constexpr u32 isomin80() {
+		u32 i = 0;
+		board x(*this);
+		mirror80();    i = (raw < x) ? 4 : i; x = std::min(x, *this);
+		transpose80(); i = (raw < x) ? 3 : i; x = std::min(x, *this);
+		mirror80();    i = (raw < x) ? 5 : i; x = std::min(x, *this);
+		transpose80(); i = (raw < x) ? 2 : i; x = std::min(x, *this);
+		mirror80();    i = (raw < x) ? 6 : i; x = std::min(x, *this);
+		transpose80(); i = (raw < x) ? 1 : i; x = std::min(x, *this);
+		mirror80();    i = (raw < x) ? 7 : i; x = std::min(x, *this);
+		operator =(x);
+		return i;
+	}
+
 	inline u32 species() const { return species64(); }
 	inline u32 species64() const {
 		return query16(0).species | query16(1).species | query16(2).species | query16(3).species;
@@ -620,68 +712,6 @@ public:
 	inline u32 max()   const { return max64(); }
 	inline u32 max64() const { return math::log2(scale64()); }
 	inline u32 max80() const { return math::log2(scale80()); }
-
-	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr void isoms(btype iso[]) const { return isoms64(iso); }
-	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr void isoms64(btype iso[]) const {
-		iso[7] = *this;       iso[0] = iso[7];
-		iso[7].mirror64();    iso[4] = iso[7];
-		iso[7].transpose64(); iso[3] = iso[7];
-		iso[7].mirror64();    iso[5] = iso[7];
-		iso[7].transpose64(); iso[2] = iso[7];
-		iso[7].mirror64();    iso[6] = iso[7];
-		iso[7].transpose64(); iso[1] = iso[7];
-		iso[7].mirror64();
-	}
-	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr void isoms80(btype iso[]) const {
-		iso[7] = *this;       iso[0] = iso[7];
-		iso[7].mirror80();    iso[4] = iso[7];
-		iso[7].transpose80(); iso[3] = iso[7];
-		iso[7].mirror80();    iso[5] = iso[7];
-		iso[7].transpose80(); iso[2] = iso[7];
-		iso[7].mirror80();    iso[6] = iso[7];
-		iso[7].transpose80(); iso[1] = iso[7];
-		iso[7].mirror80();
-	}
-
-	inline std::array<board, 8> isoms() const { return isoms64(); }
-	inline std::array<board, 8> isoms64() const {
-		std::array<board, 8> iso;
-		isoms64(iso.data());
-		return iso;
-	}
-	inline std::array<board, 8> isoms80() const {
-		std::array<board, 8> iso;
-		isoms80(iso.data());
-		return iso;
-	}
-
-	inline constexpr board minisom() const { return minisom64(); }
-	inline constexpr board maxisom() const { return maxisom64(); }
-	inline constexpr board minisom64() const {
-		board b = raw;   u64 x = u64(b);
-		b.mirror64();    x = std::min(x, u64(b));
-		b.transpose64(); x = std::min(x, u64(b));
-		b.mirror64();    x = std::min(x, u64(b));
-		b.transpose64(); x = std::min(x, u64(b));
-		b.mirror64();    x = std::min(x, u64(b));
-		b.transpose64(); x = std::min(x, u64(b));
-		b.mirror64();    x = std::min(x, u64(b));
-		return x;
-	}
-	inline constexpr board maxisom64() const {
-		board b = raw;   u64 x = u64(b);
-		b.mirror64();    x = std::max(x, u64(b));
-		b.transpose64(); x = std::max(x, u64(b));
-		b.mirror64();    x = std::max(x, u64(b));
-		b.transpose64(); x = std::max(x, u64(b));
-		b.mirror64();    x = std::max(x, u64(b));
-		b.transpose64(); x = std::max(x, u64(b));
-		b.mirror64();    x = std::max(x, u64(b));
-		return x;
-	}
 
 	inline hex numof() const {
 		return query(0).numof + query(1).numof + query(2).numof + query(3).numof;
