@@ -1530,7 +1530,7 @@ struct statistic {
 		total = {};
 		local = {};
 		accum = {};
-		for (u32 i = 0; i < info.thdid; i++) moporgic::rand();
+		for (u32 i = 0; i < info.thdid; i++) moporgic::srand(moporgic::rand());
 		local.time = moporgic::millisec();
 		info.loop = 1;
 
