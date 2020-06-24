@@ -1042,7 +1042,7 @@ void make_network(utils::options::option opt) {
 			}
 			if (init.find_first_of("{}") != npos && init != "{}") {
 				weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
-				size = std::max(size, src.size());
+				size = std::max(info != "?" ? size : 0, src.size());
 			} else if (init == "{}") {
 				size = 0;
 			}
