@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : board.h
 // Author      : Hung Guei
-// Version     : 5.0
+// Version     : 5.5
 // Description : bitboard of 2048
 //============================================================================
 
@@ -252,10 +252,6 @@ public:
 			| ((ext & 0x0f000000) >> 4) | ((ext & 0xf0000000) >> 12);
 	}
 
-	inline constexpr void reverse() { reverse64(); }
-	inline constexpr void reverse64() { mirror64(); flip64(); }
-	inline constexpr void reverse80() { mirror80(); flip80(); }
-
 	inline constexpr void transpose() { transpose64(); }
 	inline constexpr void transpose64() {
 		raw = (math::pext64(raw, 0x000f000f000f000full) <<  0) | (math::pext64(raw, 0x00f000f000f000f0ull) << 16)
@@ -265,6 +261,73 @@ public:
 		transpose64();
 		ext = (math::pext32(ext, 0x11110000u) << 16) | (math::pext32(ext, 0x22220000u) << 20)
 			| (math::pext32(ext, 0x44440000u) << 24) | (math::pext32(ext, 0x88880000u) << 28);
+	}
+
+	inline constexpr void rotate(u32 r = 1) { rotate64(r); }
+	inline constexpr void rotate64(u32 r = 1) {
+		switch (r % 4) {
+		default:
+		case 0: break;
+		case 1: transpose64(); mirror64(); break;
+		case 2: mirror64(); flip64(); break;
+		case 3: transpose64(); flip64(); break;
+		}
+	}
+	inline constexpr void rotate80(u32 r = 1) {
+		switch (r % 4) {
+		default:
+		case 0: break;
+		case 1: transpose80(); mirror80(); break;
+		case 2: mirror80(); flip80(); break;
+		case 3: transpose80(); flip80(); break;
+		}
+	}
+
+	inline constexpr void isom(u32 i = 0) { return isom64(i); }
+	inline constexpr void isom64(u32 i = 0) {
+		if ((i % 8) / 4) mirror64();
+		rotate64(i);
+	}
+	inline constexpr void isom80(u32 i = 0) {
+		if ((i % 8) / 4) mirror80();
+		rotate80(i);
+	}
+
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline constexpr void isoms(btype iso[]) const { return isoms64(iso); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline constexpr void isoms64(btype iso[]) const {
+		iso[7] = *this;       iso[0] = iso[7];
+		iso[7].mirror64();    iso[4] = iso[7];
+		iso[7].transpose64(); iso[3] = iso[7];
+		iso[7].mirror64();    iso[5] = iso[7];
+		iso[7].transpose64(); iso[2] = iso[7];
+		iso[7].mirror64();    iso[6] = iso[7];
+		iso[7].transpose64(); iso[1] = iso[7];
+		iso[7].mirror64();
+	}
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline constexpr void isoms80(btype iso[]) const {
+		iso[7] = *this;       iso[0] = iso[7];
+		iso[7].mirror80();    iso[4] = iso[7];
+		iso[7].transpose80(); iso[3] = iso[7];
+		iso[7].mirror80();    iso[5] = iso[7];
+		iso[7].transpose80(); iso[2] = iso[7];
+		iso[7].mirror80();    iso[6] = iso[7];
+		iso[7].transpose80(); iso[1] = iso[7];
+		iso[7].mirror80();
+	}
+
+	inline std::array<board, 8> isoms() const { return isoms64(); }
+	inline std::array<board, 8> isoms64() const {
+		std::array<board, 8> iso;
+		isoms64(iso.data());
+		return iso;
+	}
+	inline std::array<board, 8> isoms80() const {
+		std::array<board, 8> iso;
+		isoms80(iso.data());
+		return iso;
 	}
 
 	inline constexpr u32 empty() const { return empty64(); }
@@ -327,48 +390,6 @@ public:
 	inline constexpr void clear() {
 		raw = 0;
 		ext = 0;
-	}
-
-	inline constexpr void rotright()   { rotright64(); }
-	inline constexpr void rotright64() { transpose64(); mirror64(); }
-	inline constexpr void rotright80() { transpose80(); mirror80(); }
-
-	inline constexpr void rotleft()   { rotleft64(); }
-	inline constexpr void rotleft64() { transpose64(); flip64(); }
-	inline constexpr void rotleft80() { transpose80(); flip80(); }
-
-	inline constexpr void rotate(int r = 1) {
-		rotate64(r);
-	}
-	inline constexpr void rotate64(int r = 1) {
-		switch (((r % 4) + 4) % 4) {
-		default:
-		case 0: break;
-		case 1: rotright64(); break;
-		case 2: reverse64(); break;
-		case 3: rotleft64(); break;
-		}
-	}
-	inline constexpr void rotate80(int r = 1) {
-		switch (((r % 4) + 4) % 4) {
-		default:
-		case 0: break;
-		case 1: rotright80(); break;
-		case 2: reverse80(); break;
-		case 3: rotleft80(); break;
-		}
-	}
-
-	inline constexpr void isomorphic(int i = 0) {
-		return isomorphic64(i);
-	}
-	inline constexpr void isomorphic64(int i = 0) {
-		if ((i % 8) / 4) mirror64();
-		rotate64(i);
-	}
-	inline constexpr void isomorphic80(int i = 0) {
-		if ((i % 8) / 4) mirror80();
-		rotate80(i);
 	}
 
 	inline i32 left()  { return left64(); }
@@ -503,15 +524,15 @@ public:
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves80(btype move[]) const { moves80(move[0], move[1], move[2], move[3]); }
 
-	inline std::array<board, 4> afters() const {
-		return afters64();
+	inline std::array<board, 4> moves() const {
+		return moves64();
 	}
-	inline std::array<board, 4> afters64() const {
+	inline std::array<board, 4> moves64() const {
 		std::array<board, 4> after;
 		moves64(after.data());
 		return after;
 	}
-	inline std::array<board, 4> afters80() const {
+	inline std::array<board, 4> moves80() const {
 		std::array<board, 4> after;
 		moves80(after.data());
 		return after;
@@ -609,6 +630,61 @@ public:
 		return h;
 	}
 
+	inline constexpr u32 isomax() { return isomax64(); }
+	inline constexpr u32 isomax64() {
+		u32 i = 0;
+		u64 x = raw;
+		mirror64();    i = (raw > x) ? 4 : i; x = std::max(x, raw);
+		transpose64(); i = (raw > x) ? 3 : i; x = std::max(x, raw);
+		mirror64();    i = (raw > x) ? 5 : i; x = std::max(x, raw);
+		transpose64(); i = (raw > x) ? 2 : i; x = std::max(x, raw);
+		mirror64();    i = (raw > x) ? 6 : i; x = std::max(x, raw);
+		transpose64(); i = (raw > x) ? 1 : i; x = std::max(x, raw);
+		mirror64();    i = (raw > x) ? 7 : i; x = std::max(x, raw);
+		raw = x;
+		return i;
+	}
+	inline constexpr u32 isomax80() {
+		u32 i = 0;
+		board x(*this);
+		mirror80();    i = (raw > x) ? 4 : i; x = std::max(x, *this);
+		transpose80(); i = (raw > x) ? 3 : i; x = std::max(x, *this);
+		mirror80();    i = (raw > x) ? 5 : i; x = std::max(x, *this);
+		transpose80(); i = (raw > x) ? 2 : i; x = std::max(x, *this);
+		mirror80();    i = (raw > x) ? 6 : i; x = std::max(x, *this);
+		transpose80(); i = (raw > x) ? 1 : i; x = std::max(x, *this);
+		mirror80();    i = (raw > x) ? 7 : i; x = std::max(x, *this);
+		operator =(x);
+		return i;
+	}
+	inline constexpr u32 isomin() { return isomin64(); }
+	inline constexpr u32 isomin64() {
+		u32 i = 0;
+		u64 x = raw;
+		mirror64();    i = (raw < x) ? 4 : i; x = std::min(x, raw);
+		transpose64(); i = (raw < x) ? 3 : i; x = std::min(x, raw);
+		mirror64();    i = (raw < x) ? 5 : i; x = std::min(x, raw);
+		transpose64(); i = (raw < x) ? 2 : i; x = std::min(x, raw);
+		mirror64();    i = (raw < x) ? 6 : i; x = std::min(x, raw);
+		transpose64(); i = (raw < x) ? 1 : i; x = std::min(x, raw);
+		mirror64();    i = (raw < x) ? 7 : i; x = std::min(x, raw);
+		raw = x;
+		return i;
+	}
+	inline constexpr u32 isomin80() {
+		u32 i = 0;
+		board x(*this);
+		mirror80();    i = (raw < x) ? 4 : i; x = std::min(x, *this);
+		transpose80(); i = (raw < x) ? 3 : i; x = std::min(x, *this);
+		mirror80();    i = (raw < x) ? 5 : i; x = std::min(x, *this);
+		transpose80(); i = (raw < x) ? 2 : i; x = std::min(x, *this);
+		mirror80();    i = (raw < x) ? 6 : i; x = std::min(x, *this);
+		transpose80(); i = (raw < x) ? 1 : i; x = std::min(x, *this);
+		mirror80();    i = (raw < x) ? 7 : i; x = std::min(x, *this);
+		operator =(x);
+		return i;
+	}
+
 	inline u32 species() const { return species64(); }
 	inline u32 species64() const {
 		return query16(0).species | query16(1).species | query16(2).species | query16(3).species;
@@ -640,7 +716,6 @@ public:
 	inline hex numof() const {
 		return query(0).numof + query(1).numof + query(2).numof + query(3).numof;
 	}
-
 	inline u32 numof(u32 t) const { return numof64(t); }
 	inline u32 numof64(u32 t) const {
 		return query16(0).numof[t] + query16(1).numof[t] + query16(2).numof[t] + query16(3).numof[t];
@@ -648,75 +723,84 @@ public:
 	inline u32 numof80(u32 t) const {
 		return query20(0).numof[t] + query20(1).numof[t] + query20(2).numof[t] + query20(3).numof[t];
 	}
-
 	inline void numof(u32 num[], u32 min, u32 max) const { return numof64(num, min, max); }
 	inline void numof64(u32 num[], u32 min, u32 max) const {
 		hexa numof0 = query16(0).numof;
 		hexa numof1 = query16(1).numof;
 		hexa numof2 = query16(2).numof;
 		hexa numof3 = query16(3).numof;
-		for (u32 i = min; i < max; i++) {
-			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
-		}
+		for (u32 i = min; i < max; i++) num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 	}
 	inline void numof80(u32 num[], u32 min, u32 max) const {
 		hexa numof0 = query20(0).numof;
 		hexa numof1 = query20(1).numof;
 		hexa numof2 = query20(2).numof;
 		hexa numof3 = query20(3).numof;
-		for (u32 i = min; i < max; i++) {
-			num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
-		}
+		for (u32 i = min; i < max; i++) num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 	}
 
+	inline constexpr hex count() const {
+		return ((count64(0)  <<  0) | (count64(1)  <<  4) | (count64(2)  <<  8) | (count64(3)  << 12)
+		      | (count64(4)  << 16) | (count64(5)  << 20) | (count64(6)  << 24) | (count64(7)  << 28))
+		 | (u64((count64(8)  <<  0) | (count64(9)  <<  4) | (count64(10) <<  8) | (count64(11) << 12)
+		      | (count64(12) << 16) | (count64(13) << 20) | (count64(14) << 24) | (count64(15) << 28)) << 32);
+	}
 	inline constexpr u32 count(u32 t) const { return count64(t); }
 	inline constexpr u32 count64(u32 t) const {
-		register u32 num = 0;
-		for (u32 i = 0; i < 16; i++)
-			if (at4(i) == t) num++;
-		return num;
+		u64 x = t;
+		x |= (x << 4);
+		x |= (x << 8);
+		x |= (x << 16);
+		x |= (x << 32);
+		x ^= raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		x = ~x & 0x1111111111111111ull;
+		return math::popcnt(x);
 	}
 	inline constexpr u32 count80(u32 t) const {
-		register u32 num = 0;
-		for (u32 i = 0; i < 16; i++)
-			if (at5(i) == t) num++;
-		return num;
+		u64 x = t & 0x0f;
+		x |= (x << 4);
+		x |= (x << 8);
+		x |= (x << 16);
+		x |= (x << 32);
+		x ^= raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		u32 e = t & 0x10 ? 0xffff0000 : 0x00000000;
+		e ^= ext;
+		x = ~x & math::pdep64(~e >> 16, 0x1111111111111111ull);
+		return math::popcnt(x);
 	}
-
 	inline constexpr void count(u32 num[], u32 min, u32 max) const { return count64(num, min, max); }
 	inline constexpr void count64(u32 num[], u32 min, u32 max) const {
-		for (u32 i = 0; i < 16; i++) num[at4(i)]++;
+		for (u32 i = min; i < max; i++) num[i] = count64(i);
 	}
 	inline constexpr void count80(u32 num[], u32 min, u32 max) const {
-		for (u32 i = 0; i < 16; i++) num[at5(i)]++;
+		for (u32 i = min; i < max; i++) num[i] = count80(i);
 	}
 
-	inline u32 mask(u32 t) const { return mask64(t); }
-	inline u32 mask64(u32 t) const {
-		return (query16(0).mask[t] << 0) | (query16(1).mask[t] << 4) | (query16(2).mask[t] << 8) | (query16(3).mask[t] << 12);
+	inline constexpr u32 mask(u32 t) const { return mask64(t); }
+	inline constexpr u32 mask64(u32 t) const {
+		u64 x = t;
+		x |= (x << 4);
+		x |= (x << 8);
+		x |= (x << 16);
+		x |= (x << 32);
+		x ^= raw;
+		x |= (x >> 2);
+		x |= (x >> 1);
+		return math::pext(~x, 0x1111111111111111ull);
 	}
-	inline u32 mask80(u32 t) const {
-		return (query20(0).mask[t] << 0) | (query20(1).mask[t] << 4) | (query20(2).mask[t] << 8) | (query20(3).mask[t] << 12);
+	inline constexpr u32 mask80(u32 t) const {
+		return mask64(t & 0x0f) & (~((t & 0x10 ? 0xffff0000 : 0x00000000) ^ ext) >> 16);
 	}
-
-	inline void mask(u32 msk[], u32 min, u32 max) const { return mask64(msk, min, max); }
-	inline void mask64(u32 msk[], u32 min, u32 max) const {
-		hexa mask0 = query16(0).mask;
-		hexa mask1 = query16(1).mask;
-		hexa mask2 = query16(2).mask;
-		hexa mask3 = query16(3).mask;
-		for (u32 i = min; i < max; i++) {
-			msk[i] = (mask0[i] << 0) | (mask1[i] << 4) | (mask2[i] << 8) | (mask3[i] << 12);
-		}
+	inline constexpr void mask(u32 msk[], u32 min, u32 max) const { return mask64(msk, min, max); }
+	inline constexpr void mask64(u32 msk[], u32 min, u32 max) const {
+		for (u32 i = min; i < max; i++) msk[i] = mask64(i);
 	}
-	inline void mask80(u32 msk[], u32 min, u32 max) const {
-		hexa mask0 = query20(0).mask;
-		hexa mask1 = query20(1).mask;
-		hexa mask2 = query20(2).mask;
-		hexa mask3 = query20(3).mask;
-		for (u32 i = min; i < max; i++) {
-			msk[i] = (mask0[i] << 0) | (mask1[i] << 4) | (mask2[i] << 8) | (mask3[i] << 12);
-		}
+	inline constexpr void mask80(u32 msk[], u32 min, u32 max) const {
+		for (u32 i = min; i < max; i++) msk[i] = mask80(i);
 	}
 
 	inline hexa find(u32 t) const { return find64(t); }
@@ -759,9 +843,9 @@ public:
 		return mono;
 	}
 
-	inline u64 monotonic(bool left = true) const   { return left ? monoleft() : monoright(); }
-	inline u64 monotonic64(bool left = true) const { return left ? monoleft64() : monoright64(); }
-	inline u64 monotonic80(bool left = true) const { return left ? monoleft80() : monoright80(); }
+	inline u64 mono(bool left = true) const   { return left ? monoleft() : monoright(); }
+	inline u64 mono64(bool left = true) const { return left ? monoleft64() : monoright64(); }
+	inline u64 mono80(bool left = true) const { return left ? monoleft80() : monoright80(); }
 
 	inline u32 operations() const { return operations64(); }
 	inline u32 operations64() const {
@@ -893,12 +977,12 @@ public:
 	public:
 		style() = delete;
 		enum fmtcode : u32 {
-			index  = 0x00000000u,
-			exact  = 0x10000000u,
-			alter  = 0x20000000u,
-			binary = 0x40000000u,
-			extend = 0x80000000u,
-			full   = 0xf0000000u,
+			index  = 0x00000000u, /* print (or write) tile indexes, this is the default option */
+			exact  = 0x10000000u, /* print tile values (string); write with board info (binary) */
+			alter  = 0x20000000u, /* use alternative: print board as hex string (string); write with extension placeholder (binary) */
+			binary = 0x40000000u, /* switch between string and binary mode */
+			extend = 0x80000000u, /* print (or write) with 16-bit extension */
+			full   = 0xf0000000u, /* enable all flags: will write the whole data structure (128-bit) */
 
 			at     = index,
 			at4    = index,
@@ -906,7 +990,6 @@ public:
 			ext    = extend,
 			exact4 = index | exact,
 			exact5 = index | exact | extend,
-			actual = index | exact | extend,
 			lite   = alter,
 			lite64 = alter,
 			lite80 = alter | extend,
