@@ -146,9 +146,9 @@ public:
 			bool coherence = (code == 128);
 			// read name (raw), block size, length, and value table
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
-			code = read<u16>(in);
+			u32 blkz = read<u16>(in);
 			w.raw = weight::alloc(w.length = read<u64>(in));
-			switch (code) {
+			switch (blkz) {
 			case 2: read_cast<f16>(in, w.value().begin(), w.value().end()); break;
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
@@ -171,7 +171,7 @@ public:
 				std::fill(w.updvu().begin(), w.updvu().end(), numeric(0));
 			}
 			// skip unrecognized fields
-			while ((code = read<u16>(in)) != 0) in.ignore(code * read<u64>(in));
+			while ((blkz = read<u16>(in)) != 0) in.ignore(blkz * read<u64>(in));
 			// finalize name and display width
 			if (raw_cast<u16>(w.name[6]) == 0) { // name is serialized as integer
 				u32 sign = raw_cast<u32>(w.name[0]);
@@ -204,7 +204,7 @@ public:
 		switch (code) {
 		case 0: [&]() {
 			weight::container buf;
-			for (code = 0, read_cast<u32>(in, code); code; code--)
+			for (u32 num = read<u32>(in); num; num--)
 				in >> list<weight>::as(buf).emplace_back();
 			for (u32 idx : idx_select(opt + format("[0:%u]", u32(buf.size()))))
 				list<weight>::as(wghts()).push_back(buf[idx]);
@@ -449,11 +449,12 @@ public:
 			c.init(read<u64>(in.ignore(2)));
 			read<block>(in, c.cached, c.cached + c.size());
 			// read depth-map (nmap)
-			size_t nmnum = read<u64>(in.ignore(2));
+			u32 blkz = read<u16>(in);
+			size_t nmnum = read<u64>(in);
 			read_cast<u64>(in, c.nmap.begin(), c.nmap.begin() + std::min(c.nmap.size(), nmnum));
 			if (nmnum > c.nmap.size()) in.ignore(sizeof(u64) * (nmnum - c.nmap.size()));
 			// ignore unrecognized fields
-			while ((code = read<u16>(in)) != 0) in.ignore(code * read<u64>(in));
+			while ((blkz = read<u16>(in)) != 0) in.ignore(blkz * read<u64>(in));
 		}(); break;
 		}
 		return in;
