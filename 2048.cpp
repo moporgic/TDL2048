@@ -63,25 +63,24 @@ public:
 		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
-		default:
-		case 4:
+		case 4: [&]() {
 			try { // write sign as 32-bit integer if possible
 				size_t idx = 0;
 				u32 sign = std::stoul(w.sign(), &idx, 16);
 				if (idx != w.sign().size()) throw std::invalid_argument("unresolved");
 				write_cast<u32>(out, sign);
-				write_cast<u16>(out, w.sign().size());
+				write_cast<u16>(out, w.sign().size()); // note: legacy serial 4 stores u16(0)
 				write_cast<u16>(out, 0);
-			} catch (std::logic_error&) { // otherwise, write it as raw string
+			} catch (std::logic_error&) { // otherwise, write it as string
 				out.write(w.sign().append(8, ' ').c_str(), 8);
 			}
 			// write value table
-			write_cast<u16>(out, sizeof(weight::numeric));
+			write_cast<u16>(out, sizeof(numeric));
 			write_cast<u64>(out, w.size());
 			write_cast<numeric>(out, w.value().begin(), w.value().end());
-			// reserved for fields
+			// reserved for additional fields
 			write_cast<u16>(out, 0);
-			break;
+		}(); break;
 		}
 		return out;
 	}
@@ -91,74 +90,92 @@ public:
 		switch (code) {
 		case 0:
 		case 1:
-		case 2:
-			// read name and size
+		case 2: [&]() {
+			// read name, length, and value table
 			w.name = format("%08x", read<u32>(in));
-			w.length = read<u64>(in);
-			if (math::ones64(w.length) == 1) // remove extra beginning '0'
-				w.name = w.name.substr(8 - (math::lg64(w.length) >> 2));
-			// read value table
-			w.raw = weight::alloc(w.length);
+			w.raw = weight::alloc(w.length = read<u64>(in));
 			switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
-			break;
+			// adjust display width, remove redundant padding '0'
+			u32 padz = 8 - (math::lg64(w.length) >> 2);
+			while (padz && w.name.substr(0, padz) != std::string(padz, '0')) padz--;
+			w.name = w.name.substr(padz);
+		}(); break;
 		default:
-		case 4:
-			// read name
+		case 4: [&]() {
+			// read name (raw), block size, length, and value table
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
-			if (raw_cast<u16>(w.name[6]) == 0) { // name is written as integer
-				u32 width = raw_cast<u16>(w.name[4]);
-				if (width == 0) { // name display width is missing, try recalculate it
-					read_cast<u64>(in.ignore(2), w.length).seekg(-10, std::ios::cur);
-					width = (math::ones64(w.length) == 1) ? (math::lg64(w.length) >> 2) : 8;
-					if (format("%x", raw_cast<u32>(w.name[0])).size() > width) width = 8;
-				}
-				w.name = format(format("%%0%ux", width), raw_cast<u32>(w.name[0]));
-			} else { // name is written as string
-				w.name = w.name.substr(0, w.name.find(' '));
-			}
-			// read value table
-			read_cast<u16>(in, code);
-			read_cast<u64>(in, w.length);
-			w.raw = weight::alloc(w.length);
-			switch (code) {
+			u32 blkz = read<u16>(in);
+			w.raw = weight::alloc(w.length = read<u64>(in));
+			switch (blkz) {
 			case 2: read_cast<f16>(in, w.value().begin(), w.value().end()); break;
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
-			// ignore unrecognized extra fields
-			while (read_cast<u16>(in, code) && code)
-				in.ignore(code * read<u64>(in));
-			break;
+			// skip unrecognized fields
+			while ((blkz = read<u16>(in)) != 0) in.ignore(blkz * read<u64>(in));
+			// finalize name and display width
+			if (raw_cast<u16>(w.name[6]) == 0) { // name is serialized as integer
+				u32 sign = raw_cast<u32>(w.name[0]);
+				u32 width = raw_cast<u16>(w.name[4]);
+				if (width == 0) width = math::lg64(w.length) >> 2;
+				if (width < format("%x", sign).size()) width = 8;
+				w.name = format(format("%%0%ux", width), sign);
+			} else { // name is serialized as string
+				w.name = w.name.substr(0, w.name.find(' '));
+			}
+		}(); break;
 		}
 		return in;
 	}
 
-	static void save(std::ostream& out) {
+	static void save(std::ostream& out, std::string opt = {}) {
 		u32 code = 0;
 		write_cast<u8>(out, code);
 		switch (code) {
-		default:
-		case 0:
-			write_cast<u32>(out, wghts().size());
-			for (weight w : wghts()) out << w;
-			break;
+		case 0: [&]() {
+			std::vector<u32> idxes = idx_select(opt);
+			write_cast<u32>(out, idxes.size());
+			for (u32 idx : idxes) out << wghts()[idx];
+		}(); break;
 		}
 	}
-	static void load(std::istream& in) {
+	static void load(std::istream& in, std::string opt = {}) {
 		u32 code = 0;
 		read_cast<u8>(in, code);
 		switch (code) {
-		default:
-		case 0:
-			for (read_cast<u32>(in, code); code; code--)
-				in >> list<weight>::as(wghts()).emplace_back();
-			break;
+		case 0: [&]() {
+			weight::container buf;
+			for (u32 num = read<u32>(in); num; num--)
+				in >> list<weight>::as(buf).emplace_back();
+			for (u32 idx : idx_select(opt + format("[0:%u]", u32(buf.size()))))
+				list<weight>::as(wghts()).push_back(buf[idx]);
+			for (weight w : buf)
+				if (!weight(w.sign())) free(w.data());
+		}(); break;
 		}
 	}
+private:
+	static std::vector<u32> idx_select(std::string opt = {}) {
+		std::vector<u32> idxes;
+		std::stringstream tokens((opt += "[]").substr(0, opt.find(']')).substr(opt.find('[') + 1));
+		for (std::string token; std::getline(tokens, token, ',');) { // idx,idx-lim,idx:len
+			u32 i = -1u, n = -1u; char x = '.';
+			std::stringstream(token) >> i >> x >> n;
+			if (i != -1u) idxes.push_back(i);
+			if (x == ':' && n != -1u) x = '-', n = i + n - 1;
+			if (x == '-' && n != -1u) while (++i <= n) idxes.push_back(i);
+		}
+		if (idxes.empty()) {
+			idxes.resize(wghts().size());
+			std::iota(idxes.begin(), idxes.end(), 0);
+		}
+		return idxes;
+	}
 
+public:
 	class container : public clip<weight> {
 	public:
 		constexpr container() noexcept : clip<weight>() {}
@@ -330,15 +347,15 @@ public:
 	};
 
 	constexpr cache() : cached(&initial), length(1), mask(0), nmap{} {}
-	cache(const cache& tp) = default;
-	~cache() {}
 	constexpr inline size_t size() const { return length; }
 	constexpr inline block& operator[] (size_t i) { return cached[i]; }
 	constexpr inline const block& operator[] (size_t i) const { return cached[i]; }
-	inline block::access operator() (const board& b, u32 n) {
-		u64 x = min_isomorphic(b);
-		block& blk = operator[]((math::fmix64(x) ^ nmap[n >> 1]) & mask);
-		return blk(x, n);
+	constexpr inline block::access operator() (const board& b, u32 n) {
+		u64 x = ({ board x(b); x.isomin64(); x; });
+		return (*this)[indexof(x, n)](x, n);
+	}
+	constexpr inline size_t indexof(u64 x, u32 n) const {
+		return (math::fmix64(x) ^ nmap[n >> 1]) & mask;
 	}
 
     friend std::ostream& operator <<(std::ostream& out, const cache& c) {
@@ -346,7 +363,7 @@ public:
 		write_cast<byte>(out, code);
 		switch (code) {
 		default:
-		case 4:
+		case 4: [&]() {
 			// reserved for header
 			write_cast<u16>(out, 0);
 			write_cast<u64>(out, 0);
@@ -355,12 +372,12 @@ public:
 			write_cast<u64>(out, c.size());
 			write<block>(out, c.cached, c.cached + c.size());
 			// write depth-map (nmap)
-			write_cast<u16>(out, sizeof(size_t));
+			write_cast<u16>(out, sizeof(u64));
 			write_cast<u64>(out, c.nmap.size());
 			write_cast<u64>(out, c.nmap.begin(), c.nmap.end());
 			// reserved for fields
 			write_cast<u16>(out, 0);
-			break;
+		}(); break;
 		}
 		return out;
 	}
@@ -369,38 +386,38 @@ public:
 		read_cast<byte>(in, code);
 		switch (code) {
 		default:
-		case 4:
+		case 4: [&]() {
 			// ignore unused header
 			in.ignore(read<u16>(in) * read<u64>(in));
-			// read blocks
+			// read blocks (block size is ignored)
 			c.init(read<u64>(in.ignore(2)));
 			read<block>(in, c.cached, c.cached + c.size());
 			// read depth-map (nmap)
-			read_cast<u64>(in, c.nmap.begin(), c.nmap.begin() + read<u64>(in.ignore(2)));
+			u32 blkz = read<u16>(in);
+			size_t nmnum = read<u64>(in);
+			read_cast<u64>(in, c.nmap.begin(), c.nmap.begin() + std::min(c.nmap.size(), nmnum));
+			if (nmnum > c.nmap.size()) in.ignore(sizeof(u64) * (nmnum - c.nmap.size()));
 			// ignore unrecognized fields
-			while ((code = read<u16>(in)) != 0)
-				in.ignore(code * read<u64>(in));
-			break;
+			while ((blkz = read<u16>(in)) != 0) in.ignore(blkz * read<u64>(in));
+		}(); break;
 		}
 		return in;
 	}
 
-	static void save(std::ostream& out) {
+	static void save(std::ostream& out, std::string opt = {}) {
 		u32 code = 0;
 		write_cast<byte>(out, code);
 		switch (code) {
-		default:
 		case 0:
 			out << instance();
 			break;
 		}
 		out.flush();
 	}
-	static void load(std::istream& in) {
-		u32 code;
+	static void load(std::istream& in, std::string opt = {}) {
+		u32 code = 0;
 		read_cast<byte>(in, code);
 		switch (code) {
-		default:
 		case 0:
 			in >> instance();
 			break;
@@ -423,18 +440,6 @@ private:
 		for (size_t i = 0; i < nmap.size(); i++)
 			nmap[i] = peek ? 0 : math::fmix64(i);
 		return *this;
-	}
-
-	constexpr inline u64 min_isomorphic(board t) const {
-		u64 x = u64(t);
-		t.mirror64();    x = std::min(x, u64(t));
-		t.transpose64(); x = std::min(x, u64(t));
-		t.mirror64();    x = std::min(x, u64(t));
-		t.transpose64(); x = std::min(x, u64(t));
-		t.mirror64();    x = std::min(x, u64(t));
-		t.transpose64(); x = std::min(x, u64(t));
-		t.mirror64();    x = std::min(x, u64(t));
-		return x;
 	}
 
 private:
@@ -549,14 +554,14 @@ u64 indexmono(const board& b) { // 24-bit
 template<u32 tile, u32 isomorphic>
 u64 indexmask(const board& b) { // 16-bit
 	board k = b;
-	k.isomorphic(isomorphic);
+	k.isom(isomorphic);
 	return k.mask(tile);
 }
 
 template<u32 isomorphic>
 u64 indexmax(const board& b) { // 16-bit
 	board k = b;
-	k.isomorphic(isomorphic);
+	k.isom(isomorphic);
 	return k.mask(k.max());
 }
 
@@ -601,7 +606,7 @@ struct make {
 
 		static constexpr board isoindex(u32 i) {
 			board x = 0xfedcba9876543210ull;
-			x.isomorphic((i & 4) + (8 - i) % 4);
+			x.isom((i & 4) + (8 - i) % 4);
 			return x;
 		}
 		static std::string vtos(const std::initializer_list<u32>& v) {
@@ -812,9 +817,11 @@ private:
 	}
 };
 
-void init_logging(utils::options::option opt) {
+void init_logging(utils::options::option files) {
 	static std::ofstream logout;
-	for (std::string path : opt) {
+	for (std::string file : files) {
+		std::string path = file.substr(file.find('|') + 1);
+//		std::string opt = path != file ? file.substr(0, file.find('|')) : "";
 		char type = path[path.find_last_of(".") + 1];
 		if (logout.is_open() || (type != 'x' && type != 'l')) continue; // .x and .log are suffix for log files
 		logout.open(path, std::ios::out | std::ios::app);
@@ -963,7 +970,7 @@ void make_network(utils::options::option opt) {
 
 	auto stov = [](std::string hash, u32 iso = 0) -> std::vector<u32> {
 		std::vector<u32> patt;
-		board x(0xfedcba9876543210ull); x.isomorphic(-iso);
+		board x(0xfedcba9876543210ull); x.isom(-iso);
 		for (char tile : hash) patt.push_back(x.at((tile & 15) + (tile & 64 ? 9 : 0)));
 		return patt;
 	};
@@ -1036,7 +1043,7 @@ void make_network(utils::options::option opt) {
 			}
 			if (init.find_first_of("{}") != npos && init != "{}") {
 				weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
-				size = std::max(size, src.size());
+				size = std::max(info != "?" ? size : 0, src.size());
 			} else if (init == "{}") {
 				size = 0;
 			}
@@ -1089,8 +1096,10 @@ void make_network(utils::options::option opt) {
 		if (wght.size() && idxr.size() && !feature(wght, idxr)) feature::make(wght, idxr);
 	}
 }
-void load_network(utils::options::option opt) {
-	for (std::string path : opt) {
+void load_network(utils::options::option files) {
+	for (std::string file : files) {
+		std::string path = file.substr(file.find('|') + 1);
+		std::string opt = path != file ? file.substr(0, file.find('|')) : "";
 		std::ifstream in;
 		in.open(path, std::ios::in | std::ios::binary);
 		while (in.peek() != -1) {
@@ -1100,15 +1109,17 @@ void load_network(utils::options::option opt) {
 			} else { // legacy binaries always beginning with 0, so use name suffix to determine the type
 				type = path[path.find_last_of(".") + 1];
 			}
-			if (type == 'w')  weight::load(in);
-			if (type == 'c')   cache::load(in);
+			if (type == 'w')  weight::load(in, opt);
+			if (type == 'c')   cache::load(in, opt);
 		}
 		in.close();
 	}
 }
-void save_network(utils::options::option opt) {
+void save_network(utils::options::option files) {
 	char buf[1 << 20];
-	for (std::string path : opt) {
+	for (std::string file : files) {
+		std::string path = file.substr(file.find('|') + 1);
+		std::string opt = path != file ? file.substr(0, file.find('|')) : "";
 		char type = path[path.find_last_of(".") + 1];
 		if (type == 'x' || type == 'l') continue; // .x and .log are suffix for log files
 		std::ofstream out;
@@ -1117,9 +1128,9 @@ void save_network(utils::options::option opt) {
 		if (!out.is_open()) continue;
 		// for upward compatibility, we still write legacy binaries for traditional suffixes
 		if (type != 'c') {
-			weight::save(type != 'w' ? out.write("w", 1) : out);
+			weight::save(type != 'w' ? out.write("w", 1) : out, opt);
 		} else { // .c is reserved for cache binary
-			cache::save(type != 'c' ? out.write("c", 1) : out);
+			cache::save(type != 'c' ?  out.write("c", 1) : out, opt);
 		}
 		out.flush();
 		out.close();
@@ -1289,7 +1300,7 @@ struct method {
 
 		static inline numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
 			numeric best = 0;
-			for (const board& after : before.afters()) {
+			for (const board& after : before.moves()) {
 				auto search = after.info() != -1u ? search_expt : search_illegal;
 				best = std::max(best, after.info() + search(after, depth - 1, range));
 			}
@@ -1520,7 +1531,7 @@ struct statistic {
 		total = {};
 		local = {};
 		accum = {};
-		for (u32 i = 0; i < info.thdid; i++) moporgic::rand();
+		for (u32 i = 0; i < info.thdid; i++) moporgic::srand(moporgic::rand());
 		local.time = moporgic::millisec();
 		info.loop = 1;
 
