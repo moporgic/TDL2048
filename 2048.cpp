@@ -143,7 +143,6 @@ public:
 		default:
 		case 128:
 		case 4: [&]() {
-			bool coherence = (code == 128);
 			// read name (raw), block size, length, and value table
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
 			u32 blkz = read<u16>(in);
@@ -153,15 +152,15 @@ public:
 			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
-			if (coherence /* read coherence tables */) {
-				read_cast<u16>(in, code);
+			if (code == 128 /* read coherence tables */) {
+				blkz = read<u16>(in);
 				in.ignore(8); // == length + length
-				switch (code) {
+				switch (blkz) {
 				case 2: read_cast<f16>(in, w.accum().begin(), w.accum().end()); break;
 				case 4: read_cast<f32>(in, w.accum().begin(), w.accum().end()); break;
 				case 8: read_cast<f64>(in, w.accum().begin(), w.accum().end()); break;
 				}
-				switch (code) {
+				switch (blkz) {
 				case 2: read_cast<f16>(in, w.updvu().begin(), w.updvu().end()); break;
 				case 4: read_cast<f32>(in, w.updvu().begin(), w.updvu().end()); break;
 				case 8: read_cast<f64>(in, w.updvu().begin(), w.updvu().end()); break;
