@@ -3,7 +3,7 @@ recipes="${@:-2048}"
 networks="4x6patt 8x6patt"
 threads="single multi"
 
-echo TDL2048+ Benchmark $(date +"%F %T") | tee -a 2048-bench.log
+echo TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T") | tee -a 2048-bench.log
 test-st() { ${1:-./2048} -s -t 1x${2:-10000} -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
 test-mt() { ${1:-./2048} -s -t ${2:-$(nproc)0} -e ${2:-$(nproc)0} -p -% | grep summary | egrep -o [0-9.]+ops; }
 test-e-st() { echo nanops; ${1:-./2048} -s -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
