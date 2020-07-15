@@ -40,17 +40,17 @@ for recipe in $recipes; do
 			bench run 8 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 			sleep 10
 
-			[ -e $network.w ] || continue
-			
-			test() { test-${thread:0:1}t $@; }
-			run() { ./$recipe -n $network -i $network.w -a 0 $@; }
-			bench run 4 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
-			sleep 10
-
-			test() { test-e-${thread:0:1}t $@; }
-			run() { ./$recipe -n $network -i $network.w -a 0 $@; }
-			bench run 4 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
-			sleep 10
+			if [ -e $network.w ]; then
+				test() { test-${thread:0:1}t $@; }
+				run() { ./$recipe -n $network -i $network.w -a 0 $@; }
+				bench run 4 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+				sleep 10
+	
+				test() { test-e-${thread:0:1}t $@; }
+				run() { ./$recipe -n $network -i $network.w -a 0 $@; }
+				bench run 4 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+				sleep 10
+			fi
 
 			echo
 		done
