@@ -1,5 +1,6 @@
 #!/bin/bash
 # benchmarking targets
+# if input arguments are provided, this script will run benchmarking automatically
 recipes="$@"
 networks="4x6patt 8x6patt"
 threads="single multi"
@@ -24,12 +25,40 @@ bench () {
 	echo average: $(bc -l <<< "scale=2; (${optimize// /+})/${2:-10}")ops $(bc -l <<< "scale=2; (${evaluate// /+})/${2:-10}")ops | egrep --color=auto [0-9.]+ops
 }
 
+# comparing two binaries
+# usage: compare [binary1:./2048] [binary2:./2048] [attempt:10]
+# note: kernel function "test" should be defined before use
+compare() {
+	lc=${1:-./2048}
+	rc=${2:-./2048}
+	[ -e $lc ] || exit 1
+	[ -e $rc ] || exit 2
+	lhs=0; rhs=0;
+	for i in $(seq 1 1 ${3:-10}); do
+		echo -en "#$i\t"
+		if (( i % 2 == 0 )); then
+			L=($(test $lc))
+			R=($(test $rc))
+		else
+			R=($(test $rc))
+			L=($(test $lc))
+		fi
+		L=(${L[@]%ops})
+		lhs=$lhs+${L[0]}+${L[1]}
+		R=(${R[@]%ops})
+		rhs=$rhs+${R[0]}+${R[1]}
+		echo -en "$(bc -l <<< "scale=2; ($lhs)/$((i+i))")\t"
+		echo -en "$(bc -l <<< "scale=2; ($rhs)/$((i+i))")\n"
+		sleep 1
+	done
+}
+
 # specialized benchmarking kernels, should be wrapped with "test" before use
 test-st() { ${1:-./2048} -s -t 1x${2:-10000} -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
 test-mt() { ${1:-./2048} -s -t ${2:-$(nproc)0} -e ${2:-$(nproc)0} -p -% | grep summary | egrep -o [0-9.]+ops; }
 test-e-st() { echo nanops; ${1:-./2048} -s -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
 test-e-mt() { echo nanops; ${1:-./2048} -s -e ${2:-$(nproc)0} -p -% | grep summary | egrep -o [0-9.]+ops; }
-# an example of the benchmarking kernel, will be invoked by "bench"
+# default benchmarking kernel, will be invoked by "bench" and "compare"
 test() { test-st $@; }
 
 # main, will not execute if no recipes is given
