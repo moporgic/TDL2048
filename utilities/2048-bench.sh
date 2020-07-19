@@ -63,7 +63,16 @@ test() { test-st $@; }
 
 # main, will not execute if no recipes is given
 if [ "$recipes" ]; then
+	for network in $networks; do
+		[ -e $network.w ] && continue
+		read -p "Download $network.w from moporgic.info? " -n 1 -r
+		[[ $REPLY =~ ^[Nn]$ ]] && { echo; continue; }
+		wget -nv "moporgic.info/data/2048/$network.w.xz"
+		pixz -kd $network.w.xz || xz -kd $network.w.xz
+		touch -r $network.w.xz $network.w && rm $network.w.xz
+	done
 	sleep 10
+	
 	echo TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")
 	for recipe in $recipes; do
 		[ -e $recipe ] || continue
