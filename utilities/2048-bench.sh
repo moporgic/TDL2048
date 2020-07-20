@@ -67,38 +67,38 @@ if [ "$recipes" ]; then
 		[ -e $network.w ] && continue
 		read -p "Download $network.w from moporgic.info? " -n 1 -r
 		[[ $REPLY =~ ^[Nn]$ ]] && { echo; continue; }
-		wget -nv "moporgic.info/data/2048/$network.w.xz"
+		wget -nv "moporgic.info/data/2048/$network.w.xz" || continue
 		pixz -kd $network.w.xz || xz -kd $network.w.xz
 		touch -r $network.w.xz $network.w && rm $network.w.xz
 	done
 	sleep 10
 	
-	echo TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")
+	echo TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")	
 	for recipe in $recipes; do
 		[ -e $recipe ] || continue
 		
 		for network in $networks; do
+			init() { ./$recipe -n $network $@; }
+			load() { ./$recipe -n $network -i $network.w -a 0 $@; }
+				
 			for thread in $threads; do
 				echo "$recipe $network $thread-thread"
 				echo -n ">"
 	
 				test() { test-${thread:0:1}t $@; }
-				run() { ./$recipe -n $network $@; }
-				bench run 8 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+				bench init 8 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 				sleep 10
 	
 				if [ -e $network.w ]; then
 					test() { test-${thread:0:1}t $@; }
-					run() { ./$recipe -n $network -i $network.w -a 0 $@; }
-					bench run 4 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+					bench load 4 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
 		
 					test() { test-e-${thread:0:1}t $@; }
-					run() { ./$recipe -n $network -i $network.w -a 0 $@; }
-					bench run 4 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+					bench load 4 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
 				fi
-	
+				
 				echo
 			done
 		done
