@@ -35,27 +35,24 @@ bench () {
 # usage: compare [binary1:./2048] [binary2:./2048] [attempt:10]
 # note: kernel function "test" should be defined before use
 compare() {
-	lc=${1:-2048}; [ -e $lc ] && lc=./$lc
-	rc=${2:-2048}; [ -e $rc ] && rc=./$rc
-	command -v $lc >/dev/null 2>&1 || exit 1
-	command -v $rc >/dev/null 2>&1 || exit 2
-	lhs=0; rhs=0;
+	Lc=${1:-2048}; [ -e $Lc ] && Lc=./$Lc
+	Rc=${2:-2048}; [ -e $Rc ] && Rc=./$Rc
+	command -v $Lc >/dev/null 2>&1 || exit 1
+	command -v $Rc >/dev/null 2>&1 || exit 2
 	Lx=(); Rx=();
 	for i in $(seq -w 1 1 ${3:-10}); do
 		echo -n "#$i: "
 		if (( ${i: -1} % 2 == 0 )); then
-			L=($(test $lc))
-			R=($(test $rc))
+			L=($(test $Lc))
+			R=($(test $Rc))
 		else
-			R=($(test $rc))
-			L=($(test $lc))
+			R=($(test $Rc))
+			L=($(test $Lc))
 		fi
 		L=(${L[@]%ops})
-		lhs=$lhs+${L[0]}+${L[1]}
 		R=(${R[@]%ops})
-		rhs=$rhs+${R[0]}+${R[1]}
-		Lx+=($(bc -l <<< "scale=2; ($lhs)/$((i+i))"))
-		Rx+=($(bc -l <<< "scale=2; ($rhs)/$((i+i))"))
+		Lx+=($(bc -l <<< "scale=2; (${L[0]}+${L[1]})/2"))
+		Rx+=($(bc -l <<< "scale=2; (${R[0]}+${R[1]})/2"))
 		echo ${Lx[-1]}ops ${Rx[-1]}ops
 		sleep 1
 	done
