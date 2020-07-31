@@ -1,9 +1,12 @@
 #!/bin/bash
-# benchmarking targets
-# if input arguments are provided, this script will run benchmarking automatically
-recipes="$@"
-networks="4x6patt 8x6patt"
-threads="single multi"
+
+# default benchmarking kernel, will be invoked by "bench" and "compare"
+test() { test-st $@; }
+# specialized benchmarking kernels, should be wrapped with "test" before use
+test-st() { ${1:-./2048} -s -t 1x${2:-10000} -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
+test-mt() { ${1:-./2048} -s -t ${2:-$(nproc)0} -e ${2:-$(nproc)0} -p -% | grep summary | egrep -o [0-9.]+ops; }
+test-e-st() { echo nanops; ${1:-./2048} -s -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
+test-e-mt() { echo nanops; ${1:-./2048} -s -e ${2:-$(nproc)0} -p -% | grep summary | egrep -o [0-9.]+ops; }
 
 # benchmarking routine
 # usage: bench [binary:./2048] [attempt:10]
@@ -53,16 +56,12 @@ compare() {
 	done
 }
 
-# specialized benchmarking kernels, should be wrapped with "test" before use
-test-st() { ${1:-./2048} -s -t 1x${2:-10000} -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
-test-mt() { ${1:-./2048} -s -t ${2:-$(nproc)0} -e ${2:-$(nproc)0} -p -% | grep summary | egrep -o [0-9.]+ops; }
-test-e-st() { echo nanops; ${1:-./2048} -s -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
-test-e-mt() { echo nanops; ${1:-./2048} -s -e ${2:-$(nproc)0} -p -% | grep summary | egrep -o [0-9.]+ops; }
-# default benchmarking kernel, will be invoked by "bench" and "compare"
-test() { test-st $@; }
+# full benchmarking routine
+benchmark() {
+	recipes="${@:-2048}"
+	networks="4x6patt 8x6patt"
+	threads="single multi"
 
-# main, will not execute if no recipes is given
-if [ "$recipes" ]; then
 	for network in $networks; do
 		[ -e $network.w ] && continue
 		read -p "Download $network.w from moporgic.info? " -n 1 -r
@@ -72,35 +71,49 @@ if [ "$recipes" ]; then
 		touch -r $network.w.xz $network.w && rm $network.w.xz
 	done
 	sleep 10
-	
-	echo TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")	
+
+	echo TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")
 	for recipe in $recipes; do
 		[ -e $recipe ] || continue
-		
+
 		for network in $networks; do
 			init() { ./$recipe -n $network $@; }
 			load() { ./$recipe -n $network -i $network.w -a 0 $@; }
-				
+
 			for thread in $threads; do
 				echo "$recipe $network $thread-thread"
 				echo -n ">"
-	
+
 				test() { test-${thread:0:1}t $@; }
 				bench init 8 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 				sleep 10
-	
+
 				if [ -e $network.w ]; then
 					test() { test-${thread:0:1}t $@; }
 					bench load 4 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
-		
+
 					test() { test-e-${thread:0:1}t $@; }
 					bench load 4 | grep -v loop | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
 				fi
-				
+
 				echo
 			done
 		done
 	done
-done | tee -a 2048-bench.log
+}
+
+# execute benchmark automatically if recipes are given
+if (( $# )); then
+	benchmark "$@" | tee -a 2048-bench.log
+else # otherwise, print help info
+	echo "usage: test [binary:./2048]"
+	echo "       test-st/test-mt are for single/multi-thread; test-e-st/test-e-mt are with only evaluation"
+	echo "usage: bench [binary:./2048] [attempt:10]"
+	echo "       this function uses \"test\" as kernel"
+	echo "usage: compare [binary1:./2048] [binary2:./2048] [attempt:10]"
+	echo "       this function uses \"test\" as kernel"
+	echo "usage: benchmark [binaries:./2048]..."
+	echo "       this function uses \"bench\" as kernel"
+fi
