@@ -43,7 +43,7 @@ compare() {
 	Lx=(); Rx=();
 	for i in $(seq -w 1 1 ${3:-10}); do
 		echo -n "#$i: "
-		if (( i % 2 == 0 )); then
+		if (( ${i: -1} % 2 == 0 )); then
 			L=($(test $lc))
 			R=($(test $rc))
 		else
