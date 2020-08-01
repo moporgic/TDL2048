@@ -36,7 +36,7 @@ bench () {
 # usage: compare [binary1:./2048] [binary2:./2048] [attempt:10]
 # note: kernel function "test" should be defined before use
 compare() {
-	Lc=${1:-2048}; [ -e $Lc ] && Lc=./$Lc
+	Lc=${1:-base}; [ -e $Lc ] && Lc=./$Lc
 	Rc=${2:-2048}; [ -e $Rc ] && Rc=./$Rc
 	command -v $Lc >/dev/null 2>&1 || exit 1
 	command -v $Rc >/dev/null 2>&1 || exit 2
@@ -130,7 +130,7 @@ else # otherwise, print help info
 	echo "       available suffixes are -st -mt -e-st -e-mt"
 	echo "usage: bench [binary:./2048] [attempt:10]"
 	echo "       this function uses \"test\" as kernel"
-	echo "usage: compare [binary1:./2048] [binary2:./2048] [attempt:10]"
+	echo "usage: compare [binary1:./base] [binary2:./2048] [attempt:10]"
 	echo "       this function uses \"test\" as kernel"
 	echo "usage: benchmark [binaries:./2048]..."
 	echo "       this function uses \"bench\" as kernel"
