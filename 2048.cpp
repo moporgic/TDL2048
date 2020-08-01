@@ -53,14 +53,15 @@ public:
 		numeric value;
 		numeric accum;
 		numeric updvu;
-		inline constexpr segment() : value(0), accum(0), updvu(0) {}
+		static constexpr numeric cohp_init = std::numeric_limits<numeric>::min();
+		inline constexpr segment() : value(0), accum(cohp_init), updvu(cohp_init) {}
 		inline constexpr segment(const segment& s) = default;
 		inline constexpr operator numeric&() { return value; }
 		inline constexpr operator numeric() const { return value; }
 		inline constexpr segment& operator =(const segment& s) = default;
 		inline constexpr numeric& operator =(numeric val) { return value = val; }
 		inline constexpr numeric& operator +=(numeric aupdv) {
-			value += aupdv * (updvu ? (std::abs(accum) / updvu) : 1);
+			value += aupdv * (std::abs(accum) / updvu);
 			accum += aupdv;
 			updvu += std::abs(aupdv);
 			return value;
@@ -133,8 +134,8 @@ public:
 			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
 			}
 			// initialize coherence tables as zero
-			std::fill(w.accum().begin(), w.accum().end(), numeric(0));
-			std::fill(w.updvu().begin(), w.updvu().end(), numeric(0));
+			std::fill(w.accum().begin(), w.accum().end(), segment::cohp_init);
+			std::fill(w.updvu().begin(), w.updvu().end(), segment::cohp_init);
 			// adjust display width, remove redundant padding '0'
 			u32 padz = 8 - (math::lg64(w.length) >> 2);
 			while (padz && w.name.substr(0, padz) != std::string(padz, '0')) padz--;
@@ -165,9 +166,13 @@ public:
 				case 4: read_cast<f32>(in, w.updvu().begin(), w.updvu().end()); break;
 				case 8: read_cast<f64>(in, w.updvu().begin(), w.updvu().end()); break;
 				}
+				// fix legacy coherence parameters that was initialized as 0
+				for (segment& blk : clip<segment>(w.data(), w.data() + w.size())) {
+					if (blk.updvu == 0) blk.accum = blk.updvu = segment::cohp_init;
+				}
 			} else { // initialize coherence tables as zero
-				std::fill(w.accum().begin(), w.accum().end(), numeric(0));
-				std::fill(w.updvu().begin(), w.updvu().end(), numeric(0));
+				std::fill(w.accum().begin(), w.accum().end(), segment::cohp_init);
+				std::fill(w.updvu().begin(), w.updvu().end(), segment::cohp_init);
 			}
 			// skip unrecognized fields
 			while ((blkz = read<u16>(in)) != 0) in.ignore(blkz * read<u64>(in));
