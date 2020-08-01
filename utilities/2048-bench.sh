@@ -1,4 +1,5 @@
 #!/bin/bash
+# this script collects 2048 related benchmarking and testing procedures
 
 # default benchmarking kernel, will be invoked by "bench" and "compare"
 test() { command -v ${1:-./2048} >/dev/null 2>&1 && test-st ${@:-./2048} || test-st ./${@:-./2048}; }
@@ -105,7 +106,7 @@ benchmark() {
 					bench init ${N_init:-8} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
 				fi
-				if [ -e $network.w ] && (( ${N_load:-4} )); then
+				if (( ${N_load:-4} )) && [ -e $network.w ]; then
 					test() { test-${thread:0:1}t $@; }
 					bench load ${N_load:-4} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
@@ -125,7 +126,7 @@ benchmark() {
 if (( $# )); then
 	benchmark "$@" | tee -a 2048-bench.log
 else # otherwise, print help info
-	echo "usage: test [binary:./2048]"
+	echo "usage: test [binary:./2048] [attempt:10000|$(nproc)0]"
 	echo "       available suffixes are -st -mt -e-st -e-mt"
 	echo "usage: bench [binary:./2048] [attempt:10]"
 	echo "       this function uses \"test\" as kernel"
