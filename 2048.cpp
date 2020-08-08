@@ -943,6 +943,7 @@ std::string resolve(const std::string& token) {
 	alias["2x4patt/4"]           = "0123:0123! 4567:4567! ";
 	alias["5x4patt/4-22"]        = alias["2x4patt/4"] + "0145:0145! 1256:1256! 569a:569a! ";
 	alias["8x4patt/legacy"]      = "0123 4567 89ab cdef 048c 159d 26ae 37bf ";
+	alias["9x4patt/legacy"]      = "0145 1256 2367 4589 569a 67ab 89cd 9ade abef ";
 	alias["1x8patt/44"]          = "01234567:01234567! ";
 	alias["2x8patt/44"]          = "01234567:01234567! 456789ab:456789ab! ";
 	alias["3x8patt/44-332"]      = alias["2x8patt/44"] + "01245689:01245689! ";
@@ -2121,7 +2122,7 @@ utils::options parse(int argc, const char* argv[]) {
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts("recipes")) opts["recipes"] = "optimize", opts["optimize"] = 1000;
+	if (!opts["recipes"].size()) opts["recipes"] = "optimize", opts["optimize"] = 1000;
 	if (!opts("alpha")) opts["alpha"] = 1.0;
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
