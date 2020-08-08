@@ -2062,7 +2062,7 @@ utils::options parse(int argc, const char* argv[]) {
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts("recipes")) opts["recipes"] = "optimize", opts["optimize"] = 1000;
+	if (!opts["recipes"].size()) opts["recipes"] = "optimize", opts["optimize"] = 1000;
 	if (!opts("alpha")) opts["alpha"] = 0.1;
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
