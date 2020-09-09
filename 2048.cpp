@@ -1,8 +1,8 @@
 //============================================================================
-// Name        : 2048.cpp
-// Author      : Hung Guei
+// Name        : TDL2048+ - 2048.cpp
+// Author      : Hung Guei @ moporgic
 // Version     : beta
-// Description : 2048
+// Description : The Most Efficient TD Learning Program for 2048
 //============================================================================
 
 #include <cstdio>
@@ -38,6 +38,73 @@
 #endif
 
 namespace moporgic {
+
+auto what = R"(
+TDL2048+ by Hung Guei @ moporgic - The Most Efficient TD Learning Program for 2048
+
+Networks:
+  -n, --network [TOKEN]...  specify the n-tuple network, default is 4x6patt
+                            TOKEN is provided as either CONFIG or FEATURE
+                            CONFIG=ALIAS[IOPT][WOPT] specifies a built-in list,
+                            > ALIAS can be 4x6patt,5x6patt,8x6patt,mono,num,...
+                            FEATURE=WEIGHT[:INDEXES] specifies a n-tuple extractor
+                            WEIGHT=SIGN[SIZE][WOPT] is a n-tuple LUT, where
+                            > SIGN specifies a LUT whose SIZE is [100|16^10|p|?]
+                            > WOPT is used to modify LUT as SIGN=MODIFY, where
+                              MODIFY can be initialize,adjust,duplicate,remove
+                              as VINIT[/norm], +VADJUST[/norm], {SRC}, {}
+                            INDEXES=INDEX[!][IOPT],... is related indexers, where
+                            > INDEX specifies an indexer; if it is a pattern,
+                              using symbol ! expands to all its isomorphisms
+                            > IOPT is used to modify INDEX, as INDEX&HEX|HEX
+
+Recipes:
+  -r, --recipe ID [OPT]...  specify a recipe identified by ID
+                            OPT is provided as KEY[=VALUE], where KEY can be
+                            > mode: specify recipe routine, whose VALUE can be
+                              > optimize:{forward|backward|lambda|step}
+                              > evaluate:{best|random|reward}
+                            > loop,unit,win,info: execution and display settings
+                            > alpha,lambda,step: TD learning hyperparameters
+                            1st OPT also accepts a special alias LOOP[xUNIT][:WIN]
+                            if [OPT]... is unprovided, default is 1000x1000:2048
+  -t, --optimize [OPT]...   alias for -r optimize [OPT]...
+  -e, --evaluate [OPT]...   alias for -r evaluate [OPT]...
+  -tt MODE                  alias for -t mode=MODE
+  -et MODE                  alias for -e mode=MODE
+
+Parameters:
+  -a, --alpha ALPHA [NORM]  the learning rate, default is 0.1
+                            if NORM is unspecified, default is # of features
+  -l, --lambda LAMBDA       the TD-lambda, default is 0
+  -N, --step STEP           the n-step, default is 1 if LAMBDA is 0; otherwise 5
+  -u, --unit UNIT           the statistic display interval, default is 1000
+  -v, --win TILE            the winning threshold, default is 2048
+  -%, --info                whether to show the summary, default is auto
+
+Executions:
+  -s, --seed [SEED]         set the seed for the pseudo-random number
+  -p, --parallel [THREAD]   enable lock-free parallelism for all recipes
+                            if THREAD is unspecified, default is max supported #
+  -S, --search DEPTH [OPT]  enable the search with DEPTH layer (1,3,5,...)
+  -d, --depth DEPTH [OPT]   alias for -S DEPTH [OPT]
+  -c, --cache SIZE          enable the transposition table as NUMBER[K|M|G]
+
+Input/Output:
+  -i, --input [FILE]...     specify inputs, support weight.w and cache.c
+  -o, --output [FILE]...    specify outputs, support weight.w, cache.c, and log.x
+                            for a weight, LUT range can be selected as RANGE|PATH,
+                            where RANGE specifies the LUT indexes as 0,1-2,3:4
+  -io [FILE]...             alias for -i [FILE]... -o [FILE]...
+
+Miscellaneous:
+  -x, --options [OPT]...    specify other options as KEY[=VALUE]
+  -#, --comment [TEXT]...   specify command line comments
+  -?, --help                display this message and quit
+
+Please refer to https://moporgic.info/TDL2048+ for more details
+Report bugs and comments to "Hung Guei" <hguei@moporgic.info>
+)";
 
 typedef float numeric;
 
@@ -1952,7 +2019,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-l"): case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
 			// no break: lambda may also come with step
-		case to_hash("--step"): case to_hash("--n-step"):
+		case to_hash("-N"): case to_hash("--step"):
 			opts["step"] = next_opt(opts("lambda") && opts["lambda"].value(0) ? "5" : "1");
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
@@ -1967,7 +2034,7 @@ utils::options parse(int argc, const char* argv[]) {
 			if ((opts[""] = next_opts()).size()) opts[label] = opts[""];
 			if (opts[label].size()) opts["recipes"] += label;
 			break;
-		case to_hash("--recipes"):
+		case to_hash("-R"): case to_hash("--recipes"):
 			opts["recipes"] = next_opts();
 			break;
 		case to_hash("-io"):  case to_hash("--input-output"):
@@ -2029,6 +2096,10 @@ utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-|"):
 			opts = {};
+			break;
+		case to_hash("-?"): case to_hash("--help"):
+			std::cout << "Usage: " << argv[0] << " [OPTION]..." << moporgic::what;
+			std::exit(0);
 			break;
 		default:
 			opts["options"][label.substr(label.find_first_not_of('-'))] += next_opts();

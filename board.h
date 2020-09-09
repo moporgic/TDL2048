@@ -1,8 +1,8 @@
 //============================================================================
-// Name        : board.h
-// Author      : Hung Guei
+// Name        : TDL2048+ - board.h
+// Author      : Hung Guei @ moporgic
 // Version     : 5.5
-// Description : bitboard of 2048
+// Description : The Most Effective Bitboard Implementation for 2048
 //============================================================================
 
 #pragma once
