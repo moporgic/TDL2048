@@ -1286,13 +1286,13 @@ struct method {
 			register numeric esti = 0;
 			register board iso;
 			esti += estim(({ iso = state;     iso; }), range);
-			esti += estim(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso.flip();      iso; }), range);
 			esti += estim(({ iso.transpose(); iso; }), range);
-			esti += estim(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso.flip();      iso; }), range);
 			esti += estim(({ iso.transpose(); iso; }), range);
-			esti += estim(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso.flip();      iso; }), range);
 			esti += estim(({ iso.transpose(); iso; }), range);
-			esti += estim(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso.flip();      iso; }), range);
 			return esti;
 		}
 		template<optimizer optim = isomorphic::invoke>
@@ -1300,13 +1300,13 @@ struct method {
 			register numeric esti = 0;
 			register board iso;
 			esti += optim(({ iso = state;     iso; }), updv, range);
-			esti += optim(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso.flip();      iso; }), updv, range);
 			esti += optim(({ iso.transpose(); iso; }), updv, range);
-			esti += optim(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso.flip();      iso; }), updv, range);
 			esti += optim(({ iso.transpose(); iso; }), updv, range);
-			esti += optim(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso.flip();      iso; }), updv, range);
 			esti += optim(({ iso.transpose(); iso; }), updv, range);
-			esti += optim(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso.flip();      iso; }), updv, range);
 			return esti;
 		}
 

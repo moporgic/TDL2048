@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : TDL2048+ - board.h
 // Author      : Hung Guei @ moporgic
-// Version     : 5.5
+// Version     : 5.6
 // Description : The Most Effective Bitboard Implementation for 2048
 //============================================================================
 
@@ -269,8 +269,8 @@ public:
 		default:
 		case 0: break;
 		case 1: transpose64(); mirror64(); break;
-		case 2: mirror64(); flip64(); break;
-		case 3: transpose64(); flip64(); break;
+		case 2: mirror64();    flip64();   break;
+		case 3: transpose64(); flip64();   break;
 		}
 	}
 	inline constexpr void rotate80(u32 r = 1) {
@@ -278,18 +278,18 @@ public:
 		default:
 		case 0: break;
 		case 1: transpose80(); mirror80(); break;
-		case 2: mirror80(); flip80(); break;
-		case 3: transpose80(); flip80(); break;
+		case 2: mirror80();    flip80();   break;
+		case 3: transpose80(); flip80();   break;
 		}
 	}
 
 	inline constexpr void isom(u32 i = 0) { return isom64(i); }
 	inline constexpr void isom64(u32 i = 0) {
-		if ((i % 8) / 4) mirror64();
+		if (i & 4) flip64();
 		rotate64(i);
 	}
 	inline constexpr void isom80(u32 i = 0) {
-		if ((i % 8) / 4) mirror80();
+		if (i & 4) flip80();
 		rotate80(i);
 	}
 
@@ -297,25 +297,25 @@ public:
 	inline constexpr void isoms(btype iso[]) const { return isoms64(iso); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline constexpr void isoms64(btype iso[]) const {
-		iso[7] = *this;       iso[0] = iso[7];
-		iso[7].mirror64();    iso[4] = iso[7];
-		iso[7].transpose64(); iso[3] = iso[7];
-		iso[7].mirror64();    iso[5] = iso[7];
-		iso[7].transpose64(); iso[2] = iso[7];
-		iso[7].mirror64();    iso[6] = iso[7];
-		iso[7].transpose64(); iso[1] = iso[7];
-		iso[7].mirror64();
+		iso[5] = *this;       iso[0] = iso[5];
+		iso[5].flip64();      iso[4] = iso[5];
+		iso[5].transpose64(); iso[1] = iso[5];
+		iso[5].flip64();      iso[7] = iso[5];
+		iso[5].transpose64(); iso[2] = iso[5];
+		iso[5].flip64();      iso[6] = iso[5];
+		iso[5].transpose64(); iso[3] = iso[5];
+		iso[5].flip64();
 	}
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline constexpr void isoms80(btype iso[]) const {
-		iso[7] = *this;       iso[0] = iso[7];
-		iso[7].mirror80();    iso[4] = iso[7];
-		iso[7].transpose80(); iso[3] = iso[7];
-		iso[7].mirror80();    iso[5] = iso[7];
-		iso[7].transpose80(); iso[2] = iso[7];
-		iso[7].mirror80();    iso[6] = iso[7];
-		iso[7].transpose80(); iso[1] = iso[7];
-		iso[7].mirror80();
+		iso[5] = *this;       iso[0] = iso[5];
+		iso[5].flip80();      iso[4] = iso[5];
+		iso[5].transpose80(); iso[1] = iso[5];
+		iso[5].flip80();      iso[7] = iso[5];
+		iso[5].transpose80(); iso[2] = iso[5];
+		iso[5].flip80();      iso[6] = iso[5];
+		iso[5].transpose80(); iso[3] = iso[5];
+		iso[5].flip80();
 	}
 
 	inline std::array<board, 8> isoms() const { return isoms64(); }
@@ -634,26 +634,26 @@ public:
 	inline constexpr u32 isomax64() {
 		u32 i = 0;
 		u64 x = raw;
-		mirror64();    i = (raw > x) ? 4 : i; x = std::max(x, raw);
-		transpose64(); i = (raw > x) ? 3 : i; x = std::max(x, raw);
-		mirror64();    i = (raw > x) ? 5 : i; x = std::max(x, raw);
-		transpose64(); i = (raw > x) ? 2 : i; x = std::max(x, raw);
-		mirror64();    i = (raw > x) ? 6 : i; x = std::max(x, raw);
+		flip64();      i = (raw > x) ? 4 : i; x = std::max(x, raw);
 		transpose64(); i = (raw > x) ? 1 : i; x = std::max(x, raw);
-		mirror64();    i = (raw > x) ? 7 : i; x = std::max(x, raw);
+		flip64();      i = (raw > x) ? 7 : i; x = std::max(x, raw);
+		transpose64(); i = (raw > x) ? 2 : i; x = std::max(x, raw);
+		flip64();      i = (raw > x) ? 6 : i; x = std::max(x, raw);
+		transpose64(); i = (raw > x) ? 3 : i; x = std::max(x, raw);
+		flip64();      i = (raw > x) ? 5 : i; x = std::max(x, raw);
 		raw = x;
 		return i;
 	}
 	inline constexpr u32 isomax80() {
 		u32 i = 0;
 		board x(*this);
-		mirror80();    i = (raw > x) ? 4 : i; x = std::max(x, *this);
-		transpose80(); i = (raw > x) ? 3 : i; x = std::max(x, *this);
-		mirror80();    i = (raw > x) ? 5 : i; x = std::max(x, *this);
-		transpose80(); i = (raw > x) ? 2 : i; x = std::max(x, *this);
-		mirror80();    i = (raw > x) ? 6 : i; x = std::max(x, *this);
+		flip80();      i = (raw > x) ? 4 : i; x = std::max(x, *this);
 		transpose80(); i = (raw > x) ? 1 : i; x = std::max(x, *this);
-		mirror80();    i = (raw > x) ? 7 : i; x = std::max(x, *this);
+		flip80();      i = (raw > x) ? 7 : i; x = std::max(x, *this);
+		transpose80(); i = (raw > x) ? 2 : i; x = std::max(x, *this);
+		flip80();      i = (raw > x) ? 6 : i; x = std::max(x, *this);
+		transpose80(); i = (raw > x) ? 3 : i; x = std::max(x, *this);
+		flip80();      i = (raw > x) ? 5 : i; x = std::max(x, *this);
 		operator =(x);
 		return i;
 	}
@@ -661,26 +661,26 @@ public:
 	inline constexpr u32 isomin64() {
 		u32 i = 0;
 		u64 x = raw;
-		mirror64();    i = (raw < x) ? 4 : i; x = std::min(x, raw);
-		transpose64(); i = (raw < x) ? 3 : i; x = std::min(x, raw);
-		mirror64();    i = (raw < x) ? 5 : i; x = std::min(x, raw);
-		transpose64(); i = (raw < x) ? 2 : i; x = std::min(x, raw);
-		mirror64();    i = (raw < x) ? 6 : i; x = std::min(x, raw);
+		flip64();      i = (raw < x) ? 4 : i; x = std::min(x, raw);
 		transpose64(); i = (raw < x) ? 1 : i; x = std::min(x, raw);
-		mirror64();    i = (raw < x) ? 7 : i; x = std::min(x, raw);
+		flip64();      i = (raw < x) ? 7 : i; x = std::min(x, raw);
+		transpose64(); i = (raw < x) ? 2 : i; x = std::min(x, raw);
+		flip64();      i = (raw < x) ? 6 : i; x = std::min(x, raw);
+		transpose64(); i = (raw < x) ? 3 : i; x = std::min(x, raw);
+		flip64();      i = (raw < x) ? 5 : i; x = std::min(x, raw);
 		raw = x;
 		return i;
 	}
 	inline constexpr u32 isomin80() {
 		u32 i = 0;
 		board x(*this);
-		mirror80();    i = (raw < x) ? 4 : i; x = std::min(x, *this);
-		transpose80(); i = (raw < x) ? 3 : i; x = std::min(x, *this);
-		mirror80();    i = (raw < x) ? 5 : i; x = std::min(x, *this);
-		transpose80(); i = (raw < x) ? 2 : i; x = std::min(x, *this);
-		mirror80();    i = (raw < x) ? 6 : i; x = std::min(x, *this);
+		flip80();      i = (raw < x) ? 4 : i; x = std::min(x, *this);
 		transpose80(); i = (raw < x) ? 1 : i; x = std::min(x, *this);
-		mirror80();    i = (raw < x) ? 7 : i; x = std::min(x, *this);
+		flip80();      i = (raw < x) ? 7 : i; x = std::min(x, *this);
+		transpose80(); i = (raw < x) ? 2 : i; x = std::min(x, *this);
+		flip80();      i = (raw < x) ? 6 : i; x = std::min(x, *this);
+		transpose80(); i = (raw < x) ? 3 : i; x = std::min(x, *this);
+		flip80();      i = (raw < x) ? 5 : i; x = std::min(x, *this);
 		operator =(x);
 		return i;
 	}
