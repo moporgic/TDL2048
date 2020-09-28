@@ -479,6 +479,7 @@ public:
 		return move.inf;
 	}
 
+#ifdef __AVX2__
 	inline i32 left64x() {
 		u64 rawp = raw;
 		__m64 rawn = _mm_cvtsi64_m64(rawp);
@@ -623,9 +624,14 @@ public:
 		transpose64();
 		return score;
 	}
+#endif // __AVX2__
 
 	inline void moves(board& U, board& R, board& D, board& L) const {
-		return moves64x(U, R, D, L); /* use AVX2 instead of lookup */
+#if !defined(__AVX2__) || defined(PREFER_LUT_MOVES)
+		return moves64(U, R, D, L);
+#else  // use AVX2 instead of lookup
+		return moves64x(U, R, D, L);
+#endif // __AVX2__
 	}
 	inline void moves64(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
@@ -661,6 +667,7 @@ public:
 		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
 	}
+#ifdef __AVX2__
 	inline void moves64x(board& U, board& R, board& D, board& L) const {
 		__m256i dst = {}, rwd = {}, chk, rbf, buf;
 
@@ -763,6 +770,7 @@ public:
 		D.inf = _mm256_extract_epi32(rwd, 4);
 		L.inf = _mm256_extract_epi32(rwd, 6);
 	}
+#endif // __AVX2__
 
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves(btype move[]) const   { moves(move[0], move[1], move[2], move[3]); }
@@ -770,20 +778,17 @@ public:
 	inline void moves64(btype move[]) const { moves64(move[0], move[1], move[2], move[3]); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves80(btype move[]) const { moves80(move[0], move[1], move[2], move[3]); }
+#ifdef __AVX2__
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline void moves64x(btype move[]) const { moves64x(move[0], move[1], move[2], move[3]); }
+#endif // __AVX2__
 
-	inline std::array<board, 4> moves() const {
-		return moves64();
-	}
-	inline std::array<board, 4> moves64() const {
-		std::array<board, 4> after;
-		moves64(after.data());
-		return after;
-	}
-	inline std::array<board, 4> moves80() const {
-		std::array<board, 4> after;
-		moves80(after.data());
-		return after;
-	}
+	inline std::array<board, 4> moves() const   { return ({ std::array<board, 4> move; moves(move.data()); move; }); }
+	inline std::array<board, 4> moves64() const { return ({ std::array<board, 4> move; moves64(move.data()); move; }); }
+	inline std::array<board, 4> moves80() const { return ({ std::array<board, 4> move; moves80(move.data()); move; }); }
+#ifdef __AVX2__
+	inline std::array<board, 4> moves64x() const { return ({ std::array<board, 4> move; moves64x(move.data()); move; }); }
+#endif // __AVX2__
 
 	class action {
 	public:
@@ -818,9 +823,9 @@ public:
 	};
 
 	inline i32 operate(u32 op) {
-		if (op & action::x64) return operate64x(op); /* use AVX2 instead of lookup */
+		if (op & action::x64) return operate64(op);
 		if (op & action::x80) return operate80(op);
-		return operate64x(op);
+		return operate64(op);
 	}
 	inline i32 operate64(u32 op) {
 		switch (op & 0x0fu) {
@@ -844,6 +849,7 @@ public:
 		default:            return -1;
 		}
 	}
+#ifdef __AVX2__
 	inline i32 operate64x(u32 op) {
 		switch (op & 0x0fu) {
 		case action::up:    return up64x();
@@ -855,10 +861,14 @@ public:
 		default:            return -1;
 		}
 	}
+#endif // __AVX2__
 
 	inline i32 move(u32 op)   { return operate(op); }
 	inline i32 move64(u32 op) { return operate64(op); }
 	inline i32 move80(u32 op) { return operate80(op); }
+#ifdef __AVX2__
+	inline i32 move64x(u32 op) { return operate64x(op); }
+#endif // __AVX2__
 
 	inline constexpr u32 shift(u32 k = 0, u32 u = 0) { return shift64(k, u); }
 	inline constexpr u32 shift64(u32 k = 0, u32 u = 0) {
