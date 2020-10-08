@@ -367,36 +367,29 @@ public:
 	public:
 		class access {
 		public:
-			constexpr access(u64 sign, u32 hold, block& blk) : hash(blk.hash), info(blk.info), sign(sign), hold(hold), blk(blk) {}
-			constexpr access(u64 sign, u32 hold) : access(sign, hold, raw_cast<block>(*this)) {}
-			constexpr access(access&& acc) : access(acc.sign, acc.hold, &(acc.blk) != &(raw_cast<block>(acc)) ? acc.blk : raw_cast<block>(*this)) {}
+			constexpr access(u64 sign, u32 hold, block& blk) : sign(sign), info(0), blk(blk) {
+				register block shot = blk;
+				bool safe = (shot.sign() == sign) & (shot.hold() >= hold);
+				u32 hits = std::min(shot.hits() + 1, 65535);
+				raw_cast<f32, 0>(info) = shot.esti();
+				raw_cast<u16, 2>(info) = hold;
+				raw_cast<u16, 3>(info) = safe ? hits : 0;
+			}
+			constexpr access(access&& acc) = default;
 			constexpr access(const access&) = delete;
 			constexpr access& operator =(const access&) = delete;
 
-			constexpr operator bool() const {
-				return ((hash ^ info) == sign) & (raw_cast<u16, 2>(info) >= hold);
-			}
-			constexpr numeric fetch() {
-				numeric esti = raw_cast<f32, 0>(info);
-				u64 sign = hash ^ info;
-				raw_cast<u16, 3>(info) = std::min(raw_cast<u16, 3>(info) + 1, 65535);
-				hash = sign ^ info;
-				blk = raw_cast<block>(*this);
-				return esti;
-			}
+			constexpr operator bool() const { return raw_cast<u16, 3>(info); }
+			constexpr numeric fetch() const { return raw_cast<f32, 0>(info); }
 			constexpr numeric store(numeric esti) {
 				raw_cast<f32, 0>(info) = esti;
-				raw_cast<u16, 2>(info) = hold;
-				raw_cast<u16, 3>(info) = (hash ^ info) == sign ? raw_cast<u16, 3>(info) : 0;
-				hash = sign ^ info;
-				blk = raw_cast<block>(*this);
+				raw_cast<u16, 3>(info) = std::min(raw_cast<u16, 3>(info) + 1, 65535);
+				blk = block(sign, info);
 				return esti;
 			}
 		private:
-			u64 hash;
-			u64 info; // f32 esti; u16 hold; u16 hits;
 			u64 sign;
-			u32 hold;
+			u64 info; // f32 esti; u16 hold; u16 hits;
 			block& blk;
 		};
 
