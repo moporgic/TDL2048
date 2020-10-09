@@ -662,7 +662,7 @@ struct make {
 			make(vtos({x[patt]...}), index::indexpt<x[patt]...>);
 			if (iso) isomorphic<i + 1>(iso);
 		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
+		template<u32 i> static typename std::enable_if<(i == 8), void>::type isomorphic(bool iso) {}
 
 		static constexpr board isoindex(u32 i) {
 			board x = 0xfedcba9876543210ull;
@@ -1031,7 +1031,7 @@ void make_network(utils::options::option opt) {
 
 	auto stov = [](std::string hash, u32 iso = 0) -> std::vector<u32> {
 		std::vector<u32> patt;
-		board x(0xfedcba9876543210ull); x.isom(-iso);
+		board x(0xfedcba9876543210ull); x.isom((iso & 4) + (8 - iso) % 4);
 		for (char tile : hash) patt.push_back(x.at((tile & 15) + (tile & 64 ? 9 : 0)));
 		return patt;
 	};
