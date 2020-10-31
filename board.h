@@ -1075,45 +1075,37 @@ public:
 	inline hexa find64(u32 t) const { return cache::load(mask64(t)).layout; }
 	inline hexa find80(u32 t) const { return cache::load(mask80(t)).layout; }
 
-	inline u64 monoleft() const { return monoleft64(); }
-	inline u64 monoleft64() const {
+	inline u64 mono(bool left = true) const { return mono64(left); }
+	inline u64 mono64(bool left = true) const {
 		register u64 mono = 0;
-		mono |= u64(query16(0).left.mono) <<  0;
-		mono |= u64(query16(1).left.mono) << 12;
-		mono |= u64(query16(2).left.mono) << 24;
-		mono |= u64(query16(3).left.mono) << 36;
+		if (left) {
+			mono |= u64(query16(0).left.mono) <<  0;
+			mono |= u64(query16(1).left.mono) << 12;
+			mono |= u64(query16(2).left.mono) << 24;
+			mono |= u64(query16(3).left.mono) << 36;
+		} else {
+			mono |= u64(query16(0).right.mono) <<  0;
+			mono |= u64(query16(1).right.mono) << 12;
+			mono |= u64(query16(2).right.mono) << 24;
+			mono |= u64(query16(3).right.mono) << 36;
+		}
 		return mono;
 	}
-	inline u64 monoleft80() const {
+	inline u64 mono80(bool left = true) const {
 		register u64 mono = 0;
-		mono |= u64(query20(0).left.mono) <<  0;
-		mono |= u64(query20(1).left.mono) << 12;
-		mono |= u64(query20(2).left.mono) << 24;
-		mono |= u64(query20(3).left.mono) << 36;
+		if (left) {
+			mono |= u64(query20(0).left.mono) <<  0;
+			mono |= u64(query20(1).left.mono) << 12;
+			mono |= u64(query20(2).left.mono) << 24;
+			mono |= u64(query20(3).left.mono) << 36;
+		} else {
+			mono |= u64(query20(0).right.mono) <<  0;
+			mono |= u64(query20(1).right.mono) << 12;
+			mono |= u64(query20(2).right.mono) << 24;
+			mono |= u64(query20(3).right.mono) << 36;
+		}
 		return mono;
 	}
-
-	inline u64 monoright() const { return monoright64(); }
-	inline u64 monoright64() const {
-		register u64 mono = 0;
-		mono |= u64(query16(0).right.mono) <<  0;
-		mono |= u64(query16(1).right.mono) << 12;
-		mono |= u64(query16(2).right.mono) << 24;
-		mono |= u64(query16(3).right.mono) << 36;
-		return mono;
-	}
-	inline u64 monoright80() const {
-		register u64 mono = 0;
-		mono |= u64(query20(0).right.mono) <<  0;
-		mono |= u64(query20(1).right.mono) << 12;
-		mono |= u64(query20(2).right.mono) << 24;
-		mono |= u64(query20(3).right.mono) << 36;
-		return mono;
-	}
-
-	inline u64 mono(bool left = true) const   { return left ? monoleft() : monoright(); }
-	inline u64 mono64(bool left = true) const { return left ? monoleft64() : monoright64(); }
-	inline u64 mono80(bool left = true) const { return left ? monoleft80() : monoright80(); }
 
 	inline u32 operations() const { return operations64(); }
 	inline u32 operations64() const {

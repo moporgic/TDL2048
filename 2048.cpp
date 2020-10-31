@@ -86,7 +86,7 @@ Executions:
   -s, --seed [SEED]         set the seed for the pseudo-random number
   -p, --parallel [THREAD]   enable lock-free parallelism for all recipes
                             if THREAD is unspecified, default is max supported #
-  -S, --search DEPTH [OPT]  enable the search with DEPTH layer (1,3,5,...)
+  -S, --search DEPTH [OPT]  enable the search with DEPTH layer (1p,2p,3p,...)
   -d, --depth DEPTH [OPT]   alias for -S DEPTH [OPT]
   -c, --cache SIZE          enable the transposition table as NUMBER[K|M|G]
 
@@ -367,36 +367,29 @@ public:
 	public:
 		class access {
 		public:
-			constexpr access(u64 sign, u32 hold, block& blk) : hash(blk.hash), info(blk.info), sign(sign), hold(hold), blk(blk) {}
-			constexpr access(u64 sign, u32 hold) : access(sign, hold, raw_cast<block>(*this)) {}
-			constexpr access(access&& acc) : access(acc.sign, acc.hold, &(acc.blk) != &(raw_cast<block>(acc)) ? acc.blk : raw_cast<block>(*this)) {}
+			constexpr access(u64 sign, u32 hold, block& blk) : sign(sign), info(0), blk(blk) {
+				register block shot = blk;
+				bool safe = (shot.sign() == sign) & (shot.hold() >= hold);
+				u32 hits = std::min(shot.hits() + 1, 65535);
+				raw_cast<f32, 0>(info) = shot.esti();
+				raw_cast<u16, 2>(info) = hold;
+				raw_cast<u16, 3>(info) = safe ? hits : 0;
+			}
+			constexpr access(access&& acc) = default;
 			constexpr access(const access&) = delete;
 			constexpr access& operator =(const access&) = delete;
 
-			constexpr operator bool() const {
-				return ((hash ^ info) == sign) & (raw_cast<u16, 2>(info) >= hold);
-			}
-			constexpr numeric fetch() {
-				numeric esti = raw_cast<f32, 0>(info);
-				u64 sign = hash ^ info;
-				raw_cast<u16, 3>(info) = std::min(raw_cast<u16, 3>(info) + 1, 65535);
-				hash = sign ^ info;
-				blk = raw_cast<block>(*this);
-				return esti;
-			}
+			constexpr operator bool() const { return raw_cast<u16, 3>(info); }
+			constexpr numeric fetch() const { return raw_cast<f32, 0>(info); }
 			constexpr numeric store(numeric esti) {
 				raw_cast<f32, 0>(info) = esti;
-				raw_cast<u16, 2>(info) = hold;
-				raw_cast<u16, 3>(info) = (hash ^ info) == sign ? raw_cast<u16, 3>(info) : 0;
-				hash = sign ^ info;
-				blk = raw_cast<block>(*this);
+				raw_cast<u16, 3>(info) = std::min(raw_cast<u16, 3>(info) + 1, 65535);
+				blk = block(sign, info);
 				return esti;
 			}
 		private:
-			u64 hash;
-			u64 info; // f32 esti; u16 hold; u16 hits;
 			u64 sign;
-			u32 hold;
+			u64 info; // f32 esti; u16 hold; u16 hits;
 			block& blk;
 		};
 
@@ -669,7 +662,7 @@ struct make {
 			make(vtos({x[patt]...}), index::indexpt<x[patt]...>);
 			if (iso) isomorphic<i + 1>(iso);
 		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
+		template<u32 i> static typename std::enable_if<(i == 8), void>::type isomorphic(bool iso) {}
 
 		static constexpr board isoindex(u32 i) {
 			board x = 0xfedcba9876543210ull;
@@ -1038,7 +1031,7 @@ void make_network(utils::options::option opt) {
 
 	auto stov = [](std::string hash, u32 iso = 0) -> std::vector<u32> {
 		std::vector<u32> patt;
-		board x(0xfedcba9876543210ull); x.isom(-iso);
+		board x(0xfedcba9876543210ull); x.isom((iso & 4) + (8 - iso) % 4);
 		for (char tile : hash) patt.push_back(x.at((tile & 15) + (tile & 64 ? 9 : 0)));
 		return patt;
 	};
@@ -1341,13 +1334,22 @@ struct method {
 	struct expectimax {
 		constexpr inline operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
 		constexpr inline expectimax(utils::options::option opt) {
-			u32 n = expectimax<source>::depth(opt.value(1));
-			std::string limit = opt["limit"].value("");
-			while (limit.find(',') != std::string::npos)
-				limit[limit.find(',')] = ' ';
-			std::stringstream in(limit);
+			std::stringstream input;
+			auto next = [&](u32 n) -> u32 {
+				try {
+					std::string token = "x";
+					if (input >> token) n = std::stoul(token);
+					if (token.back() == 'p') n = n * 2 - 1;
+				} catch (std::invalid_argument&) {}
+				return n;
+			};
+			input.str(opt.value());
+			u32 n = expectimax<source>::depth(next(1) | 1);
+			std::string limit = opt["limit"].value();
+			std::replace(limit.begin(), limit.end(), ',', ' ');
+			input.clear(), input.str(limit);
 			for (u32& lim : expectimax<source>::limit())
-				in >> n, lim = n & -2u;
+				lim = n = std::min(next(n) & -2u, n);
 		}
 
 		static inline numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
@@ -2078,7 +2080,7 @@ utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-d"): case to_hash("--depth"):
 		case to_hash("-S"): case to_hash("--search"):
-			opts["search"] = next_opts("3");
+			opts["search"] = next_opts("2p");
 			break;
 		case to_hash("-c"): case to_hash("--cache"):
 			opts["cache"] = next_opts("2048M");
@@ -2149,7 +2151,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"].value() << std::endl;
 	std::cout << "alpha = " << opts["alpha"].value("0.1") << std::endl;
 	std::cout << "lambda = " << opts["lambda"].value(0) << ", step = " << opts["step"].value(1) << std::endl;
-	std::cout << "search = " << opts["search"].value("1") << ", cache = " << opts["cache"].value("none") << std::endl;
+	std::cout << "search = " << opts["search"].value("1p") << ", cache = " << opts["cache"].value("none") << std::endl;
 	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
 

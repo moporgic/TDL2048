@@ -70,6 +70,7 @@ compare() {
 #       configurable variables: recipes, networks, threads, N_init, N_load
 benchmark() {
 	echo TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")
+	sleep 1
 	if [ -e init ] || [ -e load ]; then
 		echo "Error: \"init\" and \"load\" are reserved names" >&2
 		exit 7
@@ -87,7 +88,7 @@ benchmark() {
 		pixz -kd $network.w.xz || xz -kd $network.w.xz
 		touch -r $network.w.xz $network.w && rm $network.w.xz
 	done
-	sleep 10
+	sleep 9
 
 	for recipe in $recipes; do
 		[ -e $recipe ] && runas=./$recipe || runas=$recipe
