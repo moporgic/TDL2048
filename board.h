@@ -390,6 +390,7 @@ public:
 	inline constexpr void clear() {
 		raw = 0;
 		ext = 0;
+		inf = 0;
 	}
 
 	inline i32 left()  { return left64(); }
