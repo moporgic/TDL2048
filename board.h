@@ -184,7 +184,7 @@ public:
 
 	inline constexpr void place(u32 i, u32 r) { place16(i, r); }
 	inline constexpr void place16(u32 i, u32 r) {
-		raw = (raw & ~(0xffffull << (i << 4))) | (u64(r & 0xffff) << (i << 4));
+		raw = (raw & ~(0xffffull << (i << 4))) | (u64(r) << (i << 4));
 	}
 	inline constexpr void place20(u32 i, u32 r) {
 		place16(i, r & 0xffff);
@@ -219,10 +219,10 @@ public:
 
 	inline constexpr void set(u32 i, u32 t) { set4(i, t); }
 	inline constexpr void set4(u32 i, u32 t) {
-		raw = (raw & ~(0x0full << (i << 2))) | (u64(t & 0x0f) << (i << 2));
+		raw = (raw & ~(0x0full << (i << 2))) | (u64(t) << (i << 2));
 	}
 	inline constexpr void set5(u32 i, u32 t) {
-		set4(i, t);
+		set4(i, t & 0x0f);
 		ext = (ext & ~(1U << (i + 16))) | ((t & 0x10) << (i + 12));
 	}
 
