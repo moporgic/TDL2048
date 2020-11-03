@@ -748,11 +748,7 @@ public:
 	}
 	inline constexpr u32 count(u32 t) const { return count64(t); }
 	inline constexpr u32 count64(u32 t) const {
-		u64 x = t;
-		x |= (x << 4);
-		x |= (x << 8);
-		x |= (x << 16);
-		x |= (x << 32);
+		u64 x = t * 0x1111111111111111ull;
 		x ^= raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
@@ -760,15 +756,11 @@ public:
 		return math::popcnt(x);
 	}
 	inline constexpr u32 count80(u32 t) const {
-		u64 x = t & 0x0f;
-		x |= (x << 4);
-		x |= (x << 8);
-		x |= (x << 16);
-		x |= (x << 32);
+		u64 x = (t & 0x0f) * 0x1111111111111111ull;
 		x ^= raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
-		u32 e = t & 0x10 ? 0xffff0000 : 0x00000000;
+		u32 e = (t & 0x10) ? 0xffff0000 : 0x00000000;
 		e ^= ext;
 		x = ~x & math::pdep64(~e >> 16, 0x1111111111111111ull);
 		return math::popcnt(x);
@@ -783,11 +775,7 @@ public:
 
 	inline constexpr u32 mask(u32 t) const { return mask64(t); }
 	inline constexpr u32 mask64(u32 t) const {
-		u64 x = t;
-		x |= (x << 4);
-		x |= (x << 8);
-		x |= (x << 16);
-		x |= (x << 32);
+		u64 x = t * 0x1111111111111111ull;
 		x ^= raw;
 		x |= (x >> 2);
 		x |= (x >> 1);
