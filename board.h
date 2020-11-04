@@ -480,6 +480,32 @@ public:
 		return move.inf;
 	}
 
+	inline i32 move(u32 op)   {
+		switch (op & 0xf0u) {
+		default:            return move64(op);
+		case action::x64:   return move64(op & 0x0fu);
+		case action::x80:   return move80(op & 0x0fu);
+		}
+	}
+	inline i32 move64(u32 op) {
+		switch (op) {
+		case action::up:    return up64();
+		case action::right: return right64();
+		case action::down:  return down64();
+		case action::left:  return left64();
+		default:            return -1;
+		}
+	}
+	inline i32 move80(u32 op) {
+		switch (op) {
+		case action::up:    return up80();
+		case action::right: return right80();
+		case action::down:  return down80();
+		case action::left:  return left80();
+		default:            return -1;
+		}
+	}
+
 	inline void moves(board& U, board& R, board& D, board& L) const {
 		return moves64(U, R, D, L);
 	}
@@ -554,54 +580,30 @@ public:
 			x64   = 0x40u,
 			x80   = 0x80u,
 			ext   = x80,
-
-			up64    = up | x64,
-			right64 = right | x64,
-			down64  = down | x64,
-			left64  = left | x64,
-			next64  = next | x64,
-			init64  = init | x64,
-
-			up80    = up | x80,
-			right80 = right | x80,
-			down80  = down | x80,
-			left80  = left | x80,
-			next80  = next | x80,
-			init80  = init | x80,
 		};
 	};
 
 	inline i32 operate(u32 op) {
-		if (op & action::x64) return operate64(op);
-		if (op & action::x80) return operate80(op);
-		return operate64(op);
+		switch (op & 0xf0u) {
+		default:           return operate64(op);
+		case action::x64:  return operate64(op & 0x0fu);
+		case action::x80:  return operate80(op & 0x0fu);
+		}
 	}
 	inline i32 operate64(u32 op) {
-		switch (op & 0x0fu) {
-		case action::up:    return up64();
-		case action::right: return right64();
-		case action::down:  return down64();
-		case action::left:  return left64();
-		case action::next:  return popup64() ? 0 : -1;
-		case action::init:  return init(), 0;
-		default:            return -1;
+		switch (u32 op) {
+		default:           return move64(op);
+		case action::next: return popup64() ? 0 : -1;
+		case action::init: return init(), 0;
 		}
 	}
 	inline i32 operate80(u32 op) {
-		switch (op & 0x0fu) {
-		case action::up:    return up80();
-		case action::right: return right80();
-		case action::down:  return down80();
-		case action::left:  return left80();
-		case action::next:  return popup80() ? 0 : -1;
-		case action::init:  return init(), 0;
-		default:            return -1;
+		switch (u32 op) {
+		default:           return move80(op);
+		case action::next: return popup80() ? 0 : -1;
+		case action::init: return init(), 0;
 		}
 	}
-
-	inline i32 move(u32 op)   { return operate(op); }
-	inline i32 move64(u32 op) { return operate64(op); }
-	inline i32 move80(u32 op) { return operate80(op); }
 
 	inline constexpr u32 shift(u32 k = 0, u32 u = 0) { return shift64(k, u); }
 	inline constexpr u32 shift64(u32 k = 0, u32 u = 0) {
