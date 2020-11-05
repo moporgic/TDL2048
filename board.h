@@ -830,13 +830,13 @@ public:
 		return mono;
 	}
 
-	inline u32 operations() const { return operations64(); }
-	inline u32 operations64() const {
+	inline u32 legal() const { return legal64(); }
+	inline u32 legal64() const {
 		u32 hori = query16(0).legal | query16(1).legal | query16(2).legal | query16(3).legal;
 		u32 vert = qcext16(0).legal | qcext16(1).legal | qcext16(2).legal | qcext16(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
-	inline u32 operations80() const {
+	inline u32 legal80() const {
 		u32 hori = query20(0).legal | query20(1).legal | query20(2).legal | query20(3).legal;
 		u32 vert = qcext20(0).legal | qcext20(1).legal | qcext20(2).legal | qcext20(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
@@ -844,47 +844,35 @@ public:
 
 	inline hex actions() const { return actions64(); }
 	inline hex actions64() const {
-		u32 o = operations64();
+		u32 o = legal64();
 		u32 u = o & 1, r = o & 2, d = o & 4, l = o & 8;
 		u32 k = 0, x = 0;
-		k |= (u ? 0 : 0) << x;
-		x += (u << 2);
-		k |= (r ? 1 : 0) << x;
-		x += (r << 1);
-		k |= (d ? 2 : 0) << x;
-		x += (d >> 0);
-		k |= (l ? 3 : 0) << x;
-		x += (l >> 1);
-		return { k | (u64(x >> 2) << (15 << 2)) };
+		k |= (u ? 0 : 0) << x; x += (u << 2);
+		k |= (r ? 1 : 0) << x; x += (r << 1);
+		k |= (d ? 2 : 0) << x; x += (d >> 0);
+		k |= (l ? 3 : 0) << x; x += (l >> 1);
+		return { k | (u64(x >> 2) << 60) };
 	}
 	inline hex actions80() const {
-		u32 o = operations80();
+		u32 o = legal80();
 		u32 u = o & 1, r = o & 2, d = o & 4, l = o & 8;
 		u32 k = 0, x = 0;
-		k |= (u ? 0 : 0) << x;
-		x += (u << 2);
-		k |= (r ? 1 : 0) << x;
-		x += (r << 1);
-		k |= (d ? 2 : 0) << x;
-		x += (d >> 0);
-		k |= (l ? 3 : 0) << x;
-		x += (l >> 1);
-		return { k | (u64(x >> 2) << (15 << 2)) };
+		k |= (u ? 0 : 0) << x; x += (u << 2);
+		k |= (r ? 1 : 0) << x; x += (r << 1);
+		k |= (d ? 2 : 0) << x; x += (d >> 0);
+		k |= (l ? 3 : 0) << x; x += (l >> 1);
+		return { k | (u64(x >> 2) << 60) };
 	}
 
-	inline bool operable() const { return operable64(); }
-	inline bool operable64() const {
-		return (query16(0).moved == 0) || (query16(1).moved == 0) || (query16(2).moved == 0) || (query16(3).moved == 0)
-		    || (qcext16(0).moved == 0) || (qcext16(1).moved == 0) || (qcext16(2).moved == 0) || (qcext16(3).moved == 0);
+	inline bool movable() const   { return movable64(); }
+	inline bool movable64() const {
+		return (query16(0).moved & query16(1).moved & query16(2).moved & query16(3).moved
+		      & qcext16(0).moved & qcext16(1).moved & qcext16(2).moved & qcext16(3).moved) == 0;
 	}
-	inline bool operable80() const {
-		return (query20(0).moved == 0) || (query20(1).moved == 0) || (query20(2).moved == 0) || (query20(3).moved == 0)
-		    || (qcext20(0).moved == 0) || (qcext20(1).moved == 0) || (qcext20(2).moved == 0) || (qcext20(3).moved == 0);
+	inline bool movable80() const {
+		return (query20(0).moved & query20(1).moved & query20(2).moved & query20(3).moved
+		      & qcext20(0).moved & qcext20(1).moved & qcext20(2).moved & qcext20(3).moved) == 0;
 	}
-
-	inline bool movable() const   { return operable(); }
-	inline bool movable64() const { return operable64(); }
-	inline bool movable80() const { return operable80(); }
 
 	class tile {
 	friend class board;
