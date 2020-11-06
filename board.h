@@ -591,14 +591,14 @@ public:
 		}
 	}
 	inline i32 operate64(u32 op) {
-		switch (u32 op) {
+		switch (op) {
 		default:           return move64(op);
 		case action::next: return popup64() ? 0 : -1;
 		case action::init: return init(), 0;
 		}
 	}
 	inline i32 operate80(u32 op) {
-		switch (u32 op) {
+		switch (op) {
 		default:           return move80(op);
 		case action::next: return popup80() ? 0 : -1;
 		case action::init: return init(), 0;
