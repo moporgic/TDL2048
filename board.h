@@ -956,17 +956,9 @@ public:
 			full   = 0xf0000000u, /* enable all flags: will write the whole data structure (128-bit) */
 
 			at     = index,
-			at4    = index,
-			at5    = index | extend,
 			ext    = extend,
-			exact4 = index | exact,
-			exact5 = index | exact | extend,
 			lite   = alter,
-			lite64 = alter,
-			lite80 = alter | extend,
 			raw    = binary,
-			raw64  = binary,
-			raw80  = binary | extend,
 		};
 	};
 	inline constexpr board& format(u32 i = style::index) { info((i & style::full) | (inf & ~style::full)); return *this; }
