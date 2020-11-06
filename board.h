@@ -750,20 +750,17 @@ public:
 	}
 	inline constexpr u32 count(u32 t) const { return count64(t); }
 	inline constexpr u32 count64(u32 t) const {
-		u64 x = t * 0x1111111111111111ull;
-		x ^= raw;
+		u64 x = raw ^ (t * 0x1111111111111111ull);
 		x |= (x >> 2);
 		x |= (x >> 1);
 		x = ~x & 0x1111111111111111ull;
 		return math::popcnt(x);
 	}
 	inline constexpr u32 count80(u32 t) const {
-		u64 x = (t & 0x0f) * 0x1111111111111111ull;
-		x ^= raw;
+		u64 x = raw ^ ((t & 0x0f) * 0x1111111111111111ull);
 		x |= (x >> 2);
 		x |= (x >> 1);
-		u32 e = (t & 0x10) ? 0xffff0000 : 0x00000000;
-		e ^= ext;
+		u32 e = ext ^ (i32((t & 0x10) << 27) >> 15 /*(t & 0x10) ? 0xffff0000 : 0x00000000*/);
 		x = ~x & math::pdep64(~e >> 16, 0x1111111111111111ull);
 		return math::popcnt(x);
 	}
@@ -777,14 +774,13 @@ public:
 
 	inline constexpr u32 mask(u32 t) const { return mask64(t); }
 	inline constexpr u32 mask64(u32 t) const {
-		u64 x = t * 0x1111111111111111ull;
-		x ^= raw;
+		u64 x = raw ^ (t * 0x1111111111111111ull);
 		x |= (x >> 2);
 		x |= (x >> 1);
 		return math::pext(~x, 0x1111111111111111ull);
 	}
 	inline constexpr u32 mask80(u32 t) const {
-		return mask64(t & 0x0f) & (~((t & 0x10 ? 0xffff0000 : 0x00000000) ^ ext) >> 16);
+		return mask64(t & 0x0f) & (~(ext ^ (i32((t & 0x10) << 27) >> 15)) >> 16);
 	}
 	inline constexpr void mask(u32 msk[], u32 min, u32 max) const { return mask64(msk, min, max); }
 	inline constexpr void mask64(u32 msk[], u32 min, u32 max) const {
