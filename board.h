@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : TDL2048+ - board.h
 // Author      : Hung Guei @ moporgic
-// Version     : 5.6
+// Version     : 6.0
 // Description : The Most Effective Bitboard Implementation for 2048
 //============================================================================
 
@@ -243,13 +243,13 @@ public:
 
 	inline constexpr void flip() { flip64(); }
 	inline constexpr void flip64() {
-		raw = ((raw & 0x000000000000ffffull) << 48) | ((raw & 0x00000000ffff0000ull) << 16)
-			| ((raw & 0x0000ffff00000000ull) >> 16) | ((raw & 0xffff000000000000ull) >> 48);
+		u64 buf = (raw ^ math::rol64(raw, 16)) & 0x0000ffff0000ffffull;
+		raw ^= (buf | math::ror64(buf, 16));
 	}
 	inline constexpr void flip80() {
 		flip64();
-		ext = ((ext & 0x000f0000) << 12) | ((ext & 0x00f00000) << 4)
-			| ((ext & 0x0f000000) >> 4) | ((ext & 0xf0000000) >> 12);
+		u32 buf = ((ext >> 16) ^ math::rol16(ext >> 16, 4)) & 0x0f0fu;
+		ext ^= (buf | math::ror16(buf, 4)) << 16;
 	}
 
 	inline constexpr void transpose() { transpose64(); }
