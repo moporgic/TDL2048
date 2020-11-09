@@ -22,12 +22,16 @@ public:
 	inline constexpr board(u64 raw = 0, u32 ext = 0, u32 inf = 0) : raw(raw), ext(ext), inf(inf) {}
 	inline constexpr board(u64 raw, u16 ext) : board(raw, u32(ext) << 16) {}
 	inline constexpr board(const board& b) = default;
-	inline constexpr board& operator =(u64 raw) { this->raw = raw; this->ext = 0; return *this; }
+	inline constexpr board& operator =(u64 x) { raw = x; ext = 0; return *this; }
 	inline constexpr board& operator =(const board& b) = default;
 
 	inline constexpr operator u64&() { return raw; }
 	inline constexpr operator u64() const { return raw; }
 	declare_comparators_with(const board&, raw_cast<u128>(*this), raw_cast<u128>(v), inline constexpr)
+
+	inline constexpr void set(u64 x) { raw = x; }
+	inline constexpr void set(u64 x, u16 e) { raw = x; ext = e << 16; }
+	inline constexpr void set(const board& b) { raw = b.raw; ext = b.ext; }
 
 public:
 	class cache {
@@ -166,45 +170,45 @@ public:
 		u32 legal; // legal actions
 	};
 
-	inline const cache& query(u32 r) const { return query16(r); }
-	inline const cache& query16(u32 r) const { return cache::load(fetch16(r)); }
-	inline const cache& query20(u32 r) const { return cache::load(fetch20(r)); }
+	inline const cache& qrow(u32 i) const { return qrow16(i); }
+	inline const cache& qrow16(u32 i) const { return cache::load(row16(i)); }
+	inline const cache& qrow20(u32 i) const { return cache::load(row20(i)); }
 
-	inline const cache& qcext(u32 c) const { return qcext16(c); }
-	inline const cache& qcext16(u32 c) const { return cache::load(cext16(c)); }
-	inline const cache& qcext20(u32 c) const { return cache::load(cext20(c)); }
+	inline const cache& qcol(u32 i) const { return qcol16(i); }
+	inline const cache& qcol16(u32 i) const { return cache::load(col16(i)); }
+	inline const cache& qcol20(u32 i) const { return cache::load(col20(i)); }
 
-	inline constexpr u32 fetch(u32 i) const { return fetch16(i); }
-	inline constexpr u32 fetch16(u32 i) const {
+	inline constexpr u32 row(u32 i) const { return row16(i); }
+	inline constexpr u32 row16(u32 i) const {
 		return ((raw >> (i << 4)) & 0xffff);
 	}
-	inline constexpr u32 fetch20(u32 i) const {
-		return fetch16(i) | ((ext >> (i << 2)) & 0xf0000);
+	inline constexpr u32 row20(u32 i) const {
+		return row16(i) | ((ext >> (i << 2)) & 0xf0000);
 	}
 
-	inline constexpr void place(u32 i, u32 r) { place16(i, r); }
-	inline constexpr void place16(u32 i, u32 r) {
+	inline constexpr void row(u32 i, u32 r) { row16(i, r); }
+	inline constexpr void row16(u32 i, u32 r) {
 		raw = (raw & ~(0xffffull << (i << 4))) | (u64(r) << (i << 4));
 	}
-	inline constexpr void place20(u32 i, u32 r) {
-		place16(i, r & 0xffff);
+	inline constexpr void row20(u32 i, u32 r) {
+		row16(i, r & 0xffff);
 		ext = (ext & ~(0xf0000 << (i << 2))) | ((r & 0xf0000) << (i << 2));
 	}
 
-	inline constexpr u32 cext(u32 i) const { return cext16(i); }
-	inline constexpr u32 cext16(u32 i) const {
+	inline constexpr u32 col(u32 i) const { return col16(i); }
+	inline constexpr u32 col16(u32 i) const {
 		return math::pext64(raw, 0x000f000f000f000full << (i << 2));
 	}
-	inline constexpr u32 cext20(u32 i) const {
-		return cext16(i) | (math::pext32(ext, 0x11110000u << i) << 16);
+	inline constexpr u32 col20(u32 i) const {
+		return col16(i) | (math::pext32(ext, 0x11110000u << i) << 16);
 	}
-	inline constexpr void cdep(u32 i, u32 c) { cdep16(i, c); }
-	inline constexpr void cdep16(u32 i, u32 c) {
+	inline constexpr void col(u32 i, u32 c) { col16(i, c); }
+	inline constexpr void col16(u32 i, u32 c) {
 		u64 m = 0x000f000f000f000full << (i << 2);
 		raw = (raw & ~m) | math::pdep64(c, m);
 	}
-	inline constexpr void cdep20(u32 i, u32 c) {
-		cdep16(i, c & 0xffff);
+	inline constexpr void col20(u32 i, u32 c) {
+		col16(i, c & 0xffff);
 		u32 m = 0x11110000u << i;
 		ext = (ext & ~m) | math::pdep32(c >> 16, m);
 	}
@@ -217,18 +221,14 @@ public:
 		return at4(i) | ((ext >> (i + 12)) & 0x10);
 	}
 
-	inline constexpr void set(u32 i, u32 t) { set4(i, t); }
-	inline constexpr void set4(u32 i, u32 t) {
+	inline constexpr void at(u32 i, u32 t) { at4(i, t); }
+	inline constexpr void at4(u32 i, u32 t) {
 		raw = (raw & ~(0x0full << (i << 2))) | (u64(t) << (i << 2));
 	}
-	inline constexpr void set5(u32 i, u32 t) {
-		set4(i, t & 0x0f);
+	inline constexpr void at5(u32 i, u32 t) {
+		at4(i, t & 0x0f);
 		ext = (ext & ~(1U << (i + 16))) | ((t & 0x10) << (i + 12));
 	}
-
-	inline constexpr void set(const board& b) { set80(b); }
-	inline constexpr void set64(const board& b) { raw = b.raw; }
-	inline constexpr void set80(const board& b) { raw = b.raw; ext = b.ext; }
 
 	inline constexpr void mirror() { mirror64(); }
 	inline constexpr void mirror64() {
@@ -266,7 +266,6 @@ public:
 	inline constexpr void rotate(u32 r = 1) { rotate64(r); }
 	inline constexpr void rotate64(u32 r = 1) {
 		switch (r % 4) {
-		default:
 		case 0: break;
 		case 1: transpose64(); mirror64(); break;
 		case 2: mirror64();    flip64();   break;
@@ -275,7 +274,6 @@ public:
 	}
 	inline constexpr void rotate80(u32 r = 1) {
 		switch (r % 4) {
-		default:
 		case 0: break;
 		case 1: transpose80(); mirror80(); break;
 		case 2: mirror80();    flip80();   break;
@@ -356,8 +354,8 @@ public:
 		u32 i = (k) % 16;
 		u32 j = (i + 1 + (k >> 4) % 15) % 16;
 		u32 r = (u >> 16) % 100;
-		raw =  (r >=  1 ? 1ull : 2ull) << (i << 2);
-		raw |= (r >= 19 ? 1ull : 2ull) << (j << 2);
+		raw = ((r >=  1 ? 1ull : 2ull) << (i << 2))
+		    | ((r >= 19 ? 1ull : 2ull) << (j << 2));
 		ext = 0;
 	}
 
@@ -387,12 +385,6 @@ public:
 	inline bool popup64() { return empty64() ? next64(), true : false; }
 	inline bool popup80() { return empty80() ? next80(), true : false; }
 
-	inline constexpr void clear() {
-		raw = 0;
-		ext = 0;
-		inf = 0;
-	}
-
 	inline i32 left()  { return left64(); }
 	inline i32 right() { return right64(); }
 	inline i32 up()    { return up64(); }
@@ -400,84 +392,76 @@ public:
 
 	inline i32 left64() {
 		board move;
-		query16(0).left.moveh64<0>(move);
-		query16(1).left.moveh64<1>(move);
-		query16(2).left.moveh64<2>(move);
-		query16(3).left.moveh64<3>(move);
+		qrow16(0).left.moveh64<0>(move);
+		qrow16(1).left.moveh64<1>(move);
+		qrow16(2).left.moveh64<2>(move);
+		qrow16(3).left.moveh64<3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
-		set64(move);
-		return move.inf;
+		return operator =(move).inf;
 	}
 	inline i32 right64() {
 		board move;
-		query16(0).right.moveh64<0>(move);
-		query16(1).right.moveh64<1>(move);
-		query16(2).right.moveh64<2>(move);
-		query16(3).right.moveh64<3>(move);
+		qrow16(0).right.moveh64<0>(move);
+		qrow16(1).right.moveh64<1>(move);
+		qrow16(2).right.moveh64<2>(move);
+		qrow16(3).right.moveh64<3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
-		set64(move);
-		return move.inf;
+		return operator =(move).inf;
 	}
 	inline i32 up64() {
 		board move;
-		qcext16(0).left.movev64<0>(move);
-		qcext16(1).left.movev64<1>(move);
-		qcext16(2).left.movev64<2>(move);
-		qcext16(3).left.movev64<3>(move);
+		qcol16(0).left.movev64<0>(move);
+		qcol16(1).left.movev64<1>(move);
+		qcol16(2).left.movev64<2>(move);
+		qcol16(3).left.movev64<3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
-		set64(move);
-		return move.inf;
+		return operator =(move).inf;
 	}
 	inline i32 down64() {
 		board move;
-		qcext16(0).right.movev64<0>(move);
-		qcext16(1).right.movev64<1>(move);
-		qcext16(2).right.movev64<2>(move);
-		qcext16(3).right.movev64<3>(move);
+		qcol16(0).right.movev64<0>(move);
+		qcol16(1).right.movev64<1>(move);
+		qcol16(2).right.movev64<2>(move);
+		qcol16(3).right.movev64<3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
-		set64(move);
-		return move.inf;
+		return operator =(move).inf;
 	}
 
 	inline i32 left80() {
 		board move;
-		query20(0).left.moveh80<0>(move);
-		query20(1).left.moveh80<1>(move);
-		query20(2).left.moveh80<2>(move);
-		query20(3).left.moveh80<3>(move);
+		qrow20(0).left.moveh80<0>(move);
+		qrow20(1).left.moveh80<1>(move);
+		qrow20(2).left.moveh80<2>(move);
+		qrow20(3).left.moveh80<3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
-		set80(move);
-		return move.inf;
+		return operator =(move).inf;
 	}
 	inline i32 right80() {
 		board move;
-		query20(0).right.moveh80<0>(move);
-		query20(1).right.moveh80<1>(move);
-		query20(2).right.moveh80<2>(move);
-		query20(3).right.moveh80<3>(move);
+		qrow20(0).right.moveh80<0>(move);
+		qrow20(1).right.moveh80<1>(move);
+		qrow20(2).right.moveh80<2>(move);
+		qrow20(3).right.moveh80<3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
-		set80(move);
-		return move.inf;
+		return operator =(move).inf;
 	}
 	inline i32 up80() {
 		board move;
-		qcext20(0).left.movev80<0>(move);
-		qcext20(1).left.movev80<1>(move);
-		qcext20(2).left.movev80<2>(move);
-		qcext20(3).left.movev80<3>(move);
+		qcol20(0).left.movev80<0>(move);
+		qcol20(1).left.movev80<1>(move);
+		qcol20(2).left.movev80<2>(move);
+		qcol20(3).left.movev80<3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
-		set80(move);
-		return move.inf;
+		return operator =(move).inf;
 	}
 	inline i32 down80() {
 		board move;
-		qcext20(0).right.movev80<0>(move);
-		qcext20(1).right.movev80<1>(move);
-		qcext20(2).right.movev80<2>(move);
-		qcext20(3).right.movev80<3>(move);
+		qcol20(0).right.movev80<0>(move);
+		qcol20(1).right.movev80<1>(move);
+		qcol20(2).right.movev80<2>(move);
+		qcol20(3).right.movev80<3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
-		set80(move);
-		return move.inf;
+		return operator =(move).inf;
 	}
 
 	inline i32 move(u32 op)   {
@@ -512,34 +496,34 @@ public:
 	inline void moves64(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
 
-		query16(0).moveh64<0>(L, R);
-		query16(1).moveh64<1>(L, R);
-		query16(2).moveh64<2>(L, R);
-		query16(3).moveh64<3>(L, R);
+		qrow16(0).moveh64<0>(L, R);
+		qrow16(1).moveh64<1>(L, R);
+		qrow16(2).moveh64<2>(L, R);
+		qrow16(3).moveh64<3>(L, R);
 		L.inf |= (L.raw ^ raw) ? 0 : -1;
 		R.inf |= (R.raw ^ raw) ? 0 : -1;
 
-		qcext16(0).movev64<0>(U, D);
-		qcext16(1).movev64<1>(U, D);
-		qcext16(2).movev64<2>(U, D);
-		qcext16(3).movev64<3>(U, D);
+		qcol16(0).movev64<0>(U, D);
+		qcol16(1).movev64<1>(U, D);
+		qcol16(2).movev64<2>(U, D);
+		qcol16(3).movev64<3>(U, D);
 		U.inf |= (U.raw ^ raw) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) ? 0 : -1;
 	}
 	inline void moves80(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
 
-		query20(0).moveh80<0>(L, R);
-		query20(1).moveh80<1>(L, R);
-		query20(2).moveh80<2>(L, R);
-		query20(3).moveh80<3>(L, R);
+		qrow20(0).moveh80<0>(L, R);
+		qrow20(1).moveh80<1>(L, R);
+		qrow20(2).moveh80<2>(L, R);
+		qrow20(3).moveh80<3>(L, R);
 		L.inf |= (L.raw ^ raw) | (L.ext ^ ext) ? 0 : -1;
 		R.inf |= (R.raw ^ raw) | (R.ext ^ ext) ? 0 : -1;
 
-		qcext20(0).movev80<0>(U, D);
-		qcext20(1).movev80<1>(U, D);
-		qcext20(2).movev80<2>(U, D);
-		qcext20(3).movev80<3>(U, D);
+		qcol20(0).movev80<0>(U, D);
+		qcol20(1).movev80<1>(U, D);
+		qcol20(2).movev80<2>(U, D);
+		qcol20(3).movev80<3>(U, D);
 		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
 	}
@@ -615,7 +599,7 @@ public:
 		u32 h = math::lg16(hole);
 		for (u32 i = 0; i < 16; i++) {
 			u32 t = at4(i);
-			set4(i, t > h ? t - 1 : t);
+			at4(i, t > h ? t - 1 : t);
 		}
 		return h;
 	}
@@ -628,7 +612,7 @@ public:
 		u32 h = math::lg16(hole);
 		for (u32 i = 0; i < 16; i++) {
 			u32 t = at5(i);
-			set5(i, t > h ? t - 1 : t);
+			at5(i, t > h ? t - 1 : t);
 		}
 		return h;
 	}
@@ -690,10 +674,10 @@ public:
 
 	inline u32 species() const { return species64(); }
 	inline u32 species64() const {
-		return query16(0).species | query16(1).species | query16(2).species | query16(3).species;
+		return qrow16(0).species | qrow16(1).species | qrow16(2).species | qrow16(3).species;
 	}
 	inline u32 species80() const {
-		return query20(0).species | query20(1).species | query20(2).species | query20(3).species;
+		return qrow20(0).species | qrow20(1).species | qrow20(2).species | qrow20(3).species;
 	}
 
 	inline u32 scale() const   { return scale64(); }
@@ -717,28 +701,28 @@ public:
 	inline u32 max80() const { return math::log2(scale80()); }
 
 	inline hex numof() const {
-		return query(0).numof + query(1).numof + query(2).numof + query(3).numof;
+		return qrow(0).numof + qrow(1).numof + qrow(2).numof + qrow(3).numof;
 	}
 	inline u32 numof(u32 t) const { return numof64(t); }
 	inline u32 numof64(u32 t) const {
-		return query16(0).numof[t] + query16(1).numof[t] + query16(2).numof[t] + query16(3).numof[t];
+		return qrow16(0).numof[t] + qrow16(1).numof[t] + qrow16(2).numof[t] + qrow16(3).numof[t];
 	}
 	inline u32 numof80(u32 t) const {
-		return query20(0).numof[t] + query20(1).numof[t] + query20(2).numof[t] + query20(3).numof[t];
+		return qrow20(0).numof[t] + qrow20(1).numof[t] + qrow20(2).numof[t] + qrow20(3).numof[t];
 	}
 	inline void numof(u32 num[], u32 min, u32 max) const { return numof64(num, min, max); }
 	inline void numof64(u32 num[], u32 min, u32 max) const {
-		hexa numof0 = query16(0).numof;
-		hexa numof1 = query16(1).numof;
-		hexa numof2 = query16(2).numof;
-		hexa numof3 = query16(3).numof;
+		hexa numof0 = qrow16(0).numof;
+		hexa numof1 = qrow16(1).numof;
+		hexa numof2 = qrow16(2).numof;
+		hexa numof3 = qrow16(3).numof;
 		for (u32 i = min; i < max; i++) num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 	}
 	inline void numof80(u32 num[], u32 min, u32 max) const {
-		hexa numof0 = query20(0).numof;
-		hexa numof1 = query20(1).numof;
-		hexa numof2 = query20(2).numof;
-		hexa numof3 = query20(3).numof;
+		hexa numof0 = qrow20(0).numof;
+		hexa numof1 = qrow20(1).numof;
+		hexa numof2 = qrow20(2).numof;
+		hexa numof3 = qrow20(3).numof;
 		for (u32 i = min; i < max; i++) num[i] = numof0[i] + numof1[i] + numof2[i] + numof3[i];
 	}
 
@@ -798,43 +782,43 @@ public:
 	inline u64 mono64(bool left = true) const {
 		register u64 mono = 0;
 		if (left) {
-			mono |= u64(query16(0).left.mono) <<  0;
-			mono |= u64(query16(1).left.mono) << 12;
-			mono |= u64(query16(2).left.mono) << 24;
-			mono |= u64(query16(3).left.mono) << 36;
+			mono |= u64(qrow16(0).left.mono) <<  0;
+			mono |= u64(qrow16(1).left.mono) << 12;
+			mono |= u64(qrow16(2).left.mono) << 24;
+			mono |= u64(qrow16(3).left.mono) << 36;
 		} else {
-			mono |= u64(query16(0).right.mono) <<  0;
-			mono |= u64(query16(1).right.mono) << 12;
-			mono |= u64(query16(2).right.mono) << 24;
-			mono |= u64(query16(3).right.mono) << 36;
+			mono |= u64(qrow16(0).right.mono) <<  0;
+			mono |= u64(qrow16(1).right.mono) << 12;
+			mono |= u64(qrow16(2).right.mono) << 24;
+			mono |= u64(qrow16(3).right.mono) << 36;
 		}
 		return mono;
 	}
 	inline u64 mono80(bool left = true) const {
 		register u64 mono = 0;
 		if (left) {
-			mono |= u64(query20(0).left.mono) <<  0;
-			mono |= u64(query20(1).left.mono) << 12;
-			mono |= u64(query20(2).left.mono) << 24;
-			mono |= u64(query20(3).left.mono) << 36;
+			mono |= u64(qrow20(0).left.mono) <<  0;
+			mono |= u64(qrow20(1).left.mono) << 12;
+			mono |= u64(qrow20(2).left.mono) << 24;
+			mono |= u64(qrow20(3).left.mono) << 36;
 		} else {
-			mono |= u64(query20(0).right.mono) <<  0;
-			mono |= u64(query20(1).right.mono) << 12;
-			mono |= u64(query20(2).right.mono) << 24;
-			mono |= u64(query20(3).right.mono) << 36;
+			mono |= u64(qrow20(0).right.mono) <<  0;
+			mono |= u64(qrow20(1).right.mono) << 12;
+			mono |= u64(qrow20(2).right.mono) << 24;
+			mono |= u64(qrow20(3).right.mono) << 36;
 		}
 		return mono;
 	}
 
 	inline u32 legal() const { return legal64(); }
 	inline u32 legal64() const {
-		u32 hori = query16(0).legal | query16(1).legal | query16(2).legal | query16(3).legal;
-		u32 vert = qcext16(0).legal | qcext16(1).legal | qcext16(2).legal | qcext16(3).legal;
+		u32 hori = qrow16(0).legal | qrow16(1).legal | qrow16(2).legal | qrow16(3).legal;
+		u32 vert = qcol16(0).legal | qcol16(1).legal | qcol16(2).legal | qcol16(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
 	inline u32 legal80() const {
-		u32 hori = query20(0).legal | query20(1).legal | query20(2).legal | query20(3).legal;
-		u32 vert = qcext20(0).legal | qcext20(1).legal | qcext20(2).legal | qcext20(3).legal;
+		u32 hori = qrow20(0).legal | qrow20(1).legal | qrow20(2).legal | qrow20(3).legal;
+		u32 vert = qcol20(0).legal | qcol20(1).legal | qcol20(2).legal | qcol20(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
 
@@ -862,12 +846,12 @@ public:
 
 	inline bool movable() const   { return movable64(); }
 	inline bool movable64() const {
-		return (query16(0).moved & query16(1).moved & query16(2).moved & query16(3).moved
-		      & qcext16(0).moved & qcext16(1).moved & qcext16(2).moved & qcext16(3).moved) == 0;
+		return (qrow16(0).moved & qrow16(1).moved & qrow16(2).moved & qrow16(3).moved
+		      & qcol16(0).moved & qcol16(1).moved & qcol16(2).moved & qcol16(3).moved) == 0;
 	}
 	inline bool movable80() const {
-		return (query20(0).moved & query20(1).moved & query20(2).moved & query20(3).moved
-		      & qcext20(0).moved & qcext20(1).moved & qcext20(2).moved & qcext20(3).moved) == 0;
+		return (qrow20(0).moved & qrow20(1).moved & qrow20(2).moved & qrow20(3).moved
+		      & qcol20(0).moved & qcol20(1).moved & qcol20(2).moved & qcol20(3).moved) == 0;
 	}
 
 	class tile {
@@ -878,7 +862,7 @@ public:
 		inline constexpr board& whole() const { return b; }
 		inline constexpr u32 where() const { return i; }
 		inline constexpr operator u32() const { return at(is(style::extend), is(style::exact)); }
-		inline constexpr tile& operator =(u32 k) { set(k, is(style::extend), is(style::exact)); return *this; }
+		inline constexpr tile& operator =(u32 k) { at(k, is(style::extend), is(style::exact)); return *this; }
 		inline constexpr tile& operator =(const tile& t) { return operator =(u32(t)); }
 	public:
 		inline static constexpr u32 itov(u32 i) { return (1u << i) & 0xfffffffeu; }
@@ -891,7 +875,7 @@ public:
 		friend std::istream& operator >>(std::istream& in, const tile& t) {
 			u32 v;
 			if (t.is(style::binary) ? moporgic::read_cast<byte>(in, v) : (in >> v))
-				t.set(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
+				t.at(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
 			return in;
 		}
 	protected:
@@ -903,9 +887,9 @@ public:
 			u32 v = extend ? b.at5(i) : b.at4(i);
 			return exact ? tile::itov(v) : v;
 		}
-		inline constexpr void set(u32 k, bool extend, bool exact) const {
+		inline constexpr void at(u32 k, bool extend, bool exact) const {
 			u32 v = exact ? tile::itov(k) : k;
-			if (extend) b.set5(i, v); else b.set4(i, v);
+			if (extend) b.at5(i, v); else b.at4(i, v);
 		}
 	};
 	class iter : tile {
@@ -959,8 +943,8 @@ public:
 	};
 	inline constexpr board& format(u32 i = style::index) { info((i & style::full) | (inf & ~style::full)); return *this; }
 
-	inline constexpr u32 info(u32 i) { u32 val = inf; inf = i; return val; }
 	inline constexpr u32 info() const { return inf; }
+	inline constexpr void info(u32 i) { inf = i; }
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
 		if (b.inf & style::binary) {

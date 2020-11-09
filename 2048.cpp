@@ -548,16 +548,15 @@ u64 indexptv(const board& b, const std::vector<u32>& p) {
 }
 
 u64 indexmerge(const board& b) { // 16-bit
-	board q = b; q.transpose();
 	register u32 hori = 0, vert = 0;
-	hori |= b.query(0).merge << 0;
-	hori |= b.query(1).merge << 2;
-	hori |= b.query(2).merge << 4;
-	hori |= b.query(3).merge << 6;
-	vert |= q.query(0).merge << 0;
-	vert |= q.query(1).merge << 2;
-	vert |= q.query(2).merge << 4;
-	vert |= q.query(3).merge << 6;
+	hori |= b.qrow(0).merge << 0;
+	hori |= b.qrow(1).merge << 2;
+	hori |= b.qrow(2).merge << 4;
+	hori |= b.qrow(3).merge << 6;
+	vert |= b.qcol(0).merge << 0;
+	vert |= b.qcol(1).merge << 2;
+	vert |= b.qcol(2).merge << 4;
+	vert |= b.qcol(3).merge << 6;
 	return hori | (vert << 8);
 }
 
@@ -1361,8 +1360,8 @@ struct method {
 			if (!depth) return source::estimate(after, range);
 			for (u32 pos : spaces) {
 				board before = after;
-				expt += 0.9 * search_best(({ before.set(pos, 1); before; }), depth - 1, range);
-				expt += 0.1 * search_best(({ before.set(pos, 2); before; }), depth - 1, range);
+				expt += 0.9 * search_best(({ before.at(pos, 1); before; }), depth - 1, range);
+				expt += 0.1 * search_best(({ before.at(pos, 2); before; }), depth - 1, range);
 			}
 			expt = lookup.store(expt / spaces.size());
 			return expt;
@@ -1500,8 +1499,8 @@ struct state : board {
 	inline i32 score() const { return info(); }
 
 	inline void assign(const board& b, u32 op = -1) {
-		set(b);
-		info(move(op));
+		board::operator=(b);
+		info(operate(op));
 	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats(),
@@ -1532,8 +1531,8 @@ struct select {
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
-	inline void operator >>(state& s) const { s = (*best); }
-	inline void operator >>(board& b) const { b.set(*best); }
+	inline void operator >>(state& s) const { s = *best; }
+	inline void operator >>(board& b) const { b = *best; }
 
 	inline operator bool() const { return best->operator bool(); }
 	inline numeric esti() const { return best->esti; }
