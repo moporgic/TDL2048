@@ -617,59 +617,51 @@ public:
 		return h;
 	}
 
-	inline constexpr u32 isomax() { return isomax64(); }
-	inline constexpr u32 isomax64() {
-		u32 i = 0;
+	inline constexpr void isomax() { return isomax64(); }
+	inline constexpr void isomax64() {
 		u64 x = raw;
-		flip64();      i = (raw > x) ? 4 : i; x = std::max(x, raw);
-		transpose64(); i = (raw > x) ? 1 : i; x = std::max(x, raw);
-		flip64();      i = (raw > x) ? 7 : i; x = std::max(x, raw);
-		transpose64(); i = (raw > x) ? 2 : i; x = std::max(x, raw);
-		flip64();      i = (raw > x) ? 6 : i; x = std::max(x, raw);
-		transpose64(); i = (raw > x) ? 3 : i; x = std::max(x, raw);
-		flip64();      i = (raw > x) ? 5 : i; x = std::max(x, raw);
+		flip64();      x = std::max(x, raw);
+		transpose64(); x = std::max(x, raw);
+		flip64();      x = std::max(x, raw);
+		transpose64(); x = std::max(x, raw);
+		flip64();      x = std::max(x, raw);
+		transpose64(); x = std::max(x, raw);
+		flip64();      x = std::max(x, raw);
 		raw = x;
-		return i;
 	}
-	inline constexpr u32 isomax80() {
-		u32 i = 0;
+	inline constexpr void isomax80() {
 		board x(*this);
-		flip80();      i = (raw > x) ? 4 : i; x = std::max(x, *this);
-		transpose80(); i = (raw > x) ? 1 : i; x = std::max(x, *this);
-		flip80();      i = (raw > x) ? 7 : i; x = std::max(x, *this);
-		transpose80(); i = (raw > x) ? 2 : i; x = std::max(x, *this);
-		flip80();      i = (raw > x) ? 6 : i; x = std::max(x, *this);
-		transpose80(); i = (raw > x) ? 3 : i; x = std::max(x, *this);
-		flip80();      i = (raw > x) ? 5 : i; x = std::max(x, *this);
+		flip80();      x = std::max(x, *this);
+		transpose80(); x = std::max(x, *this);
+		flip80();      x = std::max(x, *this);
+		transpose80(); x = std::max(x, *this);
+		flip80();      x = std::max(x, *this);
+		transpose80(); x = std::max(x, *this);
+		flip80();      x = std::max(x, *this);
 		operator =(x);
-		return i;
 	}
-	inline constexpr u32 isomin() { return isomin64(); }
-	inline constexpr u32 isomin64() {
-		u32 i = 0;
+	inline constexpr void isomin() { return isomin64(); }
+	inline constexpr void isomin64() {
 		u64 x = raw;
-		flip64();      i = (raw < x) ? 4 : i; x = std::min(x, raw);
-		transpose64(); i = (raw < x) ? 1 : i; x = std::min(x, raw);
-		flip64();      i = (raw < x) ? 7 : i; x = std::min(x, raw);
-		transpose64(); i = (raw < x) ? 2 : i; x = std::min(x, raw);
-		flip64();      i = (raw < x) ? 6 : i; x = std::min(x, raw);
-		transpose64(); i = (raw < x) ? 3 : i; x = std::min(x, raw);
-		flip64();      i = (raw < x) ? 5 : i; x = std::min(x, raw);
+		flip64();      x = std::min(x, raw);
+		transpose64(); x = std::min(x, raw);
+		flip64();      x = std::min(x, raw);
+		transpose64(); x = std::min(x, raw);
+		flip64();      x = std::min(x, raw);
+		transpose64(); x = std::min(x, raw);
+		flip64();      x = std::min(x, raw);
 		raw = x;
-		return i;
 	}
-	inline constexpr u32 isomin80() {
-		u32 i = 0;
+	inline constexpr void isomin80() {
 		board x(*this);
-		flip80();      i = (raw < x) ? 4 : i; x = std::min(x, *this);
-		transpose80(); i = (raw < x) ? 1 : i; x = std::min(x, *this);
-		flip80();      i = (raw < x) ? 7 : i; x = std::min(x, *this);
-		transpose80(); i = (raw < x) ? 2 : i; x = std::min(x, *this);
-		flip80();      i = (raw < x) ? 6 : i; x = std::min(x, *this);
-		transpose80(); i = (raw < x) ? 3 : i; x = std::min(x, *this);
-		flip80();      i = (raw < x) ? 5 : i; x = std::min(x, *this);
+		flip80();      x = std::min(x, *this);
+		transpose80(); x = std::min(x, *this);
+		flip80();      x = std::min(x, *this);
+		transpose80(); x = std::min(x, *this);
+		flip80();      x = std::min(x, *this);
+		transpose80(); x = std::min(x, *this);
+		flip80();      x = std::min(x, *this);
 		operator =(x);
-		return i;
 	}
 
 	inline u32 species() const { return species64(); }
