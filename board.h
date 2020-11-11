@@ -564,32 +564,32 @@ public:
 		dst = _mm256_or_si256(_mm256_and_si256(chk, _mm256_srli_epi16(dst, 4)), _mm256_andnot_si256(chk, dst));
 
 		// merge same tiles, slide if necessary
+		buf = _mm256_srli_epi16(_mm256_add_epi8(dst, _mm256_set1_epi16(0x0010)), 4);
 		rbf = _mm256_and_si256(dst, _mm256_set1_epi16(0x000f));
-		buf = _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x000f));
-		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, buf));
-		buf = _mm256_and_si256(_mm256_add_epi16(dst, _mm256_set1_epi16(0x0001)), _mm256_set1_epi16(0x000f));
-		buf = _mm256_or_si256(buf, _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x0ff0)));
+		chk = _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x000f));
+		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, chk));
 		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
 		chk = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_and_si256(chk, _mm256_set1_epi16(0x0001)), 0));
 		rbf = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(rbf, _mm256_set1_epi16(0x0001)), 0));
 		rwd = _mm256_sllv_epi32(chk, rbf);
 
-		rbf = _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x000f));
-		buf = _mm256_and_si256(_mm256_srli_epi16(dst, 8), _mm256_set1_epi16(0x000f));
-		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, buf));
-		buf = _mm256_and_si256(_mm256_add_epi16(dst, _mm256_set1_epi16(0x0010)), _mm256_set1_epi16(0x00ff));
-		buf = _mm256_or_si256(buf, _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x0f00)));
+		buf = _mm256_add_epi8(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x0010));
+		rbf = _mm256_and_si256(buf, _mm256_set1_epi16(0x000f));
+		chk = _mm256_and_si256(_mm256_srli_epi16(dst, 8), _mm256_set1_epi16(0x000f));
+		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, chk));
+		chk = _mm256_and_si256(chk, _mm256_set1_epi16(0xfff0));
 		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
-		chk = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_and_si256(chk, _mm256_set1_epi16(0x0001)), 0));
+		chk = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_srli_epi16(chk, 15), 0));
 		rbf = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(rbf, _mm256_set1_epi16(0x0001)), 0));
 		rwd = _mm256_add_epi32(rwd, _mm256_sllv_epi32(chk, rbf));
 
-		rbf = _mm256_and_si256(_mm256_srli_epi16(dst, 8), _mm256_set1_epi16(0x000f));
-		buf = _mm256_and_si256(_mm256_srli_epi16(dst, 12), _mm256_set1_epi16(0x000f));
-		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, buf));
-		buf = _mm256_and_si256(_mm256_add_epi16(dst, _mm256_set1_epi16(0x0100)), _mm256_set1_epi16(0x0fff));
+		buf = _mm256_srli_epi16(_mm256_add_epi16(dst, _mm256_set1_epi16(0x1000)), 4);
+		rbf = _mm256_srli_epi16(dst, 12);
+		chk = _mm256_and_si256(_mm256_srli_epi16(dst, 8), _mm256_set1_epi16(0x000f));
+		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, chk));
+		chk = _mm256_and_si256(chk, _mm256_set1_epi16(0xff00));
 		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
-		chk = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_and_si256(chk, _mm256_set1_epi16(0x0001)), 0));
+		chk = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_srli_epi16(chk, 15), 0));
 		rbf = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(rbf, _mm256_set1_epi16(0x0001)), 0));
 		rwd = _mm256_add_epi32(rwd, _mm256_sllv_epi32(chk, rbf));
 
