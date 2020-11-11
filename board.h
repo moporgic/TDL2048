@@ -267,17 +267,17 @@ public:
 	inline constexpr void rotate64(u32 r = 1) {
 		switch (r % 4) {
 		case 0: break;
-		case 1: transpose64(); mirror64(); break;
-		case 2: mirror64();    flip64();   break;
-		case 3: transpose64(); flip64();   break;
+		case 1: flip64(); transpose64(); break;
+		case 2: mirror64();    flip64(); break;
+		case 3: transpose64(); flip64(); break;
 		}
 	}
 	inline constexpr void rotate80(u32 r = 1) {
 		switch (r % 4) {
 		case 0: break;
-		case 1: transpose80(); mirror80(); break;
-		case 2: mirror80();    flip80();   break;
-		case 3: transpose80(); flip80();   break;
+		case 1: flip80(); transpose80(); break;
+		case 2: mirror80();    flip80(); break;
+		case 3: transpose80(); flip80(); break;
 		}
 	}
 
