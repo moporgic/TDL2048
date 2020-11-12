@@ -533,24 +533,17 @@ public:
 	}
 #ifdef __AVX2__
 	inline void moves64x(board& U, board& R, board& D, board& L) const {
-		__m256i dst = {}, rwd = {}, chk, rbf, buf;
+		__m256i dst, buf, rbf, rwd, chk;
 
 		// use left for all 4 directions, transpose and mirror first
-		rbf = _mm256_set1_epi64x(raw);
-		buf = _mm256_and_si256(_mm256_xor_si256(rbf, _mm256_srli_epi64(rbf, 12)), _mm256_set1_epi64x(0x0000f0f00000f0f0ull));
-		rbf = _mm256_xor_si256(rbf, _mm256_xor_si256(buf, _mm256_slli_epi64(buf, 12)));
-		buf = _mm256_and_si256(_mm256_xor_si256(rbf, _mm256_srli_epi64(rbf, 24)), _mm256_set1_epi64x(0x00000000ff00ff00ull));
-		rbf = _mm256_xor_si256(rbf, _mm256_xor_si256(buf, _mm256_slli_epi64(buf, 24)));
-		dst = _mm256_insert_epi64(dst, raw, 3); // L = left
-		dst = _mm256_insert_epi64(dst, _mm256_extract_epi64(rbf, 0), 0); // U = transpose left transpose
-
-		rbf = _mm256_insert_epi64(rbf, raw, 1);
-		buf = _mm256_slli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x000f)), 12);
-		buf = _mm256_or_si256(buf, _mm256_slli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x00f0)), 4));
-		buf = _mm256_or_si256(buf, _mm256_srli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x0f00)), 4));
-		rbf = _mm256_or_si256(buf, _mm256_srli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0xf000)), 12));
-		dst = _mm256_insert_epi64(dst, _mm256_extract_epi64(rbf, 1), 1); // R = mirror left mirror
-		dst = _mm256_insert_epi64(dst, _mm256_extract_epi64(rbf, 2), 2); // D = transpose mirror left mirror transpose
+		u64 x = raw;
+		raw_cast<board>(x).transpose64();
+		dst = _mm256_set_epi64x(raw, 0, 0, x); // L, 0, 0, U
+		buf = _mm256_set_epi64x(0, x, raw, 0); // 0, D, R, 0
+		dst = _mm256_or_si256(dst, _mm256_slli_epi16(buf, 12));
+		dst = _mm256_or_si256(dst, _mm256_slli_epi16(_mm256_and_si256(buf, _mm256_set1_epi16(0x00f0)), 4));
+		dst = _mm256_or_si256(dst, _mm256_srli_epi16(_mm256_and_si256(buf, _mm256_set1_epi16(0x0f00)), 4));
+		dst = _mm256_or_si256(dst, _mm256_srli_epi16(buf, 12));
 
 		// slide to left most
 		buf = _mm256_and_si256(dst, _mm256_set1_epi16(0x0f00));
@@ -594,21 +587,20 @@ public:
 		rwd = _mm256_add_epi32(rwd, _mm256_sllv_epi32(chk, rbf));
 
 		// mirror and transpose back to original direction
-		rbf = dst;
-		L = _mm256_extract_epi64(rbf, 3); // L = left
-		buf = _mm256_slli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x000f)), 12);
-		buf = _mm256_or_si256(buf, _mm256_slli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x00f0)), 4));
-		buf = _mm256_or_si256(buf, _mm256_srli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0x0f00)), 4));
-		rbf = _mm256_or_si256(buf, _mm256_srli_epi64(_mm256_and_si256(rbf, _mm256_set1_epi16(0xf000)), 12));
-		R = _mm256_extract_epi64(rbf, 1); // R = mirror left mirror
+		L = _mm256_extract_epi64(dst, 3); // L = left
+		buf = _mm256_slli_epi16(dst, 12);
+		buf = _mm256_or_si256(buf, _mm256_slli_epi16(_mm256_and_si256(dst, _mm256_set1_epi16(0x00f0)), 4));
+		buf = _mm256_or_si256(buf, _mm256_srli_epi16(_mm256_and_si256(dst, _mm256_set1_epi16(0x0f00)), 4));
+		buf = _mm256_or_si256(buf, _mm256_srli_epi16(dst, 12));
+		R = _mm256_extract_epi64(buf, 1); // R = mirror left mirror
 
-		rbf = _mm256_insert_epi64(rbf, _mm256_extract_epi64(dst, 0), 0);
-		buf = _mm256_and_si256(_mm256_xor_si256(rbf, _mm256_srli_epi64(rbf, 12)), _mm256_set1_epi64x(0x0000f0f00000f0f0ull));
-		rbf = _mm256_xor_si256(rbf, _mm256_xor_si256(buf, _mm256_slli_epi64(buf, 12)));
-		buf = _mm256_and_si256(_mm256_xor_si256(rbf, _mm256_srli_epi64(rbf, 24)), _mm256_set1_epi64x(0x00000000ff00ff00ull));
-		rbf = _mm256_xor_si256(rbf, _mm256_xor_si256(buf, _mm256_slli_epi64(buf, 24)));
-		U = _mm256_extract_epi64(rbf, 0); // U = transpose left transpose
-		D = _mm256_extract_epi64(rbf, 2); // D = transpose mirror left mirror transpose
+		buf = _mm256_blend_epi32(dst, buf, 0b11111100);
+		rbf = _mm256_and_si256(_mm256_xor_si256(buf, _mm256_srli_epi64(buf, 12)), _mm256_set1_epi64x(0x0000f0f00000f0f0ull));
+		buf = _mm256_xor_si256(buf, _mm256_xor_si256(rbf, _mm256_slli_epi64(rbf, 12)));
+		rbf = _mm256_and_si256(_mm256_xor_si256(buf, _mm256_srli_epi64(buf, 24)), _mm256_set1_epi64x(0x00000000ff00ff00ull));
+		buf = _mm256_xor_si256(buf, _mm256_xor_si256(rbf, _mm256_slli_epi64(rbf, 24)));
+		U = _mm256_extract_epi64(buf, 0); // U = transpose left transpose
+		D = _mm256_extract_epi64(buf, 2); // D = transpose mirror left mirror transpose
 
 		// sum the final reward and check moved or not
 		rwd = _mm256_add_epi64(rwd, _mm256_srli_si256(rwd, 8 /* bytes */));
