@@ -491,7 +491,11 @@ public:
 	}
 
 	inline void moves(board& U, board& R, board& D, board& L) const {
+#if !defined(__AVX2__) || defined(PREFER_LUT_MOVES)
 		return moves64(U, R, D, L);
+#else  // use AVX2 instead of lookup
+		return moves64x(U, R, D, L);
+#endif // __AVX2__
 	}
 	inline void moves64(board& U, board& R, board& D, board& L) const {
 		U = R = D = L = board();
@@ -527,6 +531,91 @@ public:
 		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
 		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
 	}
+#ifdef __AVX2__
+	inline void moves64x(board& U, board& R, board& D, board& L) const {
+		__m256i dst, buf, rbf, rwd, chk;
+
+		// use left for all 4 directions, transpose and mirror first
+		u64 x = raw;
+		raw_cast<board>(x).transpose64();
+		dst = _mm256_set_epi64x(raw, 0, 0, x); // L, 0, 0, U
+		buf = _mm256_set_epi64x(0, x, raw, 0); // 0, D, R, 0
+		dst = _mm256_or_si256(dst, _mm256_slli_epi16(buf, 12));
+		dst = _mm256_or_si256(dst, _mm256_slli_epi16(_mm256_and_si256(buf, _mm256_set1_epi16(0x00f0)), 4));
+		dst = _mm256_or_si256(dst, _mm256_srli_epi16(_mm256_and_si256(buf, _mm256_set1_epi16(0x0f00)), 4));
+		dst = _mm256_or_si256(dst, _mm256_srli_epi16(buf, 12));
+
+		// slide to left most
+		buf = _mm256_and_si256(dst, _mm256_set1_epi16(0x0f00));
+		chk = _mm256_and_si256(_mm256_cmpeq_epi16(buf, _mm256_setzero_si256()), _mm256_set1_epi16(0xff00));
+		dst = _mm256_or_si256(_mm256_and_si256(chk, _mm256_srli_epi16(dst, 4)), _mm256_andnot_si256(chk, dst));
+		buf = _mm256_and_si256(dst, _mm256_set1_epi16(0x00f0));
+		chk = _mm256_and_si256(_mm256_cmpeq_epi16(buf, _mm256_setzero_si256()), _mm256_set1_epi16(0xfff0));
+		dst = _mm256_or_si256(_mm256_and_si256(chk, _mm256_srli_epi16(dst, 4)), _mm256_andnot_si256(chk, dst));
+		buf = _mm256_and_si256(dst, _mm256_set1_epi16(0x000f));
+		chk = _mm256_cmpeq_epi16(buf, _mm256_setzero_si256());
+		dst = _mm256_or_si256(_mm256_and_si256(chk, _mm256_srli_epi16(dst, 4)), _mm256_andnot_si256(chk, dst));
+
+		// merge same tiles, slide if necessary
+		buf = _mm256_srli_epi16(_mm256_add_epi8(dst, _mm256_set1_epi16(0x0010)), 4);
+		rbf = _mm256_and_si256(dst, _mm256_set1_epi16(0x000f));
+		chk = _mm256_and_si256(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x000f));
+		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, chk));
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
+		chk = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_and_si256(chk, _mm256_set1_epi16(0x0001)), 0));
+		rbf = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(rbf, _mm256_set1_epi16(0x0001)), 0));
+		rwd = _mm256_sllv_epi32(chk, rbf);
+
+		buf = _mm256_add_epi8(_mm256_srli_epi16(dst, 4), _mm256_set1_epi16(0x0010));
+		rbf = _mm256_and_si256(buf, _mm256_set1_epi16(0x000f));
+		chk = _mm256_and_si256(_mm256_srli_epi16(dst, 8), _mm256_set1_epi16(0x000f));
+		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, chk));
+		chk = _mm256_and_si256(chk, _mm256_set1_epi16(0xfff0));
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
+		chk = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_srli_epi16(chk, 15), 0));
+		rbf = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(rbf, _mm256_set1_epi16(0x0001)), 0));
+		rwd = _mm256_add_epi32(rwd, _mm256_sllv_epi32(chk, rbf));
+
+		buf = _mm256_srli_epi16(_mm256_add_epi16(dst, _mm256_set1_epi16(0x1000)), 4);
+		rbf = _mm256_srli_epi16(dst, 12);
+		chk = _mm256_and_si256(_mm256_srli_epi16(dst, 8), _mm256_set1_epi16(0x000f));
+		chk = _mm256_andnot_si256(_mm256_cmpeq_epi16(rbf, _mm256_setzero_si256()), _mm256_cmpeq_epi16(rbf, chk));
+		chk = _mm256_and_si256(chk, _mm256_set1_epi16(0xff00));
+		dst = _mm256_or_si256(_mm256_and_si256(chk, buf), _mm256_andnot_si256(chk, dst));
+		chk = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_srli_epi16(chk, 15), 0));
+		rbf = _mm256_cvtepu16_epi32(_mm256_extracti128_si256(_mm256_add_epi16(rbf, _mm256_set1_epi16(0x0001)), 0));
+		rwd = _mm256_add_epi32(rwd, _mm256_sllv_epi32(chk, rbf));
+
+		// mirror and transpose back to original direction
+		L = _mm256_extract_epi64(dst, 3); // L = left
+		buf = _mm256_slli_epi16(dst, 12);
+		buf = _mm256_or_si256(buf, _mm256_slli_epi16(_mm256_and_si256(dst, _mm256_set1_epi16(0x00f0)), 4));
+		buf = _mm256_or_si256(buf, _mm256_srli_epi16(_mm256_and_si256(dst, _mm256_set1_epi16(0x0f00)), 4));
+		buf = _mm256_or_si256(buf, _mm256_srli_epi16(dst, 12));
+		R = _mm256_extract_epi64(buf, 1); // R = mirror left mirror
+
+		buf = _mm256_blend_epi32(dst, buf, 0b11111100);
+		rbf = _mm256_and_si256(_mm256_xor_si256(buf, _mm256_srli_epi64(buf, 12)), _mm256_set1_epi64x(0x0000f0f00000f0f0ull));
+		buf = _mm256_xor_si256(buf, _mm256_xor_si256(rbf, _mm256_slli_epi64(rbf, 12)));
+		rbf = _mm256_and_si256(_mm256_xor_si256(buf, _mm256_srli_epi64(buf, 24)), _mm256_set1_epi64x(0x00000000ff00ff00ull));
+		buf = _mm256_xor_si256(buf, _mm256_xor_si256(rbf, _mm256_slli_epi64(rbf, 24)));
+		U = _mm256_extract_epi64(buf, 0); // U = transpose left transpose
+		D = _mm256_extract_epi64(buf, 2); // D = transpose mirror left mirror transpose
+
+		// sum the final reward and check moved or not
+		rwd = _mm256_add_epi64(rwd, _mm256_srli_si256(rwd, 8 /* bytes */));
+		rwd = _mm256_add_epi64(rwd, _mm256_srli_epi64(rwd, 32));
+		U.inf = _mm256_extract_epi32(rwd, 0);
+		R.inf = _mm256_extract_epi32(rwd, 4);
+		rwd = _mm256_set_epi64x(R.inf, U.inf, R.inf, U.inf);
+		chk = _mm256_cmpeq_epi64(_mm256_set_epi64x(L, D, R, U), _mm256_set1_epi64x(raw));
+		rwd = _mm256_or_si256(rwd, chk);
+		U.inf = _mm256_extract_epi32(rwd, 0);
+		R.inf = _mm256_extract_epi32(rwd, 2);
+		D.inf = _mm256_extract_epi32(rwd, 4);
+		L.inf = _mm256_extract_epi32(rwd, 6);
+	}
+#endif // __AVX2__
 
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves(btype move[]) const   { moves(move[0], move[1], move[2], move[3]); }
@@ -534,20 +623,17 @@ public:
 	inline void moves64(btype move[]) const { moves64(move[0], move[1], move[2], move[3]); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves80(btype move[]) const { moves80(move[0], move[1], move[2], move[3]); }
+#ifdef __AVX2__
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline void moves64x(btype move[]) const { moves64x(move[0], move[1], move[2], move[3]); }
+#endif // __AVX2__
 
-	inline std::array<board, 4> moves() const {
-		return moves64();
-	}
-	inline std::array<board, 4> moves64() const {
-		std::array<board, 4> after;
-		moves64(after.data());
-		return after;
-	}
-	inline std::array<board, 4> moves80() const {
-		std::array<board, 4> after;
-		moves80(after.data());
-		return after;
-	}
+	inline std::array<board, 4> moves() const   { return ({ std::array<board, 4> move; moves(move.data()); move; }); }
+	inline std::array<board, 4> moves64() const { return ({ std::array<board, 4> move; moves64(move.data()); move; }); }
+	inline std::array<board, 4> moves80() const { return ({ std::array<board, 4> move; moves80(move.data()); move; }); }
+#ifdef __AVX2__
+	inline std::array<board, 4> moves64x() const { return ({ std::array<board, 4> move; moves64x(move.data()); move; }); }
+#endif // __AVX2__
 
 	class action {
 	public:
