@@ -1970,7 +1970,7 @@ statistic run(utils::options opts, std::string type) {
 			hex a;
 
 			for (b.init(); (a = b.actions()).size(); b.next()) {
-				score += b.operate(a[moporgic::rand() % a.size()]);
+				score += b.move(a[moporgic::rand() % a.size()]);
 				opers += 1;
 			}
 
@@ -1987,7 +1987,7 @@ statistic run(utils::options opts, std::string type) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); ({ b.moves(moves); (b = *std::max_element(moves, moves + 4)).info() != -1u; }); b.next()) {
+			for (b.init(); b.moves(moves), (b = *std::max_element(moves, moves + 4)).info() != -1u; b.next()) {
 				score += b.info();
 				opers += 1;
 			}
