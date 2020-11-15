@@ -317,16 +317,8 @@ public:
 	}
 
 	inline std::array<board, 8> isoms() const { return isoms64(); }
-	inline std::array<board, 8> isoms64() const {
-		std::array<board, 8> iso;
-		isoms64(iso.data());
-		return iso;
-	}
-	inline std::array<board, 8> isoms80() const {
-		std::array<board, 8> iso;
-		isoms80(iso.data());
-		return iso;
-	}
+	inline std::array<board, 8> isoms64() const { std::array<board, 8> iso; isoms64(iso.data()); return iso; }
+	inline std::array<board, 8> isoms80() const { std::array<board, 8> iso; isoms80(iso.data()); return iso; }
 
 	inline constexpr u32 empty() const { return empty64(); }
 	inline constexpr u32 empty64() const {
@@ -628,11 +620,11 @@ public:
 	inline void moves64x(btype move[]) const { moves64x(move[0], move[1], move[2], move[3]); }
 #endif // __AVX2__
 
-	inline std::array<board, 4> moves() const   { return ({ std::array<board, 4> move; moves(move.data()); move; }); }
-	inline std::array<board, 4> moves64() const { return ({ std::array<board, 4> move; moves64(move.data()); move; }); }
-	inline std::array<board, 4> moves80() const { return ({ std::array<board, 4> move; moves80(move.data()); move; }); }
+	inline std::array<board, 4> moves() const   { std::array<board, 4> move; moves(move.data()); return move; }
+	inline std::array<board, 4> moves64() const { std::array<board, 4> move; moves64(move.data()); return move; }
+	inline std::array<board, 4> moves80() const { std::array<board, 4> move; moves80(move.data()); return move; }
 #ifdef __AVX2__
-	inline std::array<board, 4> moves64x() const { return ({ std::array<board, 4> move; moves64x(move.data()); move; }); }
+	inline std::array<board, 4> moves64x() const { std::array<board, 4> move; moves64x(move.data()); return move; }
 #endif // __AVX2__
 
 	class action {
