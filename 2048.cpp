@@ -1,8 +1,8 @@
 //============================================================================
-// Name        : 2048.cpp
-// Author      : Hung Guei
+// Name        : TDL2048+ - 2048.cpp
+// Author      : Hung Guei @ moporgic
 // Version     : beta
-// Description : 2048
+// Description : The Most Efficient TD Learning Program for 2048
 //============================================================================
 
 #include <cstdio>
@@ -38,6 +38,73 @@
 #endif
 
 namespace moporgic {
+
+auto what = R"(
+TDL2048+ by Hung Guei @ moporgic - The Most Efficient TD Learning Program for 2048
+
+Networks:
+  -n, --network [TOKEN]...  specify the n-tuple network, default is 4x6patt
+                            TOKEN is provided as either CONFIG or FEATURE
+                            CONFIG=ALIAS[IOPT][WOPT] specifies a built-in list,
+                            > ALIAS can be 4x6patt,5x6patt,8x6patt,mono,num,...
+                            FEATURE=WEIGHT[:INDEXES] specifies a n-tuple extractor
+                            WEIGHT=SIGN[SIZE][WOPT] is a n-tuple LUT, where
+                            > SIGN specifies a LUT whose SIZE is [100|16^10|p|?]
+                            > WOPT is used to modify LUT as SIGN=MODIFY, where
+                              MODIFY can be initialize,adjust,duplicate,remove
+                              as VINIT[/norm], +VADJUST[/norm], {SRC}, {}
+                            INDEXES=INDEX[!][IOPT],... is related indexers, where
+                            > INDEX specifies an indexer; if it is a pattern,
+                              using symbol ! expands to all its isomorphisms
+                            > IOPT is used to modify INDEX, as INDEX&HEX|HEX
+
+Recipes:
+  -r, --recipe ID [OPT]...  specify a recipe identified by ID
+                            OPT is provided as KEY[=VALUE], where KEY can be
+                            > mode: specify recipe routine, whose VALUE can be
+                              > optimize:{forward|backward|lambda|step}
+                              > evaluate:{best|random|reward}
+                            > loop,unit,win,info: execution and display settings
+                            > alpha,lambda,step: TD learning hyperparameters
+                            1st OPT also accepts a special alias LOOP[xUNIT][:WIN]
+                            if [OPT]... is unprovided, default is 1000x1000:2048
+  -t, --optimize [OPT]...   alias for -r optimize [OPT]...
+  -e, --evaluate [OPT]...   alias for -r evaluate [OPT]...
+  -tt MODE                  alias for -t mode=MODE
+  -et MODE                  alias for -e mode=MODE
+
+Parameters:
+  -a, --alpha ALPHA [NORM]  the learning rate, default is 0.1
+                            if NORM is unspecified, default is # of features
+  -l, --lambda LAMBDA       the TD-lambda, default is 0
+  -N, --step STEP           the n-step, default is 1 if LAMBDA is 0; otherwise 5
+  -u, --unit UNIT           the statistic display interval, default is 1000
+  -v, --win TILE            the winning threshold, default is 2048
+  -%, --info                whether to show the summary, default is auto
+
+Executions:
+  -s, --seed [SEED]         set the seed for the pseudo-random number
+  -p, --parallel [THREAD]   enable lock-free parallelism for all recipes
+                            if THREAD is unspecified, default is max supported #
+  -S, --search DEPTH [OPT]  enable the search with DEPTH layer (1p,2p,3p,...)
+  -d, --depth DEPTH [OPT]   alias for -S DEPTH [OPT]
+  -c, --cache SIZE          enable the transposition table as NUMBER[K|M|G]
+
+Input/Output:
+  -i, --input [FILE]...     specify inputs, support weight.w and cache.c
+  -o, --output [FILE]...    specify outputs, support weight.w, cache.c, and log.x
+                            for a weight, LUT range can be selected as RANGE|PATH,
+                            where RANGE specifies the LUT indexes as 0,1-2,3:4
+  -io [FILE]...             alias for -i [FILE]... -o [FILE]...
+
+Miscellaneous:
+  -x, --options [OPT]...    specify other options as KEY[=VALUE]
+  -#, --comment [TEXT]...   specify command line comments
+  -?, --help                display this message and quit
+
+Please refer to https://moporgic.info/TDL2048+ for more details
+Report bugs and comments to "Hung Guei" <hguei@moporgic.info>
+)";
 
 typedef float numeric;
 
@@ -360,36 +427,29 @@ public:
 	public:
 		class access {
 		public:
-			constexpr access(u64 sign, u32 hold, block& blk) : hash(blk.hash), info(blk.info), sign(sign), hold(hold), blk(blk) {}
-			constexpr access(u64 sign, u32 hold) : access(sign, hold, raw_cast<block>(*this)) {}
-			constexpr access(access&& acc) : access(acc.sign, acc.hold, &(acc.blk) != &(raw_cast<block>(acc)) ? acc.blk : raw_cast<block>(*this)) {}
+			constexpr access(u64 sign, u32 hold, block& blk) : sign(sign), info(0), blk(blk) {
+				register block shot = blk;
+				bool safe = (shot.sign() == sign) & (shot.hold() >= hold);
+				u32 hits = std::min(shot.hits() + 1, 65535);
+				raw_cast<f32, 0>(info) = shot.esti();
+				raw_cast<u16, 2>(info) = hold;
+				raw_cast<u16, 3>(info) = safe ? hits : 0;
+			}
+			constexpr access(access&& acc) = default;
 			constexpr access(const access&) = delete;
 			constexpr access& operator =(const access&) = delete;
 
-			constexpr operator bool() const {
-				return ((hash ^ info) == sign) & (raw_cast<u16, 2>(info) >= hold);
-			}
-			constexpr numeric fetch() {
-				numeric esti = raw_cast<f32, 0>(info);
-				u64 sign = hash ^ info;
-				raw_cast<u16, 3>(info) = std::min(raw_cast<u16, 3>(info) + 1, 65535);
-				hash = sign ^ info;
-				blk = raw_cast<block>(*this);
-				return esti;
-			}
+			constexpr operator bool() const { return raw_cast<u16, 3>(info); }
+			constexpr numeric fetch() const { return raw_cast<f32, 0>(info); }
 			constexpr numeric store(numeric esti) {
 				raw_cast<f32, 0>(info) = esti;
-				raw_cast<u16, 2>(info) = hold;
-				raw_cast<u16, 3>(info) = (hash ^ info) == sign ? raw_cast<u16, 3>(info) : 0;
-				hash = sign ^ info;
-				blk = raw_cast<block>(*this);
+				raw_cast<u16, 3>(info) = std::min(raw_cast<u16, 3>(info) + 1, 65535);
+				blk = block(sign, info);
 				return esti;
 			}
 		private:
-			u64 hash;
-			u64 info; // f32 esti; u16 hold; u16 hits;
 			u64 sign;
-			u32 hold;
+			u64 info; // f32 esti; u16 hold; u16 hits;
 			block& blk;
 		};
 
@@ -548,16 +608,15 @@ u64 indexptv(const board& b, const std::vector<u32>& p) {
 }
 
 u64 indexmerge(const board& b) { // 16-bit
-	board q = b; q.transpose();
 	register u32 hori = 0, vert = 0;
-	hori |= b.query(0).merge << 0;
-	hori |= b.query(1).merge << 2;
-	hori |= b.query(2).merge << 4;
-	hori |= b.query(3).merge << 6;
-	vert |= q.query(0).merge << 0;
-	vert |= q.query(1).merge << 2;
-	vert |= q.query(2).merge << 4;
-	vert |= q.query(3).merge << 6;
+	hori |= b.qrow(0).merge << 0;
+	hori |= b.qrow(1).merge << 2;
+	hori |= b.qrow(2).merge << 4;
+	hori |= b.qrow(3).merge << 6;
+	vert |= b.qcol(0).merge << 0;
+	vert |= b.qcol(1).merge << 2;
+	vert |= b.qcol(2).merge << 4;
+	vert |= b.qcol(3).merge << 6;
 	return hori | (vert << 8);
 }
 
@@ -662,7 +721,7 @@ struct make {
 			make(vtos({x[patt]...}), index::indexpt<x[patt]...>);
 			if (iso) isomorphic<i + 1>(iso);
 		}
-		template<u32 i> static typename std::enable_if<(i >= 8), void>::type isomorphic(bool iso) {}
+		template<u32 i> static typename std::enable_if<(i == 8), void>::type isomorphic(bool iso) {}
 
 		static constexpr board isoindex(u32 i) {
 			board x = 0xfedcba9876543210ull;
@@ -1031,7 +1090,7 @@ void make_network(utils::options::option opt) {
 
 	auto stov = [](std::string hash, u32 iso = 0) -> std::vector<u32> {
 		std::vector<u32> patt;
-		board x(0xfedcba9876543210ull); x.isom(-iso);
+		board x(0xfedcba9876543210ull); x.isom((iso & 4) + (8 - iso) % 4);
 		for (char tile : hash) patt.push_back(x.at((tile & 15) + (tile & 64 ? 9 : 0)));
 		return patt;
 	};
@@ -1279,13 +1338,13 @@ struct method {
 			register numeric esti = 0;
 			register board iso;
 			esti += estim(({ iso = state;     iso; }), range);
-			esti += estim(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso.flip();      iso; }), range);
 			esti += estim(({ iso.transpose(); iso; }), range);
-			esti += estim(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso.flip();      iso; }), range);
 			esti += estim(({ iso.transpose(); iso; }), range);
-			esti += estim(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso.flip();      iso; }), range);
 			esti += estim(({ iso.transpose(); iso; }), range);
-			esti += estim(({ iso.mirror();    iso; }), range);
+			esti += estim(({ iso.flip();      iso; }), range);
 			return esti;
 		}
 		template<optimizer optim = isomorphic::invoke>
@@ -1293,13 +1352,13 @@ struct method {
 			register numeric esti = 0;
 			register board iso;
 			esti += optim(({ iso = state;     iso; }), updv, range);
-			esti += optim(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso.flip();      iso; }), updv, range);
 			esti += optim(({ iso.transpose(); iso; }), updv, range);
-			esti += optim(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso.flip();      iso; }), updv, range);
 			esti += optim(({ iso.transpose(); iso; }), updv, range);
-			esti += optim(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso.flip();      iso; }), updv, range);
 			esti += optim(({ iso.transpose(); iso; }), updv, range);
-			esti += optim(({ iso.mirror();    iso; }), updv, range);
+			esti += optim(({ iso.flip();      iso; }), updv, range);
 			return esti;
 		}
 
@@ -1334,13 +1393,22 @@ struct method {
 	struct expectimax {
 		constexpr inline operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
 		constexpr inline expectimax(utils::options::option opt) {
-			u32 n = expectimax<source>::depth(opt.value(1));
-			std::string limit = opt["limit"].value("");
-			while (limit.find(',') != std::string::npos)
-				limit[limit.find(',')] = ' ';
-			std::stringstream in(limit);
+			std::stringstream input;
+			auto next = [&](u32 n) -> u32 {
+				try {
+					std::string token = "x";
+					if (input >> token) n = std::stoul(token);
+					if (token.back() == 'p') n = n * 2 - 1;
+				} catch (std::invalid_argument&) {}
+				return n;
+			};
+			input.str(opt.value());
+			u32 n = expectimax<source>::depth(next(1) | 1);
+			std::string limit = opt["limit"].value();
+			std::replace(limit.begin(), limit.end(), ',', ' ');
+			input.clear(), input.str(limit);
 			for (u32& lim : expectimax<source>::limit())
-				in >> n, lim = n & -2u;
+				lim = n = std::min(next(n) & -2u, n);
 		}
 
 		static inline numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
@@ -1352,8 +1420,8 @@ struct method {
 			if (!depth) return source::estimate(after, range);
 			for (u32 pos : spaces) {
 				board before = after;
-				expt += 0.9 * search_best(({ before.set(pos, 1); before; }), depth - 1, range);
-				expt += 0.1 * search_best(({ before.set(pos, 2); before; }), depth - 1, range);
+				expt += 0.9 * search_best(({ before.at(pos, 1); before; }), depth - 1, range);
+				expt += 0.1 * search_best(({ before.at(pos, 2); before; }), depth - 1, range);
 			}
 			expt = lookup.store(expt / spaces.size());
 			return expt;
@@ -1491,8 +1559,8 @@ struct state : board {
 	inline i32 score() const { return info(); }
 
 	inline void assign(const board& b, u32 op = -1) {
-		set(b);
-		info(move(op));
+		board::operator=(b);
+		info(operate(op));
 	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats(),
@@ -1523,8 +1591,8 @@ struct select {
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
 	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
-	inline void operator >>(state& s) const { s = (*best); }
-	inline void operator >>(board& b) const { b.set(*best); }
+	inline void operator >>(state& s) const { s = *best; }
+	inline void operator >>(board& b) const { b = *best; }
 
 	inline operator bool() const { return best->operator bool(); }
 	inline numeric esti() const { return best->esti; }
@@ -1962,7 +2030,7 @@ statistic run(utils::options opts, std::string type) {
 			hex a;
 
 			for (b.init(); (a = b.actions()).size(); b.next()) {
-				score += b.operate(a[moporgic::rand() % a.size()]);
+				score += b.move(a[moporgic::rand() % a.size()]);
 				opers += 1;
 			}
 
@@ -1979,7 +2047,7 @@ statistic run(utils::options opts, std::string type) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (b.init(); ({ b.moves(moves); (b = *std::max_element(moves, moves + 4)).info() != -1u; }); b.next()) {
+			for (b.init(); b.moves(moves), (b = *std::max_element(moves, moves + 4)).info() != -1u; b.next()) {
 				score += b.info();
 				opers += 1;
 			}
@@ -2012,7 +2080,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-l"): case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
 			// no break: lambda may also come with step
-		case to_hash("--step"): case to_hash("--n-step"):
+		case to_hash("-N"): case to_hash("--step"):
 			opts["step"] = next_opt(opts("lambda") && opts["lambda"].value(0) ? "5" : "1");
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
@@ -2027,7 +2095,7 @@ utils::options parse(int argc, const char* argv[]) {
 			if ((opts[""] = next_opts()).size()) opts[label] = opts[""];
 			if (opts[label].size()) opts["recipes"] += label;
 			break;
-		case to_hash("--recipes"):
+		case to_hash("-R"): case to_hash("--recipes"):
 			opts["recipes"] = next_opts();
 			break;
 		case to_hash("-io"):  case to_hash("--input-output"):
@@ -2071,7 +2139,7 @@ utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-d"): case to_hash("--depth"):
 		case to_hash("-S"): case to_hash("--search"):
-			opts["search"] = next_opts("3");
+			opts["search"] = next_opts("2p");
 			break;
 		case to_hash("-c"): case to_hash("--cache"):
 			opts["cache"] = next_opts("2048M");
@@ -2089,6 +2157,10 @@ utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-|"):
 			opts = {};
+			break;
+		case to_hash("-?"): case to_hash("--help"):
+			std::cout << "Usage: " << argv[0] << " [OPTION]..." << moporgic::what;
+			std::exit(0);
 			break;
 		default:
 			opts["options"][label.substr(label.find_first_not_of('-'))] += next_opts();
@@ -2138,7 +2210,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"].value() << std::endl;
 	std::cout << "alpha = " << opts["alpha"].value("1.0") << " coherence" << std::endl;
 	std::cout << "lambda = " << opts["lambda"].value(0) << ", step = " << opts["step"].value(1) << std::endl;
-	std::cout << "search = " << opts["search"].value("1") << ", cache = " << opts["cache"].value("none") << std::endl;
+	std::cout << "search = " << opts["search"].value("1p") << ", cache = " << opts["cache"].value("none") << std::endl;
 	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
 

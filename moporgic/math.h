@@ -586,6 +586,38 @@ static inline constexpr uint64_t nthset(register uint64_t x, register uint32_t n
 static inline constexpr uint32_t nthset(register uint32_t x, register uint32_t n) noexcept { return nthset32(x, n); }
 
 /**
+ * Bit rotation
+ * enable compile flag -mbmi2 may provide better performance (RORX)
+ */
+static inline constexpr uint8_t  rol8 (register uint8_t x,  register uint32_t n) noexcept {
+	return __builtin_ia32_rolqi(x, n); /* __rolb(x, n) */ }
+static inline constexpr uint16_t rol16(register uint16_t x, register uint32_t n) noexcept {
+	return __builtin_ia32_rolhi(x, n); /* __rolw(x, n) */ }
+static inline constexpr uint32_t rol32(register uint32_t x, register uint32_t n) noexcept {
+	return (x << n) | (x >> (32 - n)); /* __rold(x, n) */ }
+static inline constexpr uint64_t rol64(register uint64_t x, register uint32_t n) noexcept {
+	return (x << n) | (x >> (64 - n)); /* __rolq(x, n) */ }
+
+static inline constexpr uint8_t  rol(register uint8_t x,  register uint32_t n) noexcept { return rol8(x, n); }
+static inline constexpr uint16_t rol(register uint16_t x, register uint32_t n) noexcept { return rol16(x, n); }
+static inline constexpr uint32_t rol(register uint32_t x, register uint32_t n) noexcept { return rol32(x, n); }
+static inline constexpr uint64_t rol(register uint64_t x, register uint32_t n) noexcept { return rol64(x, n); }
+
+static inline constexpr uint8_t  ror8 (register uint8_t x,  register uint32_t n) noexcept {
+	return __builtin_ia32_rorqi(x, n); /* __rorb(x, n); */}
+static inline constexpr uint16_t ror16(register uint16_t x, register uint32_t n) noexcept {
+	return __builtin_ia32_rorhi(x, n); /* __rorw(x, n); */}
+static inline constexpr uint32_t ror32(register uint32_t x, register uint32_t n) noexcept {
+	return (x >> n) | (x << (32 - n)); /* __rord(x, n); */}
+static inline constexpr uint64_t ror64(register uint64_t x, register uint32_t n) noexcept {
+	return (x >> n) | (x << (64 - n)); /* __rorq(x, n); */}
+
+static inline constexpr uint8_t  ror(register uint8_t x,  register uint32_t n) noexcept { return ror8(x, n); }
+static inline constexpr uint16_t ror(register uint16_t x, register uint32_t n) noexcept { return ror16(x, n); }
+static inline constexpr uint32_t ror(register uint32_t x, register uint32_t n) noexcept { return ror32(x, n); }
+static inline constexpr uint64_t ror(register uint64_t x, register uint32_t n) noexcept { return ror64(x, n); }
+
+/**
  * Bit Reversal
  * Reversing the bits in an integer x is somewhat painful, but here's a SWAR algorithm for a 32-bit value
  */
