@@ -185,7 +185,6 @@ public:
 	inline constexpr u32 row20(u32 i) const {
 		return row16(i) | ((ext >> (i << 2)) & 0xf0000);
 	}
-
 	inline constexpr void row(u32 i, u32 r) { row16(i, r); }
 	inline constexpr void row16(u32 i, u32 r) {
 		raw = (raw & ~(0xffffull << (i << 4))) | (u64(r) << (i << 4));
@@ -220,7 +219,6 @@ public:
 	inline constexpr u32 at5(u32 i) const {
 		return at4(i) | ((ext >> (i + 12)) & 0x10);
 	}
-
 	inline constexpr void at(u32 i, u32 t) { at4(i, t); }
 	inline constexpr void at4(u32 i, u32 t) {
 		raw = (raw & ~(0x0full << (i << 2))) | (u64(t) << (i << 2));
@@ -321,20 +319,8 @@ public:
 	inline std::array<board, 8> isoms80() const { std::array<board, 8> iso; isoms80(iso.data()); return iso; }
 
 	inline constexpr u32 empty() const { return empty64(); }
-	inline constexpr u32 empty64() const {
-		register u64 x = raw;
-		x |= (x >> 2);
-		x |= (x >> 1);
-		x = ~x & 0x1111111111111111ull;
-		return math::popcnt64(x);
-	}
-	inline constexpr u32 empty80() const {
-		register u64 x = raw;
-		x |= (x >> 2);
-		x |= (x >> 1);
-		x = ~x & math::pdep64(~ext >> 16, 0x1111111111111111ull);
-		return math::popcnt64(x);
-	}
+	inline constexpr u32 empty64() const { return count64(0); }
+	inline constexpr u32 empty80() const { return count80(0); }
 
 	inline hexa spaces() const { return spaces64(); }
 	inline hexa spaces64() const { return find64(0); }
@@ -353,20 +339,14 @@ public:
 
 	inline void next() { return next64(); }
 	inline void next64() {
-		u64 x = raw;
-		x |= (x >> 2);
-		x |= (x >> 1);
-		x = ~x & 0x1111111111111111ull;
+		u64 x = where64(0);
 		u32 e = math::popcnt64(x);
 		u32 u = moporgic::rand();
 		u64 t = math::nthset64(x, (u >> 16) % e);
 		raw |= (t << (u % 10 ? 0 : 1));
 	}
 	inline void next80() {
-		u64 x = raw;
-		x |= (x >> 2);
-		x |= (x >> 1);
-		x = ~x & math::pdep64(~ext >> 16, 0x1111111111111111ull);
+		u64 x = where80(0);
 		u32 e = math::popcnt64(x);
 		u32 u = moporgic::rand();
 		u64 t = math::nthset64(x, (u >> 16) % e);
@@ -803,21 +783,8 @@ public:
 		      | (count64(12) << 16) | (count64(13) << 20) | (count64(14) << 24) | (count64(15) << 28)) << 32);
 	}
 	inline constexpr u32 count(u32 t) const { return count64(t); }
-	inline constexpr u32 count64(u32 t) const {
-		u64 x = raw ^ (t * 0x1111111111111111ull);
-		x |= (x >> 2);
-		x |= (x >> 1);
-		x = ~x & 0x1111111111111111ull;
-		return math::popcnt(x);
-	}
-	inline constexpr u32 count80(u32 t) const {
-		u64 x = raw ^ ((t & 0x0f) * 0x1111111111111111ull);
-		x |= (x >> 2);
-		x |= (x >> 1);
-		u32 e = ext ^ (i32((t & 0x10) << 27) >> 15 /*(t & 0x10) ? 0xffff0000 : 0x00000000*/);
-		x = ~x & math::pdep64(~e >> 16, 0x1111111111111111ull);
-		return math::popcnt(x);
-	}
+	inline constexpr u32 count64(u32 t) const { return math::popcnt(where64(t)); }
+	inline constexpr u32 count80(u32 t) const { return math::popcnt(where80(t)); }
 	inline constexpr void count(u32 num[], u32 min, u32 max) const { return count64(num, min, max); }
 	inline constexpr void count64(u32 num[], u32 min, u32 max) const {
 		for (u32 i = min; i < max; i++) num[i] = count64(i);
@@ -837,7 +804,8 @@ public:
 		u64 x = raw ^ ((t & 0x0f) * 0x1111111111111111ull);
 		x |= (x >> 2);
 		x |= (x >> 1);
-		return ~x & math::pdep64(~(ext ^ (i32((t & 0x10) << 27) >> 15)) >> 16, 0x1111111111111111ull);
+		u32 e = ext ^ (i32((t & 0x10) << 27) >> 15 /*(t & 0x10) ? 0xffff0000 : 0x00000000*/);
+		return ~x & math::pdep64(~e >> 16, 0x1111111111111111ull);
 	}
 
 	inline constexpr u32 mask(u32 t) const { return mask64(t); }
