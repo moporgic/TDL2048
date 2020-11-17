@@ -826,6 +826,20 @@ public:
 		for (u32 i = min; i < max; i++) num[i] = count80(i);
 	}
 
+	inline constexpr u64 where(u32 t) const { return where64(t); }
+	inline constexpr u64 where64(u32 t) const {
+		u64 x = raw ^ (t * 0x1111111111111111ull);
+		x |= (x >> 2);
+		x |= (x >> 1);
+		return ~x & 0x1111111111111111ull;
+	}
+	inline constexpr u64 where80(u32 t) const {
+		u64 x = raw ^ ((t & 0x0f) * 0x1111111111111111ull);
+		x |= (x >> 2);
+		x |= (x >> 1);
+		return ~x & math::pdep64(~(ext ^ (i32((t & 0x10) << 27) >> 15)) >> 16, 0x1111111111111111ull);
+	}
+
 	inline constexpr u32 mask(u32 t) const { return mask64(t); }
 	inline constexpr u32 mask64(u32 t) const {
 		u64 x = raw ^ (t * 0x1111111111111111ull);
