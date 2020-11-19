@@ -228,6 +228,25 @@ public:
 		ext = (ext & ~(1U << (i + 16))) | ((t & 0x10) << (i + 12));
 	}
 
+	inline constexpr void put(u64 where, u32 t) { return put64(where, t); }
+	inline constexpr void put64(u64 where, u32 t) {
+		raw = (raw & ~(where * 0x0full)) | (where * t);
+	}
+	inline constexpr void put80(u64 where, u32 t) {
+		put64(where, t & 0x0f);
+		u32 w = math::pext64(where, 0x1111111111111111ull) << 16;
+		ext = (ext & ~w) | ((i32((t & 0x10) << 27) >> 15) & w);
+	}
+	inline constexpr void put(u16 mask, u32 t) { return put64(mask, t); }
+	inline constexpr void put64(u16 mask, u32 t) {
+		return put64(math::pdep(mask, 0x1111111111111111ull), t);
+	}
+	inline constexpr void put80(u16 mask, u32 t) {
+		put64(mask, t & 0x0f);
+		u32 w = mask << 16;
+		ext = (ext & ~w) | ((i32((t & 0x10) << 27) >> 15) & w);
+	}
+
 	inline constexpr void mirror() { mirror64(); }
 	inline constexpr void mirror64() {
 		raw = ((raw & 0x000f000f000f000full) << 12) | ((raw & 0x00f000f000f000f0ull) << 4)
