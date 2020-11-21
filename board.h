@@ -239,7 +239,7 @@ public:
 	}
 	inline constexpr void put(u16 mask, u32 t) { return put64(mask, t); }
 	inline constexpr void put64(u16 mask, u32 t) {
-		return put64(math::pdep(mask, 0x1111111111111111ull), t);
+		return put64(math::pdep64(mask, 0x1111111111111111ull), t);
 	}
 	inline constexpr void put80(u16 mask, u32 t) {
 		put64(mask, t & 0x0f);
