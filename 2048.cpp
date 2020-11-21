@@ -1353,17 +1353,17 @@ struct method {
 
 		static inline numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
 			numeric expt = 0;
-			hexa spaces;
-			if (depth) depth = std::min(depth, limit((spaces = after.spaces()).size()));
+			u64 where = after.where(0);
+			u32 empty = math::popcnt(where);
+			depth = std::min(depth, limit(empty));
 			cache::block::access lookup = cache::find(after, depth);
 			if (lookup) return lookup.fetch();
 			if (!depth) return source::estimate(after, range);
-			for (u32 pos : spaces) {
-				board before = after;
-				expt += 0.9 * search_best(({ before.at(pos, 1); before; }), depth - 1, range);
-				expt += 0.1 * search_best(({ before.at(pos, 2); before; }), depth - 1, range);
+			for (u64 which; (which = where & -where); where &= where - 1) {
+				expt += 0.9 * search_best(u64(after) | (which << 0), depth - 1, range);
+				expt += 0.1 * search_best(u64(after) | (which << 1), depth - 1, range);
 			}
-			expt = lookup.store(expt / spaces.size());
+			expt = lookup.store(expt / empty);
 			return expt;
 		}
 
