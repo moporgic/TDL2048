@@ -1997,6 +1997,42 @@ statistic run(utils::options opts, std::string type) {
 		}
 		}(); break;
 
+	case to_hash("optimize:average-backward"): [&]() {
+		u32 block = opts["options"]["avg-blk"].value(4096);
+		u32 bkmax = opts["options"]["avg-max"].value(65536);
+		u32 bkpos = math::tzcnt32(block);
+
+		for (stats.init(opts[type]); stats; stats++) {
+			board b, init; init.next();
+
+			for (u32 which = 0; which < bkmax; which = std::max(which, init.hash()) + block) {
+				for (u32 u = bkmax >> 1; u >= block; u >>= 1) {
+					u32 scale = init.hash();
+					if ((which & u) & !(scale & u)) {
+						u64 where = init.where(math::tzcnt(math::msb(scale & (u - 1))));
+						where = math::nthset(where, moporgic::rand() % math::popcnt(where));
+						init.put(where, math::tzcnt(u));
+					} else if ((scale & u) & !(which & u)) {
+						u64 where = init.where(math::tzcnt(u));
+						init.put(where, math::tzcnt(u) - 1);
+					}
+				}
+				for (b = init, b.next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
+					best >> path;
+					best >> b;
+				}
+				u32 score = 0, scale = b.hash(), opers = path.size();
+				for (numeric esti = 0; path.size(); path.pop_back()) {
+					path.back().estimate(feats, spec);
+					esti = path.back().optimize(esti, alpha, feats, spec);
+					init = (path.back().hash() >> bkpos) == (scale >> bkpos) ? path.back() : init;
+					score += path.back().info();
+				}
+				if (which == 0) stats.update(score, scale, opers);
+			}
+		}
+		}(); break;
+
 	case to_hash("optimize:step"):
 	case to_hash("optimize:step-forward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
