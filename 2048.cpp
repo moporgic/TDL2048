@@ -971,6 +971,13 @@ void config_shm(utils::options::option opt) {
 	shm::enable<cache::block>(shm::enable() && !opt("noshm:cache") && (opt("shm") || opt("shm:cache") || opt("evaluate")));
 }
 
+void config_coherence(utils::options::option opt) {
+	bool fixed = opt("fixed");
+	bool coh_explicit = opt("coherence") || opt("coh");
+	bool coh_implicit = opt.value(0.1) == 1.0 && !opt("nocoherence") && !opt("nocoh");
+	weight::coherence::enable(!fixed && (coh_implicit || coh_explicit));
+}
+
 template<typename statistic>
 statistic invoke(statistic(*run)(utils::options,std::string), utils::options opts, std::string type) {
 	opts[type]["thread"] = opts[type]["thread"].value(opts["thread"].value(1));
@@ -2215,6 +2222,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << std::endl;
 
 	moporgic::srand(to_hash(opts["seed"]));
+	utils::config_coherence(opts["alpha"]);
 	utils::config_shm(opts["thread"]);
 	utils::init_cache(opts["cache"]);
 
