@@ -1539,7 +1539,7 @@ struct method {
 		}
 	}
 
-	inline static numeric& alpha() { static numeric a = numeric(0.01); return a; }
+	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
 	inline static numeric& alpha(numeric a) { return (method::alpha() = a); }
 	inline static numeric& lambda() { static numeric l = 0.5; return l; }
 	inline static numeric& lambda(numeric l) { return (method::lambda() = l); }
@@ -2075,7 +2075,7 @@ utils::options parse(int argc, const char* argv[]) {
 		};
 		switch (to_hash(label)) {
 		case to_hash("-a"): case to_hash("--alpha"):
-			opts["alpha"] = next_opts("1.0");
+			opts["alpha"] = next_opts("0.1");
 			break;
 		case to_hash("-l"): case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
@@ -2195,20 +2195,20 @@ utils::options parse(int argc, const char* argv[]) {
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (!opts["recipes"].size()) opts["recipes"] = "optimize", opts["optimize"] = 1000;
-	if (!opts("alpha")) opts["alpha"] = 1.0;
+	if (!opts("alpha")) opts["alpha"] = 0.1;
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
 	if (!opts("lambda")) opts["lambda"] = 0;
 	if (!opts("step")) opts["step"] = opts["lambda"].value(0) ? 5 : 1;
 
 	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "Develop-Coherence" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
+	std::cout << "Develop" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
 	std::cout << " (" << __DATE_ISO__ << " " << __TIME__ ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 	std::cout << "time = " << millisec() << " (" << moporgic::put_time(millisec()) << ")" << std::endl;
 	std::cout << "seed = " << opts["seed"].value() << std::endl;
-	std::cout << "alpha = " << opts["alpha"].value("1.0") << " coherence" << std::endl;
+	std::cout << "alpha = " << opts["alpha"].value("0.1") << std::endl;
 	std::cout << "lambda = " << opts["lambda"].value(0) << ", step = " << opts["step"].value(1) << std::endl;
 	std::cout << "search = " << opts["search"].value("1p") << ", cache = " << opts["cache"].value("none") << std::endl;
 	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
