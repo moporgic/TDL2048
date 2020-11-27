@@ -189,7 +189,7 @@ public:
 				write_cast<u64>(out, w.size());
 				write_cast<numeric>(out, w.value<segment>().begin(), w.value<segment>().end());
 			} else { // also write coherence tables if enabled
-				using coherence::unit;
+				typde coherence::unit;
 				write_cast<u16>(out, sizeof(numeric));
 				write_cast<u64>(out, w.size());
 				write_cast<numeric>(out, w.value<unit<0>>().begin(), w.value<unit<0>>().end());
@@ -405,10 +405,17 @@ public:
 	inline ~feature() {}
 
 	typedef std::string sign_t;
+	using weight::segment;
 
 	inline sign_t sign() const { return name; }
-	constexpr inline weight::segment& operator [](const board& b) { return raw[map(b)]; }
-	constexpr inline weight::segment& operator [](u64 idx) { return raw[idx]; }
+	constexpr inline segment& operator [](const board& b) { return raw[map(b)]; }
+	constexpr inline const segment& operator [](const board& b) const { return raw[map(b)]; }
+	constexpr inline segment& operator [](u64 idx) { return raw[idx]; }
+	constexpr inline const segment& operator [](u64 idx) const { return raw[idx]; }
+	template<typename type = segment> constexpr inline type& at(const board& b) { return raw.at<type>(map(b)); }
+	template<typename type = segment> constexpr inline const type& at(const board& b) const { return raw.at<type>(map(b)); }
+	template<typename type = segment> constexpr inline type& at(size_t i) { return raw.at<type>(i); }
+	template<typename type = segment> constexpr inline const type& at(size_t i) const { return raw.at<type>(i); }
 	constexpr inline u64 operator ()(const board& b) const { return map(b); }
 
 	inline indexer index() const { return map; }
@@ -1356,226 +1363,251 @@ struct method {
 		return -std::numeric_limits<numeric>::max();
 	}
 
-	struct isomorphic {
-		constexpr inline operator method() { return { isomorphic::estimate, isomorphic::optimize }; }
+	template<typename type>
+	struct specific {
+		constexpr inline operator method() { return { specific<type>::estimate, specific<type>::optimize }; }
 
-		constexpr static inline_always numeric invoke(const board& iso, clip<feature> f) {
-			register numeric esti = 0;
-			for (register auto feat = f.begin(); feat != f.end(); feat += 8)
-				esti += (*feat)[iso];
-			return esti;
-		}
-		constexpr static inline_always numeric invoke(const board& iso, numeric updv, clip<feature> f) {
-			register numeric esti = 0;
-			for (register auto feat = f.begin(); feat != f.end(); feat += 8)
-				esti += ((*feat)[iso] += updv);
-			return esti;
-		}
-
-		template<estimator estim = isomorphic::invoke>
 		constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
 			register numeric esti = 0;
-			register board iso;
-			esti += estim(({ iso = state;     iso; }), range);
-			esti += estim(({ iso.flip();      iso; }), range);
-			esti += estim(({ iso.transpose(); iso; }), range);
-			esti += estim(({ iso.flip();      iso; }), range);
-			esti += estim(({ iso.transpose(); iso; }), range);
-			esti += estim(({ iso.flip();      iso; }), range);
-			esti += estim(({ iso.transpose(); iso; }), range);
-			esti += estim(({ iso.flip();      iso; }), range);
+			for (register feature& feat : range)
+				esti += feat.at<type>(state);
 			return esti;
 		}
-		template<optimizer optim = isomorphic::invoke>
-		constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
+		constexpr static inline numeric optimize(const board& state, numeric error, clip<feature> range = feature::feats()) {
 			register numeric esti = 0;
-			register board iso;
-			esti += optim(({ iso = state;     iso; }), updv, range);
-			esti += optim(({ iso.flip();      iso; }), updv, range);
-			esti += optim(({ iso.transpose(); iso; }), updv, range);
-			esti += optim(({ iso.flip();      iso; }), updv, range);
-			esti += optim(({ iso.transpose(); iso; }), updv, range);
-			esti += optim(({ iso.flip();      iso; }), updv, range);
-			esti += optim(({ iso.transpose(); iso; }), updv, range);
-			esti += optim(({ iso.flip();      iso; }), updv, range);
+			for (register feature& feat : range)
+				esti += (feat.at<type>(state) += error);
 			return esti;
 		}
 
-		template<indexer::mapper... indexes>
-		struct static_index {
-			constexpr static std::array<indexer::mapper, sizeof...(indexes)> index = { indexes... };
-			constexpr inline operator method() { return { static_index::estimate, static_index::optimize }; }
+		struct isomorphic {
+			constexpr inline operator method() { return { isomorphic::estimate, isomorphic::optimize }; }
 
-			template<indexer::mapper index, indexer::mapper... follow> constexpr static
-			inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, clip<feature> f) {
-				return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)]) + invoke<follow...>(iso, f);
+			constexpr static inline_always numeric invoke(const board& iso, clip<feature> f) {
+				register numeric esti = 0;
+				for (register auto feat = f.begin(); feat != f.end(); feat += 8)
+					esti += feat->at<type>(iso);
+				return esti;
 			}
-			template<indexer::mapper index, indexer::mapper... follow> constexpr static
-			inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, clip<feature> f) {
-				return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)]);
-			}
-			template<indexer::mapper index, indexer::mapper... follow> constexpr static
-			inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
-				return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv) + invoke<follow...>(iso, updv, f);
-			}
-			template<indexer::mapper index, indexer::mapper... follow> constexpr static
-			inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
-				return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3][index(iso)] += updv);
+			constexpr static inline_always numeric invoke(const board& iso, numeric updv, clip<feature> f) {
+				register numeric esti = 0;
+				for (register auto feat = f.begin(); feat != f.end(); feat += 8)
+					esti += (feat->at<type>(iso) += updv);
+				return esti;
 			}
 
-			constexpr static estimator estimate = isomorphic::estimate<invoke<indexes...>>;
-			constexpr static optimizer optimize = isomorphic::optimize<invoke<indexes...>>;
-		};
-	};
+			template<estimator estim = isomorphic::invoke>
+			constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
+				register numeric esti = 0;
+				register board iso;
+				esti += estim(({ iso = state;     iso; }), range);
+				esti += estim(({ iso.flip();      iso; }), range);
+				esti += estim(({ iso.transpose(); iso; }), range);
+				esti += estim(({ iso.flip();      iso; }), range);
+				esti += estim(({ iso.transpose(); iso; }), range);
+				esti += estim(({ iso.flip();      iso; }), range);
+				esti += estim(({ iso.transpose(); iso; }), range);
+				esti += estim(({ iso.flip();      iso; }), range);
+				return esti;
+			}
+			template<optimizer optim = isomorphic::invoke>
+			constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
+				register numeric esti = 0;
+				register board iso;
+				esti += optim(({ iso = state;     iso; }), updv, range);
+				esti += optim(({ iso.flip();      iso; }), updv, range);
+				esti += optim(({ iso.transpose(); iso; }), updv, range);
+				esti += optim(({ iso.flip();      iso; }), updv, range);
+				esti += optim(({ iso.transpose(); iso; }), updv, range);
+				esti += optim(({ iso.flip();      iso; }), updv, range);
+				esti += optim(({ iso.transpose(); iso; }), updv, range);
+				esti += optim(({ iso.flip();      iso; }), updv, range);
+				return esti;
+			}
 
-	template<typename source = method>
-	struct expectimax {
-		constexpr inline operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
-		constexpr inline expectimax(utils::options::option opt) {
-			std::stringstream input;
-			auto next = [&](u32 n) -> u32 {
-				try {
-					std::string token = "x";
-					if (input >> token) n = std::stoul(token);
-					if (token.back() == 'p') n = n * 2 - 1;
-				} catch (std::invalid_argument&) {}
-				return n;
+			template<indexer::mapper... indexes>
+			struct static_index {
+				constexpr static std::array<indexer::mapper, sizeof...(indexes)> index = { indexes... };
+				constexpr inline operator method() { return { static_index::estimate, static_index::optimize }; }
+
+				template<indexer::mapper index, indexer::mapper... follow> constexpr static
+				inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, clip<feature> f) {
+					return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3].at<type>(index(iso))) + invoke<follow...>(iso, f);
+				}
+				template<indexer::mapper index, indexer::mapper... follow> constexpr static
+				inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, clip<feature> f) {
+					return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3].at<type>(index(iso)));
+				}
+				template<indexer::mapper index, indexer::mapper... follow> constexpr static
+				inline_always typename std::enable_if<(sizeof...(follow) != 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
+					return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3].at<type>(index(iso)) += updv) + invoke<follow...>(iso, updv, f);
+				}
+				template<indexer::mapper index, indexer::mapper... follow> constexpr static
+				inline_always typename std::enable_if<(sizeof...(follow) == 0), numeric>::type invoke(const board& iso, numeric updv, clip<feature> f) {
+					return (f[(sizeof...(indexes) - sizeof...(follow) - 1) << 3].at<type>(index(iso)) += updv);
+				}
+
+				constexpr static estimator estimate = isomorphic::estimate<invoke<indexes...>>;
+				constexpr static optimizer optimize = isomorphic::optimize<invoke<indexes...>>;
 			};
-			input.str(opt.value());
-			u32 n = expectimax<source>::depth(next(1) | 1);
-			std::string limit = opt["limit"].value();
-			std::replace(limit.begin(), limit.end(), ',', ' ');
-			input.clear(), input.str(limit);
-			for (u32& lim : expectimax<source>::limit())
-				lim = n = std::min(next(n) & -2u, n);
-		}
+		};
 
-		static inline numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
-			numeric expt = 0;
-			u64 where = after.where(0);
-			u32 empty = math::popcnt(where);
-			depth = std::min(depth, limit(empty));
-			cache::block::access lookup = cache::find(after, depth);
-			if (lookup) return lookup.fetch();
-			if (!depth) return source::estimate(after, range);
-			for (u64 which; (which = where & -where); where &= where - 1) {
-				expt += 0.9 * search_best(u64(after) | (which << 0), depth - 1, range);
-				expt += 0.1 * search_best(u64(after) | (which << 1), depth - 1, range);
+		template<typename source = specific<type>>
+		struct expectimax {
+			constexpr inline operator method() { return { expectimax<source>::estimate, expectimax<source>::optimize }; }
+			constexpr inline expectimax(utils::options::option opt) {
+				std::stringstream input;
+				auto next = [&](u32 n) -> u32 {
+					try {
+						std::string token = "x";
+						if (input >> token) n = std::stoul(token);
+						if (token.back() == 'p') n = n * 2 - 1;
+					} catch (std::invalid_argument&) {}
+					return n;
+				};
+				input.str(opt.value());
+				u32 n = expectimax<source>::depth(next(1) | 1);
+				std::string limit = opt["limit"].value();
+				std::replace(limit.begin(), limit.end(), ',', ' ');
+				input.clear(), input.str(limit);
+				for (u32& lim : expectimax<source>::limit())
+					lim = n = std::min(next(n) & -2u, n);
 			}
-			expt = lookup.store(expt / empty);
-			return expt;
-		}
 
-		static inline numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
-			numeric best = 0;
-			for (const board& after : before.moves()) {
-				auto search = after.info() != -1u ? search_expt : search_illegal;
-				best = std::max(best, after.info() + search(after, depth - 1, range));
+			static inline numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
+				numeric expt = 0;
+				u64 where = after.where(0);
+				u32 empty = math::popcnt(where);
+				depth = std::min(depth, limit(empty));
+				cache::block::access lookup = cache::find(after, depth);
+				if (lookup) return lookup.fetch();
+				if (!depth) return source::estimate(after, range);
+				for (u64 which; (which = where & -where); where &= where - 1) {
+					expt += 0.9 * search_best(u64(after) | (which << 0), depth - 1, range);
+					expt += 0.1 * search_best(u64(after) | (which << 1), depth - 1, range);
+				}
+				expt = lookup.store(expt / empty);
+				return expt;
 			}
-			return best;
-		}
 
-		static inline numeric search_illegal(const board& after, u32 depth, clip<feature> range = feature::feats()) {
-			return -std::numeric_limits<numeric>::max();
-		}
+			static inline numeric search_best(const board& before, u32 depth, clip<feature> range = feature::feats()) {
+				numeric best = 0;
+				for (const board& after : before.moves()) {
+					auto search = after.info() != -1u ? search_expt : search_illegal;
+					best = std::max(best, after.info() + search(after, depth - 1, range));
+				}
+				return best;
+			}
 
-		static inline numeric estimate(const board& after, clip<feature> range = feature::feats()) {
-			return search_expt(after, depth() - 1, range);
-		}
-		static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
-			return source::optimize(state, updv, range);
-		}
+			static inline numeric search_illegal(const board& after, u32 depth, clip<feature> range = feature::feats()) {
+				return -std::numeric_limits<numeric>::max();
+			}
 
-		static inline u32& depth() { static u32 depth = 1; return depth; }
-		static inline u32& depth(u32 n) { return (expectimax<source>::depth() = n); }
-		static inline std::array<u32, 17>& limit() { static std::array<u32, 17> limit = {}; return limit; }
-		static inline u32& limit(u32 e) { return limit()[e]; }
+			static inline numeric estimate(const board& after, clip<feature> range = feature::feats()) {
+				return search_expt(after, depth() - 1, range);
+			}
+			static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
+				return source::optimize(state, updv, range);
+			}
+
+			static inline u32& depth() { static u32 depth = 1; return depth; }
+			static inline u32& depth(u32 n) { return (expectimax<source>::depth() = n); }
+			static inline std::array<u32, 17>& limit() { static std::array<u32, 17> limit = {}; return limit; }
+			static inline u32& limit(u32 e) { return limit()[e]; }
+		};
+
+		typedef isomorphic::static_index<
+				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
+				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
+				index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
+				index::indexpt<0x4,0x5,0x6,0x8,0x9,0xa>> iso4x6patt;
+		typedef isomorphic::static_index<
+				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
+				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
+				index::indexpt<0x8,0x9,0xa,0xb,0xc,0xd>,
+				index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
+				index::indexpt<0x4,0x5,0x6,0x8,0x9,0xa>> iso5x6patt;
+		typedef isomorphic::static_index<
+				index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
+				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
+				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
+				index::indexpt<0x2,0x3,0x4,0x5,0x6,0x9>,
+				index::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>,
+				index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>> iso6x6patt;
+		typedef isomorphic::static_index<
+				index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
+				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
+				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
+				index::indexpt<0x2,0x3,0x4,0x5,0x6,0x9>,
+				index::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>,
+				index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>,
+				index::indexpt<0x1,0x3,0x4,0x5,0x6,0x7>> iso7x6patt;
+		typedef isomorphic::static_index<
+				index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
+				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
+				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
+				index::indexpt<0x2,0x3,0x4,0x5,0x6,0x9>,
+				index::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>,
+				index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>,
+				index::indexpt<0x1,0x3,0x4,0x5,0x6,0x7>,
+				index::indexpt<0x0,0x1,0x4,0x8,0x9,0xa>> iso8x6patt;
+		typedef isomorphic::static_index<
+				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
+				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa>> iso2x7patt;
+		typedef isomorphic::static_index<
+				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
+				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa>,
+				index::indexpt<0x8,0x9,0xa,0xb,0xc,0xd,0xe>> iso3x7patt;
+		typedef isomorphic::static_index<
+				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>> iso1x8patt;
+		typedef isomorphic::static_index<
+				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>,
+				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>> iso2x8patt;
+
+		static method parse(utils::options opts, std::string name) {
+			std::string spec = opts["options"]["spec"].value("auto");
+			if (spec == "auto" || spec == "on" || spec == "default") {
+				spec = opts["make"].value("4x6patt");
+				spec = spec.substr(0, spec.find_first_of("&|="));
+			}
+
+			if (opts["search"].value(1) > 1) {
+				switch (to_hash(spec)) {
+				default:                    return specific<type>::expectimax<specific<type>>(opts["search"]);
+				case to_hash("isomorphic"): return specific<type>::expectimax<specific<type>::isomorphic>(opts["search"]);
+				case to_hash("4x6patt"):    return specific<type>::expectimax<specific<type>::iso4x6patt>(opts["search"]);
+				case to_hash("5x6patt"):    return specific<type>::expectimax<specific<type>::iso5x6patt>(opts["search"]);
+				case to_hash("6x6patt"):    return specific<type>::expectimax<specific<type>::iso6x6patt>(opts["search"]);
+				case to_hash("7x6patt"):    return specific<type>::expectimax<specific<type>::iso7x6patt>(opts["search"]);
+				case to_hash("8x6patt"):    return specific<type>::expectimax<specific<type>::iso8x6patt>(opts["search"]);
+				case to_hash("2x7patt"):    return specific<type>::expectimax<specific<type>::iso2x7patt>(opts["search"]);
+				case to_hash("3x7patt"):    return specific<type>::expectimax<specific<type>::iso3x7patt>(opts["search"]);
+				case to_hash("1x8patt"):    return specific<type>::expectimax<specific<type>::iso1x8patt>(opts["search"]);
+				case to_hash("2x8patt"):    return specific<type>::expectimax<specific<type>::iso2x8patt>(opts["search"]);
+				}
+			}
+
+			switch (to_hash(spec)) {
+			default:                    return specific<type>();
+			case to_hash("isomorphic"): return specific<type>::isomorphic();
+			case to_hash("4x6patt"):    return specific<type>::iso4x6patt();
+			case to_hash("5x6patt"):    return specific<type>::iso5x6patt();
+			case to_hash("6x6patt"):    return specific<type>::iso6x6patt();
+			case to_hash("7x6patt"):    return specific<type>::iso7x6patt();
+			case to_hash("8x6patt"):    return specific<type>::iso8x6patt();
+			case to_hash("2x7patt"):    return specific<type>::iso2x7patt();
+			case to_hash("3x7patt"):    return specific<type>::iso3x7patt();
+			case to_hash("1x8patt"):    return specific<type>::iso1x8patt();
+			case to_hash("2x8patt"):    return specific<type>::iso2x8patt();
+			}
+		}
 	};
 
-	typedef isomorphic::static_index<
-			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
-			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
-			index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::indexpt<0x4,0x5,0x6,0x8,0x9,0xa>> iso4x6patt;
-	typedef isomorphic::static_index<
-			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
-			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
-			index::indexpt<0x8,0x9,0xa,0xb,0xc,0xd>,
-			index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::indexpt<0x4,0x5,0x6,0x8,0x9,0xa>> iso5x6patt;
-	typedef isomorphic::static_index<
-			index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
-			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
-			index::indexpt<0x2,0x3,0x4,0x5,0x6,0x9>,
-			index::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>,
-			index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>> iso6x6patt;
-	typedef isomorphic::static_index<
-			index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
-			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
-			index::indexpt<0x2,0x3,0x4,0x5,0x6,0x9>,
-			index::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>,
-			index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>,
-			index::indexpt<0x1,0x3,0x4,0x5,0x6,0x7>> iso7x6patt;
-	typedef isomorphic::static_index<
-			index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
-			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
-			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
-			index::indexpt<0x2,0x3,0x4,0x5,0x6,0x9>,
-			index::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>,
-			index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>,
-			index::indexpt<0x1,0x3,0x4,0x5,0x6,0x7>,
-			index::indexpt<0x0,0x1,0x4,0x8,0x9,0xa>> iso8x6patt;
-	typedef isomorphic::static_index<
-			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
-			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa>> iso2x7patt;
-	typedef isomorphic::static_index<
-			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
-			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa>,
-			index::indexpt<0x8,0x9,0xa,0xb,0xc,0xd,0xe>> iso3x7patt;
-	typedef isomorphic::static_index<
-			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>> iso1x8patt;
-	typedef isomorphic::static_index<
-			index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>,
-			index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>> iso2x8patt;
-
-	static method parse(utils::options opts, std::string type) {
-		std::string spec = opts["options"]["spec"].value("auto");
-		if (spec == "auto" || spec == "on" || spec == "default") {
-			spec = opts["make"].value("4x6patt");
-			spec = spec.substr(0, spec.find_first_of("&|="));
-		}
-
-		if (opts["search"].value(1) > 1) {
-			switch (to_hash(spec)) {
-			default:                    return method::expectimax<method>(opts["search"]);
-			case to_hash("isomorphic"): return method::expectimax<method::isomorphic>(opts["search"]);
-			case to_hash("4x6patt"):    return method::expectimax<method::iso4x6patt>(opts["search"]);
-			case to_hash("5x6patt"):    return method::expectimax<method::iso5x6patt>(opts["search"]);
-			case to_hash("6x6patt"):    return method::expectimax<method::iso6x6patt>(opts["search"]);
-			case to_hash("7x6patt"):    return method::expectimax<method::iso7x6patt>(opts["search"]);
-			case to_hash("8x6patt"):    return method::expectimax<method::iso8x6patt>(opts["search"]);
-			case to_hash("2x7patt"):    return method::expectimax<method::iso2x7patt>(opts["search"]);
-			case to_hash("3x7patt"):    return method::expectimax<method::iso3x7patt>(opts["search"]);
-			case to_hash("1x8patt"):    return method::expectimax<method::iso1x8patt>(opts["search"]);
-			case to_hash("2x8patt"):    return method::expectimax<method::iso2x8patt>(opts["search"]);
-			}
-		}
-
-		switch (to_hash(spec)) {
-		default:                    return method();
-		case to_hash("isomorphic"): return method::isomorphic();
-		case to_hash("4x6patt"):    return method::iso4x6patt();
-		case to_hash("5x6patt"):    return method::iso5x6patt();
-		case to_hash("6x6patt"):    return method::iso6x6patt();
-		case to_hash("7x6patt"):    return method::iso7x6patt();
-		case to_hash("8x6patt"):    return method::iso8x6patt();
-		case to_hash("2x7patt"):    return method::iso2x7patt();
-		case to_hash("3x7patt"):    return method::iso3x7patt();
-		case to_hash("1x8patt"):    return method::iso1x8patt();
-		case to_hash("2x8patt"):    return method::iso2x8patt();
-		}
+	static method parse(utils::options opts, std::string name) {
+		if (!weight::coherence::enable())
+			return method::specific<weight::segment>::parse(opts, name);
+		else
+			return method::specific<weight::coherence>::parse(opts, name);
 	}
 
 	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
