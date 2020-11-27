@@ -118,47 +118,60 @@ public:
 	typedef moporgic::numeric numeric;
 	struct segment {
 		numeric value;
-		numeric accum;
-		numeric updvu;
-		static constexpr numeric cohp_init = std::numeric_limits<numeric>::min();
-		inline constexpr segment() : value(0), accum(cohp_init), updvu(cohp_init) {}
+
+		inline constexpr segment() : value(0) {}
 		inline constexpr segment(const segment& s) = default;
 		inline constexpr operator numeric&() { return value; }
-		inline constexpr operator numeric() const { return value; }
+		inline constexpr operator const numeric&() const { return value; }
 		inline constexpr segment& operator =(const segment& s) = default;
 		inline constexpr numeric& operator =(numeric val) { return value = val; }
-		inline constexpr numeric& operator +=(numeric aupdv) {
-			value += aupdv * (std::abs(accum) / updvu);
-			accum += aupdv;
-			updvu += std::abs(aupdv);
+		inline constexpr numeric& operator +=(numeric delta) { return value += delta; }
+		declare_comparators_with(const numeric&, value, v, inline constexpr);
+	};
+	struct coherence : segment {
+		numeric accum;
+		numeric updvu;
+
+		static constexpr numeric cinit = std::numeric_limits<numeric>::min();
+		inline constexpr coherence() : segment(), accum(cinit), updvu(cinit) {}
+		inline constexpr coherence(const coherence& c) = default;
+		inline constexpr coherence& operator =(const coherence& c) = default;
+		inline constexpr numeric& operator +=(numeric delta) {
+			value += delta * (std::abs(accum) / updvu);
+			accum += delta;
+			updvu += std::abs(delta);
 			return value;
 		}
+
+		template<size_t i>
+		struct unit : std::array<numeric, sizeof(coherence) / sizeof(numeric)> {
+			constexpr inline operator numeric&() { return operator [](i); }
+			constexpr inline operator const numeric&() const { return operator [](i); }
+			constexpr inline numeric& operator =(numeric v) { return (operator [](i) = v); }
+			declare_comparators_with(const numeric&, operator [](i), v, constexpr inline);
+		};
+
+		static bool& enable(bool coh) { return enable() = coh; }
+		static bool& enable() { static bool coh = false; return coh; }
 	};
 
 	inline sign_t sign() const { return name; }
 	inline size_t size() const { return length; }
-	constexpr inline segment& operator [](u64 i) { return raw[i]; }
-	constexpr inline segment* data(u64 i = 0) { return raw + i; }
-
-	template<size_t i>
-	struct block : std::array<numeric, sizeof(segment) / sizeof(numeric)> {
-		block() = delete;
-		constexpr inline operator numeric&() { return operator [](i); }
-		constexpr inline operator const numeric&() const { return operator [](i); }
-		constexpr inline numeric& operator =(numeric v) { return (operator [](i) = v); }
-		declare_comparators_with(const numeric&, operator [](i), v, constexpr inline);
-	};
-	constexpr inline clip<block<0>> value() const { return { cast<block<0>*>(raw), cast<block<0>*>(raw) + length }; }
-	constexpr inline clip<block<1>> accum() const { return { cast<block<1>*>(raw), cast<block<1>*>(raw) + length }; }
-	constexpr inline clip<block<2>> updvu() const { return { cast<block<2>*>(raw), cast<block<2>*>(raw) + length }; }
+	constexpr inline segment& operator [](size_t i) { return raw[i]; }
+	constexpr inline const segment& operator [](size_t i) const { return raw[i]; }
+	template<typename type = segment> constexpr inline type& at(size_t i) { return pointer_cast<type>(raw)[i]; }
+	template<typename type = segment> constexpr inline const type& at(size_t i) const { return pointer_cast<const type>(raw)[i]; }
+	template<typename type = segment> constexpr inline type* data(size_t i = 0) { return pointer_cast<type>(raw) + i; }
+	template<typename type = segment> constexpr inline const type* data(size_t i = 0) const { return pointer_cast<const type>(raw) + i; }
+	template<typename type = segment> constexpr inline clip<type> value() { return { data<type>(0), data<type>(length) }; }
+	template<typename type = segment> constexpr inline clip<const type> value() const { return { data<type>(0), data<type>(length) }; }
 	inline operator bool() const { return raw; }
 	declare_comparators(const weight&, sign(), inline);
 
 	friend std::ostream& operator <<(std::ostream& out, const weight& w) {
-		u32 code = 128;
+		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
-		case 128:
 		case 4: [&]() {
 			try { // write sign as 32-bit integer if possible
 				size_t idx = 0;
@@ -171,14 +184,19 @@ public:
 				out.write(w.sign().append(8, ' ').c_str(), 8);
 			}
 			// write value table
-			write_cast<u16>(out, sizeof(numeric));
-			write_cast<u64>(out, w.size());
-			write_cast<numeric>(out, w.value().begin(), w.value().end());
-			if (code == 128 /* write coherence tables */) {
+			if (!coherence::enable()) {
+				write_cast<u16>(out, sizeof(numeric));
+				write_cast<u64>(out, w.size());
+				write_cast<numeric>(out, w.value<segment>().begin(), w.value<segment>().end());
+			} else { // also write coherence tables if enabled
+				using coherence::unit;
+				write_cast<u16>(out, sizeof(numeric));
+				write_cast<u64>(out, w.size());
+				write_cast<numeric>(out, w.value<unit<0>>().begin(), w.value<unit<0>>().end());
 				write_cast<u16>(out, sizeof(numeric));
 				write_cast<u64>(out, w.size() + w.size());
-				write_cast<numeric>(out, w.accum().begin(), w.accum().end());
-				write_cast<numeric>(out, w.updvu().begin(), w.updvu().end());
+				write_cast<numeric>(out, w.value<unit<1>>().begin(), w.value<unit<1>>().end());
+				write_cast<numeric>(out, w.value<unit<2>>().begin(), w.value<unit<2>>().end());
 			}
 			// reserved for additional fields
 			write_cast<u16>(out, 0);
@@ -196,50 +214,56 @@ public:
 			// read name, length, and value table
 			w.name = format("%08x", read<u32>(in));
 			w.raw = weight::alloc(w.length = read<u64>(in));
-			switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
-			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
-			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
+			if (!coherence::enable()) {
+				switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
+				case 4: read_cast<f32>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
+				case 8: read_cast<f64>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
+				}
+			} else {
+				using coherence::unit;
+				switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
+				case 4: read_cast<f32>(in, w.value<unit<0>>().begin(), w.value<unit<0>>().end()); break;
+				case 8: read_cast<f64>(in, w.value<unit<0>>().begin(), w.value<unit<0>>().end()); break;
+				}
 			}
-			// initialize coherence tables as zero
-			std::fill(w.accum().begin(), w.accum().end(), segment::cohp_init);
-			std::fill(w.updvu().begin(), w.updvu().end(), segment::cohp_init);
 			// adjust display width, remove redundant padding '0'
 			u32 padz = 8 - (math::lg64(w.length) >> 2);
 			while (padz && w.name.substr(0, padz) != std::string(padz, '0')) padz--;
 			w.name = w.name.substr(padz);
 		}(); break;
 		default:
-		case 128:
+		case 128: // serial 128 for legacy coherence-specific binaries
 		case 4: [&]() {
 			// read name (raw), block size, length, and value table
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
 			u32 blkz = read<u16>(in);
 			w.raw = weight::alloc(w.length = read<u64>(in));
-			switch (blkz) {
-			case 2: read_cast<f16>(in, w.value().begin(), w.value().end()); break;
-			case 4: read_cast<f32>(in, w.value().begin(), w.value().end()); break;
-			case 8: read_cast<f64>(in, w.value().begin(), w.value().end()); break;
-			}
-			if (code == 128 /* read coherence tables */) {
-				blkz = read<u16>(in);
-				in.ignore(8); // == length + length
+			if (!coherence::enable()) {
 				switch (blkz) {
-				case 2: read_cast<f16>(in, w.accum().begin(), w.accum().end()); break;
-				case 4: read_cast<f32>(in, w.accum().begin(), w.accum().end()); break;
-				case 8: read_cast<f64>(in, w.accum().begin(), w.accum().end()); break;
+				case 2: read_cast<f16>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
+				case 4: read_cast<f32>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
+				case 8: read_cast<f64>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
 				}
+			} else {
+				using coherence::unit;
 				switch (blkz) {
-				case 2: read_cast<f16>(in, w.updvu().begin(), w.updvu().end()); break;
-				case 4: read_cast<f32>(in, w.updvu().begin(), w.updvu().end()); break;
-				case 8: read_cast<f64>(in, w.updvu().begin(), w.updvu().end()); break;
+				case 2: read_cast<f16>(in, w.value<unit<0>>().begin(), w.value<unit<0>>().end()); break;
+				case 4: read_cast<f32>(in, w.value<unit<0>>().begin(), w.value<unit<0>>().end()); break;
+				case 8: read_cast<f64>(in, w.value<unit<0>>().begin(), w.value<unit<0>>().end()); break;
 				}
-				// fix legacy coherence parameters that was initialized as 0
-				for (segment& blk : clip<segment>(w.data(), w.data() + w.size())) {
-					if (blk.updvu == 0) blk.accum = blk.updvu = segment::cohp_init;
+				// if coherence is enabled, try loading coherence parameters
+				if ((blkz = read<u16>(in)) != 0 && read<u64>(in) == w.length * 2) {
+					switch (blkz) {
+					case 2: read_cast<f16>(in, w.value<unit<1>>().begin(), w.value<unit<1>>().end()); break;
+					case 4: read_cast<f32>(in, w.value<unit<1>>().begin(), w.value<unit<1>>().end()); break;
+					case 8: read_cast<f64>(in, w.value<unit<1>>().begin(), w.value<unit<1>>().end()); break;
+					}
+					switch (blkz) {
+					case 2: read_cast<f16>(in, w.value<unit<2>>().begin(), w.value<unit<2>>().end()); break;
+					case 4: read_cast<f32>(in, w.value<unit<2>>().begin(), w.value<unit<2>>().end()); break;
+					case 8: read_cast<f64>(in, w.value<unit<2>>().begin(), w.value<unit<2>>().end()); break;
+					}
 				}
-			} else { // initialize coherence tables as zero
-				std::fill(w.accum().begin(), w.accum().end(), segment::cohp_init);
-				std::fill(w.updvu().begin(), w.updvu().end(), segment::cohp_init);
 			}
 			// skip unrecognized fields
 			while ((blkz = read<u16>(in)) != 0) in.ignore(blkz * read<u64>(in));
@@ -324,7 +348,9 @@ public:
 private:
 	inline weight(sign_t sign, size_t size) : name(sign), length(size), raw(alloc(size)) {}
 
-	static inline segment* alloc(size_t size) { return shm::enable<segment>() ? shm::alloc<segment>(size) : new segment[size](); }
+	template<typename type>
+	static inline type* alloc(size_t size) const { return shm::enable<segment>() ? shm::alloc<type>(size) : new type[size](); }
+	static inline segment* alloc(size_t size) { return !coherence::enable() ? alloc<segment>(size) : alloc<coherence>(size); }
 	static inline void free(segment* v) { shm::enable<segment>() ? shm::free<segment>(v) : delete[] v; }
 
 	sign_t name;
@@ -1181,22 +1207,28 @@ void make_network(utils::options::option opt) {
 				while (!test && (test.sign() + ' ')[0] == '0') test = weight(test.sign().substr(1));
 				if (test.size() == size) raw_cast<std::string>(weight::wghts().at(test.sign())) = sign; // unsafe!
 			}
+			using weight::coherence;
+			bool flat = !coherence::enable();
 			if (!weight(sign) && size) { // create new weight table
 				weight dst = weight::make(sign, size);
 				if (init.find_first_of("{}") != npos && init != "{}") {
 					weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
 					for (size_t n = 0; n < dst.size(); n += src.size()) {
-						std::copy_n(src.data(), src.size(), dst.data() + n);
+						if (flat) std::copy_n(src.data(), src.size(), dst.data() + n);
+						else std::copy_n(src.data<coherence>(), src.size(), dst.data<coherence>() + n);
 					}
 				} else if (init.find_first_of("0123456789.+-") == 0) {
 					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
-					std::fill_n(dst.data(), dst.size(), val);
+					if (flat) std::fill_n(dst.data(), dst.size(), val);
+					else std::fill_n(dst.data<coherence>(), dst.size(), val);
 				}
 			} else if (weight(sign) && size) { // table already exists
 				weight dst = weight(sign);
 				if (init.find_first_of("+-") == 0) {
 					numeric off = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
-					std::transform(dst.data(), dst.data() + dst.size(), dst.data(), [=](numeric val) { return val += off; });
+					auto offset = [=](numeric val) { return val + off; };
+					if (flat) std::transform(dst.data(), dst.data() + dst.size(), dst.data(), offset);
+					else std::transform(dst.data<coherence>(), dst.data<coherence>() + dst.size(), dst.data<coherence>(), offset);
 				}
 			}
 			wght = weight(sign).sign();
