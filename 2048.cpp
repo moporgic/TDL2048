@@ -403,17 +403,16 @@ public:
 	inline ~feature() {}
 
 	typedef std::string sign_t;
-	typedef weight::segment segment;
 
 	inline sign_t sign() const { return name; }
-	constexpr inline segment& operator [](const board& b) { return raw[map(b)]; }
-	constexpr inline const segment& operator [](const board& b) const { return raw[map(b)]; }
-	constexpr inline segment& operator [](u64 idx) { return raw[idx]; }
-	constexpr inline const segment& operator [](u64 idx) const { return raw[idx]; }
-	template<typename type = segment> constexpr inline type& at(const board& b) { return raw.at<type>(map(b)); }
-	template<typename type = segment> constexpr inline const type& at(const board& b) const { return raw.at<type>(map(b)); }
-	template<typename type = segment> constexpr inline type& at(size_t i) { return raw.at<type>(i); }
-	template<typename type = segment> constexpr inline const type& at(size_t i) const { return raw.at<type>(i); }
+	constexpr inline weight::segment& operator [](const board& b) { return raw[map(b)]; }
+	constexpr inline const weight::segment& operator [](const board& b) const { return raw[map(b)]; }
+	constexpr inline weight::segment& operator [](u64 idx) { return raw[idx]; }
+	constexpr inline const weight::segment& operator [](u64 idx) const { return raw[idx]; }
+	template<typename type = weight::segment> constexpr inline type& at(const board& b) { return raw.at<type>(map(b)); }
+	template<typename type = weight::segment> constexpr inline const type& at(const board& b) const { return raw.at<type>(map(b)); }
+	template<typename type = weight::segment> constexpr inline type& at(size_t i) { return raw.at<type>(i); }
+	template<typename type = weight::segment> constexpr inline const type& at(size_t i) const { return raw.at<type>(i); }
 	constexpr inline u64 operator ()(const board& b) const { return map(b); }
 
 	inline indexer index() const { return map; }
