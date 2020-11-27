@@ -990,7 +990,7 @@ void config_shm(utils::options::option opt) {
 void config_coherence(utils::options::option opt) {
 	bool fixed = opt("fixed");
 	bool coh_explicit = opt("coherence") || opt("coh");
-	bool coh_implicit = opt.value(0.1) == 1.0 && !opt("nocoherence") && !opt("nocoh");
+	bool coh_implicit = opt.value(0.1) >= 1.0 && !opt("nocoherence") && !opt("nocoh");
 	weight::coherence::enable(!fixed && (coh_implicit || coh_explicit));
 }
 
