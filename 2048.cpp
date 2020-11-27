@@ -118,25 +118,22 @@ public:
 	typedef moporgic::numeric numeric;
 	struct segment {
 		numeric value;
-
 		inline constexpr segment() : value(0) {}
 		inline constexpr segment(const segment& s) = default;
 		inline constexpr operator numeric&() { return value; }
 		inline constexpr operator const numeric&() const { return value; }
 		inline constexpr segment& operator =(const segment& s) = default;
-		inline constexpr numeric& operator =(numeric val) { return value = val; }
+		inline constexpr numeric& operator =(numeric v) { return value = v; }
 		inline constexpr numeric& operator +=(numeric delta) { return value += delta; }
 		declare_comparators_with(const numeric&, value, v, inline constexpr);
 	};
 	struct coherence : segment {
-		numeric accum;
-		numeric updvu;
-
+		numeric accum, updvu;
 		static constexpr numeric cinit = std::numeric_limits<numeric>::min();
 		inline constexpr coherence() : segment(), accum(cinit), updvu(cinit) {}
 		inline constexpr coherence(const coherence& c) = default;
 		inline constexpr coherence& operator =(const coherence& c) = default;
-		inline constexpr numeric& operator =(numeric val) { return value = val; }
+		inline constexpr numeric& operator =(numeric v) { return value = v; }
 		inline constexpr numeric& operator +=(numeric delta) {
 			value += delta * (std::abs(accum) / updvu);
 			accum += delta;
@@ -144,8 +141,7 @@ public:
 			return value;
 		}
 
-		template<size_t i>
-		struct unit : std::array<numeric, 3> {
+		template<size_t i> struct unit : std::array<numeric, 3> {
 			constexpr inline operator numeric&() { return operator [](i); }
 			constexpr inline operator const numeric&() const { return operator [](i); }
 			constexpr inline numeric& operator =(numeric v) { return (operator [](i) = v); }
@@ -159,13 +155,9 @@ public:
 	inline sign_t sign() const { return name; }
 	inline size_t size() const { return length; }
 	constexpr inline segment& operator [](size_t i) { return raw[i]; }
-	constexpr inline const segment& operator [](size_t i) const { return raw[i]; }
 	template<typename type = segment> constexpr inline type& at(size_t i) { return pointer_cast<type>(raw)[i]; }
-	template<typename type = segment> constexpr inline const type& at(size_t i) const { return pointer_cast<const type>(raw)[i]; }
-	template<typename type = segment> constexpr inline type* data(size_t i = 0) { return pointer_cast<type>(raw) + i; }
-	template<typename type = segment> constexpr inline const type* data(size_t i = 0) const { return pointer_cast<const type>(raw) + i; }
-	template<typename type = segment> constexpr inline clip<type> value() { return { data<type>(0), data<type>(length) }; }
-	template<typename type = segment> constexpr inline clip<const type> value() const { return { data<type>(0), data<type>(length) }; }
+	template<typename type = segment> constexpr inline type* data(size_t i = 0) const { return pointer_cast<type>(raw) + i; }
+	template<typename type = segment> constexpr inline clip<type> value() const { return { data<type>(0), data<type>(length) }; }
 	inline operator bool() const { return raw; }
 	declare_comparators(const weight&, sign(), inline);
 
@@ -231,14 +223,13 @@ public:
 			w.name = w.name.substr(padz);
 		}(); break;
 		default:
-		case 128: // serial 128 for legacy coherence-specific binaries
 		case 4: [&]() {
 			// read name (raw), block size, length, and value table
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
 			u32 blkz = read<u16>(in);
 			w.raw = weight::alloc(w.length = read<u64>(in));
 			if (!coherence::enable()) {
-				switch (blkz) {
+				switch (blkz) { // different binaries may have different numeric typedef
 				case 2: read_cast<f16>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
 				case 4: read_cast<f32>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
 				case 8: read_cast<f64>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
@@ -250,18 +241,17 @@ public:
 				case 8: read_cast<f64>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
 				}
 				// if coherence is enabled, try loading coherence parameters
-				if ((blkz = read<u16>(in)) != 0 && read<u64>(in) == w.length * 2) {
+				size_t cohz = (blkz = read<u16>(in)) != 0 ? read<u64>(in) : 0;
+				if (cohz == w.length * 2) {
 					switch (blkz) {
-					case 2: read_cast<f16>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end()); break;
-					case 4: read_cast<f32>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end()); break;
-					case 8: read_cast<f64>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end()); break;
+					case 2: read_cast<f16>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end());
+					        read_cast<f16>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
+					case 4: read_cast<f32>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end());
+					        read_cast<f32>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
+					case 8: read_cast<f64>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end());
+					        read_cast<f64>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
 					}
-					switch (blkz) {
-					case 2: read_cast<f16>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
-					case 4: read_cast<f32>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
-					case 8: read_cast<f64>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
-					}
-				}
+				} else in.ignore(blkz * cohz);
 			}
 			// skip unrecognized fields
 			while ((blkz = read<u16>(in)) != 0) in.ignore(blkz * read<u64>(in));
@@ -406,13 +396,9 @@ public:
 
 	inline sign_t sign() const { return name; }
 	constexpr inline weight::segment& operator [](const board& b) { return raw[map(b)]; }
-	constexpr inline const weight::segment& operator [](const board& b) const { return raw[map(b)]; }
 	constexpr inline weight::segment& operator [](u64 idx) { return raw[idx]; }
-	constexpr inline const weight::segment& operator [](u64 idx) const { return raw[idx]; }
 	template<typename type = weight::segment> constexpr inline type& at(const board& b) { return raw.at<type>(map(b)); }
-	template<typename type = weight::segment> constexpr inline const type& at(const board& b) const { return raw.at<type>(map(b)); }
-	template<typename type = weight::segment> constexpr inline type& at(size_t i) { return raw.at<type>(i); }
-	template<typename type = weight::segment> constexpr inline const type& at(size_t i) const { return raw.at<type>(i); }
+	template<typename type = weight::segment> constexpr inline type& at(u64 idx) { return raw.at<type>(idx); }
 	constexpr inline u64 operator ()(const board& b) const { return map(b); }
 
 	inline indexer index() const { return map; }
@@ -1211,27 +1197,25 @@ void make_network(utils::options::option opt) {
 				while (!test && (test.sign() + ' ')[0] == '0') test = weight(test.sign().substr(1));
 				if (test.size() == size) raw_cast<std::string>(weight::wghts().at(test.sign())) = sign; // unsafe!
 			}
-			bool flat = !weight::coherence::enable();
+			using coherence = weight::coherence;
 			if (!weight(sign) && size) { // create new weight table
 				weight dst = weight::make(sign, size);
-				if (init.find_first_of("{}") != npos && init != "{}") {
+				if (init.find_first_of("{}") != npos && init != "{}") { // copy from existing table
 					weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
-					for (size_t n = 0; n < dst.size(); n += src.size()) {
-						if (flat) std::copy_n(src.data(), src.size(), dst.data() + n);
-						else std::copy_n(src.data<weight::coherence>(), src.size(), dst.data<weight::coherence>() + n);
-					}
-				} else if (init.find_first_of("0123456789.+-") == 0) {
+					if (!coherence::enable()) std::copy_n(src.data(), src.size(), dst.data());
+					else std::copy_n(src.data<coherence>(), src.size(), dst.data<coherence>());
+				} else if (init.find_first_of("0123456789.+-") == 0) { // initialize with specific value
 					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
-					if (flat) std::fill_n(dst.data(), dst.size(), val);
-					else std::fill_n(dst.data<weight::coherence>(), dst.size(), val);
+					if (!coherence::enable()) std::fill_n(dst.data(), dst.size(), val);
+					else std::fill_n(dst.data<coherence>(), dst.size(), val);
 				}
 			} else if (weight(sign) && size) { // table already exists
 				weight dst = weight(sign);
-				if (init.find_first_of("+-") == 0) {
+				if (init.find_first_of("+-") == 0) { // adjust with specific value
 					numeric off = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
 					auto offset = [=](numeric val) { return val + off; };
-					if (flat) std::transform(dst.data(), dst.data() + dst.size(), dst.data(), offset);
-					else std::transform(dst.data<weight::coherence>(), dst.data<weight::coherence>() + dst.size(), dst.data<weight::coherence>(), offset);
+					if (!coherence::enable()) std::transform(dst.data(), dst.data() + dst.size(), dst.data(), offset);
+					else std::transform(dst.data<coherence>(), dst.data<coherence>() + dst.size(), dst.data<coherence>(), offset);
 				}
 			}
 			wght = weight(sign).sign();
@@ -1359,7 +1343,7 @@ struct method {
 		return -std::numeric_limits<numeric>::max();
 	}
 
-	template<typename type>
+	template<typename type = weight::segment>
 	struct specific {
 		constexpr inline operator method() { return { specific<type>::estimate, specific<type>::optimize }; }
 
@@ -1600,10 +1584,9 @@ struct method {
 	};
 
 	static method parse(utils::options opts, std::string name) {
-		if (!weight::coherence::enable())
-			return method::specific<weight::segment>::parse(opts, name);
-		else
+		if (weight::coherence::enable())
 			return method::specific<weight::coherence>::parse(opts, name);
+		return method::specific<weight::segment>::parse(opts, name);
 	}
 
 	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
@@ -1861,7 +1844,8 @@ statistic run(utils::options opts, std::string type) {
 
 	method spec = method::parse(opts, type);
 	clip<feature> feats = feature::feats();
-	numeric alpha = method::alpha(opts[type]["alpha"].value(opts["alpha"].value(0.1))
+	bool cohen = weight::coherence::enable();
+	numeric alpha = method::alpha(opts[type]["alpha"].value(opts["alpha"].value(cohen ? 1.0 : 0.1))
 			/ opts[type]["norm"].value(opts["alpha"]["norm"].value(feats.size())));
 	numeric lambda = method::lambda(opts[type]["lambda"].value(opts["lambda"].value(0)));
 	u32 step = method::step(opts[type]["step"].value(opts["step"].value(lambda ? 5 : 1)));
