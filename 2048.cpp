@@ -136,6 +136,7 @@ public:
 		inline constexpr coherence() : segment(), accum(cinit), updvu(cinit) {}
 		inline constexpr coherence(const coherence& c) = default;
 		inline constexpr coherence& operator =(const coherence& c) = default;
+		inline constexpr numeric& operator =(numeric val) { return value = val; }
 		inline constexpr numeric& operator +=(numeric delta) {
 			value += delta * (std::abs(accum) / updvu);
 			accum += delta;
@@ -144,7 +145,7 @@ public:
 		}
 
 		template<size_t i>
-		struct unit : std::array<numeric, sizeof(coherence) / sizeof(numeric)> {
+		struct unit : std::array<numeric, 3> {
 			constexpr inline operator numeric&() { return operator [](i); }
 			constexpr inline operator const numeric&() const { return operator [](i); }
 			constexpr inline numeric& operator =(numeric v) { return (operator [](i) = v); }
@@ -189,14 +190,13 @@ public:
 				write_cast<u64>(out, w.size());
 				write_cast<numeric>(out, w.value<segment>().begin(), w.value<segment>().end());
 			} else { // also write coherence tables if enabled
-				typde coherence::unit;
 				write_cast<u16>(out, sizeof(numeric));
 				write_cast<u64>(out, w.size());
-				write_cast<numeric>(out, w.value<unit<0>>().begin(), w.value<unit<0>>().end());
+				write_cast<numeric>(out, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end());
 				write_cast<u16>(out, sizeof(numeric));
 				write_cast<u64>(out, w.size() + w.size());
-				write_cast<numeric>(out, w.value<unit<1>>().begin(), w.value<unit<1>>().end());
-				write_cast<numeric>(out, w.value<unit<2>>().begin(), w.value<unit<2>>().end());
+				write_cast<numeric>(out, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end());
+				write_cast<numeric>(out, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end());
 			}
 			// reserved for additional fields
 			write_cast<u16>(out, 0);
@@ -220,10 +220,9 @@ public:
 				case 8: read_cast<f64>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
 				}
 			} else {
-				using coherence::unit;
 				switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
-				case 4: read_cast<f32>(in, w.value<unit<0>>().begin(), w.value<unit<0>>().end()); break;
-				case 8: read_cast<f64>(in, w.value<unit<0>>().begin(), w.value<unit<0>>().end()); break;
+				case 4: read_cast<f32>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
+				case 8: read_cast<f64>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
 				}
 			}
 			// adjust display width, remove redundant padding '0'
@@ -245,23 +244,22 @@ public:
 				case 8: read_cast<f64>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
 				}
 			} else {
-				using coherence::unit;
 				switch (blkz) {
-				case 2: read_cast<f16>(in, w.value<unit<0>>().begin(), w.value<unit<0>>().end()); break;
-				case 4: read_cast<f32>(in, w.value<unit<0>>().begin(), w.value<unit<0>>().end()); break;
-				case 8: read_cast<f64>(in, w.value<unit<0>>().begin(), w.value<unit<0>>().end()); break;
+				case 2: read_cast<f16>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
+				case 4: read_cast<f32>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
+				case 8: read_cast<f64>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
 				}
 				// if coherence is enabled, try loading coherence parameters
 				if ((blkz = read<u16>(in)) != 0 && read<u64>(in) == w.length * 2) {
 					switch (blkz) {
-					case 2: read_cast<f16>(in, w.value<unit<1>>().begin(), w.value<unit<1>>().end()); break;
-					case 4: read_cast<f32>(in, w.value<unit<1>>().begin(), w.value<unit<1>>().end()); break;
-					case 8: read_cast<f64>(in, w.value<unit<1>>().begin(), w.value<unit<1>>().end()); break;
+					case 2: read_cast<f16>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end()); break;
+					case 4: read_cast<f32>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end()); break;
+					case 8: read_cast<f64>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end()); break;
 					}
 					switch (blkz) {
-					case 2: read_cast<f16>(in, w.value<unit<2>>().begin(), w.value<unit<2>>().end()); break;
-					case 4: read_cast<f32>(in, w.value<unit<2>>().begin(), w.value<unit<2>>().end()); break;
-					case 8: read_cast<f64>(in, w.value<unit<2>>().begin(), w.value<unit<2>>().end()); break;
+					case 2: read_cast<f16>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
+					case 4: read_cast<f32>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
+					case 8: read_cast<f64>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
 					}
 				}
 			}
@@ -349,7 +347,7 @@ private:
 	inline weight(sign_t sign, size_t size) : name(sign), length(size), raw(alloc(size)) {}
 
 	template<typename type>
-	static inline type* alloc(size_t size) const { return shm::enable<segment>() ? shm::alloc<type>(size) : new type[size](); }
+	static inline type* alloc(size_t size) { return shm::enable<segment>() ? shm::alloc<type>(size) : new type[size](); }
 	static inline segment* alloc(size_t size) { return !coherence::enable() ? alloc<segment>(size) : alloc<coherence>(size); }
 	static inline void free(segment* v) { shm::enable<segment>() ? shm::free<segment>(v) : delete[] v; }
 
@@ -405,7 +403,7 @@ public:
 	inline ~feature() {}
 
 	typedef std::string sign_t;
-	using weight::segment;
+	typedef weight::segment segment;
 
 	inline sign_t sign() const { return name; }
 	constexpr inline segment& operator [](const board& b) { return raw[map(b)]; }
@@ -1214,20 +1212,19 @@ void make_network(utils::options::option opt) {
 				while (!test && (test.sign() + ' ')[0] == '0') test = weight(test.sign().substr(1));
 				if (test.size() == size) raw_cast<std::string>(weight::wghts().at(test.sign())) = sign; // unsafe!
 			}
-			using weight::coherence;
-			bool flat = !coherence::enable();
+			bool flat = !weight::coherence::enable();
 			if (!weight(sign) && size) { // create new weight table
 				weight dst = weight::make(sign, size);
 				if (init.find_first_of("{}") != npos && init != "{}") {
 					weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
 					for (size_t n = 0; n < dst.size(); n += src.size()) {
 						if (flat) std::copy_n(src.data(), src.size(), dst.data() + n);
-						else std::copy_n(src.data<coherence>(), src.size(), dst.data<coherence>() + n);
+						else std::copy_n(src.data<weight::coherence>(), src.size(), dst.data<weight::coherence>() + n);
 					}
 				} else if (init.find_first_of("0123456789.+-") == 0) {
 					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
 					if (flat) std::fill_n(dst.data(), dst.size(), val);
-					else std::fill_n(dst.data<coherence>(), dst.size(), val);
+					else std::fill_n(dst.data<weight::coherence>(), dst.size(), val);
 				}
 			} else if (weight(sign) && size) { // table already exists
 				weight dst = weight(sign);
@@ -1235,7 +1232,7 @@ void make_network(utils::options::option opt) {
 					numeric off = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
 					auto offset = [=](numeric val) { return val + off; };
 					if (flat) std::transform(dst.data(), dst.data() + dst.size(), dst.data(), offset);
-					else std::transform(dst.data<coherence>(), dst.data<coherence>() + dst.size(), dst.data<coherence>(), offset);
+					else std::transform(dst.data<weight::coherence>(), dst.data<weight::coherence>() + dst.size(), dst.data<weight::coherence>(), offset);
 				}
 			}
 			wght = weight(sign).sign();
@@ -1516,25 +1513,25 @@ struct method {
 			static inline u32& limit(u32 e) { return limit()[e]; }
 		};
 
-		typedef isomorphic::static_index<
+		typedef typename isomorphic::template static_index<
 				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
 				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
 				index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
 				index::indexpt<0x4,0x5,0x6,0x8,0x9,0xa>> iso4x6patt;
-		typedef isomorphic::static_index<
+		typedef typename isomorphic::template static_index<
 				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
 				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
 				index::indexpt<0x8,0x9,0xa,0xb,0xc,0xd>,
 				index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
 				index::indexpt<0x4,0x5,0x6,0x8,0x9,0xa>> iso5x6patt;
-		typedef isomorphic::static_index<
+		typedef typename isomorphic::template static_index<
 				index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
 				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
 				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
 				index::indexpt<0x2,0x3,0x4,0x5,0x6,0x9>,
 				index::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>,
 				index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>> iso6x6patt;
-		typedef isomorphic::static_index<
+		typedef typename isomorphic::template static_index<
 				index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
 				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
 				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
@@ -1542,7 +1539,7 @@ struct method {
 				index::indexpt<0x0,0x1,0x2,0x5,0x9,0xa>,
 				index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>,
 				index::indexpt<0x1,0x3,0x4,0x5,0x6,0x7>> iso7x6patt;
-		typedef isomorphic::static_index<
+		typedef typename isomorphic::template static_index<
 				index::indexpt<0x0,0x1,0x2,0x4,0x5,0x6>,
 				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9>,
 				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5>,
@@ -1551,16 +1548,16 @@ struct method {
 				index::indexpt<0x3,0x4,0x5,0x6,0x7,0x8>,
 				index::indexpt<0x1,0x3,0x4,0x5,0x6,0x7>,
 				index::indexpt<0x0,0x1,0x4,0x8,0x9,0xa>> iso8x6patt;
-		typedef isomorphic::static_index<
+		typedef typename isomorphic::template static_index<
 				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
 				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa>> iso2x7patt;
-		typedef isomorphic::static_index<
+		typedef typename isomorphic::template static_index<
 				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6>,
 				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa>,
 				index::indexpt<0x8,0x9,0xa,0xb,0xc,0xd,0xe>> iso3x7patt;
-		typedef isomorphic::static_index<
+		typedef typename isomorphic::template static_index<
 				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>> iso1x8patt;
-		typedef isomorphic::static_index<
+		typedef typename isomorphic::template static_index<
 				index::indexpt<0x0,0x1,0x2,0x3,0x4,0x5,0x6,0x7>,
 				index::indexpt<0x4,0x5,0x6,0x7,0x8,0x9,0xa,0xb>> iso2x8patt;
 
