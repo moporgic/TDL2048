@@ -116,21 +116,21 @@ public:
 
 	typedef std::string sign_t;
 	typedef moporgic::numeric numeric;
-	struct segment {
+	struct structure {
 		numeric value;
-		inline constexpr segment() : value(0) {}
-		inline constexpr segment(const segment& s) = default;
+		inline constexpr structure() : value(0) {}
+		inline constexpr structure(const structure& s) = default;
 		inline constexpr operator numeric&() { return value; }
 		inline constexpr operator const numeric&() const { return value; }
-		inline constexpr segment& operator =(const segment& s) = default;
+		inline constexpr structure& operator =(const structure& s) = default;
 		inline constexpr numeric& operator =(numeric v) { return value = v; }
 		inline constexpr numeric& operator +=(numeric delta) { return value += delta; }
 		declare_comparators_with(const numeric&, value, v, inline constexpr);
 	};
-	struct coherence : segment {
+	struct coherence : structure {
 		numeric accum, updvu;
 		static constexpr numeric cinit = std::numeric_limits<numeric>::min();
-		inline constexpr coherence() : segment(), accum(cinit), updvu(cinit) {}
+		inline constexpr coherence() : structure(), accum(cinit), updvu(cinit) {}
 		inline constexpr coherence(const coherence& c) = default;
 		inline constexpr coherence& operator =(const coherence& c) = default;
 		inline constexpr numeric& operator =(numeric v) { return value = v; }
@@ -151,10 +151,11 @@ public:
 		static bool& enable(bool coh) { return enable() = coh; }
 		static bool& enable() { static bool coh = false; return coh; }
 	};
+	typedef structure segment;
 
 	inline sign_t sign() const { return name; }
 	inline size_t size() const { return length; }
-	constexpr inline segment& operator [](size_t i) { return raw[i]; }
+	constexpr inline segment& operator [](size_t i) { return pointer_cast<segment>(raw)[i]; }
 	template<typename type = segment> constexpr inline type& at(size_t i) { return pointer_cast<type>(raw)[i]; }
 	template<typename type = segment> constexpr inline type* data(size_t i = 0) const { return pointer_cast<type>(raw) + i; }
 	template<typename type = segment> constexpr inline clip<type> value() const { return { data<type>(0), data<type>(length) }; }
@@ -180,7 +181,7 @@ public:
 			if (!coherence::enable()) {
 				write_cast<u16>(out, sizeof(numeric));
 				write_cast<u64>(out, w.size());
-				write_cast<numeric>(out, w.value<segment>().begin(), w.value<segment>().end());
+				write_cast<numeric>(out, w.value<structure>().begin(), w.value<structure>().end());
 			} else { // also write coherence tables if enabled
 				write_cast<u16>(out, sizeof(numeric));
 				write_cast<u64>(out, w.size());
@@ -208,8 +209,8 @@ public:
 			w.raw = weight::alloc(w.length = read<u64>(in));
 			if (!coherence::enable()) {
 				switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
-				case 4: read_cast<f32>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
-				case 8: read_cast<f64>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
+				case 4: read_cast<f32>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
+				case 8: read_cast<f64>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
 				}
 			} else {
 				switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
@@ -230,9 +231,9 @@ public:
 			w.raw = weight::alloc(w.length = read<u64>(in));
 			if (!coherence::enable()) {
 				switch (blkz) { // different binaries may have different numeric typedef
-				case 2: read_cast<f16>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
-				case 4: read_cast<f32>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
-				case 8: read_cast<f64>(in, w.value<segment>().begin(), w.value<segment>().end()); break;
+				case 2: read_cast<f16>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
+				case 4: read_cast<f32>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
+				case 8: read_cast<f64>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
 				}
 			} else {
 				switch (blkz) {
@@ -338,12 +339,12 @@ private:
 
 	template<typename type>
 	static inline type* alloc(size_t size) { return shm::enable<segment>() ? shm::alloc<type>(size) : new type[size](); }
-	static inline segment* alloc(size_t size) { return !coherence::enable() ? alloc<segment>(size) : alloc<coherence>(size); }
-	static inline void free(segment* v) { shm::enable<segment>() ? shm::free<segment>(v) : delete[] v; }
+	static inline structure* alloc(size_t size) { return !coherence::enable() ? alloc<structure>(size) : alloc<coherence>(size); }
+	static inline void free(structure* v) { shm::enable<segment>() ? shm::free<structure>(v) : delete[] v; }
 
 	sign_t name;
 	size_t length;
-	segment* raw;
+	structure* raw;
 };
 
 class indexer {
@@ -987,10 +988,10 @@ void config_shm(utils::options::option opt) {
 	shm::enable<cache::block>(shm::enable() && !opt("noshm:cache") && (opt("shm") || opt("shm:cache") || opt("evaluate")));
 }
 
-void config_coherence(utils::options::option opt) {
+void config_segment(utils::options::option opt) {
 	bool fixed = opt("fixed");
 	bool coh_explicit = opt("coherence") || opt("coh");
-	bool coh_implicit = opt.value(0.1) >= 1.0 && !opt("nocoherence") && !opt("nocoh");
+	bool coh_implicit = opt.value(0.1) >= 1.0 && !(opt("nocoherence") || opt("nocoh"));
 	weight::coherence::enable(!fixed && (coh_implicit || coh_explicit));
 }
 
@@ -1197,25 +1198,32 @@ void make_network(utils::options::option opt) {
 				while (!test && (test.sign() + ' ')[0] == '0') test = weight(test.sign().substr(1));
 				if (test.size() == size) raw_cast<std::string>(weight::wghts().at(test.sign())) = sign; // unsafe!
 			}
+			using structure = weight::structure;
 			using coherence = weight::coherence;
 			if (!weight(sign) && size) { // create new weight table
 				weight dst = weight::make(sign, size);
 				if (init.find_first_of("{}") != npos && init != "{}") { // copy from existing table
 					weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
-					if (!coherence::enable()) std::copy_n(src.data(), src.size(), dst.data());
-					else std::copy_n(src.data<coherence>(), src.size(), dst.data<coherence>());
+					if (!coherence::enable())
+						std::copy_n(src.data<structure>(), src.size(), dst.data<structure>());
+					else
+						std::copy_n(src.data<coherence>(), src.size(), dst.data<coherence>());
 				} else if (init.find_first_of("0123456789.+-") == 0) { // initialize with specific value
 					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
-					if (!coherence::enable()) std::fill_n(dst.data(), dst.size(), val);
-					else std::fill_n(dst.data<coherence>(), dst.size(), val);
+					if (!coherence::enable())
+						std::fill_n(dst.data<structure>(), dst.size(), val);
+					else
+						std::fill_n(dst.data<coherence>(), dst.size(), val);
 				}
 			} else if (weight(sign) && size) { // table already exists
 				weight dst = weight(sign);
 				if (init.find_first_of("+-") == 0) { // adjust with specific value
 					numeric off = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
 					auto offset = [=](numeric val) { return val + off; };
-					if (!coherence::enable()) std::transform(dst.data(), dst.data() + dst.size(), dst.data(), offset);
-					else std::transform(dst.data<coherence>(), dst.data<coherence>() + dst.size(), dst.data<coherence>(), offset);
+					if (!coherence::enable())
+						std::transform(dst.data<structure>(), dst.data<structure>() + dst.size(), dst.data<structure>(), offset);
+					else
+						std::transform(dst.data<coherence>(), dst.data<coherence>() + dst.size(), dst.data<coherence>(), offset);
 				}
 			}
 			wght = weight(sign).sign();
@@ -1586,7 +1594,7 @@ struct method {
 	static method parse(utils::options opts, std::string name) {
 		if (weight::coherence::enable())
 			return method::specific<weight::coherence>::parse(opts, name);
-		return method::specific<weight::segment>::parse(opts, name);
+		return method::specific<weight::structure>::parse(opts, name);
 	}
 
 	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
@@ -2266,7 +2274,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << std::endl;
 
 	moporgic::srand(to_hash(opts["seed"]));
-	utils::config_coherence(opts["alpha"]);
+	utils::config_segment(opts["alpha"]);
 	utils::config_shm(opts["thread"]);
 	utils::init_cache(opts["cache"]);
 
