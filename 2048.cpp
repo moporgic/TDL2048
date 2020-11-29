@@ -1180,40 +1180,34 @@ void make_network(utils::options::option opt) {
 				while (!test && (test.sign() + ' ')[0] == '0') test = weight(test.sign().substr(1));
 				if (test.size() == size) raw_cast<std::string>(weight::wghts().at(test.sign())) = sign; // unsafe!
 			}
-			using structure = weight::structure;
-			using coherence = weight::coherence;
+			using wght_s = weight::structure;
+			using wght_c = weight::coherence;
 			if (!weight(sign) && size) { // create new weight table
 				weight dst = weight::make(sign, size);
 				if (init.find_first_of("{}") != npos && init != "{}") { // copy from existing table
 					weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
 					switch (weight::type()) {
 					default:
-					case structure::code:
-						std::copy_n(src.data<structure>(), src.size(), dst.data<structure>()); break;
-					case coherence::code:
-						std::copy_n(src.data<coherence>(), src.size(), dst.data<coherence>()); break;
+					case wght_s::code: std::copy_n(src.data<wght_s>(), src.size(), dst.data<wght_s>()); break;
+					case wght_c::code: std::copy_n(src.data<wght_c>(), src.size(), dst.data<wght_c>()); break;
 					}
 				} else if (init.find_first_of("0123456789.+-") == 0) { // initialize with specific value
 					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
 					switch (weight::type()) {
 					default:
-					case structure::code:
-						std::fill_n(dst.data<structure>(), dst.size(), val); break;
-					case coherence::code:
-						std::fill_n(dst.data<coherence>(), dst.size(), val); break;
+					case wght_s::code: std::fill_n(dst.data<wght_s>(), dst.size(), val); break;
+					case wght_c::code: std::fill_n(dst.data<wght_c>(), dst.size(), val); break;
 					}
 				}
 			} else if (weight(sign) && size) { // table already exists
 				weight dst = weight(sign);
 				if (init.find_first_of("+-") == 0) { // adjust with specific value
 					numeric off = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
-					auto offset = [=](numeric val) { return val + off; };
+					auto adjust = [=](numeric& value) { value += off; };
 					switch (weight::type()) {
 					default:
-					case structure::code:
-						std::transform(dst.data<structure>(), dst.data<structure>() + dst.size(), dst.data<structure>(), offset); break;
-					case coherence::code:
-						std::transform(dst.data<coherence>(), dst.data<coherence>() + dst.size(), dst.data<coherence>(), offset); break;
+					case wght_s::code: std::for_each(dst.data<wght_s>(), dst.data<wght_s>(dst.size()), adjust); break;
+					case wght_c::code: std::for_each(dst.data<wght_c>(), dst.data<wght_c>(dst.size()), adjust); break;
 					}
 				}
 			}
