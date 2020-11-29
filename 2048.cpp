@@ -118,6 +118,7 @@ public:
 	typedef moporgic::numeric numeric;
 	struct structure {
 		numeric value;
+		static constexpr u32 code = to_hash("structure");
 		inline constexpr structure() : value(0) {}
 		inline constexpr structure(const structure& s) = default;
 		inline constexpr operator numeric&() { return value; }
@@ -129,6 +130,7 @@ public:
 	};
 	struct coherence : structure {
 		numeric accum, updvu;
+		static constexpr u32 code = to_hash("coherence");
 		static constexpr numeric cinit = std::numeric_limits<numeric>::min();
 		inline constexpr coherence() : structure(), accum(cinit), updvu(cinit) {}
 		inline constexpr coherence(const coherence& c) = default;
@@ -147,10 +149,9 @@ public:
 			constexpr inline numeric& operator =(numeric v) { return (operator [](i) = v); }
 			declare_comparators_with(const numeric&, operator [](i), v, constexpr inline);
 		};
-
-		static bool& enable(bool coh) { return enable() = coh; }
-		static bool& enable() { static bool coh = false; return coh; }
 	};
+	static u32& type() { static u32 code = structure::code; return code; }
+	static u32& type(u32 code) { return type() = code; }
 	typedef structure segment;
 
 	inline sign_t sign() const { return name; }
@@ -166,6 +167,7 @@ public:
 		u32 code = 4;
 		write_cast<u8>(out, code);
 		switch (code) {
+		default:
 		case 4: [&]() {
 			try { // write sign as 32-bit integer if possible
 				size_t idx = 0;
@@ -177,12 +179,14 @@ public:
 			} catch (std::logic_error&) { // otherwise, write it as string
 				out.write(w.sign().append(8, ' ').c_str(), 8);
 			}
-			// write value table
-			if (!coherence::enable()) {
+			switch (weight::type()) { // write value table
+			default:
+			case structure::code:
 				write_cast<u16>(out, sizeof(numeric));
 				write_cast<u64>(out, w.size());
 				write_cast<numeric>(out, w.value<structure>().begin(), w.value<structure>().end());
-			} else { // also write coherence tables if enabled
+				break;
+			case coherence::code: // also write coherence tables if enabled
 				write_cast<u16>(out, sizeof(numeric));
 				write_cast<u64>(out, w.size());
 				write_cast<numeric>(out, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end());
@@ -190,6 +194,7 @@ public:
 				write_cast<u64>(out, w.size() + w.size());
 				write_cast<numeric>(out, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end());
 				write_cast<numeric>(out, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end());
+				break;
 			}
 			// reserved for additional fields
 			write_cast<u16>(out, 0);
@@ -207,16 +212,20 @@ public:
 			// read name, length, and value table
 			w.name = format("%08x", read<u32>(in));
 			w.raw = weight::alloc(w.length = read<u64>(in));
-			if (!coherence::enable()) {
+			switch (weight::type()) {
+			default:
+			case structure::code:
 				switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
 				case 4: read_cast<f32>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
 				case 8: read_cast<f64>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
 				}
-			} else {
+				break;
+			case coherence::code:
 				switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
 				case 4: read_cast<f32>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
 				case 8: read_cast<f64>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
 				}
+				break;
 			}
 			// adjust display width, remove redundant padding '0'
 			u32 padz = 8 - (math::lg64(w.length) >> 2);
@@ -229,13 +238,16 @@ public:
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
 			u32 blkz = read<u16>(in);
 			w.raw = weight::alloc(w.length = read<u64>(in));
-			if (!coherence::enable()) {
+			switch (weight::type()) {
+			default:
+			case structure::code:
 				switch (blkz) { // different binaries may have different numeric typedef
 				case 2: read_cast<f16>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
 				case 4: read_cast<f32>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
 				case 8: read_cast<f64>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
 				}
-			} else {
+				break;
+			case coherence::code:
 				switch (blkz) {
 				case 2: read_cast<f16>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
 				case 4: read_cast<f32>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
@@ -253,6 +265,7 @@ public:
 					        read_cast<f64>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
 					}
 				} else in.ignore(blkz * cohz);
+				break;
 			}
 			// skip unrecognized fields
 			while ((blkz = read<u16>(in)) != 0) in.ignore(blkz * read<u64>(in));
@@ -337,9 +350,13 @@ public:
 private:
 	inline weight(sign_t sign, size_t size) : name(sign), length(size), raw(alloc(size)) {}
 
-	template<typename type>
-	static inline type* alloc(size_t size) { return shm::enable<segment>() ? shm::alloc<type>(size) : new type[size](); }
-	static inline structure* alloc(size_t size) { return !coherence::enable() ? alloc<structure>(size) : alloc<coherence>(size); }
+	static inline structure* alloc(size_t size) {
+		switch (weight::type()) {
+		default:
+		case structure::code: return shm::enable<segment>() ? shm::alloc<structure>(size) : new structure[size]();
+		case coherence::code: return shm::enable<segment>() ? shm::alloc<coherence>(size) : new coherence[size]();
+		}
+	}
 	static inline void free(structure* v) { shm::enable<segment>() ? shm::free<structure>(v) : delete[] v; }
 
 	sign_t name;
@@ -988,11 +1005,11 @@ void config_shm(utils::options::option opt) {
 	shm::enable<cache::block>(shm::enable() && !opt("noshm:cache") && (opt("shm") || opt("shm:cache") || opt("evaluate")));
 }
 
-void config_segment(utils::options::option opt) {
-	bool fixed = opt("fixed");
-	bool coh_explicit = opt("coherence") || opt("coh");
-	bool coh_implicit = opt.value(0.1) >= 1.0 && !(opt("nocoherence") || opt("nocoh"));
-	weight::coherence::enable(!fixed && (coh_implicit || coh_explicit));
+void config_weight(utils::options::option opt) {
+	u32 code = weight::segment::code;
+	if (opt("fixed") || opt("nocoherence") || opt("nocoh")) code = weight::structure::code;
+	else if (opt("coherence") || opt("coh") || opt.value(0.1) >= 1.0) code = weight::coherence::code;
+	weight::type(code);
 }
 
 template<typename statistic>
@@ -1204,26 +1221,35 @@ void make_network(utils::options::option opt) {
 				weight dst = weight::make(sign, size);
 				if (init.find_first_of("{}") != npos && init != "{}") { // copy from existing table
 					weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
-					if (!coherence::enable())
-						std::copy_n(src.data<structure>(), src.size(), dst.data<structure>());
-					else
-						std::copy_n(src.data<coherence>(), src.size(), dst.data<coherence>());
+					switch (weight::type()) {
+					default:
+					case structure::code:
+						std::copy_n(src.data<structure>(), src.size(), dst.data<structure>()); break;
+					case coherence::code:
+						std::copy_n(src.data<coherence>(), src.size(), dst.data<coherence>()); break;
+					}
 				} else if (init.find_first_of("0123456789.+-") == 0) { // initialize with specific value
 					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
-					if (!coherence::enable())
-						std::fill_n(dst.data<structure>(), dst.size(), val);
-					else
-						std::fill_n(dst.data<coherence>(), dst.size(), val);
+					switch (weight::type()) {
+					default:
+					case structure::code:
+						std::fill_n(dst.data<structure>(), dst.size(), val); break;
+					case coherence::code:
+						std::fill_n(dst.data<coherence>(), dst.size(), val); break;
+					}
 				}
 			} else if (weight(sign) && size) { // table already exists
 				weight dst = weight(sign);
 				if (init.find_first_of("+-") == 0) { // adjust with specific value
 					numeric off = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
 					auto offset = [=](numeric val) { return val + off; };
-					if (!coherence::enable())
-						std::transform(dst.data<structure>(), dst.data<structure>() + dst.size(), dst.data<structure>(), offset);
-					else
-						std::transform(dst.data<coherence>(), dst.data<coherence>() + dst.size(), dst.data<coherence>(), offset);
+					switch (weight::type()) {
+					default:
+					case structure::code:
+						std::transform(dst.data<structure>(), dst.data<structure>() + dst.size(), dst.data<structure>(), offset); break;
+					case coherence::code:
+						std::transform(dst.data<coherence>(), dst.data<coherence>() + dst.size(), dst.data<coherence>(), offset); break;
+					}
 				}
 			}
 			wght = weight(sign).sign();
@@ -1592,9 +1618,11 @@ struct method {
 	};
 
 	static method parse(utils::options opts, std::string name) {
-		if (weight::coherence::enable())
-			return method::specific<weight::coherence>::parse(opts, name);
-		return method::specific<weight::structure>::parse(opts, name);
+		switch (weight::type()) {
+		default:
+		case weight::structure::code: return method::specific<weight::structure>::parse(opts, name);
+		case weight::coherence::code: return method::specific<weight::coherence>::parse(opts, name);
+		}
 	}
 
 	inline static numeric& alpha() { static numeric a = numeric(0.0025); return a; }
@@ -1852,7 +1880,7 @@ statistic run(utils::options opts, std::string type) {
 
 	method spec = method::parse(opts, type);
 	clip<feature> feats = feature::feats();
-	bool cohen = weight::coherence::enable();
+	bool cohen = weight::type() == weight::coherence::code;
 	numeric alpha = method::alpha(opts[type]["alpha"].value(opts["alpha"].value(cohen ? 1.0 : 0.1))
 			/ opts[type]["norm"].value(opts["alpha"]["norm"].value(feats.size())));
 	numeric lambda = method::lambda(opts[type]["lambda"].value(opts["lambda"].value(0)));
@@ -2274,7 +2302,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << std::endl;
 
 	moporgic::srand(to_hash(opts["seed"]));
-	utils::config_segment(opts["alpha"]);
+	utils::config_weight(opts["alpha"]);
 	utils::config_shm(opts["thread"]);
 	utils::init_cache(opts["cache"]);
 
