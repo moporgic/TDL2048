@@ -206,23 +206,6 @@ public:
 		u32 code = 4;
 		read_cast<u8>(in, code);
 		switch (code) {
-		case 0:
-		case 1:
-		case 2: [&]() {
-			// read name, length, and value table
-			w.name = format("%08x", read<u32>(in));
-			w.raw = weight::alloc(w.length = read<u64>(in));
-			auto read_block = [blkz = (code == 2) ? read<u16>(in) : (code + 1) * 4](std::istream& in, auto data) {
-				if (blkz == 4) read_cast<f32>(in, data.begin(), data.end());
-				if (blkz == 8) read_cast<f64>(in, data.begin(), data.end());
-			};
-			if (weight::type() == structure::code) read_block(in, w.value<structure>());
-			if (weight::type() == coherence::code) read_block(in, w.value<coherence::unit<0>>());
-			// adjust display width, remove redundant padding '0'
-			u32 padz = 8 - (math::lg64(w.length) >> 2);
-			while (padz && w.name.substr(0, padz) != std::string(padz, '0')) padz--;
-			w.name = w.name.substr(padz);
-		}(); break;
 		default:
 		case 4: [&]() {
 			// read name (raw), block size, length, and value table
