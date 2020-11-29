@@ -212,21 +212,12 @@ public:
 			// read name, length, and value table
 			w.name = format("%08x", read<u32>(in));
 			w.raw = weight::alloc(w.length = read<u64>(in));
-			switch (weight::type()) {
-			default:
-			case structure::code:
-				switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
-				case 4: read_cast<f32>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
-				case 8: read_cast<f64>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
-				}
-				break;
-			case coherence::code:
-				switch ((code == 2) ? read<u16>(in) : (code == 1 ? 8 : 4)) {
-				case 4: read_cast<f32>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
-				case 8: read_cast<f64>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
-				}
-				break;
-			}
+			auto read_block = [blkz = (code == 2) ? read<u16>(in) : (code + 1) * 4](std::istream& in, auto data) {
+				if (blkz == 4) read_cast<f32>(in, data.begin(), data.end());
+				if (blkz == 8) read_cast<f64>(in, data.begin(), data.end());
+			};
+			if (weight::type() == structure::code) read_block(in, w.value<structure>());
+			if (weight::type() == coherence::code) read_block(in, w.value<coherence::unit<0>>());
 			// adjust display width, remove redundant padding '0'
 			u32 padz = 8 - (math::lg64(w.length) >> 2);
 			while (padz && w.name.substr(0, padz) != std::string(padz, '0')) padz--;
@@ -236,39 +227,30 @@ public:
 		case 4: [&]() {
 			// read name (raw), block size, length, and value table
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
-			u32 blkz = read<u16>(in);
+			auto read_block = [blkz = read<u16>(in)](std::istream& in, auto data) {
+				switch (blkz) { // binaries may typedef different numeric
+				case 2: read_cast<f16>(in, data.begin(), data.end()); break;
+				case 4: read_cast<f32>(in, data.begin(), data.end()); break;
+				case 8: read_cast<f64>(in, data.begin(), data.end()); break;
+				}
+			};
 			w.raw = weight::alloc(w.length = read<u64>(in));
 			switch (weight::type()) {
 			default:
 			case structure::code:
-				switch (blkz) { // different binaries may have different numeric typedef
-				case 2: read_cast<f16>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
-				case 4: read_cast<f32>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
-				case 8: read_cast<f64>(in, w.value<structure>().begin(), w.value<structure>().end()); break;
-				}
+				read_block(in, w.value<structure>());
 				break;
 			case coherence::code:
-				switch (blkz) {
-				case 2: read_cast<f16>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
-				case 4: read_cast<f32>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
-				case 8: read_cast<f64>(in, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end()); break;
-				}
-				// if coherence is enabled, try loading coherence parameters
-				size_t cohz = (blkz = read<u16>(in)) != 0 ? read<u64>(in) : 0;
-				if (cohz == w.length * 2) {
-					switch (blkz) {
-					case 2: read_cast<f16>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end());
-					        read_cast<f16>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
-					case 4: read_cast<f32>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end());
-					        read_cast<f32>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
-					case 8: read_cast<f64>(in, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end());
-					        read_cast<f64>(in, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end()); break;
-					}
-				} else in.ignore(blkz * cohz);
+				read_block(in, w.value<coherence::unit<0>>());
+				// also try loading coherence parameters
+				if (read<u16>(in) == 0) break;
+				in.ignore(8);
+				read_block(in, w.value<coherence::unit<1>>());
+				read_block(in, w.value<coherence::unit<2>>());
 				break;
 			}
 			// skip unrecognized fields
-			while ((blkz = read<u16>(in)) != 0) in.ignore(blkz * read<u64>(in));
+			for (u32 blkz; (blkz = read<u16>(in)); in.ignore(blkz * read<u64>(in)));
 			// finalize name and display width
 			if (raw_cast<u16>(w.name[6]) == 0) { // name is serialized as integer
 				u32 sign = raw_cast<u32>(w.name[0]);
