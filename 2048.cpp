@@ -46,12 +46,12 @@ Networks:
   -n, --network [TOKEN]...  specify the n-tuple network, default is 4x6patt
                             TOKEN is provided as either CONFIG or FEATURE
                             CONFIG=ALIAS[IOPT][WOPT] specifies a built-in list,
-                            > ALIAS can be 4x6patt,5x6patt,8x6patt,mono,num,...
+                            > ALIAS can be 4x6patt, 5x6patt, 8x6patt, mono, ...
                             FEATURE=WEIGHT[:INDEXES] specifies a n-tuple extractor
                             WEIGHT=SIGN[SIZE][WOPT] is a n-tuple LUT, where
-                            > SIGN specifies a LUT whose SIZE is [100|16^10|p|?]
+                            > SIGN specifies a LUT whose SIZE is 100|16^10|p|?
                             > WOPT is used to modify LUT as SIGN=MODIFY, where
-                              MODIFY can be initialize,adjust,duplicate,remove
+                              MODIFY can be initialize, adjust, duplicate, remove
                               as VINIT[/norm], +VADJUST[/norm], {SRC}, {}
                             INDEXES=INDEX[!][IOPT],... is related indexers, where
                             > INDEX specifies an indexer; if it is a pattern,
@@ -64,8 +64,8 @@ Recipes:
                             > mode: specify recipe routine, whose VALUE can be
                               > optimize:{forward|backward|lambda|step}
                               > evaluate:{best|random|reward}
-                            > loop,unit,win,info: execution and display settings
-                            > alpha,lambda,step: TD learning hyperparameters
+                            > loop, unit, win, info: execution settings
+                            > alpha, lambda, step: hyperparameters for training
                             1st OPT also accepts a special alias LOOP[xUNIT][:WIN]
                             if [OPT]... is unprovided, default is 1000x1000:2048
   -t, --optimize [OPT]...   alias for -r optimize [OPT]...
@@ -75,7 +75,7 @@ Recipes:
 
 Parameters:
   -a, --alpha ALPHA [NORM]  the learning rate, default is 0.1
-                            if NORM is unspecified, default is # of features
+                            a high learning rate 1.0 enables TC learning
   -l, --lambda LAMBDA       the TD-lambda, default is 0
   -N, --step STEP           the n-step, default is 1 if LAMBDA is 0; otherwise 5
   -u, --unit UNIT           the statistic display interval, default is 1000
@@ -94,7 +94,7 @@ Input/Output:
   -i, --input [FILE]...     specify inputs, support weight.w and cache.c
   -o, --output [FILE]...    specify outputs, support weight.w, cache.c, and log.x
                             for a weight, LUT range can be selected as RANGE|PATH,
-                            where RANGE specifies the LUT indexes as 0,1-2,3:4
+                            where RANGE specifies the LUT indexes as [0,1-2,3:4]
   -io [FILE]...             alias for -i [FILE]... -o [FILE]...
 
 Miscellaneous:
