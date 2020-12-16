@@ -226,7 +226,7 @@ public:
 			case coherence::code:
 				read_block(in, w.value<coherence::unit<0>>());
 				// also try loading coherence parameters
-				if (read<u16>(in) == 0) break;
+				if (read<u16>(in) == 0 && in.seekg(-2, std::ios::cur)) break;
 				in.ignore(8);
 				read_block(in, w.value<coherence::unit<1>>());
 				read_block(in, w.value<coherence::unit<2>>());
