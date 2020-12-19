@@ -150,9 +150,9 @@ public:
 			declare_comparators_with(const numeric&, operator [](i), v, constexpr inline);
 		};
 	};
-	static u32& type() { static u32 code = structure::code; return code; }
-	static u32& type(u32 code) { return type() = code; }
 	typedef structure segment;
+	static u32& type() { static u32 code = segment::code; return code; }
+	static u32& type(u32 code) { return type() = code; }
 
 	inline sign_t sign() const { return name; }
 	inline size_t size() const { return length; }
@@ -2241,20 +2241,17 @@ utils::options parse(int argc, const char* argv[]) {
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (!opts["recipes"].size()) opts["recipes"] = "optimize", opts["optimize"] = 1000;
-	if (!opts("alpha")) opts["alpha"] = 0.1;
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
-	if (!opts("lambda")) opts["lambda"] = 0;
-	if (!opts("step")) opts["step"] = opts["lambda"].value(0) ? 5 : 1;
 
 	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "Develop" << " Build GCC " __VERSION__ << " C++" << __cplusplus;
-	std::cout << " (" << __DATE_ISO__ << " " << __TIME__ ")" << std::endl;
+	std::cout << "Develop" << " (GCC " << __VERSION__ << " C++" << __cplusplus
+	          << " @ " << __DATE_ISO__ << " " << __TIME__ << ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
-	std::cout << "time = " << millisec() << " (" << moporgic::put_time(millisec()) << ")" << std::endl;
+	std::cout << "time = " << moporgic::put_time(millisec()) << std::endl;
 	std::cout << "seed = " << opts["seed"].value() << std::endl;
-	std::cout << "alpha = " << opts["alpha"].value("0.1") << std::endl;
+	std::cout << "alpha = " << opts["alpha"].value(weight::type() != weight::coherence::code ? "0.1" : "1.0") << std::endl;
 	std::cout << "lambda = " << opts["lambda"].value(0) << ", step = " << opts["step"].value(1) << std::endl;
 	std::cout << "search = " << opts["search"].value("1p") << ", cache = " << opts["cache"].value("none") << std::endl;
 	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
