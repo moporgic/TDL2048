@@ -135,7 +135,10 @@ public:
 		inline constexpr coherence() : structure(), accum(cinit), updvu(cinit) {}
 		inline constexpr coherence(const coherence& c) = default;
 		inline constexpr coherence& operator =(const coherence& c) = default;
-		inline constexpr numeric& operator =(numeric v) { return value = v; }
+		inline constexpr numeric& operator =(numeric v) {
+			accum = updvu = cinit;
+			return value = v;
+		}
 		inline constexpr numeric& operator +=(numeric delta) {
 			value += delta * (std::abs(accum) / updvu);
 			accum += delta;
@@ -179,21 +182,24 @@ public:
 			} catch (std::logic_error&) { // otherwise, write it as string
 				out.write(w.sign().append(8, ' ').c_str(), 8);
 			}
+			auto write_unit = [](std::ostream& out, auto data) {
+				write_cast<numeric>(out, data.begin(), data.end());
+			};
 			switch (weight::type()) { // write value table
 			default:
 			case structure::code:
 				write_cast<u16>(out, sizeof(numeric));
 				write_cast<u64>(out, w.size());
-				write_cast<numeric>(out, w.value<structure>().begin(), w.value<structure>().end());
+				write_unit(out, w.value<structure>());
 				break;
 			case coherence::code: // also write coherence tables if enabled
 				write_cast<u16>(out, sizeof(numeric));
 				write_cast<u64>(out, w.size());
-				write_cast<numeric>(out, w.value<coherence::unit<0>>().begin(), w.value<coherence::unit<0>>().end());
+				write_unit(out, w.value<coherence::unit<0>>());
 				write_cast<u16>(out, sizeof(numeric));
 				write_cast<u64>(out, w.size() + w.size());
-				write_cast<numeric>(out, w.value<coherence::unit<1>>().begin(), w.value<coherence::unit<1>>().end());
-				write_cast<numeric>(out, w.value<coherence::unit<2>>().begin(), w.value<coherence::unit<2>>().end());
+				write_unit(out, w.value<coherence::unit<1>>());
+				write_unit(out, w.value<coherence::unit<2>>());
 				break;
 			}
 			// reserved for additional fields
@@ -210,7 +216,7 @@ public:
 		case 4: [&]() {
 			// read name (raw), block size, length, and value table
 			in.read(const_cast<char*>(w.name.assign(8, ' ').data()), 8);
-			auto read_block = [blkz = read<u16>(in)](std::istream& in, auto data) {
+			auto read_unit = [blkz = read<u16>(in)](std::istream& in, auto data) {
 				switch (blkz) { // binaries may typedef different numeric
 				case 2: read_cast<f16>(in, data.begin(), data.end()); break;
 				case 4: read_cast<f32>(in, data.begin(), data.end()); break;
@@ -221,15 +227,15 @@ public:
 			switch (weight::type()) {
 			default:
 			case structure::code:
-				read_block(in, w.value<structure>());
+				read_unit(in, w.value<structure>());
 				break;
 			case coherence::code:
-				read_block(in, w.value<coherence::unit<0>>());
+				read_unit(in, w.value<coherence::unit<0>>());
 				// also try loading coherence parameters
 				if (read<u16>(in) == 0 && in.seekg(-2, std::ios::cur)) break;
 				in.ignore(8);
-				read_block(in, w.value<coherence::unit<1>>());
-				read_block(in, w.value<coherence::unit<2>>());
+				read_unit(in, w.value<coherence::unit<1>>());
+				read_unit(in, w.value<coherence::unit<2>>());
 				break;
 			}
 			// skip unrecognized fields
