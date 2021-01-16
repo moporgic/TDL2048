@@ -236,6 +236,9 @@ public:
 				in.ignore(8);
 				read_unit(in, w.value<coherence::unit<1>>());
 				read_unit(in, w.value<coherence::unit<2>>());
+				// fix legacy coherence::cinit == 0
+				for (coherence& c : w.value<coherence>())
+					if (c.updvu == 0) c = numeric(c);
 				break;
 			}
 			// skip unrecognized fields
