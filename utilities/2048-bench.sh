@@ -70,25 +70,24 @@ compare() {
 #       configurable variables: recipes, networks, threads, N_init, N_load
 benchmark() {
 	echo TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")
-	sleep 1
-	if [ -e init ] || [ -e load ]; then
-		echo "Error: \"init\" and \"load\" are reserved names" >&2
-		exit 7
-	fi
 
 	recipes="${@:-${recipes:-2048}}"
 	networks="${networks:-"4x6patt 8x6patt"}"
 	threads="${threads:-"single multi"}"
 
+	if [ -e init ] || [ -e load ]; then
+		echo "Error: \"init\" and \"load\" are reserved names" >&2
+		exit 7
+	fi
 	(( ${N_load:-4} )) && for network in $networks; do
 		[ -e $network.w ] && continue
-		read -p "Download $network.w from moporgic.info? [Y/n] " >&2
-		[[ $REPLY =~ ^[Nn] ]] && continue
-		wget -nv "moporgic.info/data/2048/$network.w.xz" >&2 || continue
-		pixz -kd $network.w.xz || xz -kd $network.w.xz
-		touch -r $network.w.xz $network.w && rm $network.w.xz
+		echo "Retrieving \"$network.w\" from moporgic.info..." >&2
+		curl -OJRfs moporgic.info/data/2048/$network.w.xz && xz -d $network.w.xz || {
+			echo "Error: \"$network.w\" not available" >&2
+			exit 8
+		}
 	done
-	sleep 9
+	sleep 10
 
 	for recipe in $recipes; do
 		[ -e $recipe ] && runas=./$recipe || runas=$recipe
