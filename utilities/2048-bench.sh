@@ -71,9 +71,9 @@ compare() {
 benchmark() {
 	echo TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")
 
-	recipes="${@:-${recipes:-2048}}"
-	networks="${networks:-"4x6patt 8x6patt"}"
-	threads="${threads:-"single multi"}"
+	recipes=${@:-${recipes:-2048}}
+	networks=${networks:-4x6patt 8x6patt}
+	threads=${threads:-single multi}
 
 	if [ -e init ] || [ -e load ]; then
 		echo "Error: \"init\" and \"load\" are reserved names" >&2
@@ -122,10 +122,53 @@ benchmark() {
 	done
 }
 
-# execute benchmark automatically if recipes are given
-if (( $# )); then
-	benchmark "$@" | tee -a 2048-bench.log
-else # otherwise, print help info
+if (( $# + ${#recipes} )); then # execute benchmarks if recipes are given
+	while (( $# )); do
+		case $1 in
+		-D*|--develop*|--default*) develop=$1; ;;
+		-p*|--profile-lite*)       profile_type=lite; ;&
+		-P*|--profile*)            profile=$1; ;;
+		*)                         recipes+=${recipes:+ }$1; ;;
+		esac; shift
+	done
+	output() { tee -a 2048-bench.log; }
+	prefix() { xargs -d\\n -n1 echo \>; }
+	x6patt() { sed -u "s/x6patt//g" | egrep -o [0-9] | xargs -I% echo %x6patt; }
+	if [[ $recipes ]]; then ( # execute dedicated benchmarks
+		[[ $develop$profile ]] && echo ========= Benchmarking Dedicated TDL2048+ ==========
+		benchmark $recipes | output || exit $?
+	) fi
+	if [[ $develop ]]; then ( # build and benchmark default develop
+		[[ $develop =~ ^-.[0-9]+$ ]] && networks=$(x6patt <<< $develop)
+		[[ $develop =~ ^-.+=(.+)$ ]] && networks=${BASH_REMATCH[1]//,/ }
+		echo ============= Building Default Develop =============
+		make | prefix && mv 2048 2048-develop || exit $?
+		echo =========== Benchmarking Default Develop ===========
+		networks=$networks benchmark 2048-develop | output || exit $?
+	) fi
+	if [[ $profile ]]; then ( # build and benchmark profiled develop
+		[[ $profile =~ ^-.[0-9]+$ ]] && networks=$(x6patt <<< $profile)
+		[[ $profile =~ ^-.+=(.+)$ ]] && networks=${BASH_REMATCH[1]//,/ }
+		output-fix() { output; }
+		prefix-fix() { sed -u "/^>/d" | prefix; }
+		profiled-recipes() { echo 2048-$network 2048-$network-t 2048-$network-e; }
+		[ ${profile_type:-full} != full ] && profiled-recipes() { echo 2048-$network; }
+		for network in ${networks:-4x6patt 8x6patt}; do
+			echo ======== Building $network-Profiled Develop =========
+			make $network | prefix-fix && mv 2048 2048-$network || exit $?
+			if [ ${profile_type:-full} == full ]; then
+				make $network PGO_EVAL=0 | prefix-fix && mv 2048 2048-$network-t || exit $?
+				make $network PGO_OPTI=0 | prefix-fix && mv 2048 2048-$network-e || exit $?
+			fi
+		done
+		echo ========== Benchmarking Profiled Develop ===========
+		for network in ${networks:-4x6patt 8x6patt}; do
+			networks=$network benchmark $(profiled-recipes) | output-fix || exit $?
+			output-fix() { tail -n+2 | output; }
+		done
+	) fi
+elif [ "$0" != "$BASH_SOURCE" ]; then # otherwise print help info if script is sourced
+	echo "=========== Benchmarking Scripts Manual ============"
 	echo "usage: test [binary:./2048] [attempt:10000|$(nproc)0]"
 	echo "       available suffixes are -st -mt -e-st -e-mt"
 	echo "usage: bench [binary:./2048] [attempt:10]"
