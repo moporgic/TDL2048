@@ -1062,7 +1062,7 @@ std::string resolve(const std::string& token) {
 void make_network(utils::options::option opt) {
 	std::string tokens = opt;
 	if (tokens.empty() && feature::feats().empty())
-		tokens = "default";
+		tokens = weight::wghts().size() ? format("%ux6patt", weight::wghts().size()) : "default";
 
 	const auto npos = std::string::npos;
 	for (size_t i; (i = tokens.find(" norm")) != npos; tokens[i] = '/');
@@ -1549,7 +1549,7 @@ struct method {
 		static method parse(utils::options opts, std::string name) {
 			std::string spec = opts["options"]["spec"].value("auto");
 			if (spec == "auto" || spec == "on" || spec == "default") {
-				spec = opts["make"].value("4x6patt");
+				spec = opts["make"].value(format("%ux6patt", weight::wghts().size()));
 				spec = spec.substr(0, spec.find_first_of("&|="));
 			}
 
