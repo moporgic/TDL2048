@@ -164,7 +164,7 @@ if (( $# + ${#recipes} )); then # execute benchmarks if recipes are given
 		echo ========== Benchmarking Profiled Develop ===========
 		for network in ${networks:-4x6patt 8x6patt}; do
 			networks=$network benchmark $(profiled-recipes) | output-fix || exit $?
-			output-fix() { tail -n+2 | output; }
+			output-fix() { stdbuf -o0 tail -n+2 | output; }
 		done
 	) fi
 elif [ "$0" != "$BASH_SOURCE" ]; then # otherwise print help info if script is sourced
