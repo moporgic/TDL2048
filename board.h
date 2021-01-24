@@ -884,7 +884,18 @@ public:
 		x |= (x >> 2);
 		x |= (x >> 1);
 		u32 e = ext ^ (i32((t & 0x10) << 27) >> 15 /*(t & 0x10) ? 0xffff0000 : 0x00000000*/);
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_WHERE)
 		return ~x & math::pdep64(~e >> 16, 0x1111111111111111ull);
+#else
+		u64 w = ~e >> 16;
+		w |= (w << 24);
+		w |= (w << 12);
+		w &= 0x000f000f000f000full;
+		w |= (w << 6);
+		w |= (w << 3);
+		w &= 0x1111111111111111ull;
+		return ~x & w;
+#endif
 	}
 
 	inline constexpr u32 mask(u32 t) const { return mask64(t); }
@@ -892,7 +903,17 @@ public:
 		u64 x = raw ^ (t * 0x1111111111111111ull);
 		x |= (x >> 2);
 		x |= (x >> 1);
-		return math::pext(~x, 0x1111111111111111ull);
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_MASK)
+		return math::pext64(~x, 0x1111111111111111ull);
+#else
+		x = ~x & 0x1111111111111111ull;
+		x |= (x >> 3);
+		x |= (x >> 6);
+		x &= 0x000f000f000f000full;
+		x |= (x >> 12);
+		x |= (x >> 24);
+		return x & 0xffffu;
+#endif
 	}
 	inline constexpr u32 mask80(u32 t) const {
 		return mask64(t & 0x0f) & (~(ext ^ (i32((t & 0x10) << 27) >> 15)) >> 16);
