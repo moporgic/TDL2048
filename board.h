@@ -258,17 +258,37 @@ public:
 	}
 	inline constexpr void put80(u64 where, u32 t) {
 		put64(where, t & 0x0f);
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_PUT)
 		u32 w = math::pext64(where, 0x1111111111111111ull) << 16;
-		ext = (ext & ~w) | ((i32((t & 0x10) << 27) >> 15) & w);
+#else
+		where |= where >> 3;
+		where |= where >> 6;
+		where &= 0x000f000f000f000full;
+		where |= where >> 12;
+		where |= where >> 24;
+		u32 w = (where & 0xffffu) << 16;
+#endif
+		ext = (ext ^ (ext & w)) | (t & 0x10 ? w : 0);
 	}
 	inline constexpr void put(u16 mask, u32 t) { return put64(mask, t); }
 	inline constexpr void put64(u16 mask, u32 t) {
-		return put64(math::pdep64(mask, 0x1111111111111111ull), t);
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_PUT)
+		u64 where = math::pdep64(mask, 0x1111111111111111ull);
+#else
+		u64 where = mask;
+		where |= where << 24;
+		where |= where << 12;
+		where &= 0x000f000f000f000full;
+		where |= where << 6;
+		where |= where << 3;
+		where &= 0x1111111111111111ull;
+#endif
+		return put64(where, t);
 	}
 	inline constexpr void put80(u16 mask, u32 t) {
 		put64(mask, t & 0x0f);
 		u32 w = mask << 16;
-		ext = (ext & ~w) | ((i32((t & 0x10) << 27) >> 15) & w);
+		ext = (ext ^ (ext & w)) | (t & 0x10 ? w : 0);
 	}
 
 	inline constexpr void mirror() { mirror64(); }
