@@ -554,48 +554,10 @@ public:
 	}
 
 	inline void moves(board& U, board& R, board& D, board& L) const {
-#if !defined(__AVX2__) || defined(PREFER_LUT_MOVES)
 		return moves64(U, R, D, L);
-#else  // use AVX2 instead of lookup
-		return moves64x(U, R, D, L);
-#endif // __AVX2__
 	}
 	inline void moves64(board& U, board& R, board& D, board& L) const {
-		U = R = D = L = board();
-
-		qrow16(0).moveh64<0>(L, R);
-		qrow16(1).moveh64<1>(L, R);
-		qrow16(2).moveh64<2>(L, R);
-		qrow16(3).moveh64<3>(L, R);
-		L.inf |= (L.raw ^ raw) ? 0 : -1;
-		R.inf |= (R.raw ^ raw) ? 0 : -1;
-
-		qcol16(0).movev64<0>(U, D);
-		qcol16(1).movev64<1>(U, D);
-		qcol16(2).movev64<2>(U, D);
-		qcol16(3).movev64<3>(U, D);
-		U.inf |= (U.raw ^ raw) ? 0 : -1;
-		D.inf |= (D.raw ^ raw) ? 0 : -1;
-	}
-	inline void moves80(board& U, board& R, board& D, board& L) const {
-		U = R = D = L = board();
-
-		qrow20(0).moveh80<0>(L, R);
-		qrow20(1).moveh80<1>(L, R);
-		qrow20(2).moveh80<2>(L, R);
-		qrow20(3).moveh80<3>(L, R);
-		L.inf |= (L.raw ^ raw) | (L.ext ^ ext) ? 0 : -1;
-		R.inf |= (R.raw ^ raw) | (R.ext ^ ext) ? 0 : -1;
-
-		qcol20(0).movev80<0>(U, D);
-		qcol20(1).movev80<1>(U, D);
-		qcol20(2).movev80<2>(U, D);
-		qcol20(3).movev80<3>(U, D);
-		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
-		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
-	}
-#ifdef __AVX2__
-	inline void moves64x(board& U, board& R, board& D, board& L) const {
+#if defined(__AVX2__) && !defined(PREFER_LUT_MOVES)
 		__m256i dst, buf, rbf, rwd, chk;
 
 		// use left for all 4 directions, transpose and mirror first
@@ -677,8 +639,42 @@ public:
 		R.inf = _mm256_extract_epi32(rwd, 2);
 		D.inf = _mm256_extract_epi32(rwd, 4);
 		L.inf = _mm256_extract_epi32(rwd, 6);
+
+#else // if AVX2 is unavailable or disabled
+		U = R = D = L = board();
+
+		qrow16(0).moveh64<0>(L, R);
+		qrow16(1).moveh64<1>(L, R);
+		qrow16(2).moveh64<2>(L, R);
+		qrow16(3).moveh64<3>(L, R);
+		L.inf |= (L.raw ^ raw) ? 0 : -1;
+		R.inf |= (R.raw ^ raw) ? 0 : -1;
+
+		qcol16(0).movev64<0>(U, D);
+		qcol16(1).movev64<1>(U, D);
+		qcol16(2).movev64<2>(U, D);
+		qcol16(3).movev64<3>(U, D);
+		U.inf |= (U.raw ^ raw) ? 0 : -1;
+		D.inf |= (D.raw ^ raw) ? 0 : -1;
+#endif
 	}
-#endif // __AVX2__
+	inline void moves80(board& U, board& R, board& D, board& L) const {
+		U = R = D = L = board();
+
+		qrow20(0).moveh80<0>(L, R);
+		qrow20(1).moveh80<1>(L, R);
+		qrow20(2).moveh80<2>(L, R);
+		qrow20(3).moveh80<3>(L, R);
+		L.inf |= (L.raw ^ raw) | (L.ext ^ ext) ? 0 : -1;
+		R.inf |= (R.raw ^ raw) | (R.ext ^ ext) ? 0 : -1;
+
+		qcol20(0).movev80<0>(U, D);
+		qcol20(1).movev80<1>(U, D);
+		qcol20(2).movev80<2>(U, D);
+		qcol20(3).movev80<3>(U, D);
+		U.inf |= (U.raw ^ raw) | (U.ext ^ ext) ? 0 : -1;
+		D.inf |= (D.raw ^ raw) | (D.ext ^ ext) ? 0 : -1;
+	}
 
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves(btype move[]) const   { moves(move[0], move[1], move[2], move[3]); }
@@ -686,17 +682,10 @@ public:
 	inline void moves64(btype move[]) const { moves64(move[0], move[1], move[2], move[3]); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves80(btype move[]) const { moves80(move[0], move[1], move[2], move[3]); }
-#ifdef __AVX2__
-	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline void moves64x(btype move[]) const { moves64x(move[0], move[1], move[2], move[3]); }
-#endif // __AVX2__
 
 	inline std::array<board, 4> moves() const   { std::array<board, 4> move; moves(move.data()); return move; }
 	inline std::array<board, 4> moves64() const { std::array<board, 4> move; moves64(move.data()); return move; }
 	inline std::array<board, 4> moves80() const { std::array<board, 4> move; moves80(move.data()); return move; }
-#ifdef __AVX2__
-	inline std::array<board, 4> moves64x() const { std::array<board, 4> move; moves64x(move.data()); return move; }
-#endif // __AVX2__
 
 	class action {
 	public:
