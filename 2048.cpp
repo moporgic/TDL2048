@@ -584,11 +584,13 @@ template<u32... patt>
 inline constexpr u32 order() {
 	if (sizeof...(patt) > 8 || sizeof...(patt) == 0) return -1;
 	constexpr u32 x[] = { patt... };
-	for (u32 i = 1; i < sizeof...(patt); i++)
-		if (x[i] <= x[i - 1]) return 0; // unordered or duplicated, e.g. {4,3,2,1} or {0,1,2,2}
-	for (u32 i = 1; i < sizeof...(patt); i++)
-		if (x[i] != x[i - 1] + 1) return 1; // ordered, e.g. {0,1,2,4}
-	return 2; // strictly ordered, e.g. {0,1,2,3}
+	for (u32 i = 1; i < sizeof...(patt); i++) if (x[i] <= x[i - 1])     return 0; // unordered
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_INDEXPT_ORDER)
+	for (u32 i = 1; i < sizeof...(patt); i++) if (x[i] != x[i - 1] + 1) return 1; // ordered
+#else
+	for (u32 i = 1; i < sizeof...(patt); i++) if (x[i] != x[i - 1] + 1) return 0; // ordered (fall back)
+#endif
+	return 2; // strictly ordered
 }
 
 template<u32... patt>
