@@ -196,20 +196,44 @@ public:
 
 	inline constexpr u32 col(u32 i) const { return col16(i); }
 	inline constexpr u32 col16(u32 i) const {
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_COL)
 		return math::pext64(raw, 0x000f000f000f000full << (i << 2));
+#else
+		return (u32(raw >> ((i << 2) +  0)) & 0x000fu) | (u32(raw >> ((i << 2) + 12)) & 0x00f0u) |
+		       (u32(raw >> ((i << 2) + 24)) & 0x0f00u) | (u32(raw >> ((i << 2) + 36)) & 0xf000u);
+#endif
 	}
 	inline constexpr u32 col20(u32 i) const {
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_COL)
 		return col16(i) | (math::pext32(ext, 0x11110000u << i) << 16);
+#else
+		return col16(i) | (u32(ext >> (i + 0)) & 0x10000u) | (u32(ext >> (i + 3)) & 0x20000u) |
+		                  (u32(ext >> (i + 6)) & 0x40000u) | (u32(ext >> (i + 9)) & 0x80000u);
+#endif
 	}
 	inline constexpr void col(u32 i, u32 c) { col16(i, c); }
 	inline constexpr void col16(u32 i, u32 c) {
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_COL)
 		u64 m = 0x000f000f000f000full << (i << 2);
 		raw = (raw & ~m) | math::pdep64(c, m);
+#else
+		at4(i +  0, (c >>  0) & 0xfu);
+		at4(i +  4, (c >>  4) & 0xfu);
+		at4(i +  8, (c >>  8) & 0xfu);
+		at4(i + 12, (c >> 12) & 0xfu);
+#endif
 	}
 	inline constexpr void col20(u32 i, u32 c) {
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_COL)
 		col16(i, c & 0xffff);
 		u32 m = 0x11110000u << i;
 		ext = (ext & ~m) | math::pdep32(c >> 16, m);
+#else
+		at5(i +  0, ((c >>  0) & 0xfu) | ((c >> 12) & 0x10u));
+		at5(i +  4, ((c >>  4) & 0xfu) | ((c >> 13) & 0x10u));
+		at5(i +  8, ((c >>  8) & 0xfu) | ((c >> 14) & 0x10u));
+		at5(i + 12, ((c >> 12) & 0xfu) | ((c >> 15) & 0x10u));
+#endif
 	}
 
 	inline constexpr u32 at(u32 i) const { return at4(i); }
