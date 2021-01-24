@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : TDL2048+ - board.h
 // Author      : Hung Guei @ moporgic
-// Version     : 6.0
+// Version     : 6.1
 // Description : The Most Effective Bitboard Implementation for 2048
 //============================================================================
 
@@ -315,7 +315,7 @@ public:
 
 	inline constexpr void transpose() { transpose64(); }
 	inline constexpr void transpose64() {
-#if defined(__BMI2__) && !defined(PREFER_XOR_TRANSPOSE)
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_TRANSPOSE)
 		raw = (math::pext64(raw, 0x000f000f000f000full) <<  0) | (math::pext64(raw, 0x00f000f000f000f0ull) << 16)
 		    | (math::pext64(raw, 0x0f000f000f000f00ull) << 32) | (math::pext64(raw, 0xf000f000f000f000ull) << 48);
 #else
@@ -328,7 +328,7 @@ public:
 	}
 	inline constexpr void transpose80() {
 		transpose64();
-#if defined(__BMI2__) && !defined(PREFER_XOR_TRANSPOSE)
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_TRANSPOSE)
 		ext = (math::pext32(ext, 0x11110000u) << 16) | (math::pext32(ext, 0x22220000u) << 20)
 			| (math::pext32(ext, 0x44440000u) << 24) | (math::pext32(ext, 0x88880000u) << 28);
 #else
@@ -421,14 +421,26 @@ public:
 		u64 x = where64(0);
 		u32 e = math::popcnt64(x);
 		u32 u = moporgic::rand();
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_NEXT)
 		u64 t = math::nthset64(x, (u >> 16) % e);
+#else
+		u32 k = (u >> 16) % e;
+		while (k--) x &= x - 1;
+		u64 t = x & -x;
+#endif
 		raw |= (t << (u % 10 ? 0 : 1));
 	}
 	inline void next80() {
 		u64 x = where80(0);
 		u32 e = math::popcnt64(x);
 		u32 u = moporgic::rand();
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_NEXT)
 		u64 t = math::nthset64(x, (u >> 16) % e);
+#else
+		u32 k = (u >> 16) % e;
+		while (k--) x &= x - 1;
+		u64 t = x & -x;
+#endif
 		raw |= (t << (u % 10 ? 0 : 1));
 	}
 
