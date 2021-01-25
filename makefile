@@ -1,13 +1,13 @@
-STD ?= c++1y
+STD ?= c++14
 OLEVEL ?= 3
 ARCH ?= tune=native
 INSTS ?= abm bmi bmi2 avx avx2
-DEFINES := $(shell echo | gcc -x c++ -march=native -dM -E -)
-ifneq ($(findstring __BMI2__, $(DEFINES)), __BMI2__)
-	INSTS := $(filter-out abm bmi bmi2, popcnt $(INSTS))
+MACROS := $(shell echo | gcc -x c++ -march=native -dM -E -)
+ifneq ($(findstring $(or $(BMI2), BMI2), $(MACROS)), BMI2)
+	INSTS := $(filter-out abm bmi bmi2, popcnt $(INSTS) no-bmi2)
 endif
-ifneq ($(findstring __AVX2__, $(DEFINES)), __AVX2__)
-	INSTS := $(filter-out avx avx2, $(INSTS))
+ifneq ($(findstring $(or $(AVX2), AVX2), $(MACROS)), AVX2)
+	INSTS := $(filter-out avx avx2, $(INSTS) no-avx2)
 endif
 FLAGS ?= -Wall -fmessage-length=0
 OUTPUT ?= 2048
@@ -23,7 +23,7 @@ static:
 	@+make --no-print-directory default ARCH="tune=generic" FLAGS="-pthread $(FLAGS) -static"
 
 native:
-	@+make --no-print-directory default ARCH="arch=native" INSTS=
+	@+make --no-print-directory default ARCH="arch=native"
 
 profile:
 	@+make --no-print-directory $(TARGET) FLAGS="$(filter-out -g, $(FLAGS)) -fprofile-generate"
