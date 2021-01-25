@@ -599,12 +599,30 @@ inline constexpr typename std::enable_if<order<patt...>() == 0, u64>::type index
 	for (u32 p : { patt... }) index += b.at(p) << (n++ << 2);
 	return index;
 }
+
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_INDEXPT_ORDER)
 template<u32... patt>
 inline constexpr typename std::enable_if<order<patt...>() == 1, u64>::type indexpt(const board& b) {
 	u64 mask = 0;
 	for (u64 p : { patt... }) mask |= 0xfull << (p << 2);
 	return math::pext64(b, mask);
 }
+#elif !defined(PREFER_LEGACY_INDEXPT_ORDER) // specialize common ordered patterns when BMI2 is unavailable
+template<> u64 indexpt<0x0,0x1,0x4,0x5>(const board& b) { return ((u64(b)) & 0x00ff) | ((u64(b) >> 8) & 0xff00); }
+template<> u64 indexpt<0x1,0x2,0x5,0x6>(const board& b) { return ((u64(b) >> 4) & 0x00ff) | ((u64(b) >> 12) & 0xff00); }
+template<> u64 indexpt<0x5,0x6,0x9,0xa>(const board& b) { return ((u64(b) >> 20) & 0x00ff) | ((u64(b) >> 28) & 0xff00); }
+template<> u64 indexpt<0x0,0x1,0x2,0x4,0x5>(const board& b) { return ((u64(b)) & 0x00fff) | (((u64(b)) >> 4) & 0xff000); }
+template<> u64 indexpt<0x4,0x5,0x6,0x8,0x9>(const board& b) { return ((u64(b) >> 16) & 0x00fff) | ((u64(b) >> 20) & 0xff000); }
+template<> u64 indexpt<0x0,0x1,0x2,0x3,0x5>(const board& b) { return ((u64(b)) & 0x0ffff) | ((u64(b) >> 4) & 0xf0000); }
+template<> u64 indexpt<0x4,0x5,0x6,0x7,0x9>(const board& b) { return ((u64(b) >> 16) & 0x0ffff) | ((u64(b) >> 20) & 0xf0000); }
+template<> u64 indexpt<0x0,0x1,0x2,0x4,0x5,0x6>(const board& b) { return ((u64(b)) & 0x000fff) | (((u64(b)) >> 4) & 0xfff000); }
+template<> u64 indexpt<0x4,0x5,0x6,0x8,0x9,0xa>(const board& b) { return ((u64(b) >> 16) & 0x000fff) | ((u64(b) >> 20) & 0xfff000); }
+template<> u64 indexpt<0x2,0x3,0x4,0x5,0x6,0x9>(const board& b) { return ((u64(b) >> 8) & 0x0fffff) | ((u64(b) >> 16) & 0xf00000); }
+template<> u64 indexpt<0x0,0x1,0x2,0x5,0x9,0xa>(const board& b) { return ((u64(b)) & 0x000fff) | ((u64(b) >> 8) & 0x00f000) | ((u64(b) >> 20) & 0xff0000); }
+template<> u64 indexpt<0x1,0x3,0x4,0x5,0x6,0x7>(const board& b) { return ((u64(b) >> 4) & 0x00000f) | ((u64(b) >> 8) & 0xfffff0); }
+template<> u64 indexpt<0x0,0x1,0x4,0x8,0x9,0xa>(const board& b) { return ((u64(b)) & 0x0000ff) | ((u64(b) >> 8) & 0x000f00) | ((u64(b) >> 20) & 0xfff000); }
+#endif
+
 template<u32 p, u32... x>
 inline constexpr typename std::enable_if<order<p, x...>() == 2, u64>::type indexpt(const board& b) {
 	return u32(u64(b) >> (p << 2)) & u32((1ull << ((sizeof...(x) + 1) << 2)) - 1);
