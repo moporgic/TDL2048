@@ -15,7 +15,9 @@
 #include <numeric>
 #include <iterator>
 #include <algorithm>
+#if defined __x86_64__ || defined __i386__
 #include <x86intrin.h>
+#endif
 
 namespace moporgic {
 
@@ -551,10 +553,17 @@ static inline constexpr uint64_t nlpo2(register uint64_t x) noexcept {
  * bit extraction
  * to use these functions, compile flag -mbmi is necessary
  */
+#if (defined __x86_64__ || defined __i386__) && !defined PREFER_GENERAL_INSTRUCTIONS
 static inline constexpr uint64_t bextr64(register uint64_t x, register uint32_t off, register uint32_t len) noexcept { // return _bextr_u64(x, off, len); }
 	return __builtin_ia32_bextr_u64(x, (off & 0xff) | ((len & 0xff) << 8)); }
 static inline constexpr uint32_t bextr32(register uint32_t x, register uint32_t off, register uint32_t len) noexcept { // return _bextr_u32(x, off, len); }
 	return __builtin_ia32_bextr_u32(x, (off & 0xff) | ((len & 0xff) << 8)); }
+#else
+static inline constexpr uint64_t bextr64(register uint64_t x, register uint32_t off, register uint32_t len) noexcept { // return _bextr_u64(x, off, len); }
+	return (x >> off) & ((1ull << len) - 1); }
+static inline constexpr uint32_t bextr32(register uint32_t x, register uint32_t off, register uint32_t len) noexcept { // return _bextr_u32(x, off, len); }
+	return (x >> off) & ((1u << len) - 1); }
+#endif
 static inline constexpr uint64_t bextr(register uint64_t x, register uint32_t off, register uint32_t len) noexcept { return bextr64(x, off, len); }
 static inline constexpr uint32_t bextr(register uint32_t x, register uint32_t off, register uint32_t len) noexcept { return bextr32(x, off, len); }
 
@@ -562,16 +571,35 @@ static inline constexpr uint32_t bextr(register uint32_t x, register uint32_t of
  * Parallel bit deposit and extract: PEXT and PDEP
  * to use these functions, compile flag -mbmi2 is necessary
  */
+#if (defined __x86_64__ || defined __i386__) && !defined PREFER_GENERAL_INSTRUCTIONS
 static inline constexpr uint64_t pdep64(register uint64_t a, register uint64_t mask) noexcept { // return _pdep_u64(a, mask); }
 	return __builtin_ia32_pdep_di(a, mask); }
 static inline constexpr uint32_t pdep32(register uint32_t a, register uint32_t mask) noexcept { // return _pdep_u32(a, mask); }
 	return __builtin_ia32_pdep_si(a, mask); }
-static inline constexpr uint64_t pdep(register uint64_t a, register uint64_t mask) noexcept { return pdep64(a, mask); }
-static inline constexpr uint32_t pdep(register uint32_t a, register uint32_t mask) noexcept { return pdep32(a, mask); }
 static inline constexpr uint64_t pext64(register uint64_t a, register uint64_t mask) noexcept { // return _pext_u64(a, mask); }
 	return __builtin_ia32_pext_di(a, mask); }
 static inline constexpr uint32_t pext32(register uint32_t a, register uint32_t mask) noexcept { // return _pext_u32(a, mask); }
 	return __builtin_ia32_pext_si(a, mask); }
+#else
+static inline constexpr uint64_t pdep64(register uint64_t a, register uint64_t mask) noexcept {
+	uint64_t dep = 0;
+	for (;a; a >>= 1, mask &= (mask - 1))
+		dep |= math::lsb64(mask) & ((a & 1) ? -1ull : 0);
+	return dep;
+}
+static inline constexpr uint32_t pdep32(register uint32_t a, register uint32_t mask) noexcept {
+	return pdep64(a, mask); }
+static inline constexpr uint64_t pext64(register uint64_t a, register uint64_t mask) noexcept {
+	uint64_t ext = 0;
+	for (uint32_t off = 0; mask; mask &= (mask - 1), off++)
+		ext |= ((a & math::lsb64(mask)) ? 1ull : 0) << off;
+	return ext;
+}
+static inline constexpr uint32_t pext32(register uint32_t a, register uint32_t mask) noexcept {
+	return pext64(a, mask); }
+#endif
+static inline constexpr uint64_t pdep(register uint64_t a, register uint64_t mask) noexcept { return pdep64(a, mask); }
+static inline constexpr uint32_t pdep(register uint32_t a, register uint32_t mask) noexcept { return pdep32(a, mask); }
 static inline constexpr uint64_t pext(register uint64_t a, register uint64_t mask) noexcept { return pext64(a, mask); }
 static inline constexpr uint32_t pext(register uint32_t a, register uint32_t mask) noexcept { return pext32(a, mask); }
 
@@ -589,10 +617,17 @@ static inline constexpr uint32_t nthset(register uint32_t x, register uint32_t n
  * Bit rotation
  * enable compile flag -mbmi2 may provide better performance (RORX)
  */
+#if (defined __x86_64__ || defined __i386__) && !defined PREFER_GENERAL_INSTRUCTIONS
 static inline constexpr uint8_t  rol8 (register uint8_t x,  register uint32_t n) noexcept {
 	return __builtin_ia32_rolqi(x, n); /* __rolb(x, n) */ }
 static inline constexpr uint16_t rol16(register uint16_t x, register uint32_t n) noexcept {
 	return __builtin_ia32_rolhi(x, n); /* __rolw(x, n) */ }
+#else
+static inline constexpr uint8_t  rol8 (register uint8_t x,  register uint32_t n) noexcept {
+	return (x << n) | (x >> (8 - n)); }
+static inline constexpr uint16_t rol16(register uint16_t x, register uint32_t n) noexcept {
+	return (x << n) | (x >> (16 - n)); }
+#endif
 static inline constexpr uint32_t rol32(register uint32_t x, register uint32_t n) noexcept {
 	return (x << n) | (x >> (32 - n)); /* __rold(x, n) */ }
 static inline constexpr uint64_t rol64(register uint64_t x, register uint32_t n) noexcept {
@@ -603,10 +638,17 @@ static inline constexpr uint16_t rol(register uint16_t x, register uint32_t n) n
 static inline constexpr uint32_t rol(register uint32_t x, register uint32_t n) noexcept { return rol32(x, n); }
 static inline constexpr uint64_t rol(register uint64_t x, register uint32_t n) noexcept { return rol64(x, n); }
 
+#if (defined __x86_64__ || defined __i386__) && !defined PREFER_GENERAL_INSTRUCTIONS
 static inline constexpr uint8_t  ror8 (register uint8_t x,  register uint32_t n) noexcept {
 	return __builtin_ia32_rorqi(x, n); /* __rorb(x, n); */}
 static inline constexpr uint16_t ror16(register uint16_t x, register uint32_t n) noexcept {
 	return __builtin_ia32_rorhi(x, n); /* __rorw(x, n); */}
+#else
+static inline constexpr uint8_t  ror8 (register uint8_t x,  register uint32_t n) noexcept {
+	return (x >> n) | (x << (8 - n)); }
+static inline constexpr uint16_t ror16(register uint16_t x, register uint32_t n) noexcept {
+	return (x >> n) | (x << (16 - n)); }
+#endif
 static inline constexpr uint32_t ror32(register uint32_t x, register uint32_t n) noexcept {
 	return (x >> n) | (x << (32 - n)); /* __rord(x, n); */}
 static inline constexpr uint64_t ror64(register uint64_t x, register uint32_t n) noexcept {

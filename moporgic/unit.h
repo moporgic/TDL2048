@@ -22,8 +22,14 @@ typedef uint16_t u16;
 typedef int8_t   i8;
 typedef uint8_t  u8;
 
+#ifdef __SIZEOF_INT128__
 typedef __int128          i128;
 typedef unsigned __int128 u128;
+#else
+#warning "128-bit integer is unsupported on this platform"
+typedef int64_t           i128;
+typedef uint64_t          u128;
+#endif
 typedef unsigned char     uchar;
 typedef unsigned long int ulint;
 

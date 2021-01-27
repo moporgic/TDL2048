@@ -117,14 +117,23 @@ static inline uint64_t microsec() {
 }
 static __attribute__((unused)) std::string put_time(std::time_t t) {
 	std::stringstream buf;
+#if SIZE_MAX == UINT64_MAX
 	if (t >= std::time_t(253402300799000ull)) { // is microseconds
 		buf << "YYYY-MM-DD HH:MM:SS." << std::setfill('0') << std::setw(6) << (std::exchange(t, t / 1000000) % 1000000);
 	} else if (t >= std::time_t(253402300799ull)) { // is milliseconds
 		buf << "YYYY-MM-DD HH:MM:SS." << std::setfill('0') << std::setw(3) << (std::exchange(t, t / 1000) % 1000);
 	} // else is seconds, do nothing
+#endif
 	buf.seekp(0) << std::put_time(std::localtime(&t), "%Y-%m-%d %H:%M:%S");
 	return buf.str();
 }
+#if SIZE_MAX == UINT32_MAX // 32-bit platform whose std::time_t only support seconds
+static __attribute__((unused)) std::string put_time(uint64_t t) {
+	if (t >= 253402300799000ull)   t /= 1000000; // is microseconds
+	else if (t >= 253402300799ull) t /= 1000;    // is milliseconds
+	return put_time(std::time_t(t));
+}
+#endif
 
 #define __DATE_ISO__ ({ std::tm t = {}; std::string DATE(__DATE__); if (DATE[4] == ' ') DATE[4] = '0'; \
 std::istringstream(DATE) >> std::get_time(&t, "%b %d %Y"); std::put_time(&t, "%Y-%m-%d");})

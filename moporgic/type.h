@@ -221,7 +221,7 @@ public:
 	typedef const type* const_iterator, const_pointer;
 	typedef const type& const_reference;
 	typedef size_t size_type, difference_type;
-	static constexpr size_t npos = -1ull;
+	static constexpr size_t npos = size_t(-1ull);
 public:
 	constexpr type* data() const noexcept { return first; }
 	constexpr type* begin() const noexcept { return first; }

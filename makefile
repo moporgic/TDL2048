@@ -2,6 +2,13 @@ STD ?= c++14
 OLEVEL ?= 3
 ARCH ?= tune=native
 INSTS ?= abm bmi bmi2 avx avx2
+FLAGS ?= -Wall -fmessage-length=0
+OUTPUT ?= 2048
+TARGET ?= default
+PGO_ALPHA ?= 0 fixed
+PGO_OPTI ?= 1x10000
+PGO_EVAL ?= 1x10000
+
 MACROS := $(shell echo | gcc -x c++ -march=native -dM -E -)
 ifneq ($(findstring $(or $(BMI2), BMI2), $(MACROS)), BMI2)
 	INSTS := $(filter-out abm bmi bmi2, popcnt $(INSTS) no-bmi2)
@@ -9,12 +16,10 @@ endif
 ifneq ($(findstring $(or $(AVX2), AVX2), $(MACROS)), AVX2)
 	INSTS := $(filter-out avx avx2, $(INSTS) no-avx2)
 endif
-FLAGS ?= -Wall -fmessage-length=0
-OUTPUT ?= 2048
-TARGET ?= default
-PGO_ALPHA ?= 0 fixed
-PGO_OPTI ?= 1x10000
-PGO_EVAL ?= 1x10000
+ifneq ($(findstring x86_64, $(MACROS)), x86_64)
+    INSTS :=
+    FLAGS := -Wall -Wno-psabi -fmessage-length=0
+endif
 
 default:
 	g++ -std=$(STD) -O$(OLEVEL) $(addprefix -m, $(ARCH) $(INSTS)) -lpthread $(FLAGS) -o $(OUTPUT) 2048.cpp
