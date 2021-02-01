@@ -27,10 +27,10 @@ ifneq ($(findstring x86_64, $(MACROS)), x86_64)
 endif
 
 default: # build with default
-	g++ -std=$(STD) -O$(OLEVEL) $(addprefix -m, $(ARCH) $(INSTS)) -lpthread $(FLAGS) -o $(OUTPUT) 2048.cpp
+	g++ -std=$(STD) -O$(OLEVEL) $(addprefix -m, $(ARCH) $(INSTS)) -pthread $(FLAGS) -o $(OUTPUT) 2048.cpp
 
 static: # build with static executable
-	@+make --no-print-directory default ARCH="tune=generic" FLAGS="-pthread $(FLAGS) -static"
+	@+make --no-print-directory default ARCH="tune=generic" FLAGS="$(FLAGS) -static"
 
 native: # build with native architecture
 	@+make --no-print-directory default ARCH="arch=native"
@@ -38,12 +38,12 @@ native: # build with native architecture
 profile: # build with profiling by using make-profile.sh
 	@+make --no-print-directory $(TARGET) FLAGS="$(filter-out -g, $(FLAGS)) -fprofile-generate"
 	[ ! -e 2048.gcda ] || rm 2048.gcda && bash make-profile.sh | xargs -d\\n -n1 echo \>
-	@+make --no-print-directory $(TARGET) FLAGS="$(FLAGS) -fprofile-use"
+	@+make --no-print-directory $(TARGET) FLAGS="$(filter-out -fprofile-%, $(FLAGS)) -fprofile-use"
 
 4x6patt 5x6patt 6x6patt 7x6patt 8x6patt: # build with profiling by using predefined settings
 	[ -e $@.w ] || { [ -e $@.w.xz ] || curl -OJRf moporgic.info/data/2048/$@.w.xz; xz -vd $@.w.xz; }
 	echo "./$(OUTPUT) -n $@ -i $@.w -a $(PGO_ALPHA) -t $(PGO_OPTI) -e $(PGO_EVAL) -% none -s" > make-profile.sh
-	@+make --no-print-directory profile
+	@+make --no-print-directory profile FLAGS="$(FLAGS) -fprofile-update=single"
 
 dump: # build and dump the disassembly
 	@+make --no-print-directory $(word 1, $(TARGET)) TARGET="$(word 2, $(TARGET) default)" FLAGS="$(FLAGS) -g"
