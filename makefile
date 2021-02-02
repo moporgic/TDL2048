@@ -36,9 +36,9 @@ native: # build with native architecture
 	@+make --no-print-directory default ARCH="arch=native"
 
 profile: # build with profiling by using make-profile.sh
-	@+make --no-print-directory $(TARGET) FLAGS="$(filter-out -g, $(FLAGS)) -fprofile-generate"
+	@+make --no-print-directory $(TARGET) FLAGS="$(FLAGS) -fprofile-generate"
 	[ ! -e 2048.gcda ] || rm 2048.gcda && bash make-profile.sh | xargs -d\\n -n1 echo \>
-	@+make --no-print-directory $(TARGET) FLAGS="$(filter-out -fprofile-%, $(FLAGS)) -fprofile-use"
+	@+make --no-print-directory $(TARGET) FLAGS="$(FLAGS) -fprofile-use"
 
 4x6patt 5x6patt 6x6patt 7x6patt 8x6patt: # build with profiling by using predefined settings
 	[ -e $@.w ] || { [ -e $@.w.xz ] || curl -OJRf moporgic.info/data/2048/$@.w.xz; xz -vd $@.w.xz; }
