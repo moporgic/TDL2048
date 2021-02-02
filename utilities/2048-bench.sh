@@ -122,7 +122,7 @@ benchmark() {
 	done
 }
 
-if (( $# + ${#recipes} )); then # execute benchmarks if recipes are given
+if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmarks
 	while (( $# )); do
 		case $1 in
 		-D*|--develop*|--default*) develop=$1; ;;
