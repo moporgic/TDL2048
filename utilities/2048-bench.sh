@@ -125,7 +125,7 @@ benchmark() {
 if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmarks
 	while (( $# )); do
 		case $1 in
-		-D*|--develop*|--default*) develop=$1; ;;
+		-D*|--default*|--develop*) default=$1; ;;
 		-p*|--profile-lite*)       profile_type=lite; ;&
 		-P*|--profile*)            profile=$1; ;;
 		*)                         recipes+=${recipes:+ }$1; ;;
@@ -135,18 +135,18 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmar
 	prefix() { xargs -d\\n -n1 echo \>; }
 	x6patt() { sed -u "s/x6patt//g" | egrep -o [0-9] | xargs -I% echo %x6patt; }
 	if [[ $recipes ]]; then ( # execute dedicated benchmarks
-		[[ $develop$profile ]] && echo ========= Benchmarking Dedicated TDL2048+ ==========
+		[[ $default$profile ]] && echo ========== Benchmarking Dedicated TDL2048+ ==========
 		benchmark $recipes | output || exit $?
 	) fi
-	if [[ $develop ]]; then ( # build and benchmark default develop
-		[[ $develop =~ ^-.[0-9]+$ ]] && networks=$(x6patt <<< $develop)
-		[[ $develop =~ ^-.+=(.+)$ ]] && networks=${BASH_REMATCH[1]//,/ }
-		echo ============= Building Default Develop =============
-		make | prefix && mv 2048 2048-develop || exit $?
-		echo =========== Benchmarking Default Develop ===========
-		networks=$networks benchmark 2048-develop | output || exit $?
+	if [[ $default ]]; then ( # build and benchmark default target
+		[[ $default =~ ^-.[0-9]+$ ]] && networks=$(x6patt <<< $default)
+		[[ $default =~ ^-.+=(.+)$ ]] && networks=${BASH_REMATCH[1]//,/ }
+		echo ============= Building Default TDL2048+ =============
+		make OUTPUT=2048 | prefix || exit $?
+		echo =========== Benchmarking Default TDL2048+ ===========
+		networks=$networks benchmark 2048 | output || exit $?
 	) fi
-	if [[ $profile ]]; then ( # build and benchmark profiled develop
+	if [[ $profile ]]; then ( # build and benchmark profiled target
 		[[ $profile =~ ^-.[0-9]+$ ]] && networks=$(x6patt <<< $profile)
 		[[ $profile =~ ^-.+=(.+)$ ]] && networks=${BASH_REMATCH[1]//,/ }
 		output-fix() { output; }
@@ -154,14 +154,14 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmar
 		profiled-recipes() { echo 2048-$network 2048-$network-t 2048-$network-e; }
 		[ ${profile_type:-full} != full ] && profiled-recipes() { echo 2048-$network; }
 		for network in ${networks:-4x6patt 8x6patt}; do
-			echo ======== Building $network-Profiled Develop =========
-			make $network | prefix-fix && mv 2048 2048-$network || exit $?
+			echo ======== Building $network-Profiled TDL2048+ =========
+			make $network OUTPUT=2048-$network | prefix-fix || exit $?
 			if [ ${profile_type:-full} == full ]; then
-				make $network PGO_EVAL=0 | prefix-fix && mv 2048 2048-$network-t || exit $?
-				make $network PGO_OPTI=0 | prefix-fix && mv 2048 2048-$network-e || exit $?
+				make $network PGO_EVAL=0 OUTPUT=2048-$network-t | prefix-fix || exit $?
+				make $network PGO_OPTI=0 OUTPUT=2048-$network-e | prefix-fix || exit $?
 			fi
 		done
-		echo ========== Benchmarking Profiled Develop ===========
+		echo ========== Benchmarking Profiled TDL2048+ ===========
 		for network in ${networks:-4x6patt 8x6patt}; do
 			networks=$network benchmark $(profiled-recipes) | output-fix || exit $?
 			output-fix() { stdbuf -o0 tail -n+2 | output; }
