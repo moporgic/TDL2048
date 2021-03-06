@@ -65,7 +65,7 @@ Recipes:
                               > optimize:{forward|backward|lambda|step}
                               > evaluate:{best|random|reward}
                             > loop, unit, win, info: execution settings
-                            > alpha, lambda, step: hyperparameters for training
+                            > alpha, lambda, step: hyper-parameters for training
                             1st OPT also accepts a special alias LOOP[xUNIT][:WIN]
                             if [OPT]... is unprovided, default is 1000x1000:2048
   -t, --optimize [OPT]...   alias for -r optimize [OPT]...
@@ -79,15 +79,14 @@ Parameters:
   -l, --lambda LAMBDA       the TD-lambda, default is 0
   -N, --step STEP           the n-step, default is 1 if LAMBDA is 0; otherwise 5
   -u, --unit UNIT           the statistic display interval, default is 1000
-  -v, --win TILE            the winning threshold, default is 2048
+  -w, --win TILE            the winning threshold, default is 2048
   -%, --info                whether to show the summary, default is auto
 
 Executions:
   -s, --seed [SEED]         set the seed for the pseudo-random number
   -p, --parallel [THREAD]   enable lock-free parallelism for all recipes
                             if THREAD is unspecified, default is max supported #
-  -S, --search DEPTH [OPT]  enable the search with DEPTH layer (1p,2p,3p,...)
-  -d, --depth DEPTH [OPT]   alias for -S DEPTH [OPT]
+  -d, --depth DEPTH [OPT]   enable the search with DEPTH layer (1p,2p,3p,...)
   -c, --cache SIZE          enable the transposition table as NUMBER[K|M|G]
 
 Input/Output:
@@ -102,7 +101,7 @@ Miscellaneous:
   -#, --comment [TEXT]...   specify command line comments
   -?, --help                display this message and quit
 
-Please refer to https://moporgic.info/TDL2048+ for more details
+Please refer to https://moporgic.info/2048 for more details
 Report bugs and comments to "Hung Guei" <hguei@moporgic.info>
 )";
 
@@ -2156,7 +2155,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["lambda"] = next_opt("0.5");
 			// no break: lambda may also come with step
 		case to_hash("-N"): case to_hash("--step"):
-			opts["step"] = next_opt(opts("lambda") && opts["lambda"].value(0) ? "5" : "1");
+			opts["step"] = next_opt("5");
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
@@ -2173,48 +2172,39 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-R"): case to_hash("--recipes"):
 			opts["recipes"] = next_opts();
 			break;
-		case to_hash("-io"):  case to_hash("--input-output"):
-		case to_hash("-nio"): case to_hash("--network-input-output"):
-		case to_hash("-wio"): case to_hash("--weight-input-output"):
-		case to_hash("-i"):   case to_hash("--input"):
-		case to_hash("-wi"):  case to_hash("--weight-input"):
-		case to_hash("-ni"):  case to_hash("--network-input"):
-		case to_hash("-o"):   case to_hash("--output"):
-		case to_hash("-wo"):  case to_hash("--weight-output"):
-		case to_hash("-no"):  case to_hash("--network-output"):
+		case to_hash("-i"): case to_hash("--input"):
+		case to_hash("-o"): case to_hash("--output"):
+		case to_hash("-io"): case to_hash("--input-output"):
 			opts[""] = next_opts(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
 			if (label.find(label[1] != '-' ? "i" : "input")  != std::string::npos) opts["load"] += opts[""];
 			if (label.find(label[1] != '-' ? "o" : "output") != std::string::npos) opts["save"] += opts[""];
 			break;
-		case to_hash("-w"): case to_hash("--weight"):
 		case to_hash("-f"): case to_hash("--feature"):
 		case to_hash("-n"): case to_hash("--network"):
 			opts["make"] += next_opts("default");
 			break;
-		case to_hash("-tt"): case to_hash("--optimize-type"):
-		case to_hash("-tm"): case to_hash("--optimize-mode"):
-		case to_hash("-et"): case to_hash("--evaluate-type"):
-		case to_hash("-em"): case to_hash("--evaluate-mode"):
+		case to_hash("-tt"): case to_hash("-tm"): case to_hash("--optimize-mode"):
+		case to_hash("-et"): case to_hash("-em"): case to_hash("--evaluate-mode"):
 			label = label[label.find_first_not_of('-')] != 'e' ? "optimize" : "evaluate";
 			opts[label]["mode"] = next_opt(label);
 			if (!opts["recipes"](label)) opts["recipes"] += label;
 			break;
-		case to_hash("-m"):  case to_hash("--mode"):
+		case to_hash("-m"): case to_hash("--mode"):
 			if (opts["recipes"].empty()) opts["recipes"] += "optimize";
 			opts[opts["recipes"].back()]["mode"] = next_opt(opts["recipes"].back());
 			break;
 		case to_hash("-u"): case to_hash("--unit"):
-			opts["unit"] = next_opt("1000");
+			opts["unit"] = next_opt("1");
 			break;
-		case to_hash("-v"): case to_hash("--win"):
-			opts["win"] = next_opt("2048");
+		case to_hash("-w"): case to_hash("--win"):
+			opts["win"] = next_opt("32768");
 			break;
-		case to_hash("-%"): case to_hash("-I"): case to_hash("--info"):
+		case to_hash("-%"): case to_hash("--info"):
 			opts["info"] = next_opt();
 			break;
 		case to_hash("-d"): case to_hash("--depth"):
 		case to_hash("-S"): case to_hash("--search"):
-			opts["search"] = next_opts("2p");
+			opts["search"] = next_opts("3p");
 			break;
 		case to_hash("-c"): case to_hash("--cache"):
 			opts["cache"] = next_opts("2048M");
@@ -2271,6 +2261,7 @@ int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	if (!opts["recipes"].size()) opts["recipes"] = "optimize", opts["optimize"] = 1000;
 	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
+	moporgic::srand(to_hash(opts["seed"]));
 
 	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
@@ -2278,7 +2269,7 @@ int main(int argc, const char* argv[]) {
 	          << " @ " << __DATE_ISO__ << " " << __TIME__ << ")" << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
-	std::cout << "time = " << moporgic::put_time(millisec()) << std::endl;
+	std::cout << "time = " << put_time(millisec()) << std::endl;
 	std::cout << "seed = " << opts["seed"].value() << std::endl;
 	std::cout << "alpha = " << opts["alpha"].value(weight::type() != weight::coherence::code ? "0.1" : "1.0") << std::endl;
 	std::cout << "lambda = " << opts["lambda"].value(0) << ", step = " << opts["step"].value(1) << std::endl;
@@ -2286,7 +2277,6 @@ int main(int argc, const char* argv[]) {
 	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
 
-	moporgic::srand(to_hash(opts["seed"]));
 	utils::config_weight(opts["alpha"]);
 	utils::config_shm(opts["thread"]);
 	utils::init_cache(opts["cache"]);
