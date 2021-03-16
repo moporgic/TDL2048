@@ -1998,8 +1998,8 @@ statistic run(utils::options opts, std::string type) {
 		}(); break;
 
 	case to_hash("optimize:average-backward"): [&]() {
-		u32 block = opts["options"]["avg-blk"].value(4096);
-		u32 bkmax = opts["options"]["avg-max"].value(65536);
+		u32 block = opts["options"]["block-size"].value(2048);
+		u32 bkmax = opts["options"]["block-max"].value(65536);
 		u32 bkpos = math::tzcnt32(block);
 
 		for (stats.init(opts[type]); stats; stats++) {
