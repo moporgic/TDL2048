@@ -825,6 +825,10 @@ public:
 	inline u32 max64() const { return math::log2(scale64()); }
 	inline u32 max80() const { return math::log2(scale80()); }
 
+	inline u32 min()   const { return min64(); }
+	inline u32 min64() const { return math::tzcnt32(scale64()); }
+	inline u32 min80() const { return math::tzcnt32(scale80()); }
+
 	inline hex numof() const {
 		return qrow(0).numof + qrow(1).numof + qrow(2).numof + qrow(3).numof;
 	}
