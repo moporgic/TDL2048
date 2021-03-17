@@ -1997,10 +1997,52 @@ statistic run(utils::options opts, std::string type) {
 		}
 		}(); break;
 
-	case to_hash("optimize:average-backward"): [&]() {
-		u32 block = opts["options"]["block-size"].value(2048);
-		u32 bkmax = opts["options"]["block-max"].value(65536);
-		u32 bkpos = math::tzcnt32(block);
+	case to_hash("optimize:block"):
+	case to_hash("optimize:block-forward"): [&]() {
+		const u32 block = opts["options"]["block-size"].value(2048);
+		const u32 bkmax = opts["options"]["block-max"].value(65536);
+
+		for (stats.init(opts[type]); stats; stats++) {
+			board init; init.next();
+
+			for (u32 which = 0; which < bkmax; which = std::max(which, init.hash()) + block) {
+				for (u32 u = bkmax >> 1; u >= block; u >>= 1) {
+					u32 scale = init.hash();
+					if ((which & u) & !(scale & u)) {
+						u64 where = init.where(math::tzcnt(math::msb(scale & (u - 1))));
+						where = math::nthset(where, rand() % math::popcnt(where));
+						init.put(where, math::tzcnt(u));
+					} else if ((scale & u) & !(which & u)) {
+						u64 where = init.where(math::tzcnt(u));
+						init.put(where, math::tzcnt(u) - 1);
+					}
+				}
+
+				board b = init; b.next();
+				last.set(-1ull);
+				u32 score = 0, opers = 0;
+				u32 scale = b.hash();
+
+				while (best(b, feats, spec) & (best.score() < 65536)) {
+					last.optimize(best.esti(), alpha, feats, spec);
+					score += best.score();
+					opers += 1;
+					best >> last;
+					best >> b;
+					u32 slast = std::exchange(scale, b.hash());
+					init.set((scale ^ slast) >= block ? u64(b) : u64(init));
+					b.next();
+				}
+				last.optimize(0, alpha, feats, spec);
+
+				if (which == 0) stats.update(score, scale, opers);
+			}
+		}
+		}(); break;
+
+	case to_hash("optimize:block-backward"): [&]() {
+		const u32 block = opts["options"]["block-size"].value(2048);
+		const u32 bkmax = opts["options"]["block-max"].value(65536);
 
 		for (stats.init(opts[type]); stats; stats++) {
 			board b, init; init.next();
@@ -2025,7 +2067,7 @@ statistic run(utils::options opts, std::string type) {
 				for (numeric esti = 0; path.size(); path.pop_back()) {
 					path.back().estimate(feats, spec);
 					esti = path.back().optimize(esti, alpha, feats, spec);
-					init = (path.back().hash() >> bkpos) == (scale >> bkpos) ? path.back() : init;
+					init.set(path.back().hash() ^ scale < block ? u64(path.back()) : u64(init));
 					score += path.back().info();
 				}
 				if (which == 0) stats.update(score, scale, opers);
