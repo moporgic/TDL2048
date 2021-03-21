@@ -725,29 +725,23 @@ public:
 	inline constexpr u32 shift(u32 k = 0, u32 u = 0) { return shift64(k, u); }
 	inline constexpr u32 shift64(u32 k = 0, u32 u = 0) {
 		u32 hash = hash64();
-		u32 tile = math::msb16(hash);
-		u32 mask = (((k ? (1 << k) : tile) << 1) - 1) & ~((2 << u) - 1);
-		u32 hole = ~hash & mask;
-		if (hole == 0 || hole > tile) return 0;
-		u32 h = math::lg16(hole);
-		for (u32 i = 0; i < 16; i++) {
-			u32 t = at4(i);
-			at4(i, t > h ? t - 1 : t);
+		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
+		u32 hole = math::msb(~hash & (hash >= (1u << k) ? mask : 0));
+		for (hash &= ~(hole - 1); hash; hash &= hash - 1) {
+			u32 tile = math::tzcnt(hash);
+			put64(where64(tile), tile - 1);
 		}
-		return h;
+		return math::tzcnt(hole ?: 1);
 	}
 	inline constexpr u32 shift80(u32 k = 0, u32 u = 0) {
 		u32 hash = hash80();
-		u32 tile = math::msb16(hash);
-		u32 mask = (((k ? (1 << k) : tile) << 1) - 1) & ~((2 << u) - 1);
-		u32 hole = ~hash & mask;
-		if (hole == 0 || hole > tile) return 0;
-		u32 h = math::lg16(hole);
-		for (u32 i = 0; i < 16; i++) {
-			u32 t = at5(i);
-			at5(i, t > h ? t - 1 : t);
+		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
+		u32 hole = math::msb(~hash & (hash >= (1u << k) ? mask : 0));
+		for (hash &= ~(hole - 1); hash; hash &= hash - 1) {
+			u32 tile = math::tzcnt(hash);
+			put80(where80(tile), tile - 1);
 		}
-		return h;
+		return math::tzcnt(hole ?: 1);
 	}
 
 	inline constexpr void isomax() { return isomax64(); }
