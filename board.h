@@ -744,6 +744,54 @@ public:
 		return math::tzcnt(hole ?: 1);
 	}
 
+	inline constexpr u32 expect(u32 scale, u32 thres = 0) { return expect64(scale, thres); }
+	inline constexpr u32 expect64(u32 scale, u32 thres = 0) {
+		u32 hash = hash64();
+		i32 dist = math::lg(hash) - math::lg(scale);
+		while (dist-- > 0 && shift64()) hash = hash64();
+		u32 mask = ~(math::msb(thres | 1) - 1);
+		u32 diff = (scale ^ hash) & mask;
+		for (u32 u = 0; (u = math::msb(diff)) != 0; diff ^= u) {
+			if (scale & u) { // if u is expected but not present
+				u32 t = math::msb(hash & (u - 1));
+				u64 w = t ? where64(math::tzcnt(t)) : 0;
+				u32 n = math::popcnt(w);
+				for (u32 k = hash & ~(u - 1); !n && k; k ^= t) {
+					t = math::lsb(k);
+					w = where64(math::tzcnt(t));
+					n = math::popcnt(w);
+					n = n > 1 ? n : 0;
+				}
+				if (n == 0) continue;
+				put64(math::lsb(w), math::tzcnt(u));
+				diff ^= (n == 1) ? (scale ^ diff) & t : 0;
+				hash = (hash ^ (n > 1 ? 0 : t)) | u;
+			} else { // if u is unexpected but present
+				u64 w = where64(math::tzcnt(u));
+				u32 t = math::msb((scale | ~mask) & (u - 1)) ?:
+				       (math::lsb(hash ^ u) ?: 1);
+				put64(w, math::tzcnt(t));
+				hash = (hash ^ u) | t;
+			}
+		}
+		return hash;
+	}
+	inline constexpr u32 expect80(u32 scale, u32 thres = 0) {
+		scale &= ~(math::msb(thres | 1) - 1);
+		u32 hash = hash80();
+		while (hash >= 65536 && shift80()) hash = hash80();
+		i32 dist = math::popcnt(scale & -2u) - math::popcnt(hash);
+		while (dist-- > 0) hash |= math::msb(~hash & 0xffff);
+		hash |= (scale & 1);
+		hash = expect64(hash, math::lsb(hash));
+		for (u32 s = 0, h = 0; scale; scale ^= s, hash ^= s ^ h) {
+			s = math::msb(scale);
+			h = math::msb(hash & (s ^ (s - 1)));
+			put80(where80(math::tzcnt(h)), math::tzcnt(s));
+		}
+		return hash;
+	}
+
 	inline constexpr void isomax() { return isomax64(); }
 	inline constexpr void isomax64() {
 		u64 x = raw;
