@@ -2004,19 +2004,8 @@ statistic run(utils::options opts, std::string type) {
 
 		for (stats.init(opts[type]); stats; stats++) {
 			board init; init.next();
-
 			for (u32 which = 0; which < bkmax; which = std::max(which, init.hash()) + block) {
-				for (u32 u = bkmax >> 1; u >= block; u >>= 1) {
-					u32 scale = init.hash();
-					if ((which & u) & !(scale & u)) {
-						u64 where = init.where(math::tzcnt(math::msb(scale & (u - 1))));
-						where = math::nthset(where, rand() % math::popcnt(where));
-						init.put(where, math::tzcnt(u));
-					} else if ((scale & u) & !(which & u)) {
-						u64 where = init.where(math::tzcnt(u));
-						init.put(where, math::tzcnt(u) - 1);
-					}
-				}
+				init.expect(which, block);
 
 				board b = init; b.next();
 				last.set(-1ull);
@@ -2046,19 +2035,9 @@ statistic run(utils::options opts, std::string type) {
 
 		for (stats.init(opts[type]); stats; stats++) {
 			board b, init; init.next();
-
 			for (u32 which = 0; which < bkmax; which = std::max(which, init.hash()) + block) {
-				for (u32 u = bkmax >> 1; u >= block; u >>= 1) {
-					u32 scale = init.hash();
-					if ((which & u) & !(scale & u)) {
-						u64 where = init.where(math::tzcnt(math::msb(scale & (u - 1))));
-						where = math::nthset(where, moporgic::rand() % math::popcnt(where));
-						init.put(where, math::tzcnt(u));
-					} else if ((scale & u) & !(which & u)) {
-						u64 where = init.where(math::tzcnt(u));
-						init.put(where, math::tzcnt(u) - 1);
-					}
-				}
+				init.expect(which, block);
+
 				for (b = init, b.next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
 					best >> path;
 					best >> b;
@@ -2067,7 +2046,7 @@ statistic run(utils::options opts, std::string type) {
 				for (numeric esti = 0; path.size(); path.pop_back()) {
 					path.back().estimate(feats, spec);
 					esti = path.back().optimize(esti, alpha, feats, spec);
-					init.set(path.back().hash() ^ scale < block ? u64(path.back()) : u64(init));
+					init.set((path.back().hash() ^ scale) < block ? u64(path.back()) : u64(init));
 					score += path.back().info();
 				}
 				if (which == 0) stats.update(score, scale, opers);
