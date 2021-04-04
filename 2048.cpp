@@ -1999,46 +1999,52 @@ statistic run(utils::options opts, std::string type) {
 
 	case to_hash("optimize:block"):
 	case to_hash("optimize:block-forward"): [&]() {
-		const u32 block = opts["options"]["block-size"].value(2048);
-		const u32 bkmax = opts["options"]["block-max"].value(65536);
+		u32 block = opts["options"]["block-size"].value(2048);
+		u32 bkmax = opts["options"]["block-max"].value(65536);
+		struct stat { u32 score, scale, opers; };
+		std::vector<stat> bkstat;
 
 		for (stats.init(opts[type]); stats; stats++) {
-			board init; init.next();
-			for (u32 which = 0; which < bkmax; which = std::max(which, init.hash()) + block) {
-				init.expect(which, block);
+			board b, a; a.next();
+			u32 score = 0;
+			u32 opers = 0;
 
-				board b = init; b.next();
+			for (u32 which = a.hash(); which < bkmax; which = a.hash() + block) {
+				a.expect(which | 1u);
+
 				last.set(-1ull);
-				u32 score = 0, opers = 0;
-				u32 scale = b.hash();
-
-				while (best(b, feats, spec) & (best.score() < 65536)) {
+				for ((b = a).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
 					last.optimize(best.esti(), alpha, feats, spec);
 					score += best.score();
 					opers += 1;
 					best >> last;
 					best >> b;
-					u32 slast = std::exchange(scale, b.hash());
-					init.set((scale ^ slast) >= block ? u64(b) : u64(init));
-					b.next();
+					if (b.info() >= block && (b.hash() ^ a.hash()) >= block) best >> a;
 				}
 				last.optimize(0, alpha, feats, spec);
 
-				if (which == 0) stats.update(score, scale, opers);
+				bkstat.emplace_back(stat{score, b.hash(), opers});
 			}
+
+			stat stat = bkstat.front();
+			stats.update(stat.score, stat.scale, stat.opers);
+			bkstat.clear();
 		}
 		}(); break;
 
 	case to_hash("optimize:block-backward"): [&]() {
-		const u32 block = opts["options"]["block-size"].value(2048);
-		const u32 bkmax = opts["options"]["block-max"].value(65536);
+		u32 block = opts["options"]["block-size"].value(2048);
+		u32 bkmax = opts["options"]["block-max"].value(65536);
+		struct stat { u32 score, scale, opers; };
+		std::vector<stat> bkstat;
 
 		for (stats.init(opts[type]); stats; stats++) {
-			board b, init; init.next();
-			for (u32 which = 0; which < bkmax; which = std::max(which, init.hash()) + block) {
-				init.expect(which, block);
+			board b, a; a.next();
 
-				for (b = init, b.next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
+			for (u32 which = a.hash(); which < bkmax; which = a.hash() + block) {
+				a.expect(which | 1u);
+
+				for ((b = a).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
 					best >> path;
 					best >> b;
 				}
@@ -2046,11 +2052,15 @@ statistic run(utils::options opts, std::string type) {
 				for (numeric esti = 0; path.size(); path.pop_back()) {
 					path.back().estimate(feats, spec);
 					esti = path.back().optimize(esti, alpha, feats, spec);
-					init.set((path.back().hash() ^ scale) < block ? u64(path.back()) : u64(init));
 					score += path.back().info();
+					if (path.back().info() >= block && (path.back().hash() ^ scale) >= block) a.set(path.back());
 				}
-				if (which == 0) stats.update(score, scale, opers);
+				bkstat.emplace_back(stat{score, b.hash(), opers});
 			}
+
+			stat stat = bkstat.front();
+			stats.update(stat.score, stat.scale, stat.opers);
+			bkstat.clear();
 		}
 		}(); break;
 
