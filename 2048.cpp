@@ -1,19 +1,14 @@
 //============================================================================
-// Name        : TDL2048+ - 2048.cpp
+// Name        : moporgic/TDL2048+ - 2048.cpp
 // Author      : Hung Guei @ moporgic
 // Version     : beta
-// Description : The Most Efficient TD Learning Program for 2048
+// Description : The Most Efficient TD Learning Framework for 2048
 //============================================================================
 
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
-#include "moporgic/type.h"
-#include "moporgic/util.h"
-#include "moporgic/math.h"
-#include "moporgic/shm.h"
-#include "board.h"
 #include <vector>
 #include <functional>
 #include <memory>
@@ -36,37 +31,42 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
+#include "moporgic/type.h"
+#include "moporgic/util.h"
+#include "moporgic/math.h"
+#include "moporgic/shm.h"
+#include "board.h"
 
 namespace moporgic {
 
 auto what = R"(
-TDL2048+ by Hung Guei @ moporgic - The Most Efficient TD Learning Program for 2048
+moporgic/TDL2048+ - The Most Efficient TD Learning Framework for 2048
 
 Networks:
   -n, --network [TOKEN]...  specify the n-tuple network, default is 4x6patt
                             TOKEN is provided as either CONFIG or FEATURE
                             CONFIG=ALIAS[IOPT][WOPT] specifies a built-in list,
-                            > ALIAS can be 4x6patt, 5x6patt, 8x6patt, mono, ...
+                            - ALIAS can be 4x6patt, 5x6patt, 8x6patt, mono, ...
                             FEATURE=WEIGHT[:INDEXES] specifies a n-tuple extractor
                             WEIGHT=SIGN[SIZE][WOPT] is a n-tuple LUT, where
-                            > SIGN specifies a LUT whose SIZE is 100|16^10|p|?
-                            > WOPT is used to modify LUT as SIGN=MODIFY, where
+                            - SIGN specifies a LUT whose SIZE is 100|16^10|p|?
+                            - WOPT is used to modify LUT as SIGN=MODIFY, where
                               MODIFY can be initialize, adjust, duplicate, remove
                               as VINIT[/norm], +VADJUST[/norm], {SRC}, {}
                             INDEXES=INDEX[!][IOPT],... is related indexers, where
-                            > INDEX specifies an indexer; if it is a pattern,
+                            - INDEX specifies an indexer; if it is a pattern,
                               using symbol ! expands to all its isomorphisms
-                            > IOPT is used to modify INDEX, as INDEX&HEX|HEX
+                            - IOPT is used to modify INDEX, as INDEX&HEX|HEX
 
 Recipes:
   -r, --recipe ID [OPT]...  specify a recipe identified by ID
                             OPT is provided as KEY[=VALUE], where KEY can be
-                            > mode: specify recipe routine, whose VALUE can be
-                              > optimize:{forward|backward|lambda|step}
-                              > evaluate:{best|random|reward}
-                            > loop, unit, win, info: execution settings
-                            > alpha, lambda, step: hyper-parameters for training
-                            1st OPT also accepts a special alias LOOP[xUNIT][:WIN]
+                            - mode: specify recipe routine, whose VALUE can be
+                              - optimize:{forward|backward|lambda|step}
+                              - evaluate:{best|random|reward}
+                            - loop, unit, win, info: execution settings
+                            - alpha, lambda, step: hyper-parameters for training
+                            the 1st OPT accepts a special alias LOOP[xUNIT][:WIN]
                             if [OPT]... is unprovided, default is 1000x1000:2048
   -t, --optimize [OPT]...   alias for -r optimize [OPT]...
   -e, --evaluate [OPT]...   alias for -r evaluate [OPT]...
@@ -85,7 +85,6 @@ Parameters:
 Executions:
   -s, --seed [SEED]         set the seed for the pseudo-random number
   -p, --parallel [THREAD]   enable lock-free parallelism for all recipes
-                            if THREAD is unspecified, default is max supported #
   -d, --depth DEPTH [OPT]   enable the search with DEPTH layer (1p,2p,3p,...)
   -c, --cache SIZE          enable the transposition table as NUMBER[K|M|G]
 
@@ -101,8 +100,8 @@ Miscellaneous:
   -#, --comment [TEXT]...   specify command line comments
   -?, --help                display this message and quit
 
-Please refer to https://moporgic.info/2048 for more details
 Report bugs and comments to "Hung Guei" <hguei@moporgic.info>
+Please refer to https://moporgic.info/2048 for more details
 )";
 
 typedef float numeric;
