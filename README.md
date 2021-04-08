@@ -1,6 +1,6 @@
 # moporgic/TDL2048+
 
-[TDL2048+](https://github.com/moporgic/TDL2048) is a highly optimized TD learning framework for [2048](https://gabrielecirulli.github.io/2048/).
+[TDL2048+](https://github.com/moporgic/TDL2048) is a highly optimized temporal difference (TD) learning framework for [2048](https://gabrielecirulli.github.io/2048/).
 
 ### Features
 
