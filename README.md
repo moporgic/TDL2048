@@ -668,7 +668,7 @@ The third line, ```total```, has the same format as the second line, but shows t
 
 #### Summary Block
 
-A summary block only be attached at the end of the training session by default.
+A summary block only be attached at the end of a testing session (```-e```) by default.
 ```
 summary 2648ms 4671990.18ops
 total:  avg=22427 max=76716 tile=4096 win=39.58%
