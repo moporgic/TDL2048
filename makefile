@@ -38,7 +38,7 @@ native: # build with native architecture
 
 profile: # build with profiling by using make-profile.sh
 	@+make --no-print-directory $(TARGET) FLAGS="$(FLAGS) -fprofile-generate"
-	[ ! -e 2048.gcda ] || rm 2048.gcda && bash make-profile.sh | xargs -d\\n -n1 echo \>
+	[ ! -e $(OUTPUT).gcda ] || rm $(OUTPUT).gcda && bash make-profile.sh | xargs -d\\n -n1 echo \>
 	@+make --no-print-directory $(TARGET) FLAGS="$(FLAGS) -fprofile-use"
 
 4x6patt 5x6patt 6x6patt 7x6patt 8x6patt: # build with profiling by using predefined settings
