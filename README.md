@@ -226,7 +226,12 @@ Then, make with target ```profile``` as follow.
 make profile # profile with make-profile.sh
 ```
 
-Note that a pre-defined profiling will overwrite the ```make-profile.sh```.
+To profile with multithreading (```-p```), set ```-fprofile-update=atomic``` explicitly as follow.
+```bash
+make profile FLAGS="-fprofile-update=atomic" # profile with multithreading
+```
+
+Note that pre-defined profiling recipes (e.g., ```4x6patt```) will overwrite the ```make-profile.sh```.
 </details>
 
 ### Miscellaneous
