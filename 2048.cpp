@@ -1656,9 +1656,9 @@ struct select {
 		return *this;
 	}
 	inline select& operator <<(const board& b) { return operator ()(b); }
-	inline void operator >>(std::vector<state>& path) const { path.push_back(*best); }
-	inline void operator >>(state& s) const { s = *best; }
-	inline void operator >>(board& b) const { b = *best; }
+	inline const select& operator >>(std::vector<state>& path) const { path.push_back(*best); return *this; }
+	inline const select& operator >>(state& s) const { s = *best; return *this; }
+	inline const select& operator >>(board& b) const { b = *best; return *this; }
 
 	inline operator bool() const { return best->operator bool(); }
 	inline numeric esti() const { return best->esti; }
