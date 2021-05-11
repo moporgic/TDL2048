@@ -1856,7 +1856,6 @@ statistic run(utils::options opts, std::string type) {
 	std::vector<state> path;
 	statistic stats;
 	select best;
-	state last;
 
 	method spec = method::parse(opts, type);
 	clip<feature> feats = feature::feats();
@@ -1870,7 +1869,7 @@ statistic run(utils::options opts, std::string type) {
 	case to_hash("optimize"):
 	case to_hash("optimize:forward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
-			board b;
+			state b, a;
 			u32 score = 0;
 			u32 opers = 0;
 
@@ -1878,18 +1877,16 @@ statistic run(utils::options opts, std::string type) {
 			best(b, feats, spec);
 			score += best.score();
 			opers += 1;
-			best >> last;
-			best >> b;
+			best >> a >> b;
 			b.next();
 			while (best(b, feats, spec)) {
-				last.optimize(best.esti(), alpha, feats, spec);
+				a.optimize(best.esti(), alpha, feats, spec);
 				score += best.score();
 				opers += 1;
-				best >> last;
-				best >> b;
+				best >> a >> b;
 				b.next();
 			}
-			last.optimize(0, alpha, feats, spec);
+			a.optimize(0, alpha, feats, spec);
 
 			stats.update(score, b.hash(), opers);
 		}
@@ -1904,8 +1901,7 @@ statistic run(utils::options opts, std::string type) {
 			for (b.init(); best(b, feats, spec); b.next()) {
 				score += best.score();
 				opers += 1;
-				best >> path;
-				best >> b;
+				best >> path >> b;
 			}
 
 			for (numeric esti = 0; path.size(); path.pop_back()) {
@@ -1930,8 +1926,7 @@ statistic run(utils::options opts, std::string type) {
 				rsum += best.score();
 				score += best.score();
 				opers += 1;
-				best >> path;
-				best >> b;
+				best >> path >> b;
 				b.next();
 			}
 			while (best(b, feats, spec)) {
@@ -1942,8 +1937,7 @@ statistic run(utils::options opts, std::string type) {
 				rsum += best.score();
 				score += best.score();
 				opers += 1;
-				best >> path;
-				best >> b;
+				best >> path >> b;
 				b.next();
 			}
 			for (u32 i = opers - std::min(step, opers); i < opers; i++) {
@@ -1967,8 +1961,7 @@ statistic run(utils::options opts, std::string type) {
 			for (b.init(); best(b, feats, spec); b.next()) {
 				score += best.score();
 				opers += 1;
-				best >> path;
-				best >> b;
+				best >> path >> b;
 			}
 
 			u32 rsum = 0;
@@ -2003,8 +1996,7 @@ statistic run(utils::options opts, std::string type) {
 			while (best(b, feats, spec) && opers < step) {
 				score += best.score();
 				opers += 1;
-				best >> path;
-				best >> b;
+				best >> path >> b;
 				b.next();
 			}
 			while (best(b, feats, spec)) {
@@ -2021,8 +2013,7 @@ statistic run(utils::options opts, std::string type) {
 				update.optimize(z, alpha, feats, spec);
 				score += best.score();
 				opers += 1;
-				best >> path;
-				best >> b;
+				best >> path >> b;
 				b.next();
 			}
 			for (u32 i = std::min(step, opers); i > 0; i--) {
@@ -2054,8 +2045,7 @@ statistic run(utils::options opts, std::string type) {
 			for (b.init(); best(b, feats, spec); b.next()) {
 				score += best.score();
 				opers += 1;
-				best >> path;
-				best >> b;
+				best >> path >> b;
 			}
 
 			numeric z = 0;
