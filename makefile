@@ -9,6 +9,7 @@ FLAGS ?= -Wall -fmessage-length=0
 OUTPUT ?= 2048
 # other make settings
 TARGET ?= default
+SCRIPT ?= make-profile.sh
 PGO_ALPHA ?= 0 fixed
 PGO_OPTI ?= 1x10000
 PGO_EVAL ?= 1x10000
@@ -36,14 +37,14 @@ static: # build with static executable
 native: # build with native architecture
 	@+make --no-print-directory default ARCH="arch=native"
 
-profile: # build with profiling by using make-profile.sh
+profile: # build with profiling by using a custom script
 	@+make --no-print-directory $(TARGET) FLAGS="$(FLAGS)$(if $(filter -fprofile-update=%, $(FLAGS)),, -fprofile-update=single) -fprofile-generate"
-	[ ! -e 2048.gcda ] || rm 2048.gcda && bash make-profile.sh | xargs -d\\n -n1 echo \>
+	[ ! -e 2048.gcda ] || rm 2048.gcda && bash $(SCRIPT) | xargs -d\\n -n1 echo \>
 	@+make --no-print-directory $(TARGET) FLAGS="$(FLAGS) -fprofile-use"
 
 4x6patt 5x6patt 6x6patt 7x6patt 8x6patt: # build with profiling by using predefined settings
 	[ -e $@.w ] || { [ -e $@.w.xz ] || curl -OJRf moporgic.info/data/2048/$@.w.xz; xz -vd $@.w.xz; }
-	echo "./$(OUTPUT) -n $@ -i $@.w -a $(PGO_ALPHA) -t $(PGO_OPTI) -e $(PGO_EVAL) -% none $(PGO_FLAGS)" > make-profile.sh
+	echo "./$(OUTPUT) -n $@ -i $@.w -a $(PGO_ALPHA) -t $(PGO_OPTI) -e $(PGO_EVAL) -% none $(PGO_FLAGS)" > $(SCRIPT)
 	@+make --no-print-directory profile FLAGS="$(FLAGS) -fprofile-update=single"
 
 dump: # build and dump the disassembly
