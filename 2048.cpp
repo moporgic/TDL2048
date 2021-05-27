@@ -78,6 +78,7 @@ Parameters:
                             a high learning rate 1.0 enables TC learning
   -l, --lambda LAMBDA       the TD-lambda, default is 0
   -N, --step STEP           the n-step, default is 1 if LAMBDA is 0; otherwise 5
+  -b, --block BLOCK         the minimal learning block, default is disabled
   -u, --unit UNIT           the statistic display interval, default is 1000
   -w, --win TILE            the winning threshold, default is 2048
   -%, --info                whether to show the summary, default is auto
@@ -1997,72 +1998,6 @@ statistic run(utils::options opts, std::string type) {
 		}
 		}(); break;
 
-	case to_hash("optimize:block"):
-	case to_hash("optimize:block-forward"): [&]() {
-		u32 block = opts["options"]["block-size"].value(2048);
-		u32 bkmax = opts["options"]["block-max"].value(65536);
-		struct stat { u32 score, scale, opers; };
-		std::vector<stat> bkstat;
-
-		for (stats.init(opts[type]); stats; stats++) {
-			state b, a, o; o.next();
-			u32 score = 0;
-			u32 opers = 0;
-
-			for (u32 which = o.hash(); which < bkmax; which = o.hash() + block) {
-				o.expect(which | 1u);
-
-				a.set(-1ull);
-				for ((b = o).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
-					a.optimize(best.esti(), alpha, feats, spec);
-					score += best.score();
-					opers += 1;
-					best >> a >> b;
-					if (b.info() >= block && (b.hash() ^ o.hash()) >= block) best >> o;
-				}
-				a.optimize(0, alpha, feats, spec);
-
-				bkstat.emplace_back(stat{score, b.hash(), opers});
-			}
-
-			stat stat = bkstat.front();
-			stats.update(stat.score, stat.scale, stat.opers);
-			bkstat.clear();
-		}
-		}(); break;
-
-	case to_hash("optimize:block-backward"): [&]() {
-		u32 block = opts["options"]["block-size"].value(2048);
-		u32 bkmax = opts["options"]["block-max"].value(65536);
-		struct stat { u32 score, scale, opers; };
-		std::vector<stat> bkstat;
-
-		for (stats.init(opts[type]); stats; stats++) {
-			state b, o; o.next();
-
-			for (u32 which = o.hash(); which < bkmax; which = o.hash() + block) {
-				o.expect(which | 1u);
-
-				for ((b = o).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
-					best >> path >> b;
-				}
-				u32 score = 0, scale = b.hash(), opers = path.size();
-				for (numeric esti = 0; path.size(); path.pop_back()) {
-					state& a = path.back();
-					a.estimate(feats, spec);
-					esti = a.optimize(esti, alpha, feats, spec);
-					score += a.info();
-					if (a.info() >= block && (a.hash() ^ scale) >= block) o.set(a);
-				}
-				bkstat.emplace_back(stat{score, scale, opers});
-			}
-
-			stat stat = bkstat.front();
-			stats.update(stat.score, stat.scale, stat.opers);
-			bkstat.clear();
-		}
-		}(); break;
-
 	case to_hash("optimize:step"):
 	case to_hash("optimize:step-forward"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
@@ -2212,6 +2147,72 @@ statistic run(utils::options opts, std::string type) {
 		}
 		}(); break;
 
+	case to_hash("optimize:block"):
+	case to_hash("optimize:block-forward"): [&]() {
+		u32 block = opts["block"].value(2048);
+		u32 limit = opts["block"]["limit"].value(65536);
+		struct stat { u32 score, scale, opers; };
+		std::vector<stat> bkstat;
+
+		for (stats.init(opts[type]); stats; stats++) {
+			state b, a, o; o.next();
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (u32 which = o.hash(); which < limit; which = o.hash() + block) {
+				o.expect(which | 1u);
+
+				a.set(-1ull);
+				for ((b = o).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
+					a.optimize(best.esti(), alpha, feats, spec);
+					score += best.score();
+					opers += 1;
+					best >> a >> b;
+					if (b.info() >= block && (b.hash() ^ o.hash()) >= block) best >> o;
+				}
+				a.optimize(0, alpha, feats, spec);
+
+				bkstat.emplace_back(stat{score, b.hash(), opers});
+			}
+
+			stat stat = bkstat.front();
+			stats.update(stat.score, stat.scale, stat.opers);
+			bkstat.clear();
+		}
+		}(); break;
+
+	case to_hash("optimize:block-backward"): [&]() {
+		u32 block = opts["block"].value(2048);
+		u32 limit = opts["block"]["limit"].value(65536);
+		struct stat { u32 score, scale, opers; };
+		std::vector<stat> bkstat;
+
+		for (stats.init(opts[type]); stats; stats++) {
+			state b, o; o.next();
+
+			for (u32 which = o.hash(); which < limit; which = o.hash() + block) {
+				o.expect(which | 1u);
+
+				for ((b = o).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
+					best >> path >> b;
+				}
+				u32 score = 0, scale = b.hash(), opers = path.size();
+				for (numeric esti = 0; path.size(); path.pop_back()) {
+					state& a = path.back();
+					a.estimate(feats, spec);
+					esti = a.optimize(esti, alpha, feats, spec);
+					score += a.info();
+					if (a.info() >= block && (a.hash() ^ scale) >= block) o.set(a);
+				}
+				bkstat.emplace_back(stat{score, scale, opers});
+			}
+
+			stat stat = bkstat.front();
+			stats.update(stat.score, stat.scale, stat.opers);
+			bkstat.clear();
+		}
+		}(); break;
+
 	case to_hash("evaluate"):
 	case to_hash("evaluate:best"): [&]() {
 		for (stats.init(opts[type]); stats; stats++) {
@@ -2289,6 +2290,9 @@ utils::options parse(int argc, const char* argv[]) {
 			// no break: lambda may also come with step
 		case to_hash("-N"): case to_hash("--step"):
 			opts["step"] = next_opt("5");
+			break;
+		case to_hash("-b"): case to_hash("--block"):
+			opts["block"] = next_opts("2048");
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
@@ -2372,7 +2376,7 @@ utils::options parse(int argc, const char* argv[]) {
 		if (mode != "optimize" && mode != "evaluate")
 			continue;
 
-		for (std::string flag : {"lambda", "step"})
+		for (std::string flag : {"lambda", "step", "block"})
 			if (mode == "optimize" && (opts[recipe](flag) || opts(flag)))
 				opts[recipe]["mode"] = opts[recipe]["mode"].value(flag);
 		if (opts[recipe].find("mode", recipe).find(mode) != 0)
