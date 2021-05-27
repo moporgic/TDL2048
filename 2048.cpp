@@ -2005,23 +2005,22 @@ statistic run(utils::options opts, std::string type) {
 		std::vector<stat> bkstat;
 
 		for (stats.init(opts[type]); stats; stats++) {
-			board b, a; a.next();
+			state b, a, o; o.next();
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (u32 which = a.hash(); which < bkmax; which = a.hash() + block) {
-				a.expect(which | 1u);
+			for (u32 which = o.hash(); which < bkmax; which = o.hash() + block) {
+				o.expect(which | 1u);
 
-				last.set(-1ull);
-				for ((b = a).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
-					last.optimize(best.esti(), alpha, feats, spec);
+				a.set(-1ull);
+				for ((b = o).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
+					a.optimize(best.esti(), alpha, feats, spec);
 					score += best.score();
 					opers += 1;
-					best >> last;
-					best >> b;
-					if (b.info() >= block && (b.hash() ^ a.hash()) >= block) best >> a;
+					best >> a >> b;
+					if (b.info() >= block && (b.hash() ^ o.hash()) >= block) best >> o;
 				}
-				last.optimize(0, alpha, feats, spec);
+				a.optimize(0, alpha, feats, spec);
 
 				bkstat.emplace_back(stat{score, b.hash(), opers});
 			}
@@ -2039,23 +2038,23 @@ statistic run(utils::options opts, std::string type) {
 		std::vector<stat> bkstat;
 
 		for (stats.init(opts[type]); stats; stats++) {
-			board b, a; a.next();
+			state b, o; o.next();
 
-			for (u32 which = a.hash(); which < bkmax; which = a.hash() + block) {
-				a.expect(which | 1u);
+			for (u32 which = o.hash(); which < bkmax; which = o.hash() + block) {
+				o.expect(which | 1u);
 
-				for ((b = a).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
-					best >> path;
-					best >> b;
+				for ((b = o).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
+					best >> path >> b;
 				}
 				u32 score = 0, scale = b.hash(), opers = path.size();
 				for (numeric esti = 0; path.size(); path.pop_back()) {
-					path.back().estimate(feats, spec);
-					esti = path.back().optimize(esti, alpha, feats, spec);
-					score += path.back().info();
-					if (path.back().info() >= block && (path.back().hash() ^ scale) >= block) a.set(path.back());
+					state& a = path.back();
+					a.estimate(feats, spec);
+					esti = a.optimize(esti, alpha, feats, spec);
+					score += a.info();
+					if (a.info() >= block && (a.hash() ^ scale) >= block) o.set(a);
 				}
-				bkstat.emplace_back(stat{score, b.hash(), opers});
+				bkstat.emplace_back(stat{score, scale, opers});
 			}
 
 			stat stat = bkstat.front();
