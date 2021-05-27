@@ -2149,8 +2149,8 @@ statistic run(utils::options opts, std::string type) {
 
 	case to_hash("optimize:block"):
 	case to_hash("optimize:block-forward"): [&]() {
-		u32 block = opts["block"].value(2048);
-		u32 limit = opts["block"]["limit"].value(65536);
+		u32 block = opts[type]["block"].value(opts["block"].value(2048));
+		u32 limit = opts[type]["limit"].value(opts["block"]["limit"].value(65536));
 		struct stat { u32 score, scale, opers; };
 		std::vector<stat> bkstat;
 
@@ -2182,8 +2182,8 @@ statistic run(utils::options opts, std::string type) {
 		}(); break;
 
 	case to_hash("optimize:block-backward"): [&]() {
-		u32 block = opts["block"].value(2048);
-		u32 limit = opts["block"]["limit"].value(65536);
+		u32 block = opts[type]["block"].value(opts["block"].value(2048));
+		u32 limit = opts[type]["limit"].value(opts["block"]["limit"].value(65536));
 		struct stat { u32 score, scale, opers; };
 		std::vector<stat> bkstat;
 
