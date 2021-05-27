@@ -256,31 +256,35 @@ public:
 		return in;
 	}
 
-	static void save(std::ostream& out, std::string opt = {}) {
+	static list<weight> save(std::ostream& out, std::string opt = {}) {
 		u32 code = 0;
 		write_cast<u8>(out, code);
+		list<weight> res;
 		switch (code) {
 		case 0: [&]() {
 			std::vector<u32> idxes = idx_select(opt);
 			write_cast<u32>(out, idxes.size());
-			for (u32 idx : idxes) out << wghts()[idx];
+			for (u32 idx : idxes) out << wghts()[idx], res.push_back(wghts()[idx]);
 		}(); break;
 		}
+		return res;
 	}
-	static void load(std::istream& in, std::string opt = {}) {
+	static list<weight> load(std::istream& in, std::string opt = {}) {
 		u32 code = 0;
 		read_cast<u8>(in, code);
+		list<weight> res;
 		switch (code) {
 		case 0: [&]() {
 			weight::container buf;
 			for (u32 num = read<u32>(in); num; num--)
 				in >> list<weight>::as(buf).emplace_back();
 			for (u32 idx : idx_select(opt + format("[0:%u]", u32(buf.size()))))
-				list<weight>::as(wghts()).push_back(buf[idx]);
+				list<weight>::as(wghts()).push_back(buf[idx]), res.push_back(buf[idx]);
 			for (weight w : buf)
 				if (!weight(w.sign())) free(w.data());
 		}(); break;
 		}
+		return res;
 	}
 private:
 	static std::vector<u32> idx_select(std::string opt = {}) {
@@ -530,24 +534,27 @@ public:
 		return in;
 	}
 
-	static void save(std::ostream& out, std::string opt = {}) {
+	static list<cache> save(std::ostream& out, std::string opt = {}) {
 		u32 code = 0;
 		write_cast<byte>(out, code);
+		list<cache> res;
 		switch (code) {
 		case 0:
-			out << instance();
+			out << instance(), res.push_back(instance());
 			break;
 		}
-		out.flush();
+		return res;
 	}
-	static void load(std::istream& in, std::string opt = {}) {
+	static list<cache> load(std::istream& in, std::string opt = {}) {
 		u32 code = 0;
 		read_cast<byte>(in, code);
+		list<cache> res;
 		switch (code) {
 		case 0:
-			in >> instance();
+			in >> instance(), res.push_back(instance());
 			break;
 		}
+		return res;
 	}
 
 	static inline block::access find(const board& b, u32 n) { return instance()(b, n); }
