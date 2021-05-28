@@ -1287,6 +1287,45 @@ void load_network(utils::options::option files) {
 		}
 		in.close();
 	}
+	weight::container buf, &wghts = weight::wghts();
+	std::map<std::string, size_t> N;
+	using wght_s = weight::structure;
+	using wght_c = weight::coherence;
+	while (wghts.size()) { // ensemble same weight sign
+		weight w(wghts.front()), u(w.sign(), buf);
+		if (u) { // if w is a duplicated sign
+			switch (weight::type()) { // merge duplicated weights
+			default:
+			case wght_s::code:
+				for (size_t i = 0; i < u.size(); i++)
+					u.at<wght_s>(i).value += w.at<wght_s>(i).value; // will be divided later
+				break;
+			case wght_c::code:
+				for (size_t i = 0; i < u.size(); i++) {
+					u.at<wght_c>(i).value += w.at<wght_c>(i).value; // will be divided later
+					u.at<wght_c>(i).accum += w.at<wght_c>(i).accum;
+					u.at<wght_c>(i).updvu += w.at<wght_c>(i).updvu;
+				}
+				break;
+			}
+			weight::wghts().erase(w.sign());
+			N[w.sign()] += 1;
+		} else { // if w is a first accessed sign
+			list<weight>::as(buf).push_back(w);
+			list<weight>::as(wghts).pop_front();
+			N[w.sign()] = 1;
+		}
+	}
+	for (weight u : buf) { // divide the merged weights
+		size_t n = N[u.sign()];
+		if (n == 1) continue;
+		switch (weight::type()) {
+		default:
+		case wght_s::code: for (wght_s& s : u.value<wght_s>()) s.value /= n; break;
+		case wght_c::code: for (wght_c& c : u.value<wght_c>()) c.value /= n; break;
+		}
+	}
+	wghts.swap(buf);
 }
 void save_network(utils::options::option files) {
 	char buf[1 << 20];
