@@ -1270,6 +1270,7 @@ void make_network(utils::options::option opt) {
 	}
 }
 void load_network(utils::options::option files) {
+	list<weight::segment*> fixed;
 	for (std::string file : files) {
 		std::string path = file.substr(file.find('|') + 1);
 		std::string opt = path != file ? file.substr(0, file.find('|')) : "";
@@ -1282,50 +1283,58 @@ void load_network(utils::options::option files) {
 			} else { // legacy binaries always beginning with 0, so use name suffix to determine the type
 				type = path[path.find_last_of(".") + 1];
 			}
-			if (type == 'w')  weight::load(in, opt);
-			if (type == 'c')   cache::load(in, opt);
+			if (type == 'w') {
+				list<weight> ws = weight::load(in, opt);
+				if (opt.find('!') != std::string::npos) // mark loaded weights as fixed
+					for (weight w : ws) fixed.push_back(w.data());
+			} else if (type == 'c') cache::load(in, opt);
 		}
 		in.close();
 	}
-	weight::container buf, &wghts = weight::wghts();
+	weight::container final, merge;
+	weight::container& wghts = weight::wghts();
 	std::map<std::string, size_t> N;
 	using wght_s = weight::structure;
 	using wght_c = weight::coherence;
-	while (wghts.size()) { // ensemble same weight sign
-		weight w(wghts.front()), u(w.sign(), buf);
-		if (u) { // if w is a duplicated sign
+	while (wghts.size()) { // try ensemble same weight sign
+		weight w(wghts.front()), m(w.sign(), merge);
+		if (std::find(fixed.begin(), fixed.end(), w.data()) != fixed.end()) { // if w is fixed
+			list<weight>::as(final).push_back(w);
+			list<weight>::as(wghts).pop_front();
+		} else if (!m) { // if w is a first accessed sign
+			list<weight>::as(final).push_back(w);
+			list<weight>::as(merge).push_back(w);
+			list<weight>::as(wghts).pop_front();
+			N[w.sign()] = 1;
+		} else { // if w is a duplicated sign
 			switch (weight::type()) { // merge duplicated weights
 			default:
 			case wght_s::code:
-				for (size_t i = 0; i < u.size(); i++)
-					u.at<wght_s>(i).value += w.at<wght_s>(i).value; // will be divided later
+				for (size_t i = 0; i < m.size(); i++)
+					m.at<wght_s>(i).value += w.at<wght_s>(i).value; // will be divided later
 				break;
 			case wght_c::code:
-				for (size_t i = 0; i < u.size(); i++) {
-					u.at<wght_c>(i).value += w.at<wght_c>(i).value; // will be divided later
-					u.at<wght_c>(i).accum += w.at<wght_c>(i).accum;
-					u.at<wght_c>(i).updvu += w.at<wght_c>(i).updvu;
+				for (size_t i = 0; i < m.size(); i++) {
+					m.at<wght_c>(i).value += w.at<wght_c>(i).value; // will be divided later
+					m.at<wght_c>(i).accum += w.at<wght_c>(i).accum;
+					m.at<wght_c>(i).updvu += w.at<wght_c>(i).updvu;
 				}
 				break;
 			}
 			weight::wghts().erase(w.sign());
 			N[w.sign()] += 1;
-		} else { // if w is a first accessed sign
-			list<weight>::as(buf).push_back(w);
-			list<weight>::as(wghts).pop_front();
-			N[w.sign()] = 1;
 		}
 	}
-	for (weight u : buf) { // divide the merged weights
-		size_t n = N[u.sign()];
+	for (weight m : merge) { // divide merged weights
+		size_t n = N[m.sign()];
 		if (n == 1) continue;
 		switch (weight::type()) {
 		default:
-		case wght_s::code: for (wght_s& s : u.value<wght_s>()) s.value /= n; break;
-		case wght_c::code: for (wght_c& c : u.value<wght_c>()) c.value /= n; break;
+		case wght_s::code: for (wght_s& s : m.value<wght_s>()) s.value /= n; break;
+		case wght_c::code: for (wght_c& c : m.value<wght_c>()) c.value /= n; break;
 		}
 	}
-	wghts.swap(buf);
+	wghts.swap(final);
 }
 void save_network(utils::options::option files) {
 	char buf[1 << 20];
