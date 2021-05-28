@@ -1296,18 +1296,18 @@ void load_network(utils::options::option files) {
 	std::map<std::string, size_t> N;
 	using wght_s = weight::structure;
 	using wght_c = weight::coherence;
-	while (wghts.size()) { // try ensemble same weight sign
+	while (wghts.size()) { // try ensemble weights with same sign
 		weight w(wghts.front()), m(w.sign(), merge);
-		if (std::find(fixed.begin(), fixed.end(), w.data()) != fixed.end()) { // if w is fixed
+		if (std::find(fixed.begin(), fixed.end(), w.data()) != fixed.end()) { // if w is fixed, never merge
 			list<weight>::as(final).push_back(w);
 			list<weight>::as(wghts).pop_front();
-		} else if (!m) { // if w is a first accessed sign
+		} else if (!m) { // if w is with a first accessed sign, assign it to be a base
 			list<weight>::as(final).push_back(w);
 			list<weight>::as(merge).push_back(w);
 			list<weight>::as(wghts).pop_front();
 			N[w.sign()] = 1;
-		} else { // if w is a duplicated sign
-			switch (weight::type()) { // merge duplicated weights
+		} else { // if w is with a duplicated sign, merge it with the existing base
+			switch (weight::type()) {
 			default:
 			case wght_s::code:
 				for (size_t i = 0; i < m.size(); i++)

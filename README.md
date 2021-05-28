@@ -397,6 +397,8 @@ You may enable the forward TD(λ) with ```-tt lambda-forward``` with a step size
 ```bash
 ./2048 -n 4x6patt -t 1000 -tt lambda-forward -l 0.5 -N 5 # forward 5-step TD(0.5)
 ```
+
+In addition, ensemble learning is supported. Check the loading options below for more details.
 </details>
 
 #### Learning Rate and TC
@@ -494,6 +496,25 @@ for i in {01..10}; do
     tar Jcvf 4x6patt.$i.tar.xz 4x6patt.w 4x6patt.x
 done
 ```
+</details>
+
+<details><summary>Show advanced options</summary><br>
+
+To select specific weights of a file when loading or saving, use ```[IDX]|``` prefix with file path as
+```bash
+./2048 -n 4x6patt -t 1000 -o '[0]|4x6patt-part.w' # save the first n-tuple
+./2048 -n 8x6patt -t 1000 -o '[0-3]|8x6patt-part.w' # save the first 4 n-tuples
+./2048 -n 4x6patt -e 10 -i '[0,1]|4x6patt-1.w' '[2,3]|4x6patt-2.w' -o 4x6patt.w
+# load from two different weights, test and save the merged result
+```
+
+TDL2048+ supports ensemble learning by averaging n-tuple weights. To perform this, specify multiple weight files as input, weights with the same signature are automatically averaged.
+```bash
+./2048 -n 4x6patt -e 1000 -i 4x6patt-0.w 4x6patt-1.w -o 4x6patt.x 4x6patt.w
+# two networks, 4x6patt-0.w and 4x6patt-1.w, are averaged,
+# the ensemble result is then evaluated and stored as 4x6patt.w
+```
+
 </details>
 
 #### Random Seed
