@@ -1237,11 +1237,10 @@ void make_network(utils::options::option opt) {
 				weight dst = weight(sign);
 				if (init.find_first_of("+-") == 0) { // adjust with specific value
 					numeric off = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
-					auto adjust = [=](numeric& value) { value += off; };
 					switch (weight::type()) {
 					default:
-					case wght_s::code: std::for_each(dst.data<wght_s>(), dst.data<wght_s>(dst.size()), adjust); break;
-					case wght_c::code: std::for_each(dst.data<wght_c>(), dst.data<wght_c>(dst.size()), adjust); break;
+					case wght_s::code: for (numeric& val : dst.value<wght_s>()) val += off; break;
+					case wght_c::code: for (numeric& val : dst.value<wght_c>()) val += off; break;
 					}
 				}
 			}
@@ -1281,19 +1280,20 @@ void load_network(utils::options::option files) {
 			if (type != 0) { // new binaries already store its type, so use it for the later loading
 				in.ignore(1);
 			} else { // legacy binaries always beginning with 0, so use name suffix to determine the type
-				type = path[path.find_last_of(".") + 1];
+				type = path[path.find_last_of('.') + 1];
 			}
 			if (type == 'w') {
 				list<weight> ws = weight::load(in, opt);
-				if (opt.find('!') != std::string::npos) // mark loaded weights as fixed
+				if (opt.find('!') != std::string::npos) { // mark loaded weights as fixed
 					for (weight w : ws) fixed.push_back(w.data());
+				}
 			} else if (type == 'c') cache::load(in, opt);
 		}
 		in.close();
 	}
-	weight::container final, merge;
 	weight::container& wghts = weight::wghts();
-	std::map<std::string, size_t> N;
+	weight::container final, merge;
+	std::map<std::string, size_t> numof;
 	using wght_s = weight::structure;
 	using wght_c = weight::coherence;
 	while (wghts.size()) { // try ensemble weights with same sign
@@ -1305,7 +1305,7 @@ void load_network(utils::options::option files) {
 			list<weight>::as(final).push_back(w);
 			list<weight>::as(merge).push_back(w);
 			list<weight>::as(wghts).pop_front();
-			N[w.sign()] = 1;
+			numof[w.sign()] = 1;
 		} else { // if w is with a duplicated sign, merge it with the existing base
 			switch (weight::type()) {
 			default:
@@ -1321,12 +1321,12 @@ void load_network(utils::options::option files) {
 				}
 				break;
 			}
-			weight::wghts().erase(w.sign());
-			N[w.sign()] += 1;
+			wghts.erase(w.sign());
+			numof[w.sign()] += 1;
 		}
 	}
 	for (weight m : merge) { // divide merged weights
-		size_t n = N[m.sign()];
+		size_t n = numof[m.sign()];
 		if (n == 1) continue;
 		switch (weight::type()) {
 		default:
@@ -1337,23 +1337,20 @@ void load_network(utils::options::option files) {
 	wghts.swap(final);
 }
 void save_network(utils::options::option files) {
-	char buf[1 << 20];
 	for (std::string file : files) {
 		std::string path = file.substr(file.find('|') + 1);
 		std::string opt = path != file ? file.substr(0, file.find('|')) : "";
 		char type = path[path.find_last_of(".") + 1];
 		if (type == 'x' || type == 'l') continue; // .x and .log are suffix for log files
 		std::ofstream out;
-		out.rdbuf()->pubsetbuf(buf, sizeof(buf));
 		out.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
 		if (!out.is_open()) continue;
 		// for upward compatibility, we still write legacy binaries for traditional suffixes
-		if (type != 'c') {
+		if (type != 'c') { // .w is reserved for weights binary
 			weight::save(type != 'w' ? out.write("w", 1) : out, opt);
 		} else { // .c is reserved for cache binary
 			cache::save(type != 'c' ?  out.write("c", 1) : out, opt);
 		}
-		out.flush();
 		out.close();
 	}
 }
