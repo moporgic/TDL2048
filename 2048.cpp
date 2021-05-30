@@ -1629,10 +1629,27 @@ struct method {
 	static method specialize(utils::options opts, std::string name) {
 		std::string spec = opts["options"]["spec"].value("auto");
 		if (spec == "auto") {
-			spec = opts["make"].value(format("%ux6patt", weight::wghts().size()));
-			spec = spec.substr(0, spec.find_first_of("&|="));
+			u32 m = weight::wghts().size();
+			u32 n = m ? math::log2(weight::wghts().front().size()) >> 2 : 0;
+			for (weight w : weight::wghts()) {
+				// check: (1) isomorphic? (2) pattern-based? (3) capacity?
+				if (std::accumulate(feature::feats().begin(), feature::feats().end(), 0,
+					[=](u32 n, feature f) { return n + (f.value() == w ? 1 : 0); }) != 8) m = 0;
+				if (w.sign().find_first_not_of("0123456789abcdef") != std::string::npos) n = 0;
+				if (math::log2(w.size()) >> 2 != n) n = 0;
+			}
+			if (m) { // if features are assumed as isomorphic
+				spec = opts["make"].value();
+				spec = spec.substr(0, spec.find_first_of("&|="));
+				if (utils::resolve(spec) == spec) spec = format("%ux%upatt", m, n);
+				if (utils::resolve(spec) == spec) spec = "isomorphic";
+			} else { // if features are definitely not isomorphic
+				spec = "common";
+			}
 		}
 		switch (to_hash(spec)) {
+		default: return option<common<mode>>(opts);
+		case to_hash("isomorphic"): return option<isomorphic<mode>>(opts);
 		case to_hash("4x6patt"): return option<typename isomorphic<mode>::idx4x6patt>(opts);
 		case to_hash("5x6patt"): return option<typename isomorphic<mode>::idx5x6patt>(opts);
 		case to_hash("6x6patt"): return option<typename isomorphic<mode>::idx6x6patt>(opts);
@@ -1642,10 +1659,6 @@ struct method {
 		case to_hash("3x7patt"): return option<typename isomorphic<mode>::idx3x7patt>(opts);
 		case to_hash("1x8patt"): return option<typename isomorphic<mode>::idx1x8patt>(opts);
 		case to_hash("2x8patt"): return option<typename isomorphic<mode>::idx2x8patt>(opts);
-		default: for (auto token : {"none", "mono", "num"}) // non-isomorphic
-			if (spec.find(token) != std::string::npos) return option<common<mode>>(opts);
-			// no break: otherwise assume isomorphic structures
-		case to_hash("isomorphic"): return option<isomorphic<mode>>(opts);
 		}
 	}
 
