@@ -277,9 +277,9 @@ public:
 		case 0: [&]() {
 			weight::container buf;
 			for (u32 num = read<u32>(in); num; num--)
-				in >> list<weight>::as(buf).emplace_back();
+				in >> buf.emplace_back();
 			for (u32 idx : idx_select(opt + format("[0:%u]", u32(buf.size()))))
-				list<weight>::as(wghts()).push_back(buf[idx]), res.push_back(buf[idx]);
+				wghts().push_back(buf[idx]), res.push_back(buf[idx]);
 			for (weight w : buf)
 				if (!weight(w.sign())) free(w.data());
 		}(); break;
@@ -305,13 +305,13 @@ private:
 	}
 
 public:
-	class container : public clip<weight> {
+	class container : public list<weight> {
 	public:
-		constexpr container() noexcept : clip<weight>() {}
-		constexpr container(const clip<weight>& w) : clip<weight>(w) {}
+		constexpr container() noexcept : list<weight>() {}
+		container(const clip<weight>& w) : list<weight>(w) {}
 	public:
-		weight& make(sign_t sign, size_t size) { return list<weight>::as(*this).emplace_back(weight(sign, size)); }
-		weight erase(sign_t sign) { auto it = find(sign); auto w = *it; free(it->data()); list<weight>::as(*this).erase(it); return w; }
+		weight& make(sign_t sign, size_t size) { return list<weight>::emplace_back(weight(sign, size)); }
+		weight erase(sign_t sign) { auto it = find(sign); auto w = *it; free(it->data()); list<weight>::erase(it); return w; }
 		weight* find(sign_t sign) const { return std::find_if(begin(), end(), [=](const weight& w) { return w.sign() == sign; }); }
 		weight& at(sign_t sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("weight::at"); }
 		weight& operator[](sign_t sign) const { return (*find(sign)); }
@@ -355,13 +355,13 @@ public:
 	inline operator bool() const { return map; }
 	declare_comparators(const indexer&, sign(), inline);
 
-	class container : public clip<indexer> {
+	class container : public list<indexer> {
 	public:
-		constexpr container() noexcept : clip<indexer>() {}
-		constexpr container(const clip<indexer>& i) : clip<indexer>(i) {}
+		constexpr container() noexcept : list<indexer>() {}
+		container(const clip<indexer>& i) : list<indexer>(i) {}
 	public:
-		indexer& make(sign_t sign, mapper map) { return list<indexer>::as(*this).emplace_back(indexer(sign, map)); }
-		indexer erase(sign_t sign) { auto it = find(sign); auto x = *it; list<indexer>::as(*this).erase(it); return x; }
+		indexer& make(sign_t sign, mapper map) { return list<indexer>::emplace_back(indexer(sign, map)); }
+		indexer erase(sign_t sign) { auto it = find(sign); auto x = *it; list<indexer>::erase(it); return x; }
 		indexer* find(sign_t sign) const { return std::find_if(begin(), end(), [=](const indexer& i) { return i.sign() == sign; }); }
 		indexer& at(sign_t sign) const { auto it = find(sign); if (it != end()) return *it; throw std::out_of_range("indexer::at"); }
 		indexer& operator[](sign_t sign) const { return (*find(sign)); }
@@ -400,15 +400,15 @@ public:
 	inline operator bool() const { return map && raw; }
 	declare_comparators(const feature&, sign(), inline);
 
-	class container : public clip<feature> {
+	class container : public list<feature> {
 	public:
-		constexpr container() noexcept : clip<feature>() {}
-		constexpr container(const clip<feature>& f) : clip<feature>(f) {}
+		constexpr container() noexcept : list<feature>() {}
+		container(const clip<feature>& f) : list<feature>(f) {}
 	public:
-		feature& make(sign_t wgt, sign_t idx) { return list<feature>::as(*this).emplace_back(feature(weight(wgt), indexer(idx))); }
+		feature& make(sign_t wgt, sign_t idx) { return list<feature>::emplace_back(feature(weight(wgt), indexer(idx))); }
 		feature& make(sign_t sign) { return make(sign.substr(0, sign.find(':')), sign.substr(sign.find(':') + 1)); }
 		feature erase(sign_t wgt, sign_t idx) { return erase(wgt + ':' + idx); }
-		feature erase(sign_t sign) { auto it = find(sign); auto f = *it; list<feature>::as(*this).erase(it); return f; }
+		feature erase(sign_t sign) { auto it = find(sign); auto f = *it; list<feature>::erase(it); return f; }
 		feature* find(sign_t wgt, sign_t idx) const { return find(wgt + ':' + idx); }
 		feature* find(sign_t sign) const { return std::find_if(begin(), end(), [=](const feature& f) { return f.sign() == sign; }); }
 		feature& at(sign_t wgt, sign_t idx) const { return at(wgt + ':' + idx); }
@@ -1299,12 +1299,12 @@ void load_network(utils::options::option files) {
 	while (wghts.size()) { // try ensemble weights with same sign
 		weight w(wghts.front()), m(w.sign(), merge);
 		if (std::find(fixed.begin(), fixed.end(), w.data()) != fixed.end()) { // if w is fixed, never merge
-			list<weight>::as(final).push_back(w);
-			list<weight>::as(wghts).pop_front();
+			final.push_back(w);
+			wghts.pop_front();
 		} else if (!m) { // if w is with a first accessed sign, assign it to be a base
-			list<weight>::as(final).push_back(w);
-			list<weight>::as(merge).push_back(w);
-			list<weight>::as(wghts).pop_front();
+			final.push_back(w);
+			merge.push_back(w);
+			wghts.pop_front();
 			numof[w.sign()] = 1;
 		} else { // if w is with a duplicated sign, merge it with the existing base
 			switch (weight::type()) {
@@ -1321,7 +1321,7 @@ void load_network(utils::options::option files) {
 				}
 				break;
 			}
-			wghts.erase(w.sign());
+			wghts.erase(w.sign()); // free this duplicated weight
 			numof[w.sign()] += 1;
 		}
 	}
