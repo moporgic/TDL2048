@@ -16,6 +16,7 @@ PGO_EVAL ?= 1x10000
 PGO_FLAGS ?= -s
 
 # fine-tune for specific architectures
+CXXVER := $(shell gcc -dumpversion)
 MACROS := $(shell echo | gcc -x c++ -march=native -dM -E -)
 ifneq ($(findstring $(or $(BMI2), BMI2), $(MACROS)), BMI2)
 	INSTS := $(filter-out abm bmi bmi2, popcnt $(INSTS) no-bmi2)
@@ -40,7 +41,8 @@ native: # build with native architecture
 profile: # build with profiling by using a custom script
 	@+make --no-print-directory $(TARGET) FLAGS="$(FLAGS)$(if $(filter -fprofile-update=%, $(FLAGS)),, -fprofile-update=single) -fprofile-generate"
 	@sed "s|"\$$"(OUTPUT)|$(if $(findstring /, $(OUTPUT)),,./)$(OUTPUT)|g" $(SCRIPT) | tee $(SCRIPT).run
-	@[ ! -e 2048.gcda ] || rm 2048.gcda && bash $(SCRIPT).run | xargs -d\\n -n1 echo \> && rm $(SCRIPT).run
+	@rm $(if $(and $(OUTPUT:2048=), $(filter 1, $(shell expr $(CXXVER) \>= 11))), $(OUTPUT)-)2048.gcda 2>/dev/null ||:
+	@bash $(SCRIPT).run | xargs -d\\n -n1 echo \> && rm $(SCRIPT).run
 	@+make --no-print-directory $(TARGET) FLAGS="$(filter-out -fprofile-update=%, $(FLAGS)) -fprofile-use"
 
 4x6patt 5x6patt 6x6patt 7x6patt 8x6patt: # build with profiling by using predefined settings
