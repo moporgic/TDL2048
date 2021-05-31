@@ -40,8 +40,8 @@ native: # build with native architecture
 
 profile: # build with profiling by using a custom script
 	@+make --no-print-directory $(TARGET) FLAGS="$(FLAGS)$(if $(filter -fprofile-update=%, $(FLAGS)),, -fprofile-update=single) -fprofile-generate"
-	@sed "s|"\$$"(OUTPUT)|$(if $(findstring /, $(OUTPUT)),,./)$(OUTPUT)|g" $(SCRIPT) | tee $(SCRIPT).run
-	@rm $(if $(and $(OUTPUT:2048=), $(filter 1, $(shell expr $(CXXVER) \>= 11))), $(OUTPUT)-)2048.gcda 2>/dev/null ||:
+	@sed "s|"\$$"(OUTPUT)|$(dir $(OUTPUT))$(notdir $(OUTPUT))|g" $(SCRIPT) | tee $(SCRIPT).run
+	@rm $(if $(and $(filter-out 2048, $(notdir $(OUTPUT))), $(filter 1, $(shell expr $(CXXVER) \>= 11))), $(OUTPUT)-, $(dir $(OUTPUT)))2048.gcda 2>/dev/null ||:
 	@bash $(SCRIPT).run | xargs -d\\n -n1 echo \> && rm $(SCRIPT).run
 	@+make --no-print-directory $(TARGET) FLAGS="$(filter-out -fprofile-update=%, $(FLAGS)) -fprofile-use"
 
