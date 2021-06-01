@@ -45,9 +45,9 @@ native: # build with native architecture
 profile: # build with profiling by using a custom script
 	@+make --no-print-directory $(TARGET) FLAGS="$(FLAGS)$(if $(filter -fprofile-update=%, $(FLAGS)),, -fprofile-update=single) -fprofile-generate"
 	@sed "s|"\$$"(OUTPUT)|$(dir $(OUTPUT))$(notdir $(OUTPUT))|g" $(SCRIPT) | tee $(SCRIPT).run
-	$(eval GCDA ?= $(if $(filter 2048$(SUFFIX), $(notdir $(OUTPUT)))$(filter-out 1, $(shell expr $(CXXVER) \>= 11)), \
-						$(dir $(OUTPUT))2048.gcda, $(OUTPUT:%$(SUFFIX)=%)-2048.gcda))
-	@[ ! -e $(GCDA) ] || rm -f $(GCDA) && bash $(SCRIPT).run | xargs -d\\n -n1 echo \> && rm $(SCRIPT).run
+	$(eval GCDA ?= $(if $(filter 1, $(shell expr $(CXXVER) \>= 11)), $(if $(filter 2048$(SUFFIX), $(notdir $(OUTPUT))), \
+						$(dir $(OUTPUT)), $(OUTPUT:%$(SUFFIX)=%)-))2048.gcda)
+	@[ ! -e $(GCDA) ] || rm -f $(GCDA) && bash $(SCRIPT).run | xargs -d\\n -n1 echo \> && rm -f $(SCRIPT).run
 	@+make --no-print-directory $(TARGET) FLAGS="$(filter-out -fprofile-update=%, $(FLAGS)) -fprofile-use"
 
 4x6patt 5x6patt 6x6patt 7x6patt 8x6patt: # build with profiling by using predefined settings
