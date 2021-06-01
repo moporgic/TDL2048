@@ -18,6 +18,10 @@ PGO_FLAGS ?= -s
 # fine-tune for specific architectures
 CXXVER := $(shell gcc -dumpversion)
 MACROS := $(shell echo | gcc -x c++ -march=native -dM -E -)
+ifneq ($(filter WIN32 WIN64 WINNT, $(MACROS)),)
+	override OUTPUT := $(OUTPUT)$(if $(filter %.EXE %.exe, $(OUTPUT)),,.exe)
+	override SUFFIX := $(suffix $(OUTPUT))
+endif
 ifneq ($(findstring $(or $(BMI2), BMI2), $(MACROS)), BMI2)
 	INSTS := $(filter-out abm bmi bmi2, popcnt $(INSTS) no-bmi2)
 endif
@@ -41,7 +45,8 @@ native: # build with native architecture
 profile: # build with profiling by using a custom script
 	@+make --no-print-directory $(TARGET) FLAGS="$(FLAGS)$(if $(filter -fprofile-update=%, $(FLAGS)),, -fprofile-update=single) -fprofile-generate"
 	@sed "s|"\$$"(OUTPUT)|$(dir $(OUTPUT))$(notdir $(OUTPUT))|g" $(SCRIPT) | tee $(SCRIPT).run
-	$(eval GCDA ?= $(if $(filter 2048, $(notdir $(OUTPUT)))$(filter-out 1, $(shell expr $(CXXVER) \>= 11)), $(dir $(OUTPUT)), $(OUTPUT)-)2048.gcda)
+	$(eval GCDA ?= $(if $(filter 2048$(SUFFIX), $(notdir $(OUTPUT)))$(filter-out 1, $(shell expr $(CXXVER) \>= 11)), \
+						$(dir $(OUTPUT))2048.gcda, $(OUTPUT:%$(SUFFIX)=%)-2048.gcda))
 	@[ ! -e $(GCDA) ] || rm -f $(GCDA) && bash $(SCRIPT).run | xargs -d\\n -n1 echo \> && rm $(SCRIPT).run
 	@+make --no-print-directory $(TARGET) FLAGS="$(filter-out -fprofile-update=%, $(FLAGS)) -fprofile-use"
 
@@ -52,7 +57,7 @@ profile: # build with profiling by using a custom script
 
 dump: # build and dump the disassembly
 	@+make --no-print-directory $(word 1, $(TARGET)) TARGET="$(word 2, $(TARGET) default)" FLAGS="$(FLAGS) -g"
-	objdump -S $(word 1, $(wildcard $(OUTPUT) $(OUTPUT).exe)) > $(OUTPUT).dump
+	objdump -S $(OUTPUT) > $(OUTPUT:%$(SUFFIX)=%).dump
 
 clean: # cleanup
-	rm $(wildcard $(OUTPUT) $(OUTPUT).exe) ||:
+	rm -f $(OUTPUT) 2>/dev/null ||:
