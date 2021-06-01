@@ -60,4 +60,5 @@ dump: # build and dump the disassembly
 	objdump -S $(OUTPUT) > $(OUTPUT:%$(SUFFIX)=%).dump
 
 clean: # cleanup
-	rm -f $(OUTPUT) 2>/dev/null ||:
+	$(eval FILES ?= $(shell file $(wildcard $(OUTPUT:%$(SUFFIX)=%)* .) | grep -E "executable|gcda" | grep -v script | cut -d: -f1))
+	$(if $(FILES), rm -f $(FILES))
