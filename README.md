@@ -565,6 +565,16 @@ Note that on Linux platforms, if you keep the SHM option unchanged, specifying b
 ```
 
 Due to a current limitation, the speed of ```-e 1000``` in the former is slower than that in the latter. However, should still be faster than using ```std::thread```.
+
+Finally, TDL2048+ has not been optimized to support [multiprocessing](https://en.wikipedia.org/wiki/Multiprocessing) with [non-uniform memory access (NUMA)](https://en.wikipedia.org/wiki/Non-uniform_memory_access) architecture. Parallel training on such platforms may result in speed loss.
+Therefore, it is recommended to use [```taskset```](https://man7.org/linux/man-pages/man1/taskset.1.html) to limit the execution on only a single processor.
+
+For example, on a machine with two Intel E5-2620 v4 (8C/16T x2), the program speeds (training and testing) without and with ```taskset``` are as follows.
+```bash
+./2048 -n 4x6patt -t 320 -e 320 # 2.4M ops, 2.7M ops
+./2048 -n 4x6patt -t 320 -e 320 -p 32 # 8.1M ops (!), 33.3M ops
+taskset -c 0-7,16-23 ./2048 -n 4x6patt -t 320 -e 320 -p 16 # 12.8M ops, 18.2M ops
+```
 </details>
 
 #### Miscellaneous
