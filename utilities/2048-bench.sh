@@ -5,9 +5,9 @@
 test() { command -v ${1:-./2048} >/dev/null 2>&1 && test-st ${@:-./2048} || test-st ./${@:-./2048}; }
 # specialized benchmarking kernels, should be wrapped with "test" before use
 test-st() { ${1:-./2048} -s -t 1x${2:-10000} -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
-test-mt() { ${1:-./2048} -s -t ${2:-$(nproc)0} -e ${2:-$(nproc)0} -p -% | grep summary | egrep -o [0-9.]+ops; }
+test-mt() { ${1:-./2048} -s -t ${2:-$(nproc)0} -e ${2:-$(nproc)0} -p ${3:-$(nproc)} -% | grep summary | egrep -o [0-9.]+ops; }
 test-e-st() { echo nanops; ${1:-./2048} -s -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
-test-e-mt() { echo nanops; ${1:-./2048} -s -e ${2:-$(nproc)0} -p -% | grep summary | egrep -o [0-9.]+ops; }
+test-e-mt() { echo nanops; ${1:-./2048} -s -e ${2:-$(nproc)0} -p ${3:-$(nproc)} -% | grep summary | egrep -o [0-9.]+ops; }
 
 # benchmarking routine
 # usage: bench [binary:./2048] [attempt:10]
