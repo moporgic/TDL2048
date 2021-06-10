@@ -754,15 +754,15 @@ benchmark # perform a full benchmark
 
 Extract AVG, MAX, TILE, and WIN from a log, which is useful when exporting statistics.
 ```bash
-grep local 2048.x | ./2048-arse.sh # extract AVG, MAX, TILE, and WIN from each block
+grep local 2048.x | ./2048-parse.sh # extract AVG, MAX, TILE, and WIN from each block
 ```
 </details>
 
 <details><summary>2048-winrate.sh - log parser for summary block</summary>
 
-Extract win rates of large tiles and print them. Check the script for more details.
+Extract win rates of large tiles from summary block and print them. Check the script for more details.
 ```bash
-./2048-winrate.sh < 2048.x # extract win rates and print them
+./2048-winrate.sh < 2048.x # extract win rates from summary block and print them
 ```
 </details>
 
@@ -771,7 +771,7 @@ Extract win rates of large tiles and print them. Check the script for more detai
 This script helps you rearrange a log of statistic blocks.
 For example, follow below steps to join 10 statistic blocks and print the new statistics.
 ```bash
-./2048-thick.sh 10 < 2048.x
+grep local 2048.x | ./2048-parse.sh | ./2048-thick.sh 10 # average every 10 blocks
 ```
 </details>
 
