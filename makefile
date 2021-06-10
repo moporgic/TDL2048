@@ -6,7 +6,8 @@ OLEVEL ?= 3
 ARCH ?= tune=native
 INSTS ?= abm bmi bmi2 avx avx2
 FLAGS ?= -Wall -fmessage-length=0
-OUTPUT ?= 2048
+SOURCE ?= 2048.cpp
+OUTPUT ?= $(basename $(SOURCE))
 # other make options
 TARGET ?= default
 SCRIPT ?= make-profile.sh
@@ -40,7 +41,7 @@ ifneq ($(findstring x86_64, $(MACROS)), x86_64)
 endif
 
 default: # build with default
-	$(CXX) -std=$(STD) -O$(OLEVEL) $(addprefix -m, $(ARCH) $(INSTS)) -pthread $(FLAGS) -o $(OUTPUT) 2048.cpp
+	$(CXX) -std=$(STD) -O$(OLEVEL) $(addprefix -m, $(ARCH) $(INSTS)) -pthread $(FLAGS) -o $(OUTPUT) $(SOURCE)
 
 static: # build with static executable
 	@+$(MAKE) default ARCH="tune=generic" FLAGS="$(FLAGS) -static"
@@ -50,8 +51,8 @@ native: # build with native architecture
 
 profile: # build with profiling by using a custom script
 	@+$(MAKE) $(TARGET) FLAGS="$(FLAGS)$(if $(filter -fprofile-update=%, $(FLAGS)),, -fprofile-update=single) -fprofile-generate"
-	$(eval GCDA ?= $(if $(filter 1, $(shell expr $(CXXVER) \>= 11)), $(if $(filter 2048$(SUFFIX), $(notdir $(OUTPUT))), \
-						$(dir $(OUTPUT)), $(OUTPUT:%$(SUFFIX)=%)-))2048.gcda)
+	$(eval GCDA ?= $(if $(filter 1, $(shell expr $(CXXVER) \>= 11)), $(if $(filter $(basename $(SOURCE))$(SUFFIX), $(notdir $(OUTPUT))), \
+						$(dir $(OUTPUT)), $(OUTPUT:%$(SUFFIX)=%)-))$(basename $(SOURCE)).gcda)
 	$(if $(wildcard $(GCDA)), @$(RM) $(GCDA))
 	@sed "s|"\$$"(OUTPUT)|$(dir $(OUTPUT))$(notdir $(OUTPUT))|g" $(SCRIPT) | BASH_XTRACEFD=1 bash -x \
 		| xargs -d\\n -n1 echo \> | $(if $(findstring s, $(filter-out -%, $(MAKEFLAGS))), grep -v "^> + ", sed "s|^> + ||g")
