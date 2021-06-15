@@ -709,6 +709,33 @@ public:
 	inline std::array<board, 4> moves64() const { std::array<board, 4> move; moves64(move.data()); return move; }
 	inline std::array<board, 4> moves80() const { std::array<board, 4> move; moves80(move.data()); return move; }
 
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline u32 movals(btype move[]) const { return movals64(move); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline u32 movals64(btype move[]) const {
+		moves64(move);
+		u32 i = 0;
+		move[i] = move[0]; i += ~move[0].inf >> 31;
+		move[i] = move[1]; i += ~move[1].inf >> 31;
+		move[i] = move[2]; i += ~move[2].inf >> 31;
+		move[i] = move[3]; i += ~move[3].inf >> 31;
+		return i;
+	}
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline u32 movals80(btype move[]) const {
+		moves80(move);
+		u32 i = 0;
+		move[i] = move[0]; i += ~move[0].inf >> 31;
+		move[i] = move[1]; i += ~move[1].inf >> 31;
+		move[i] = move[2]; i += ~move[2].inf >> 31;
+		move[i] = move[3]; i += ~move[3].inf >> 31;
+		return i;
+	}
+
+	inline std::vector<board> movals() const   { std::vector<board> move(4); move.resize(movals(move.data())); return move; }
+	inline std::vector<board> movals64() const { std::vector<board> move(4); move.resize(movals64(move.data())); return move; }
+	inline std::vector<board> movals80() const { std::vector<board> move(4); move.resize(movals80(move.data())); return move; }
+
 	class action {
 	public:
 		action() = delete;
