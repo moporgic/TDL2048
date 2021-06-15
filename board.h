@@ -443,6 +443,33 @@ public:
 	inline bool popup64() { return empty64() ? next64(), true : false; }
 	inline bool popup80() { return empty80() ? next80(), true : false; }
 
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline u32 popups(btype popup[]) const { return popups64(popup); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline u32 popups64(btype popup[]) const {
+		u32 i = 0;
+		u64 x = where64(0);
+		for (u64 t; (t = x & -x) != 0; x ^= t) {
+			popup[i++] = board(raw | (t << 0), ext);
+			popup[i++] = board(raw | (t << 1), ext);
+		}
+		return i;
+	}
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline u32 popups80(btype popup[]) const {
+		u32 i = 0;
+		u64 x = where80(0);
+		for (u64 t; (t = x & -x) != 0; x ^= t) {
+			popup[i++] = board(raw | (t << 0), ext);
+			popup[i++] = board(raw | (t << 1), ext);
+		}
+		return i;
+	}
+
+	inline std::vector<board> popups() const   { std::vector<board> popup(empty() * 2); popups(popup.data()); return popup; }
+	inline std::vector<board> popups64() const { std::vector<board> popup(empty64() * 2); popups64(popup.data()); return popup; }
+	inline std::vector<board> popups80() const { std::vector<board> popup(empty80() * 2); popups80(popup.data()); return popup; }
+
 	inline i32 left()  { return left64(); }
 	inline i32 right() { return right64(); }
 	inline i32 up()    { return up64(); }
