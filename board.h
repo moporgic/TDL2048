@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : moporgic/TDL2048+ - board.h
 // Author      : Hung Guei @ moporgic
-// Version     : 6.1
+// Version     : 6.2
 // Description : The Most Effective Bitboard Implementation for 2048
 //============================================================================
 
