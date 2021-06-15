@@ -751,7 +751,8 @@ public:
 		while (dist-- > 0 && shift64()) hash = hash64();
 		u32 mask = ~(math::msb(thres | 1) - 1);
 		u32 diff = (scale ^ hash) & mask;
-		for (u32 u = 0; (u = math::msb(diff)) != 0; diff ^= u) {
+		for (u32 u = 0; diff != 0; diff ^= u) {
+			u = math::msb(diff);
 			if (scale & u) { // if u is expected but not present
 				u32 t = math::msb(hash & (u - 1));
 				u64 w = t ? where64(math::tzcnt(t)) : 0;
