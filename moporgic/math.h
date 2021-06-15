@@ -133,13 +133,23 @@ static inline constexpr uint32_t popcnt32(register uint32_t x) noexcept { return
 static inline constexpr uint64_t popcnt(register uint64_t x) noexcept { return popcnt64(x); }
 static inline constexpr uint32_t popcnt(register uint32_t x) noexcept { return popcnt32(x); }
 
+#if defined(__LZCNT__) || defined(__ABM__) // LZCNT intrinsic is available
 static inline constexpr uint32_t lzcnt64(register uint64_t x) noexcept { return __builtin_clzll(x); }
 static inline constexpr uint32_t lzcnt32(register uint32_t x) noexcept { return __builtin_clz(x); }
+#else // no LZCNT support, need to check if input is 0 or not
+static inline constexpr uint32_t lzcnt64(register uint64_t x) noexcept { return x ? __builtin_clzll(x) : 64u; }
+static inline constexpr uint32_t lzcnt32(register uint32_t x) noexcept { return x ? __builtin_clz(x) : 32u; }
+#endif
 static inline constexpr uint32_t lzcnt(register uint64_t x) noexcept { return lzcnt64(x); }
 static inline constexpr uint32_t lzcnt(register uint32_t x) noexcept { return lzcnt32(x); }
 
+#if defined(__BMI__) // TZCNT intrinsic is available
 static inline constexpr uint32_t tzcnt64(register uint64_t x) noexcept { return __builtin_ctzll(x); }
 static inline constexpr uint32_t tzcnt32(register uint32_t x) noexcept { return __builtin_ctz(x); }
+#else // no TZCNT support, need to check if input is 0 or not
+static inline constexpr uint32_t tzcnt64(register uint64_t x) noexcept { return x ? __builtin_ctzll(x) : 64u; }
+static inline constexpr uint32_t tzcnt32(register uint32_t x) noexcept { return x ? __builtin_ctz(x) : 32u; }
+#endif
 static inline constexpr uint32_t tzcnt(register uint64_t x) noexcept { return tzcnt64(x); }
 static inline constexpr uint32_t tzcnt(register uint32_t x) noexcept { return tzcnt32(x); }
 
@@ -334,10 +344,8 @@ static inline constexpr uint32_t msb32(register uint32_t x) noexcept {
 }
 static inline constexpr uint64_t msb64(register uint64_t x) noexcept {
 #ifndef PREFER_GENERAL_INSTRUCTIONS
-	// the same reason as msb32, while we use xor to mask out bad value when x == 0
-	// it should be compiled to cmove when optimization is on
-	register uint64_t msb = 0x8000000000000000ull >> lzcnt64(x);
-	return msb ^ (x ? 0ull : msb);
+	// the same reason as msb32, so we use x to mask out bad value when x == 0
+	return (0x8000000000000000ull >> lzcnt64(x)) & x;
 #else
 	x |= (x >> 1);
 	x |= (x >> 2);
@@ -553,14 +561,17 @@ static inline constexpr uint64_t nlpo2(register uint64_t x) noexcept {
  * bit extraction
  * to use these functions, compile flag -mbmi is necessary
  */
-#if (defined __x86_64__ || defined __i386__) && !defined PREFER_GENERAL_INSTRUCTIONS
+#if defined(__x86_64__) && defined(__BMI__) && !defined(PREFER_GENERAL_INSTRUCTIONS)
 static inline constexpr uint64_t bextr64(register uint64_t x, register uint32_t off, register uint32_t len) noexcept { // return _bextr_u64(x, off, len); }
 	return __builtin_ia32_bextr_u64(x, (off & 0xff) | ((len & 0xff) << 8)); }
-static inline constexpr uint32_t bextr32(register uint32_t x, register uint32_t off, register uint32_t len) noexcept { // return _bextr_u32(x, off, len); }
-	return __builtin_ia32_bextr_u32(x, (off & 0xff) | ((len & 0xff) << 8)); }
 #else
 static inline constexpr uint64_t bextr64(register uint64_t x, register uint32_t off, register uint32_t len) noexcept { // return _bextr_u64(x, off, len); }
 	return (x >> off) & ((1ull << len) - 1); }
+#endif
+#if (defined(__x86_64__) || defined(__i386__)) && defined(__BMI__) && !defined(PREFER_GENERAL_INSTRUCTIONS)
+static inline constexpr uint32_t bextr32(register uint32_t x, register uint32_t off, register uint32_t len) noexcept { // return _bextr_u32(x, off, len); }
+	return __builtin_ia32_bextr_u32(x, (off & 0xff) | ((len & 0xff) << 8)); }
+#else
 static inline constexpr uint32_t bextr32(register uint32_t x, register uint32_t off, register uint32_t len) noexcept { // return _bextr_u32(x, off, len); }
 	return (x >> off) & ((1u << len) - 1); }
 #endif
@@ -571,15 +582,11 @@ static inline constexpr uint32_t bextr(register uint32_t x, register uint32_t of
  * Parallel bit deposit and extract: PEXT and PDEP
  * to use these functions, compile flag -mbmi2 is necessary
  */
-#if (defined __x86_64__ || defined __i386__) && !defined PREFER_GENERAL_INSTRUCTIONS
+#if defined(__x86_64__) && defined(__BMI2__) && !defined(PREFER_GENERAL_INSTRUCTIONS)
 static inline constexpr uint64_t pdep64(register uint64_t a, register uint64_t mask) noexcept { // return _pdep_u64(a, mask); }
 	return __builtin_ia32_pdep_di(a, mask); }
-static inline constexpr uint32_t pdep32(register uint32_t a, register uint32_t mask) noexcept { // return _pdep_u32(a, mask); }
-	return __builtin_ia32_pdep_si(a, mask); }
 static inline constexpr uint64_t pext64(register uint64_t a, register uint64_t mask) noexcept { // return _pext_u64(a, mask); }
 	return __builtin_ia32_pext_di(a, mask); }
-static inline constexpr uint32_t pext32(register uint32_t a, register uint32_t mask) noexcept { // return _pext_u32(a, mask); }
-	return __builtin_ia32_pext_si(a, mask); }
 #else
 static inline constexpr uint64_t pdep64(register uint64_t a, register uint64_t mask) noexcept {
 	uint64_t dep = 0;
@@ -587,14 +594,21 @@ static inline constexpr uint64_t pdep64(register uint64_t a, register uint64_t m
 		dep |= math::lsb64(mask) & ((a & 1) ? -1ull : 0);
 	return dep;
 }
-static inline constexpr uint32_t pdep32(register uint32_t a, register uint32_t mask) noexcept {
-	return pdep64(a, mask); }
 static inline constexpr uint64_t pext64(register uint64_t a, register uint64_t mask) noexcept {
 	uint64_t ext = 0;
 	for (uint32_t off = 0; mask; mask &= (mask - 1), off++)
 		ext |= ((a & math::lsb64(mask)) ? 1ull : 0) << off;
 	return ext;
 }
+#endif
+#if (defined(__x86_64__) || defined(__i386__)) && defined(__BMI2__) && !defined(PREFER_GENERAL_INSTRUCTIONS)
+static inline constexpr uint32_t pdep32(register uint32_t a, register uint32_t mask) noexcept { // return _pdep_u32(a, mask); }
+	return __builtin_ia32_pdep_si(a, mask); }
+static inline constexpr uint32_t pext32(register uint32_t a, register uint32_t mask) noexcept { // return _pext_u32(a, mask); }
+	return __builtin_ia32_pext_si(a, mask); }
+#else
+static inline constexpr uint32_t pdep32(register uint32_t a, register uint32_t mask) noexcept {
+	return pdep64(a, mask); }
 static inline constexpr uint32_t pext32(register uint32_t a, register uint32_t mask) noexcept {
 	return pext64(a, mask); }
 #endif

@@ -476,19 +476,21 @@ namespace moporgic {
 
 template<typename type,
 	template<typename...> class list = moporgic::list,
-	template<typename...> class alloc = std::allocator,
-	bool bchk = false>
+	template<typename...> class alloc = std::allocator>
 class segment {
 public:
 	constexpr segment() noexcept {}
 	segment(const segment& seg) = delete;
 	segment(segment&& seg) noexcept : space(std::move(seg.space)) {}
+	segment(type* buf, size_t num) noexcept { deallocate(buf, num); }
+	segment& operator =(const segment& seg) = delete;
+	segment& operator =(segment& seg) { space = std::move(seg.space); return *this; }
 
 	type* allocate(size_t num) {
-		for (auto it = idle().begin(); it != idle().end(); it++) {
+		for (auto it = space.begin(); it != space.end(); it++) {
 			if (it->size() >= num) {
 				type* buf = it->begin(it->begin() + num);
-				if (it->empty()) idle().erase(it);
+				if (it->empty()) space.erase(it);
 				return buf;
 			}
 		}
@@ -497,36 +499,38 @@ public:
 
 	void deallocate(type* buf, size_t num) {
 		clip<type> tok(buf, buf + num);
-		auto it = std::lower_bound(idle().begin(), idle().end(), tok);
+		auto it = std::lower_bound(space.begin(), space.end(), tok);
 		auto pt = std::prev(it);
 
-		if (bchk && it != idle().begin()) {
+		if (it != space.begin()) {
 			tok.begin(std::max(tok.begin(), pt->end()));
 			tok.end(std::max(tok.end(), pt->end()));
 		}
-		if (bchk && it != idle().end()) {
-			tok.end(std::min(tok.end(), it->begin()));
+		if (it != space.end()) {
+			while (it != space.end() && tok.end() > it->end())
+				it = space.erase(it), pt = std::prev(it);
+			if (it != space.end())
+				tok.end(std::min(tok.end(), it->begin()));
 		}
 
-		if (it != idle().begin() && pt->end() == tok.begin()) {
-			if (it != idle().end() && tok.end() == it->begin()) {
+		if (it != space.begin() && pt->end() == tok.begin()) {
+			if (it != space.end() && tok.end() == it->begin()) {
 				it->begin(pt->begin());
-				it = idle().erase(pt);
+				it = space.erase(pt);
 			} else {
 				pt->end(tok.end());
 			}
 		} else {
-			if (it != idle().end() && tok.end() == it->begin()) {
+			if (it != space.end() && tok.end() == it->begin()) {
 				it->begin(tok.begin());
 			} else {
-				it = idle().insert(it, tok);
+				it = space.insert(it, tok);
 			}
 		}
 	}
 
-private:
+protected:
 	list<clip<type>, alloc<clip<type>>> space;
-	constexpr inline auto& idle() noexcept { return space; }
 };
 
 } /* namespace moporgic */
