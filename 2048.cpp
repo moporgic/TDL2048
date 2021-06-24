@@ -1146,8 +1146,10 @@ void make_network(utils::options::option opt) {
 	std::stringstream unisomorphic(tokens); tokens.clear();
 	for (std::string token; unisomorphic >> token; tokens += (token + ' ')) {
 		if (token.find('!') == npos) {
-			if (token.find_first_not_of("0123456789abcdef") != npos) continue;
-			token = token + ':' + token + '!';
+			std::string name = token.substr(0, token.find_first_of("&|="));
+			std::string info = token.substr(name.size());
+			if (name.find_first_not_of("0123456789abcdef") != npos) continue;
+			token = name + info + ':' + name + '!';
 		}
 		std::vector<std::string> lvals, rvals;
 		lvals.push_back(token.substr(0, token.find(':')));
