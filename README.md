@@ -302,41 +302,20 @@ Use ```-n``` to specify the target network structure as follow. TDL2048+ support
 
 Pattern-based structures are defined with cell locations, using characters from '0', '1', ... 'f' to indicate the cell from upper left corner to lower right corner, respectively.
 
-Below is the mapping of built-in aliases and corresponding patterns.
+Below lists the most commonly used built-in aliases and their corresponding patterns.
 ```
-4x6patt             = an alias of 4x6patt/khyeh
-5x6patt             = an alias of 5x6patt/42-33
-2x4patt             = an alias of 2x4patt/4
-5x4patt             = an alias of 5x4patt/4-22
-8x4patt             = an alias of 8x4patt/legacy
-1x8patt             = an alias of 1x8patt/44
-2x8patt             = an alias of 2x8patt/44
-3x8patt             = an alias of 3x8patt/44-4211
-4x8patt             = an alias of 4x8patt/44-332-4211
-2x7patt             = an alias of 2x7patt/43
-3x7patt             = an alias of 3x7patt/43
-6x6patt             = an alias of 6x6patt/k.matsuzaki
-7x6patt             = an alias of 7x6patt/k.matsuzaki
-8x6patt             = an alias of 8x6patt/k.matsuzaki
-
-4x6patt/khyeh       = 012345 456789 012456 45689a
-5x6patt/42-33       = 012345 456789 89abcd 012456 45689a
-2x4patt/4           = 0123 4567
-5x4patt/4-22        = 0123 4567 0145 1256 569a
-8x4patt/legacy      = 0123 4567 89ab cdef 048c 159d 26ae 37bf
-9x4patt/legacy      = 0145 1256 2367 4589 569a 67ab 89cd 9ade abef
-1x8patt/44          = 01234567
-2x8patt/44          = 01234567 456789ab
-3x8patt/44-332      = 01234567 456789ab 01245689
-3x8patt/44-4211     = 01234567 456789ab 0123458c
-4x8patt/44-332-4211 = 01234567 456789ab 01245689 0123458c
-2x7patt/43          = 0123456 456789a
-3x7patt/43          = 0123456 456789a 89abcde
-4x6patt/k.matsuzaki = 012456 456789 012345 234569
-5x6patt/k.matsuzaki = 012456 456789 012345 234569 01259a
-6x6patt/k.matsuzaki = 012456 456789 012345 234569 01259a 345678
-7x6patt/k.matsuzaki = 012456 456789 012345 234569 01259a 345678 134567
-8x6patt/k.matsuzaki = 012456 456789 012345 234569 01259a 345678 134567 01489a
+4x6patt = 012345 456789 012456 45689a
+5x6patt = 012345 456789 89abcd 012456 45689a
+6x6patt = 012456 456789 012345 234569 01259a 345678
+7x6patt = 012456 456789 012345 234569 01259a 345678 134567
+8x6patt = 012456 456789 012345 234569 01259a 345678 134567 01489a
+2x7patt = 0123456 456789a
+3x7patt = 0123456 456789a 89abcde
+1x8patt = 01234567
+2x8patt = 01234567 456789ab
+2x4patt = 0123 4567
+5x4patt = 0123 4567 0145 1256 569a
+4x5patt = 01234 45678 01245 45689
 ```
 
 The most common structures, ```4x6patt```, ```5x6patt```, ```6x6patt```, ```7x6patt```, ```8x6patt```, ```2x7patt```, ```3x7patt```, ```1x8patt```, and ```2x8patt```, are with the sophisticated optimization enabled by default.
