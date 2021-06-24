@@ -350,7 +350,7 @@ To define a structure with custom patterns, specify the patterns in the ```-n```
 
 In addition, some statistic-based designs are also supported, such as the monotonicity (```mono```), and the number of tiles (```num```, ```num@lt```, ```num@st```). You may use them with pattern-based designs.
 ```bash
-./2048 -n 4x6patt mono num@st # use the 4x6patt, mono, and # of large tiles
+./2048 -n 4x6patt mono num@lt # use the 4x6patt, mono, and # of large tiles
 ```
 
 <details><summary>Show advanced options</summary><br>
@@ -539,19 +539,19 @@ If the number of threads is not provided, the program will use all available thr
 Make sure that the number in ```-t``` or ```-e``` is larger than the parallism.
 In the following example, only thread 1 to thread 10 will work, while other threads will be idle.
 ```bash
-./2048 -n 4x6patt -i 4x6patt -d 5p -c 64G -e 10 -p 20
+./2048 -n 4x6patt -i 4x6patt.w -d 5p -c 64G -e 10 -p 20
 ```
 
 To prevent this from happening, set the unit instead of using the default (1000) as follow.
 ```bash
-./2048 -n 4x6patt -i 4x6patt -d 5p -c 64G -e 20x500 -p 20
+./2048 -n 4x6patt -i 4x6patt.w -d 5p -c 64G -e 20x500 -p 20
 ```
 
 In addition, the program will automatically toggle the use of [shared memory (SHM)](https://en.wikipedia.org/wiki/Shared_memory) on Linux platforms, since using ```fork``` performs better than using ```std::thread``` in speed.
 
 To explicitly disable the SHM, add ```noshm``` with ```-p``` to tell the program to use ```std::thread```.
 ```bash
-./2048 -n 4x6patt -i 4x6patt -d 5p -c 64G -e 20x500 -p 20 noshm
+./2048 -n 4x6patt -i 4x6patt.w -d 5p -c 64G -e 20x500 -p 20 noshm
 ```
 
 Note that on Linux platforms, if you keep the SHM option unchanged, specifying both ```-t``` and ```-e``` in a same command with parallelism leading to a slightly worse testing speed.
