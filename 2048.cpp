@@ -1089,8 +1089,10 @@ std::string resolve(const std::string& token) {
 
 void make_network(utils::options::option opt) {
 	std::string tokens = opt;
-	if (tokens.empty() && feature::feats().empty())
-		tokens = weight::wghts().size() ? format("%ux6patt", weight::wghts().size()) : "default";
+	if (tokens.empty() && feature::feats().empty()) {
+		for (weight w : weight::wghts()) tokens += (w.sign() + ' ');
+		if (tokens.empty()) tokens = "default";
+	}
 
 	const auto npos = std::string::npos;
 	for (size_t i; (i = tokens.find(" norm")) != npos; tokens[i] = '/');
