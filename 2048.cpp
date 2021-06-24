@@ -1633,7 +1633,7 @@ struct method {
 
 	template<typename mode = weight::segment>
 	static method specialize(utils::options opts, std::string name) {
-		std::string spec = opts["options"]["spec"].value("auto");
+		std::string spec = opts[name]["spec"].value(opts["options"]["spec"].value("auto"));
 		if (spec == "auto") {
 			u32 m = weight::wghts().size();
 			u32 n = m ? math::log2(weight::wghts().front().size()) >> 2 : 0;
@@ -1645,10 +1645,19 @@ struct method {
 				if (math::log2(w.size()) >> 2 != n) n = 0;
 			}
 			if (m) { // if features are assumed as isomorphic
-				spec = opts["make"].value();
-				spec = spec.substr(0, spec.find_first_of("&|="));
-				if (utils::resolve(spec) == spec) spec = format("%ux%upatt", m, n);
-				if (utils::resolve(spec) == spec) spec = "isomorphic";
+				std::string list = "4x6patt 5x6patt 6x6patt 7x6patt 8x6patt 2x7patt 3x7patt 1x8patt 2x8patt ";
+				std::string make = opts["make"].value("?");
+				make = make.substr(0, make.find_first_of("&|="));
+				std::string form = format("%ux%upatt", m, n);
+				if (list.find(make) != std::string::npos) {
+					spec = make;
+				} else if (list.find(form) != std::string::npos &&
+					std::accumulate(weight::wghts().begin(), weight::wghts().end(), std::string{},
+						[](std::string s, weight w) { return s + w.sign() + ' '; }) == utils::resolve(form)) {
+					spec = form;
+				} else {
+					spec = "isomorphic";
+				}
 			} else { // if features are definitely not isomorphic
 				spec = "common";
 			}
