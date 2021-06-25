@@ -141,9 +141,14 @@ After a successful build, a binary file ```./2048``` should be generated.
 
 <details><summary>Show advanced options</summary><br>
 
-To use another file name instead of ```./2048```, set the ```OUTPUT``` as follow.
+To use another output file name instead of ```./2048```, set the ```OUTPUT``` as follow.
 ```bash
 make OUTPUT="run" # the output binary will be ./run instead of ./2048
+```
+
+Also, to build with another source file instead of ```2048.cpp```, set the ```SOURCE``` as follow.
+```bash
+make SOURCE="2048-test.cpp" # compile 2048-test.cpp and generate ./2048-test
 ```
 
 If other optimization level is needed, set the ```OLEVEL``` as follow.
@@ -204,7 +209,7 @@ Similarly, to maximize the testing speed, set the ```PGO_OPTI``` as follow.
 make 4x6patt PGO_OPTI="0" # profile with only testing routine
 ```
 
-In addition, the above profiling are all with TD. To profile with TC, set the ```PGO_ALPHA``` as follow.
+The above profiling examples are all with TD. To profile with TC, set the ```PGO_ALPHA``` as follow.
 ```bash
 make 4x6patt PGO_ALPHA="0 coherence" # profile with TC learning
 ```
@@ -284,7 +289,7 @@ Below is an example of training, in which a new network is initialized as the pr
 ./2048 -n 4x6patt -t 1000 -o 4x6patt.w
 ```
 
-Similarly, an example of testing is as follow, in which a pre-trained network ```4x6patt.w``` is loaded and tested with 1000k episodes, and the log is written to ```4x6patt.x```.
+Similarly, below is an example of testing, in which a pre-trained network ```4x6patt.w``` is loaded and tested with 1000k episodes, and the log is written to ```4x6patt.x```.
 ```bash
 ./2048 -n 4x6patt -e 1000 -i 4x6patt.w -o 4x6patt.x
 ```
@@ -293,16 +298,16 @@ More CLI options will be introduced in the following subsection.
 
 #### N-Tuple Network
 
-Use ```-n``` to specify the target network structure as follow. TDL2048+ supports any pattern-based structures with no more than 8-tuple, in which  common pattern-based designs are per-defined for simplicity, such as ```4x6patt```, ```5x6patt```, ```56x6patt```, ```7x6patt```, ```8x6patt```, and so on.
+Use ```-n``` to specify the target network structure as follow. TDL2048+ supports any pattern-based structures with no more than 8-tuple, in which  common pattern-based designs are per-defined for simplicity, such as ```4x6patt```, ```5x6patt```, ```6x6patt```, ```7x6patt```, ```8x6patt```, and so on.
 ```bash
 ./2048 -n 8x6patt -t 1000 # use the 8x6patt network
 ```
 
 <details><summary>Show advanced options</summary><br>
 
-Pattern-based structures are defined with cell locations, using characters from '0', '1', ... 'f' to indicate the cell from upper left corner to lower right corner, respectively.
+Pattern-based structures are defined with cell locations, by using hexadecimal characters from ```0```, ```1```, ..., ```f``` to indicate the upper left cell to the lower right cell, respectively. Also, isomorphisms including rotations and reflections are enabled by default, e.g., a declared pattern ```012345``` actually involves ```012345 37bf26 fedcba c840d9 cdef89 fb73ea 321076 048c15```.
 
-Below lists the most commonly used built-in aliases and their corresponding patterns.
+For simplicity, aliases (e.g., ```4x6patt```) are defined for commonly used structures. The definitions of commonly used built-in aliases are listed below. Check the source for a detailed list.
 ```
 4x6patt = 012345 456789 012456 45689a
 5x6patt = 012345 456789 89abcd 012456 45689a
@@ -313,23 +318,20 @@ Below lists the most commonly used built-in aliases and their corresponding patt
 3x7patt = 0123456 456789a 89abcde
 1x8patt = 01234567
 2x8patt = 01234567 456789ab
+4x5patt = 01234 45678 01245 45689
 2x4patt = 0123 4567
 5x4patt = 0123 4567 0145 1256 569a
-4x5patt = 01234 45678 01245 45689
 ```
 
-The most common structures, ```4x6patt```, ```5x6patt```, ```6x6patt```, ```7x6patt```, ```8x6patt```, ```2x7patt```, ```3x7patt```, ```1x8patt```, and ```2x8patt```, are with the sophisticated optimization enabled by default.
-
-All pattern-based networks are defined with isomorphisms, e.g., a pattern ```012456``` actually involves ```012345 37bf26 fedcba c840d9 cdef89 fb73ea 321076 048c15```.
-To define a structure with custom patterns, specify the patterns in the ```-n``` command as following example. Note that custom patterns is less efficient than the built-in patterns.
+To define a structure with custom patterns, specify the patterns in the ```-n``` command as follow. Note that custom patterns may be less efficient than built-in patterns.
 ```bash
 ./2048 -n 012345 456789 012456 45689a -t 1000
 ```
 </details><br>
 
-In addition, some statistic-based designs are also supported, such as the monotonicity (```mono```), and the number of tiles (```num```, ```num@lt```, ```num@st```). You may use them with pattern-based designs.
+In addition, some statistic-based designs are also supported, such as the monotonicity (```mono```), and the number of tiles of each type (```num```). You may use them with pattern-based designs.
 ```bash
-./2048 -n 4x6patt mono num@lt # use the 4x6patt, mono, and # of large tiles
+./2048 -n 4x6patt mono num -t 1000 # use 4x6patt, mono, and number of tiles
 ```
 
 <details><summary>Show advanced options</summary><br>
@@ -397,11 +399,11 @@ To explicitly specify TD or TC, use option ```fixed``` or ```coherence``` togeth
 ./2048 -n 4x6patt -t 1000 -a 0.1 coherence # force using TC with alpha=0.1
 ```
 
-The learning rate is distributed to each n-tuple feature weight. For example, the ```4x6patt``` network has 32 feature weights, so a weight is actually adjusted with a rate of 0.01 if ```-a 0.32``` is set.
+The learning rate is distributed to each n-tuple feature weight. For example, the ```4x6patt``` network has 32 feature weights, so a weight is actually adjusted with a rate of 0.01 when ```-a 0.32``` is set.
 
 However, you may use ```norm``` together with ```-a``` to override the default behaviour as
 ```bash
-./2048 -n 4x6patt -t 1000 -a 0.0025 norm=1 # each weight is adjusted a rate of 0.0025/1
+./2048 -n 4x6patt -t 1000 -a 0.0025 norm=1 # adjust each weight with a rate of 0.0025/1
 ```
 </details>
 
@@ -422,7 +424,7 @@ You may want to log each episode when running a deep search, which can be done b
 ```
 Note that the number of tested episodes is the same as ```-e 10```, but with a more detailed log.
 
-Sometimes, you may want to limit the maximum search depth when there are too many empty cells on the puzzle. This can be set by using ```limit``` with ```-d``` as follow.
+In order to prevent the search tree from becoming too large, it is best to limit the search depth when there are many empty cells on the puzzle. This can be set by using ```limit``` with ```-d``` as follow.
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -e 10 -d 5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p
 ```
@@ -433,18 +435,18 @@ To speed up the search, a transposition table (TT) can be enabled with ```-c``` 
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -e 10 -d 3p -c 8G # 3-ply search with 8G TT
 ```
-The size of TT must be the power of 2, e.g., 4G, 8G, 16G, 64G, etc.
+Note that the size of TT must be the power of 2, e.g., 4G, 8G, 16G, 64G, etc.
 
 <details><summary>Show advanced options</summary><br>
 
-Note that using TT involves a lot of memory access, which may result in worse search speed in some cases especially when the search depth is less than 3-ply.
+Be sure to decide the size of TT carefully. The use of TT involves a lot of memory access, which may result in worse search speed especially when the search depth is less than 3-ply.
 
-In addition, for deep search such as 5-ply, you may want to allow the search to use a "deeper" TT result, which may improve the strength and can be set by using ```peek``` with ```-c``` as follow.
+In addition, it is possible to allow the search to use a deeper TT cache when available. This may improve the strength especially for deep search. Use ```peek``` together with ```-c``` to enable this.
 ```bash
-./2048 -n 4x6patt -i 4x6patt.w -e 10 -d 5p -c 64G peek
+./2048 -n 4x6patt -i 4x6patt.w -e 10 -d 5p -c 64G peek # peeking the deeper TT cache
 ```
 
-To be more specific, if there is only a result with 5-ply for a given puzzle but you need a result with 3-ply, setting ```peek``` allows the search to take the 5-ply result directly.
+More specifically, if the search requires the 3-ply result of a puzzle, while TT only caches the 5-ply result, setting ```peek``` allows the search to directly obtain the 5-ply result for current use.
 </details>
 
 #### Saving/Loading and Logging
@@ -458,7 +460,7 @@ Note that no error message will appear when an IO failure occurs.
 
 <details><summary>Show some examples</summary><br>
 
-To log to ```4x6patt-training.x``` and save the trained network as ```4x6patt.w```:
+To save the trained network as ```4x6patt.w``` and log to ```4x6patt-training.x```:
 ```bash
 ./2048 -n 4x6patt -t 1000 -o 4x6patt.w 4x6patt-training.x
 ```
@@ -468,7 +470,7 @@ To load from a trained network and log the results of expectimax search:
 ./2048 -n 4x6patt -e 1000 -d 3p -i 4x6patt.w -o 4x6patt-testing.x
 ```
 
-To save snapshots regularly and prevent power failure during a long-term training:
+To save snapshots regularly during a long-term training:
 ```bash
 for i in {01..10}; do
     ./2048 -n 4x6patt -t 1000 -e 10 -io 4x6patt.w -o 4x6patt.x
@@ -488,10 +490,10 @@ To select specific weights of a file when loading or saving, use ```[IDX]|``` pr
 ```
 
 TDL2048+ supports ensemble learning by averaging n-tuple weights. To perform this, specify multiple weight files as input, weights with the same signature are automatically averaged.
+
+In the following example of ensemble learning, two networks (```4x6patt-0.w``` and ```4x6patt-1.w```) are averaged, their ensemble result is then evaluated and stored as ```4x6patt.w```.
 ```bash
 ./2048 -n 4x6patt -e 1000 -i 4x6patt-0.w 4x6patt-1.w -o 4x6patt.x 4x6patt.w
-# two networks, 4x6patt-0.w and 4x6patt-1.w, are averaged,
-# the ensemble result is then evaluated and stored as 4x6patt.w
 ```
 
 </details>
@@ -516,7 +518,7 @@ If the number of threads is not provided, the program will use all available thr
 <details><summary>Show advanced options</summary><br>
 
 Make sure that the number in ```-t``` or ```-e``` is larger than the parallism.
-In the following example, only thread 1 to thread 10 will work, while other threads will be idle.
+In the following example, only thread #1 to thread #10 will work, while other threads will be idle.
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -d 5p -c 64G -e 10 -p 20
 ```
@@ -526,24 +528,23 @@ To prevent this from happening, set the unit instead of using the default (1000)
 ./2048 -n 4x6patt -i 4x6patt.w -d 5p -c 64G -e 20x500 -p 20
 ```
 
-In addition, the program will automatically toggle the use of [shared memory (SHM)](https://en.wikipedia.org/wiki/Shared_memory) on Linux platforms, since using ```fork``` performs better than using ```std::thread``` in speed.
+In addition, the program will automatically toggle the use of [shared memory (SHM)](https://en.wikipedia.org/wiki/Shared_memory) on Linux platforms, since using ```fork``` with SHM performs better than using ```std::thread``` in speed.
 
 To explicitly disable the SHM, add ```noshm``` with ```-p``` to tell the program to use ```std::thread```.
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -d 5p -c 64G -e 20x500 -p 20 noshm
 ```
 
-Note that on Linux platforms, if you keep the SHM option unchanged, specifying both ```-t``` and ```-e``` in a same command with parallelism leading to a slightly worse testing speed.
+Note that on Linux platforms with SHM enabled, issuing both training and testing (```-t``` and ```-e```) in a single command with parallelism may lead to a slightly worse testing speed.
 ```bash
+# issue training and testing in a single command
 ./2048 -n 4x6patt -t 1000 -e 1000 -p 10 -o 4x6patt.w # training, then testing
-```
-
-```bash
+# issue training and testing in two different commands
 ./2048 -n 4x6patt -t 1000 -p 10 -o 4x6patt.w # training,
 ./2048 -n 4x6patt -e 1000 -p 10 -i 4x6patt.w # then testing
 ```
 
-Due to a current limitation, the speed of ```-e 1000``` in the former is slower than that in the latter. However, should still be faster than using ```std::thread```.
+Due to a current limitation, the speed of testing in the former may be slightly slower than that in the latter. However, should still be faster than using ```std::thread```.
 
 Finally, TDL2048+ has not been optimized to support [multiprocessing](https://en.wikipedia.org/wiki/Multiprocessing) with [non-uniform memory access (NUMA)](https://en.wikipedia.org/wiki/Non-uniform_memory_access) architecture. Parallel training on such platforms may result in speed loss.
 Therefore, it is recommended to use [```taskset```](https://man7.org/linux/man-pages/man1/taskset.1.html) to limit the execution on only a single processor.
@@ -561,7 +562,7 @@ taskset -c 0-7,16-23 ./2048 -n 4x6patt -t 320 -e 320 -p 16 # 12.8M ops, 18.2M op
 <details><summary>Summary</summary>
 
 By default, the summary is only printed for testing (```-e```).
-Use ```-%``` to display it also for training; use ```-% none``` to hide the it for testing.
+Use ```-%``` to display it also for training; use ```-% none``` to hide the it for both training and testing.
 </details>
 
 <details><summary>Winning Tile</summary>
@@ -731,7 +732,7 @@ benchmark # perform a full benchmark
 
 <details><summary>2048-parse.sh - log parser for statistic block</summary>
 
-Extract AVG, MAX, TILE, and WIN from a log, which is useful when exporting statistics.
+Extract AVG, MAX, TILE, and WIN from a log, which is useful for exporting statistics.
 ```bash
 grep local 2048.x | ./2048-parse.sh # extract AVG, MAX, TILE, and WIN from each block
 ```
@@ -739,7 +740,7 @@ grep local 2048.x | ./2048-parse.sh # extract AVG, MAX, TILE, and WIN from each 
 
 <details><summary>2048-winrate.sh - log parser for summary block</summary>
 
-Extract win rates of large tiles from summary block and print them. Check the script for more details.
+Extract win rates of large tiles from summary block. Check the script for more details.
 ```bash
 ./2048-winrate.sh < 2048.x # extract win rates from summary block and print them
 ```
@@ -747,8 +748,7 @@ Extract win rates of large tiles from summary block and print them. Check the sc
 
 <details><summary>2048-thick.sh - log concentrator for statistic block</summary>
 
-This script helps you rearrange a log of statistic blocks.
-For example, follow below steps to join 10 statistic blocks and print the new statistics.
+Rearrange the statistics. To join every 10 statistic blocks and print the new statistics, do
 ```bash
 grep local 2048.x | ./2048-parse.sh | ./2048-thick.sh 10 # average every 10 blocks
 ```
