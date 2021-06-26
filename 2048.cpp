@@ -1949,6 +1949,8 @@ statistic run(utils::options opts, std::string type) {
 			/ opts[type]["norm"].value(opts["alpha"]["norm"].value(feats.size())));
 	numeric lambda = method::lambda(opts[type]["lambda"].value(opts["lambda"].value(0)));
 	u32 step = method::step(opts[type]["step"].value(opts["step"].value(lambda ? 5 : 1)));
+	u32 block = opts[type]["block"].value(opts["block"].value(2048));
+	u32 limit = opts[type]["limit"].value(opts["block"]["limit"].value(65536));
 
 	switch (to_hash(opts[type]["mode"].value(type))) {
 	case to_hash("optimize"):
@@ -2149,12 +2151,9 @@ statistic run(utils::options opts, std::string type) {
 
 	case to_hash("optimize:block"):
 	case to_hash("optimize:block-forward"): [&]() {
-		u32 block = opts[type]["block"].value(opts["block"].value(2048));
-		u32 limit = opts[type]["limit"].value(opts["block"]["limit"].value(65536));
-		struct stat { u32 score, scale, opers; };
-		std::vector<stat> bkstat;
-
 		for (stats.init(opts[type]); stats; stats++) {
+			struct stat { u32 score, scale, opers; };
+			once<stat> stat;
 			state b, a, o; o.next();
 			u32 score = 0;
 			u32 opers = 0;
@@ -2172,22 +2171,17 @@ statistic run(utils::options opts, std::string type) {
 				}
 				a.optimize(0, alpha, feats, spec);
 
-				bkstat.emplace_back(stat{score, b.hash(), opers});
+				stat = {score, b.hash(), opers};
 			}
 
-			stat stat = bkstat.front();
 			stats.update(stat.score, stat.scale, stat.opers);
-			bkstat.clear();
 		}
 		}(); break;
 
 	case to_hash("optimize:block-backward"): [&]() {
-		u32 block = opts[type]["block"].value(opts["block"].value(2048));
-		u32 limit = opts[type]["limit"].value(opts["block"]["limit"].value(65536));
-		struct stat { u32 score, scale, opers; };
-		std::vector<stat> bkstat;
-
 		for (stats.init(opts[type]); stats; stats++) {
+			struct stat { u32 score, scale, opers; };
+			once<stat> stat;
 			state b, o; o.next();
 
 			for (u32 which = o.hash(); which < limit; which = o.hash() + block) {
@@ -2204,12 +2198,11 @@ statistic run(utils::options opts, std::string type) {
 					score += a.info();
 					if (a.info() >= block && (a.hash() ^ scale) >= block) o.set(a);
 				}
-				bkstat.emplace_back(stat{score, scale, opers});
+
+				stat = {score, b.hash(), opers};
 			}
 
-			stat stat = bkstat.front();
 			stats.update(stat.score, stat.scale, stat.opers);
-			bkstat.clear();
 		}
 		}(); break;
 

@@ -30,7 +30,8 @@ typedef moporgic::half f16;
 namespace moporgic {
 
 #define declare_enable_if_with(trait, name, detail...)\
-template<typename test> using enable_if_##name = typename std::enable_if<std::trait<detail>::value>::type;
+template<typename test> using enable_if_##name = typename std::enable_if<std::trait<detail>::value>::type;\
+template<typename test> using enable_if_not_##name = typename std::enable_if<not std::trait<detail>::value>::type;
 #define declare_enable_if(trait)\
 declare_enable_if_with(trait, trait, test);
 
@@ -538,19 +539,34 @@ protected:
 
 namespace moporgic {
 
-template<typename type>
-class once {
+template<typename type, typename = void>
+class once { // for fundamental types
 public:
-	constexpr inline once() : data({}), pass(0) {}
-	constexpr inline once(const type& v ) : data({ v, v }), pass(1) {}
+	constexpr inline once() : data{}, pass(0) {}
+	constexpr inline once(const type& v, u32 p = 0) : data{v}, pass(p) { reset(v); }
 	constexpr inline once(const once& o) = default;
-	constexpr inline operator type&() { pass = 0; return data[0]; }
-	constexpr inline operator const type&() const { const_cast<u32&>(pass) = 0; return data[0]; }
-	constexpr inline type& operator =(const type& v) { return data[std::min(pass++, 1u)] = v; }
-	constexpr inline u32 reset() { std::fill_n(data, 2, type()); return std::exchange(pass, 0); }
-	constexpr inline u32 set() const { return pass; }
+	constexpr inline operator type&() { return data; }
+	constexpr inline operator const type&() const { return data; }
+	constexpr inline type& operator =(const type& v) { return (data = (pass++ ? data : v)); }
+	constexpr inline u32 reset(const type& v = {}) { data = v; return std::exchange(pass, 0); }
+	constexpr inline u32 count() const { return pass; }
 private:
-	type data[2];
+	type data;
+	u32 pass;
+};
+
+template<typename type>
+class once<type, enable_if_is_class<type>> : public type { // for class types
+public:
+	constexpr inline once() : type(), pass(0) {}
+	constexpr inline once(const type& v, u32 p = 0) : type(v), pass(p) { reset(v); }
+	constexpr inline once(const once& o) = default;
+	template<typename save>
+	constexpr inline type& operator =(const save& v) { return pass++ ? *this : type::operator =(v); }
+	constexpr inline type& operator =(const type& v) { return type::operator =(pass++ ? *this : v); }
+	constexpr inline u32 reset(const type& v = {}) { type::operator =(v); return std::exchange(pass, 0); }
+	constexpr inline u32 count() const { return pass; }
+private:
 	u32 pass;
 };
 
