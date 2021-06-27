@@ -1708,11 +1708,6 @@ struct state : board {
 	inline u32 reward() const { return std::max(i32(info()), 0); }
 	inline i32 score() const { return info(); }
 
-	inline state& assign(const board& b, u32 op = -1) {
-		board::operator=(b);
-		info(operate(op));
-		return *this;
-	}
 	inline numeric evaluate(
 			clip<feature> range = feature::feats(),
 			method::estimator estim = method::estimate) {
