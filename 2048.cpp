@@ -1708,14 +1708,20 @@ struct state : board {
 	inline u32 reward() const { return std::max(i32(info()), 0); }
 	inline i32 score() const { return info(); }
 
-	inline void assign(const board& b, u32 op = -1) {
+	inline state& assign(const board& b, u32 op = -1) {
 		board::operator=(b);
 		info(operate(op));
+		return *this;
+	}
+	inline numeric evaluate(
+			clip<feature> range = feature::feats(),
+			method::estimator estim = method::estimate) {
+		estim = info() != -1u ? estim : method::illegal;
+		return estimate(range, estim);
 	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats(),
 			method::estimator estim = method::estimate) {
-		estim = info() != -1u ? estim : method::illegal;
 		esti = score() + estim(*this, range);
 		return esti;
 	}
@@ -1732,10 +1738,10 @@ struct select {
 	inline select() : best(move) {}
 	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
 		b.moves(move[0], move[1], move[2], move[3]);
-		move[0].estimate(range, estim);
-		move[1].estimate(range, estim);
-		move[2].estimate(range, estim);
-		move[3].estimate(range, estim);
+		move[0].evaluate(range, estim);
+		move[1].evaluate(range, estim);
+		move[2].evaluate(range, estim);
+		move[3].evaluate(range, estim);
 		best = std::max_element(move, move + 4);
 		return *this;
 	}
