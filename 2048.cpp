@@ -2102,7 +2102,7 @@ statistic run(utils::options opts, std::string type) {
 				b.next();
 			}
 			for (u32 i = std::min(step, opers); i > 0; i--) {
-				numeric z = best.esti();
+				numeric z = 0;
 				for (u32 k = 1; k < i; k++) {
 					state& source = path[opers - k];
 					source.estimate(feats, spec);
