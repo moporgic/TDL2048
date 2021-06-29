@@ -70,14 +70,14 @@ namespace half_float {
 
 // In-place Cast
 static inline constexpr
-float& _float_cast( const uint32_t& f ) noexcept
+const float& _float_cast( const uint32_t& f ) noexcept
 {
   return reference_cast<float>(f);
 }
 
 // In-place Cast
 static inline constexpr
-uint32_t& _uint32_cast( const float& f ) noexcept
+const uint32_t& _uint32_cast( const float& f ) noexcept
 {
   return reference_cast<uint32_t>(f);
 }

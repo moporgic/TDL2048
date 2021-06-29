@@ -57,3 +57,12 @@ dst& reference_cast(src& ref) noexcept { return *(pointer_cast<dst>(&ref)); }
 
 template<typename dst, int off = 0, typename src> static inline constexpr
 dst& raw_cast(src& ref, int sh = 0) noexcept { return *(pointer_cast<dst>(&ref) + off + sh); }
+
+template<typename dst, typename src> static inline constexpr
+const dst* pointer_cast(const src* ptr) noexcept { return cast<const dst*>(ptr); }
+
+template<typename dst, typename src> static inline constexpr
+const dst& reference_cast(const src& ref) noexcept { return *(pointer_cast<const dst>(&ref)); }
+
+template<typename dst, int off = 0, typename src> static inline constexpr
+const dst& raw_cast(const src& ref, int sh = 0) noexcept { return *(pointer_cast<const dst>(&ref) + off + sh); }
