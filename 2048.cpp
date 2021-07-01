@@ -1708,12 +1708,6 @@ struct state : board {
 	inline u32 reward() const { return std::max(i32(info()), 0); }
 	inline i32 score() const { return info(); }
 
-	inline numeric evaluate(
-			clip<feature> range = feature::feats(),
-			method::estimator estim = method::estimate) {
-		estim = info() != -1u ? estim : method::illegal;
-		return estimate(range, estim);
-	}
 	inline numeric estimate(
 			clip<feature> range = feature::feats(),
 			method::estimator estim = method::estimate) {
@@ -1725,6 +1719,19 @@ struct state : board {
 			method::optimizer optim = method::optimize) {
 		numeric update = (exact - value()) * alpha;
 		esti = score() + optim(*this, update, range);
+		return esti;
+	}
+	inline numeric evaluate(
+			clip<feature> range = feature::feats(),
+			method::estimator estim = method::estimate) {
+		estim = info() != -1u ? estim : method::illegal;
+		return estimate(range, estim);
+	}
+	inline numeric instruct(numeric exact, numeric alpha = method::alpha(),
+			clip<feature> range = feature::feats(),
+			method spec = {method::estimate, method::optimize}) {
+		numeric update = (exact - spec(*this, range)) * alpha;
+		esti = score() + spec(*this, update, range);
 		return esti;
 	}
 };
@@ -1990,8 +1997,7 @@ statistic run(utils::options opts, std::string type) {
 			}
 
 			for (numeric esti = 0; path.size(); path.pop_back()) {
-				path.back().estimate(feats, spec);
-				esti = path.back().optimize(esti, alpha, feats, spec);
+				esti = path.back().instruct(esti, alpha, feats, spec);
 			}
 
 			stats.update(score, b.hash(), opers);
@@ -2017,8 +2023,7 @@ statistic run(utils::options opts, std::string type) {
 			while (best(b, feats, spec)) {
 				state& update = path[opers - step];
 				rsum -= update.info();
-				update.estimate(feats, spec);
-				update.optimize(rsum + best.esti(), alpha, feats, spec);
+				update.instruct(rsum + best.esti(), alpha, feats, spec);
 				rsum += best.score();
 				score += best.score();
 				opers += 1;
@@ -2028,8 +2033,7 @@ statistic run(utils::options opts, std::string type) {
 			for (u32 i = opers - std::min(step, opers); i < opers; i++) {
 				state& update = path[i];
 				rsum -= update.info();
-				update.estimate(feats, spec);
-				update.optimize(rsum, alpha, feats, spec);
+				update.instruct(rsum, alpha, feats, spec);
 			}
 			path.clear();
 
@@ -2052,8 +2056,7 @@ statistic run(utils::options opts, std::string type) {
 			u32 rsum = 0;
 			for (u32 i = opers - 1; i >= opers - std::min(step, opers); i--) {
 				state& update = path[i];
-				update.estimate(feats, spec);
-				update.optimize(rsum, alpha, feats, spec);
+				update.instruct(rsum, alpha, feats, spec);
 				rsum += update.info();
 			}
 			for (u32 i = opers - 1; i >= step; i--) {
@@ -2061,8 +2064,7 @@ statistic run(utils::options opts, std::string type) {
 				rsum -= source.info();
 				numeric esti = source.estimate(feats, spec);
 				state& update = path[i - step];
-				update.estimate(feats, spec);
-				update.optimize(rsum + esti, alpha, feats, spec);
+				update.instruct(rsum + esti, alpha, feats, spec);
 				rsum += update.info();
 			}
 			path.clear();
@@ -2094,8 +2096,7 @@ statistic run(utils::options opts, std::string type) {
 					z = r + (lambda * z + (1 - lambda) * v);
 				}
 				state& update = path[opers - step];
-				update.estimate(feats, spec);
-				update.optimize(z, alpha, feats, spec);
+				update.instruct(z, alpha, feats, spec);
 				score += best.score();
 				opers += 1;
 				best >> path >> b;
@@ -2111,8 +2112,7 @@ statistic run(utils::options opts, std::string type) {
 					z = r + (lambda * z + (1 - lambda) * v);
 				}
 				state& update = path[opers - i];
-				update.estimate(feats, spec);
-				update.optimize(z, alpha, feats, spec);
+				update.instruct(z, alpha, feats, spec);
 			}
 			path.clear();
 
@@ -2133,14 +2133,10 @@ statistic run(utils::options opts, std::string type) {
 				best >> path >> b;
 			}
 
-			numeric z = 0;
-			numeric r = path.back().score();
-			numeric v = path.back().optimize(0, alpha, feats, spec) - r;
-			for (path.pop_back(); path.size(); path.pop_back()) {
-				path.back().estimate(feats, spec);
+			for (numeric z = 0, r = 0, v = 0; path.size(); path.pop_back()) {
 				z = r + (lambda * z + (1 - lambda) * v);
 				r = path.back().score();
-				v = path.back().optimize(z, alpha, feats, spec) - r;
+				v = path.back().instruct(z, alpha, feats, spec) - r;
 			}
 
 			stats.update(score, b.hash(), opers);
