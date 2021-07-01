@@ -2229,7 +2229,7 @@ utils::options parse(int argc, const char* argv[]) {
 			// no break: optimize and evaluate are also handled by the same recipe logic
 		case to_hash("-t"): case to_hash("--optimize"):
 		case to_hash("-e"): case to_hash("--evaluate"):
-			label = label[label.find_first_not_of('-')] != 'e' ? "optimize" : "evaluate";
+			if (label[0] == '-') label = label.find("-e") == std::string::npos ? "optimize" : "evaluate";
 			if ((opts[""] = next_opts()).size()) opts[label] = opts[""];
 			if (opts[label].size()) opts["recipes"] += label;
 			break;
@@ -2240,8 +2240,8 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-o"): case to_hash("--output"):
 		case to_hash("-io"): case to_hash("--input-output"):
 			opts[""] = next_opts(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
-			if (label.find(label[1] != '-' ? "i" : "input")  != std::string::npos) opts["load"] += opts[""];
-			if (label.find(label[1] != '-' ? "o" : "output") != std::string::npos) opts["save"] += opts[""];
+			if (label.find('i') != std::string::npos) opts["load"] += opts[""];
+			if (label.find('o') != std::string::npos) opts["save"] += opts[""];
 			break;
 		case to_hash("-f"): case to_hash("--feature"):
 		case to_hash("-n"): case to_hash("--network"):
@@ -2249,7 +2249,7 @@ utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-tt"): case to_hash("-tm"): case to_hash("--optimize-mode"):
 		case to_hash("-et"): case to_hash("-em"): case to_hash("--evaluate-mode"):
-			label = label[label.find_first_not_of('-')] != 'e' ? "optimize" : "evaluate";
+			label = label.find("-e") == std::string::npos ? "optimize" : "evaluate";
 			opts[label]["mode"] = next_opt(label);
 			if (!opts["recipes"](label)) opts["recipes"] += label;
 			break;
