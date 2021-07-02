@@ -2248,8 +2248,11 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-t"): case to_hash("--optimize"):
 		case to_hash("-e"): case to_hash("--evaluate"):
 			if (label[0] == '-') label = label.find("-e") == std::string::npos ? "optimize" : "evaluate";
-			if ((opts[""] = next_opts()).size()) opts[label] = opts[""];
-			if (opts[label].size()) opts["recipes"] += label;
+			opts[""] = next_opts(opts[label].size() ? "" : "1000");
+			if (opts[""].value(opts.find(label)) != opts[label].value(opts.find("")))
+				label += format("#%08x", to_hash(opts[""])), opts[""]["mode"];
+			if (opts[""].size()) opts[label] = opts[""];
+			opts["recipes"] += label;
 			break;
 		case to_hash("-R"): case to_hash("--recipes"):
 			opts["recipes"] = next_opts();
@@ -2329,6 +2332,7 @@ utils::options parse(int argc, const char* argv[]) {
 		std::string form = opts[recipe].find("mode", opts.find("mode"));
 		if (form.size() && form.find(mode) != 0) form = mode + ':' + form;
 		else if (form.empty() && recipe.find(mode) != 0) form = mode;
+		else if (opts[recipe].find("mode", "?").empty()) form = mode;
 		opts[recipe]["mode"] = form;
 
 		if (opts("thread")) opts["thread"][mode];
