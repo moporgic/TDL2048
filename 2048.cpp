@@ -1005,14 +1005,32 @@ void config_shm(utils::options::option opt) {
 }
 
 void config_weight(utils::options::option opt) {
-	u32 code = weight::segment::code;
-	if (opt("fixed") || opt("nocoherence") || opt("nocoh")) code = weight::structure::code;
-	else if (opt("coherence") || opt("coh") || opt.value(0.1) >= 1.0) code = weight::coherence::code;
-	weight::type(code);
+	using wght_s = weight::structure;
+	using wght_c = weight::coherence;
+	u32 code = weight::type(), last = code;
+	if (opt["alpha"].value(0.0 / 0.0) < 1.0 || opt["alpha"]("fixed")) code = wght_s::code;
+	else if (opt["alpha"].value(0.0 / 0.0) >= 1.0 || opt["alpha"]("coh")) code = wght_c::code;
+	else if (opt("fixed") || opt("nocoherence") || opt("nocoh")) code = wght_s::code;
+	else if (opt("coherence") || opt("coh") || opt.value(0.1) >= 1.0) code = wght_c::code;
+	if (weight::type(code) == last || weight::wghts().empty()) return;
+
+	weight::container wbuf(std::move(weight::wghts()));
+	for (weight u, w; wbuf.size(); wbuf.erase(u.sign())) { // format existing weights into new scheme
+		u = wbuf.front();
+		w = weight::make(u.sign(), u.size());
+		switch (code) {
+		case wght_s::code: std::copy_n(u.data<wght_c::unit<0>>(), u.size(), w.data<wght_s>()); break;
+		case wght_c::code: std::copy_n(u.data<wght_s>(), u.size(), w.data<wght_c::unit<0>>()); break;
+		}
+	}
+	for (feature f : feature::container(std::move(feature::feats()))) { // bind features and weights
+		feature::make(f.value().sign(), f.index().sign());
+	}
 }
 
 template<typename statistic>
 statistic invoke(statistic(*run)(utils::options,std::string), utils::options opts, std::string type) {
+	if (opts[type]("alpha")) config_weight(opts[type]);
 	opts[type]["thread"] = opts[type]["thread"].value(opts["thread"].value(1));
 	u32 thdnum = opts[type]["thread"].value(1), thdid = thdnum;
 #if defined(__linux__)
