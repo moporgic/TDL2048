@@ -2239,9 +2239,12 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-i"): case to_hash("--input"):
 		case to_hash("-o"): case to_hash("--output"):
 		case to_hash("-io"): case to_hash("--input-output"):
-			opts[""] = next_opts(opts.find("make", argv[0]) + '.' + label[label.find_first_not_of('-')]);
-			if (label.find('i') != std::string::npos) opts["load"] += opts[""];
-			if (label.find('o') != std::string::npos) opts["save"] += opts[""];
+			opts[""] = opts.find("comment", opts.find("make", argv[0]));
+			opts["~load"] = {opts[""] + ".w"};
+			opts["~save"] = {opts[""] + ".w", opts[""] + ".x"};
+			if ((opts[""] = next_opts()).size()) opts["~load"] = opts["~save"] = opts[""];
+			if (label.find('i') != std::string::npos) opts["load"] += opts["~load"];
+			if (label.find('o') != std::string::npos) opts["save"] += opts["~save"];
 			break;
 		case to_hash("-f"): case to_hash("--feature"):
 		case to_hash("-n"): case to_hash("--network"):
