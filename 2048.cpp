@@ -2254,8 +2254,7 @@ utils::options parse(int argc, const char* argv[]) {
 			if (!opts["recipes"](label)) opts["recipes"] += label;
 			break;
 		case to_hash("-m"): case to_hash("--mode"):
-			if (opts["recipes"].empty()) opts["recipes"] += "optimize";
-			opts[opts["recipes"].back()]["mode"] = next_opt(opts["recipes"].back());
+			opts["mode"] = next_opt("optimize");
 			break;
 		case to_hash("-u"): case to_hash("--unit"):
 			opts["unit"] = next_opt("1");
@@ -2297,26 +2296,27 @@ utils::options parse(int argc, const char* argv[]) {
 		}
 	}
 	for (std::string recipe : opts["recipes"]) {
-		std::string mode = recipe.substr(0, 8);
-		if (mode != "optimize" && mode != "evaluate")
-			mode = opts[recipe].find("mode").substr(0, 8);
-		if (mode != "optimize" && mode != "evaluate")
-			continue;
+		std::string mode = "optimize";
+		for (auto test : {recipe, opts.find("mode"), opts[recipe].find("mode")})
+			if (test.find("optimize") == 0 || test.find("evaluate") == 0)
+				mode = test.substr(0, 8);
 
-		for (std::string flag : {"lambda", "step"})
+		for (auto flag : {"lambda", "step"})
 			if (mode == "optimize" && (opts[recipe](flag) || opts(flag)))
 				opts[recipe]["mode"] = opts[recipe]["mode"].value(flag);
-		if (opts[recipe].find("mode", recipe).find(mode) != 0)
-			opts[recipe]["mode"] = mode + ":" + opts[recipe]["mode"];
-		if (opts[recipe].find("mode") == "" && recipe != mode)
-			opts[recipe]["mode"] = mode;
+
+		std::string form = opts[recipe].find("mode", opts.find("mode"));
+		if (form.size() && form.find(mode) != 0) form = mode + ':' + form;
+		else if (form.empty() && recipe.find(mode) != 0) form = mode;
+		opts[recipe]["mode"] = form;
 
 		if (opts("thread")) opts["thread"][mode];
-		for (std::string item : {"loop", "unit", "win", "info"})
+		if (!opts("info") && mode == "evaluate") opts[recipe]["info"];
+		for (auto item : {"loop", "unit", "win", "info"})
 			if (opts(item) && !opts[recipe](item))
 				opts[recipe][item] = opts[item];
-		if (mode == "evaluate") opts[recipe]["info"];
-		opts[recipe].remove("info=none");
+		for (auto item : {"mode", "info=none"})
+			opts[recipe].remove(item);
 	}
 	return opts;
 }
