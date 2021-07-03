@@ -59,7 +59,8 @@ Networks:
                             - IOPT is used to modify INDEX, as INDEX&HEX|HEX
 
 Recipes:
-  -r, --recipe ID [OPT]...  specify a recipe identified by ID
+  -t, --optimize [OPT]...   issue a recipe to optimize the network
+  -e, --evaluate [OPT]...   issue a recipe to evaluate the network
                             OPT is provided as KEY[=VALUE], where KEY can be
                             - mode: specify recipe routine, whose VALUE can be
                               - optimize:{forward|backward|lambda|step}
@@ -68,10 +69,8 @@ Recipes:
                             - alpha, lambda, step: hyper-parameters for training
                             the 1st OPT accepts a special alias LOOP[xUNIT][:WIN]
                             if [OPT]... is unprovided, default is 1000x1000:2048
-  -t, --optimize [OPT]...   alias for -r optimize [OPT]...
-  -e, --evaluate [OPT]...   alias for -r evaluate [OPT]...
-  -tt MODE                  alias for -t mode=MODE
-  -et MODE                  alias for -e mode=MODE
+  -tt MODE                  set recipe routine for -t, must be issued after -t
+  -et MODE                  set recipe routine for -e, must be issued after -e
 
 Parameters:
   -a, --alpha ALPHA [NORM]  the learning rate, default is 0.1
@@ -2242,20 +2241,14 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
 			break;
-		case to_hash("-r"): case to_hash("--recipe"):
-			label = next_opt("optimize");
-			// no break: optimize and evaluate are also handled by the same recipe logic
 		case to_hash("-t"): case to_hash("--optimize"):
 		case to_hash("-e"): case to_hash("--evaluate"):
-			if (label[0] == '-') label = label.find("-e") == std::string::npos ? "optimize" : "evaluate";
+			label = label.find("-e") == std::string::npos ? "optimize" : "evaluate";
 			opts[""] = next_opts(opts[label].size() ? "" : "1000");
 			if (opts[""].value(opts.find(label)) != opts[label].value(opts.find("")))
 				label += format("#%08x", to_hash(opts[""])), opts[""]["mode"];
 			if (opts[""].size()) opts[label] = opts[""];
 			opts["recipes"] += label;
-			break;
-		case to_hash("-R"): case to_hash("--recipes"):
-			opts["recipes"] = next_opts();
 			break;
 		case to_hash("-i"): case to_hash("--input"):
 		case to_hash("-o"): case to_hash("--output"):
