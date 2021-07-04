@@ -997,7 +997,11 @@ void init_cache(utils::options::option opt) {
 	cache::make(size, peek);
 }
 
-void config_shm(utils::options::option opt) {
+void config_random(utils::options::option opt) {
+	moporgic::srand(to_hash(opt.value("moporgic")));
+}
+
+void config_memory(utils::options::option opt) {
 	shm::enable(shm::support() && !opt("noshm") && (opt("shm") || opt.value(1) > 1));
 	shm::enable<weight::segment>(shm::enable() && !opt("noshm:weight") && (opt("shm") || opt("shm:weight") || opt("optimize")));
 	shm::enable<cache::block>(shm::enable() && !opt("noshm:cache") && (opt("shm") || opt("shm:cache") || opt("evaluate")));
@@ -2346,7 +2350,6 @@ utils::options parse(int argc, const char* argv[]) {
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
 	utils::init_logging(opts["save"]);
-	moporgic::srand(to_hash(opts["seed"]));
 
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
 	std::cout << "Develop" << " (GCC " << __VERSION__ << " C++" << __cplusplus
@@ -2361,10 +2364,11 @@ int main(int argc, const char* argv[]) {
 	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
 
+	utils::config_random(opts["seed"]);
+	utils::config_memory(opts["thread"]);
 	utils::config_weight(opts["alpha"]);
-	utils::config_shm(opts["thread"]);
-	utils::init_cache(opts["cache"]);
 
+	utils::init_cache(opts["cache"]);
 	utils::load_network(opts["load"]);
 	utils::make_network(opts["make"]);
 	utils::list_network();
