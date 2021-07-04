@@ -69,8 +69,8 @@ Recipes:
                             - alpha, lambda, step: hyper-parameters for training
                             the 1st OPT accepts a special alias LOOP[xUNIT][:WIN]
                             if [OPT]... is unprovided, default is 1000x1000:2048
-  -tt MODE                  set recipe routine for -t, must be issued after -t
-  -et MODE                  set recipe routine for -e, must be issued after -e
+  -tt MODE                  set default recipe routine for -t
+  -et MODE                  set default recipe routine for -e
 
 Parameters:
   -a, --alpha ALPHA [NORM]  the learning rate, default is 0.1
@@ -2244,10 +2244,9 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-t"): case to_hash("--optimize"):
 		case to_hash("-e"): case to_hash("--evaluate"):
 			label = label.find("-e") == std::string::npos ? "optimize" : "evaluate";
-			opts[""] = next_opts(opts[label].size() ? "" : "1000");
-			if (opts[""].value(opts.find(label)) != opts[label].value(opts.find("")))
-				label += format("#%08x", to_hash(opts[""])), opts[""]["mode"];
-			if (opts[""].size()) opts[label] = opts[""];
+			opts[""] = next_opts("1000");
+			label += format("#%08x", to_hash(opts[""]));
+			opts[label] = opts[""];
 			opts["recipes"] += label;
 			break;
 		case to_hash("-i"): case to_hash("--input"):
@@ -2267,11 +2266,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-tt"): case to_hash("-tm"): case to_hash("--optimize-mode"):
 		case to_hash("-et"): case to_hash("-em"): case to_hash("--evaluate-mode"):
 			label = label.find("-e") == std::string::npos ? "optimize" : "evaluate";
-			opts[label]["mode"] = next_opt(label);
-			if (!opts["recipes"](label)) opts["recipes"] += label;
-			break;
-		case to_hash("-m"): case to_hash("--mode"):
-			opts["mode"] = next_opt("optimize");
+			opts["mode"][label] = next_opt(label);
 			break;
 		case to_hash("-u"): case to_hash("--unit"):
 			opts["unit"] = next_opt("1");
@@ -2308,44 +2303,51 @@ utils::options parse(int argc, const char* argv[]) {
 			std::exit(0);
 			break;
 		default:
-			opts["options"][label.substr(label.find_first_not_of('-'))] += next_opts();
+			label = label.substr(label.find_first_not_of('-'));
+			opts["options"][label] += next_opts();
 			break;
 		}
 	}
+
+	if (!opts("recipes")) opts["recipes"] = "optimize", opts["optimize"] = 1000;
+	if (!opts("seed")) opts["seed"] = format("%" PRIx64, u64(rdtsc()));
+
 	for (std::string recipe : opts["recipes"]) {
-		std::string mode = "optimize";
-		for (auto test : {recipe, opts.find("mode"), opts[recipe].find("mode")})
-			if (test.find("optimize") == 0 || test.find("evaluate") == 0)
-				mode = test.substr(0, 8);
-
-		for (auto flag : {"lambda", "step"})
-			if (mode == "optimize" && (opts[recipe](flag) || opts(flag)))
-				opts[recipe]["mode"] = opts[recipe]["mode"].value(flag);
-
-		std::string form = opts[recipe].find("mode", opts.find("mode"));
-		if (form.size() && form.find(mode) != 0) form = mode + ':' + form;
-		else if (form.empty() && recipe.find(mode) != 0) form = mode;
-		else if (opts[recipe].find("mode", "?").empty()) form = mode;
-		opts[recipe]["mode"] = form;
-
-		if (opts("thread")) opts["thread"][mode];
-		if (!opts("info") && mode == "evaluate") opts[recipe]["info"];
-		for (auto item : {"loop", "unit", "win", "info"})
+		std::string form = recipe.substr(0, recipe.find('#'));
+		// priority: build-in > global > auto-detect > form
+		std::string mode = opts[recipe].find("mode");
+		if (mode.empty()) mode = opts["mode"].find(form);
+		for (std::string flag : {"lambda", "step"})
+			if (form == "optimize" && (opts[recipe](flag) || opts(flag)))
+				if (mode.empty()) mode = flag;
+		if (mode.empty()) mode = form;
+		// standardize mode and remove form from built-in
+		if (mode.find(form) != 0) // e.g.: mode == lambda
+			opts[recipe]["mode"] = mode, mode = form + ':' + mode;
+		else if (mode != form) // e.g.: mode == optimize:lambda
+			opts[recipe]["mode"] = mode.substr(form.size() + 1);
+		else if (mode == form) // e.g.: mode == optimize
+			opts[recipe].remove("mode=" + form);
+		// touch other flags
+		if (opts("thread")) opts["thread"][form]; // for shm
+		if (form == "evaluate" && !opts("info")) opts[recipe]["info"];
+		for (std::string item : {"loop", "unit", "win", "info"})
 			if (opts(item) && !opts[recipe](item))
 				opts[recipe][item] = opts[item];
-		for (auto item : {"mode", "info=none"})
+		for (std::string item : {"info=none"})
 			opts[recipe].remove(item);
+		// set recipe display and final mode
+		opts[recipe]["what"] = form + ": " + opts[recipe];
+		opts[recipe]["mode"] = mode;
 	}
 	return opts;
 }
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
-	if (!opts["recipes"].size()) opts["recipes"] = "optimize", opts["optimize"] = 1000;
-	if (!opts("seed")) opts["seed"] = ({std::stringstream ss; ss << std::hex << rdtsc(); ss.str();});
+	utils::init_logging(opts["save"]);
 	moporgic::srand(to_hash(opts["seed"]));
 
-	utils::init_logging(opts["save"]);
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
 	std::cout << "Develop" << " (GCC " << __VERSION__ << " C++" << __cplusplus
 	          << " @ " << __DATE_ISO__ << " " << __TIME__ << ")" << std::endl;
@@ -2368,7 +2370,7 @@ int main(int argc, const char* argv[]) {
 	utils::list_network();
 
 	for (std::string recipe : opts["recipes"]) {
-		std::cout << recipe << ": " << opts[recipe] << std::endl << std::endl;
+		std::cout << opts[recipe]["what"] << std::endl << std::endl;
 		statistic stat = utils::invoke(run, opts, recipe);
 		if (opts[recipe]("info")) stat.summary();
 	}
