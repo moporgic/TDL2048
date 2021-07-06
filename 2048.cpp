@@ -1011,10 +1011,11 @@ void config_weight(utils::options::option opt) {
 	using wght_s = weight::structure;
 	using wght_c = weight::coherence;
 	u32 code = weight::type(), last = code;
-	if (opt["alpha"].value(0.0 / 0.0) < 1.0 || opt["alpha"]("fixed")) code = wght_s::code;
-	else if (opt["alpha"].value(0.0 / 0.0) >= 1.0 || opt["alpha"]("coh")) code = wght_c::code;
-	else if (opt("fixed") || opt("nocoherence") || opt("nocoh")) code = wght_s::code;
-	else if (opt("coherence") || opt("coh") || opt.value(0.1) >= 1.0) code = wght_c::code;
+	opt += ("alpha=" + opt);
+	if (opt["alpha"].value(0.0 / 0.0) <  1.0) code = wght_s::code;
+	if (opt["alpha"].value(0.0 / 0.0) >= 1.0) code = wght_c::code;
+	if (opt["alpha"]("fix")) code = wght_s::code;
+	if (opt["alpha"]("coh")) code = wght_c::code;
 	if (weight::type(code) == last || weight::wghts().empty()) return;
 
 	weight::container wbuf(std::move(weight::wghts()));
@@ -2234,7 +2235,7 @@ utils::options parse(int argc, const char* argv[]) {
 		};
 		switch (to_hash(label)) {
 		case to_hash("-a"): case to_hash("--alpha"):
-			opts["alpha"] = next_opts("0.1");
+			opts["alpha"] = next_opts("1.0");
 			break;
 		case to_hash("-l"): case to_hash("--lambda"):
 			opts["lambda"] = next_opt("0.5");
