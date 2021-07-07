@@ -44,36 +44,22 @@ moporgic/TDL2048+ - The Most Efficient TD Learning Framework for 2048
 
 Networks:
   -n, --network [TOKEN]...  specify the n-tuple network, default is 4x6patt
-                            TOKEN is provided as either CONFIG or FEATURE
-                            CONFIG=ALIAS[IOPT][WOPT] specifies a built-in list,
-                            - ALIAS can be 4x6patt, 5x6patt, 8x6patt, mono, ...
-                            FEATURE=WEIGHT[:INDEXES] specifies a n-tuple extractor
-                            WEIGHT=SIGN[SIZE][WOPT] is a n-tuple LUT, where
-                            - SIGN specifies a LUT whose SIZE is 100|16^10|p|?
-                            - WOPT is used to modify LUT as SIGN=MODIFY, where
-                              MODIFY can be initialize, adjust, duplicate, remove
-                              as VINIT[/norm], +VADJUST[/norm], {SRC}, {}
-                            INDEXES=INDEX[!][IOPT],... is related indexers, where
-                            - INDEX specifies an indexer; if it is a pattern,
-                              using symbol ! expands to all its isomorphisms
-                            - IOPT is used to modify INDEX, as INDEX&HEX|HEX
+                            TOKEN is provided as built-in ALIAS or custom PATTERN
+                            - ALIAS can be 4x6patt, 8x6patt, mono, num, ...
+                            - PATTERN specifies cell locations using hex number
 
 Recipes:
   -t, --optimize [OPT]...   issue a recipe to optimize the network
   -e, --evaluate [OPT]...   issue a recipe to evaluate the network
-                            OPT is provided as KEY[=VALUE], where KEY can be
-                            - mode: specify recipe routine, whose VALUE can be
-                              - optimize:{forward|backward|lambda|step}
-                              - evaluate:{best|random|reward}
-                            - loop, unit, win, info: execution settings
-                            - alpha, lambda, step: hyper-parameters for training
-                            the 1st OPT accepts a special alias LOOP[xUNIT][:WIN]
+                            OPT begins with execution setting LOOP[xUNIT][:WIN],
+                            followed by a list of options KEY[=VALUE]..., where
+                            - KEY can be mode, alpha, lambda, step, search, ...
                             if [OPT]... is unprovided, default is 1000x1000:2048
-  -tt MODE                  set default recipe routine for -t
-  -et MODE                  set default recipe routine for -e
+  -tt MODE                  set default recipe mode for -t
+  -et MODE                  set default recipe mode for -e
 
 Parameters:
-  -a, --alpha ALPHA [NORM]  the learning rate, default is 0.1
+  -a, --alpha ALPHA         the learning rate, default is 0.1
                             a high learning rate 1.0 enables TC learning
   -l, --lambda LAMBDA       the TD-lambda, default is 0
   -N, --step STEP           the n-step, default is 1 if LAMBDA is 0; otherwise 5
