@@ -890,6 +890,7 @@ public:
 		opinion& operator +=(const std::string& val) { return operator =(value() + val); }
 		opinion& operator  =(const list& vec) { return operator =(vtos(vec)); }
 		opinion& operator +=(const list& vec) { return operator =(value() + vtos(vec)); }
+		opinion& operator <<(const std::string& val) { return operator =(value(val)); }
 		bool operator ==(const std::string& val) const { return value() == val; }
 		bool operator !=(const std::string& val) const { return value() != val; }
 		bool operator ()(const std::string& val) const { return value().find(val) != std::string::npos; }
@@ -915,6 +916,7 @@ public:
 		option& operator +=(const std::string& val) { push_back(val); return *this; }
 		option& operator  =(const list& vec) { clear(); return operator +=(vec); }
 		option& operator +=(const list& vec) { insert(end(), vec.begin(), vec.end()); return *this; }
+		option& operator <<(const std::string& val) { return operator =(value(val)); }
 		bool operator ==(const std::string& val) const { return value() == val; }
 		bool operator !=(const std::string& val) const { return value() != val; }
 		bool operator ()(const std::string& ext) const {
@@ -1032,16 +1034,15 @@ void config_weight(utils::options::option opt) {
 	}
 }
 
-template<typename statistic>
-statistic invoke(statistic(*run)(utils::options,std::string), utils::options opts, std::string type) {
-	if (opts[type]("alpha")) config_weight(opts[type]);
-	opts[type]["thread"] = opts[type]["thread"].value(opts["thread"].value(1));
-	u32 thdnum = opts[type]["thread"].value(1), thdid = thdnum;
+template<typename statistic, typename option = options::option>
+statistic invoke(statistic(*run)(option), option opt) {
+	if (opt("alpha")) config_weight(opt);
+	u32 thdnum = opt["thread"].value(1), thdid = thdnum;
 #if defined(__linux__)
 	if (shm::enable()) {
 		statistic* stats = shm::alloc<statistic>(thdnum);
-		while ((opts[type]["thread#"] = (--thdid)).value(0) && fork());
-		statistic stat = stats[thdid] = run(opts, type);
+		while ((opt["thread#"] = (--thdid)).value(0) && fork());
+		statistic stat = stats[thdid] = run(opt);
 		if (thdid == 0) while (wait(nullptr) > 0); else std::quick_exit(0);
 		for (u32 i = 1; i < thdnum; i++) stat += stats[i];
 		shm::free(stats);
@@ -1049,9 +1050,9 @@ statistic invoke(statistic(*run)(utils::options,std::string), utils::options opt
 	}
 #endif
 	std::list<std::future<statistic>> thdpool;
-	while ((opts[type]["thread#"] = (--thdid)).value(0))
-		thdpool.push_back(std::async(std::launch::async, run, opts, type));
-	statistic stat = run(opts, type);
+	while ((opt["thread#"] = (--thdid)).value(0))
+		thdpool.push_back(std::async(std::launch::async, run, opt));
+	statistic stat = run(opt);
 	for (std::future<statistic>& thd : thdpool) stat += thd.get();
 	return stat;
 }
@@ -1599,9 +1600,10 @@ struct method {
 				} catch (std::invalid_argument&) {}
 				return n;
 			};
-			input.str(opt.value());
+			input.str(opt["search"].value());
 			u32 n = expectimax<source>::depth(next(1) | 1);
-			std::string limit = opt["limit"].value();
+			std::string limit = input.str() + " limit=";
+			limit = limit.substr(limit.find("limit=") + 6);
 			std::replace(limit.begin(), limit.end(), ',', ' ');
 			input.clear(), input.str(limit);
 			for (u32& lim : expectimax<source>::limit())
@@ -1651,15 +1653,14 @@ struct method {
 	};
 
 	template<typename spec>
-	static method option(utils::options opts) {
-		if (opts["search"].value(1) > 1)
-			return expectimax<spec>(opts["search"]);
+	static method option(utils::options::option opt) {
+		if (opt["search"].value(1) > 1) return expectimax<spec>(opt);
 		return spec();
 	}
 
 	template<typename mode = weight::segment>
-	static method specialize(utils::options opts, std::string name) {
-		std::string spec = opts[name]["spec"].value(opts["options"]["spec"].value("auto"));
+	static method specialize(utils::options::option opt) {
+		std::string spec = opt["spec"].value("auto");
 		if (spec == "auto") {
 			u32 m = weight::wghts().size();
 			u32 n = m ? math::log2(weight::wghts().front().size()) >> 2 : 0;
@@ -1672,7 +1673,7 @@ struct method {
 			}
 			if (m) { // if features are assumed as isomorphic
 				std::string list = "4x6patt 5x6patt 6x6patt 7x6patt 8x6patt 2x7patt 3x7patt 1x8patt 2x8patt ";
-				std::string make = opts["make"].value("?");
+				std::string make = opt["make"].value("?");
 				make = make.substr(0, make.find_first_of("&|="));
 				std::string form = format("%ux%upatt", m, n);
 				if (list.find(make) != std::string::npos) {
@@ -1689,25 +1690,25 @@ struct method {
 			}
 		}
 		switch (to_hash(spec)) {
-		default: return option<common<mode>>(opts);
-		case to_hash("isomorphic"): return option<isomorphic<mode>>(opts);
-		case to_hash("4x6patt"): return option<typename isomorphic<mode>::idx4x6patt>(opts);
-		case to_hash("5x6patt"): return option<typename isomorphic<mode>::idx5x6patt>(opts);
-		case to_hash("6x6patt"): return option<typename isomorphic<mode>::idx6x6patt>(opts);
-		case to_hash("7x6patt"): return option<typename isomorphic<mode>::idx7x6patt>(opts);
-		case to_hash("8x6patt"): return option<typename isomorphic<mode>::idx8x6patt>(opts);
-		case to_hash("2x7patt"): return option<typename isomorphic<mode>::idx2x7patt>(opts);
-		case to_hash("3x7patt"): return option<typename isomorphic<mode>::idx3x7patt>(opts);
-		case to_hash("1x8patt"): return option<typename isomorphic<mode>::idx1x8patt>(opts);
-		case to_hash("2x8patt"): return option<typename isomorphic<mode>::idx2x8patt>(opts);
+		default: return option<common<mode>>(opt);
+		case to_hash("isomorphic"): return option<isomorphic<mode>>(opt);
+		case to_hash("4x6patt"): return option<typename isomorphic<mode>::idx4x6patt>(opt);
+		case to_hash("5x6patt"): return option<typename isomorphic<mode>::idx5x6patt>(opt);
+		case to_hash("6x6patt"): return option<typename isomorphic<mode>::idx6x6patt>(opt);
+		case to_hash("7x6patt"): return option<typename isomorphic<mode>::idx7x6patt>(opt);
+		case to_hash("8x6patt"): return option<typename isomorphic<mode>::idx8x6patt>(opt);
+		case to_hash("2x7patt"): return option<typename isomorphic<mode>::idx2x7patt>(opt);
+		case to_hash("3x7patt"): return option<typename isomorphic<mode>::idx3x7patt>(opt);
+		case to_hash("1x8patt"): return option<typename isomorphic<mode>::idx1x8patt>(opt);
+		case to_hash("2x8patt"): return option<typename isomorphic<mode>::idx2x8patt>(opt);
 		}
 	}
 
-	static method parse(utils::options opts, std::string name) {
+	static method parse(utils::options::option opt) {
 		switch (weight::type()) {
 		default:
-		case weight::structure::code: return method::specialize<weight::structure>(opts, name);
-		case weight::coherence::code: return method::specialize<weight::coherence>(opts, name);
+		case weight::structure::code: return method::specialize<weight::structure>(opt);
+		case weight::coherence::code: return method::specialize<weight::coherence>(opt);
 		}
 	}
 
@@ -1829,7 +1830,7 @@ struct statistic {
 		std::string conf = opt.value().substr(0, opt.value().find(' ')) + "x:";
 		info.loop = opt["loop"].value((opt["-"] = conf).value(1000));
 		info.unit = opt["unit"].value((opt["-"] = conf.substr(conf.find('x') + 1)).value(1000));
-		info.win  = opt["win"].value((opt["-"] = conf.substr(conf.find(':') + 1)).value(2048));
+		info.win  = opt["win" ].value((opt["-"] = conf.substr(conf.find(':') + 1)).value(2048));
 
 		info.thdid  = opt["thread#"].value(0);
 		info.thdnum = opt["thread"].value(1);
@@ -1966,23 +1967,22 @@ struct statistic {
 	}
 };
 
-statistic run(utils::options opts, std::string type) {
+statistic run(utils::options::option opt) {
 	std::vector<state> path;
 	statistic stats;
 	select best;
 
-	method spec = method::parse(opts, type);
+	method spec = method::parse(opt);
 	clip<feature> feats = feature::feats();
-	bool cohen = weight::type() == weight::coherence::code;
-	numeric alpha = method::alpha(opts[type]["alpha"].value(opts["alpha"].value(cohen ? 1.0 : 0.1))
-			/ opts[type]["norm"].value(opts["alpha"]["norm"].value(feats.size())));
-	numeric lambda = method::lambda(opts[type]["lambda"].value(opts["lambda"].value(0)));
-	u32 step = method::step(opts[type]["step"].value(opts["step"].value(lambda ? 5 : 1)));
+	numeric alpha = weight::type() != weight::coherence::code ? 0.1 : 1.0;
+	        alpha = method::alpha(opt["alpha"].value(alpha) / opt["norm"].value(feats.size()));
+	numeric lambda = method::lambda(opt["lambda"].value(0));
+	u32 step = method::step(opt["step"].value(lambda ? 5 : 1));
 
-	switch (to_hash(opts[type]["mode"].value(type))) {
+	switch (to_hash(opt["mode"])) {
 	case to_hash("optimize"):
 	case to_hash("optimize:forward"): [&]() {
-		for (stats.init(opts[type]); stats; stats++) {
+		for (stats.init(opt); stats; stats++) {
 			state b, a;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2007,7 +2007,7 @@ statistic run(utils::options opts, std::string type) {
 		}(); break;
 
 	case to_hash("optimize:backward"): [&]() {
-		for (stats.init(opts[type]); stats; stats++) {
+		for (stats.init(opt); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2028,7 +2028,7 @@ statistic run(utils::options opts, std::string type) {
 
 	case to_hash("optimize:step"):
 	case to_hash("optimize:step-forward"): [&]() {
-		for (stats.init(opts[type]); stats; stats++) {
+		for (stats.init(opt); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2064,7 +2064,7 @@ statistic run(utils::options opts, std::string type) {
 		}(); break;
 
 	case to_hash("optimize:step-backward"): [&]() {
-		for (stats.init(opts[type]); stats; stats++) {
+		for (stats.init(opt); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2096,7 +2096,7 @@ statistic run(utils::options opts, std::string type) {
 		}(); break;
 
 	case to_hash("optimize:lambda-forward"): [&]() {
-		for (stats.init(opts[type]); stats; stats++) {
+		for (stats.init(opt); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2144,7 +2144,7 @@ statistic run(utils::options opts, std::string type) {
 
 	case to_hash("optimize:lambda"):
 	case to_hash("optimize:lambda-backward"): [&]() {
-		for (stats.init(opts[type]); stats; stats++) {
+		for (stats.init(opt); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2167,7 +2167,7 @@ statistic run(utils::options opts, std::string type) {
 
 	case to_hash("evaluate"):
 	case to_hash("evaluate:best"): [&]() {
-		for (stats.init(opts[type]); stats; stats++) {
+		for (stats.init(opt); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2183,7 +2183,7 @@ statistic run(utils::options opts, std::string type) {
 		}(); break;
 
 	case to_hash("evaluate:random"): [&]() {
-		for (stats.init(opts[type]); stats; stats++) {
+		for (stats.init(opt); stats; stats++) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2199,7 +2199,7 @@ statistic run(utils::options opts, std::string type) {
 		}(); break;
 
 	case to_hash("evaluate:reward"): [&]() {
-		for (stats.init(opts[type]); stats; stats++) {
+		for (stats.init(opt); stats; stats++) {
 			board b;
 			struct state : board {
 				declare_comparators_with(const state&, int(info()), int(v.info()), inline constexpr)
@@ -2337,13 +2337,16 @@ utils::options parse(int argc, const char* argv[]) {
 		if (opts("thread")) opts["thread"][form]; // for shm
 		if (form == "evaluate" && !opts("info")) opts[recipe]["info"];
 		for (std::string item : {"loop", "unit", "win", "info"})
-			if (opts(item) && !opts[recipe](item))
-				opts[recipe][item] = opts[item];
+			if (opts(item)) opts[recipe][item] << opts[item];
 		for (std::string item : {"info=none"})
 			opts[recipe].remove(item);
-		// set recipe display and final mode
+		// set recipe display, final mode, and other options
 		opts[recipe]["what"] = form + ": " + opts[recipe];
 		opts[recipe]["mode"] = mode;
+		for (std::string item : {"alpha", "lambda", "step", "thread", "make", "search"})
+			if (opts(item)) opts[recipe][item] << opts[item];
+		if (opts("alpha", "norm")) opts[recipe]["norm"] << opts["alpha"]["norm"];
+		if (opts("options", "spec")) opts[recipe]["spec"] << opts["options"]["spec"];
 	}
 	return opts;
 }
@@ -2376,7 +2379,7 @@ int main(int argc, const char* argv[]) {
 
 	for (std::string recipe : opts["recipes"]) {
 		std::cout << opts[recipe]["what"] << std::endl << std::endl;
-		statistic stat = utils::invoke(run, opts, recipe);
+		statistic stat = utils::invoke(run, opts[recipe]);
 		if (opts[recipe]("info")) stat.summary();
 	}
 
