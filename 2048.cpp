@@ -1967,7 +1967,7 @@ statistic run(utils::options::option opt) {
 
 	switch (to_hash(opt["mode"])) {
 	case to_hash("optimize"):
-	case to_hash("optimize:forward"): [&]() {
+	case to_hash("optimize:fast"): [&]() {
 		for (stats.init(opt); stats; stats++) {
 			state b, a;
 			u32 score = 0;
@@ -1987,6 +1987,31 @@ statistic run(utils::options::option opt) {
 				b.next();
 			}
 			a.optimize(0, alpha, feats, spec);
+
+			stats.update(score, b.hash(), opers);
+		}
+		}(); break;
+
+	case to_hash("optimize:forward"): [&]() {
+		for (stats.init(opt); stats; stats++) {
+			state b, a;
+			u32 score = 0;
+			u32 opers = 0;
+
+			b.init();
+			best(b, feats, spec);
+			score += best.score();
+			opers += 1;
+			best >> a >> b;
+			b.next();
+			while (best(b, feats, spec)) {
+				a.instruct(best.esti(), alpha, feats, spec);
+				score += best.score();
+				opers += 1;
+				best >> a >> b;
+				b.next();
+			}
+			a.instruct(0, alpha, feats, spec);
 
 			stats.update(score, b.hash(), opers);
 		}
