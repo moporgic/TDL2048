@@ -2224,8 +2224,9 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["alpha"] = next_opts("1.0");
 			break;
 		case to_hash("-l"): case to_hash("--lambda"):
-			opts["lambda"] = next_opt("0.5");
-			// no break: lambda may also come with step
+			opts["lambda"] = (opts[""] = next_opts("0.5")).front();
+			if (opts[""].size() > 1) (opts["step"] = opts[""]).pop_front();
+			break;
 		case to_hash("-N"): case to_hash("--step"):
 			opts["step"] = next_opt("5");
 			break;
@@ -2305,23 +2306,24 @@ utils::options parse(int argc, const char* argv[]) {
 
 	for (std::string recipe : opts["recipes"]) {
 		std::string form = recipe.substr(0, recipe.find('#'));
-		// priority: build-in > global > auto-detect > form
-		std::string mode = opts[recipe].find("mode");
+		// priority: built-in > global > auto-detect > form
+		std::string mode = opts[recipe].find("mode"), type;
 		if (mode.empty()) mode = opts["mode"].find(form);
-		for (std::string flag : {"lambda", "step"})
-			if (form == "optimize" && (opts[recipe](flag) || opts(flag)))
-				if (mode.empty()) mode = flag;
-		if (mode.empty()) mode = form;
+		bool optimize = form == "optimize", evaluate = form == "evaluate";
+		bool lambda = optimize && (opts[recipe]("lambda") || opts("lambda"));
+		bool step   = optimize && (opts[recipe]("step")   || opts("step"));
+		if (lambda)    type = step ? "lambda-forward" : "lambda";
+		else if (step) type = "step";
+		if (type.size() && (mode == "backward" || mode == "forward"))
+			mode = type.substr(0, type.find('-')) + '-' + mode;
+		if (mode.empty()) mode = type.size() ? type : form;
 		// standardize mode and remove form from built-in
-		if (mode.find(form) != 0) // e.g.: mode == lambda
-			opts[recipe]["mode"] = mode, mode = form + ':' + mode;
-		else if (mode != form) // e.g.: mode == optimize:lambda
-			opts[recipe]["mode"] = mode.substr(form.size() + 1);
-		else if (mode == form) // e.g.: mode == optimize
-			opts[recipe].remove("mode=" + form);
+		if (mode.find(form))   opts[recipe]["mode"] = mode, mode = form + ':' + mode;
+		else if (mode != form) opts[recipe]["mode"] = mode.substr(form.size() + 1);
+		else if (mode == form) opts[recipe].remove("mode=" + form);
 		// touch other flags
-		if (opts("thread")) opts["thread"][form]; // for shm
-		if (form == "evaluate" && !opts("info")) opts[recipe]["info"];
+		if (opts("thread")) opts["thread"][form];
+		if (evaluate && !opts("info")) opts[recipe]["info"];
 		for (std::string item : {"loop", "unit", "win", "info"})
 			if (opts(item)) opts[recipe][item] << opts[item];
 		for (std::string item : {"info=none"})
@@ -2331,7 +2333,7 @@ utils::options parse(int argc, const char* argv[]) {
 		opts[recipe]["mode"] = mode;
 		for (std::string item : {"alpha", "lambda", "step", "thread", "make", "search"})
 			if (opts(item)) opts[recipe][item] << opts[item];
-		if (opts("alpha", "norm")) opts[recipe]["norm"] << opts["alpha"]["norm"];
+		if (opts("alpha",   "norm")) opts[recipe]["norm"] << opts["alpha"]["norm"];
 		if (opts("options", "spec")) opts[recipe]["spec"] << opts["options"]["spec"];
 	}
 	return opts;
