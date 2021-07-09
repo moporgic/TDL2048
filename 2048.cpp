@@ -2335,10 +2335,13 @@ utils::options parse(int argc, const char* argv[]) {
 		std::string mode = opts[recipe].find("mode"), type;
 		if (mode.empty()) mode = opts["mode"].find(form);
 		bool optimize = form == "optimize", evaluate = form == "evaluate";
+		auto alpha  = opts[""]["alpha"] = opts[recipe].find("alpha", opts.find("alpha"));
+		bool cohen  = optimize && (alpha.value(0) >= 1.0  || alpha("coh"));
 		bool lambda = optimize && (opts[recipe]("lambda") || opts("lambda"));
 		bool step   = optimize && (opts[recipe]("step")   || opts("step"));
-		if (lambda)    type = step ? "lambda-forward" : "lambda";
-		else if (step) type = "step";
+		if (lambda)     type = step ? "lambda-forward" : "lambda";
+		else if (step)  type = "step";
+		else if (cohen) type = mode.empty() ? "forward" : "";
 		if (type.size() && (mode == "backward" || mode == "forward"))
 			mode = type.substr(0, type.find('-')) + '-' + mode;
 		if (mode.empty()) mode = type.size() ? type : form;
