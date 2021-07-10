@@ -185,7 +185,8 @@ public:
 	constexpr friend bool operator > (numeric n, half f) { return n >  numeric(f); }
 
 public:
-	static constexpr half& as(const u16& raw) noexcept { return raw_cast<half>(raw); }
+	static constexpr half& as(u16& raw) noexcept { return raw_cast<half>(raw); }
+	static constexpr const half& as(const u16& raw) noexcept { return raw_cast<half>(raw); }
 	friend std::ostream& operator <<(std::ostream& os, const half& hf) { return os << f32(hf); }
 	friend std::istream& operator >>(std::istream& is, half& hf) { f32 k; if (is >> k) hf = k; return is; }
 private:
