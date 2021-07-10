@@ -544,6 +544,7 @@ public:
 
 	static inline block::access find(const board& b, u32 n) { return instance()(b, n); }
 	static inline cache& make(size_t len, bool peek = false) { return instance().init(std::max(len, size_t(1)), peek); }
+	static inline cache& refresh() { return instance().reset(); }
 	static inline cache& instance() { static cache tp; return tp; }
 
 private:
@@ -557,6 +558,10 @@ private:
 		cached = length > 1 ? alloc(length) : &initial;
 		for (size_t i = 0; i < nmap.size(); i++)
 			nmap[i] = peek ? 0 : math::fmix64(i);
+		return *this;
+	}
+	cache& reset() {
+		std::fill_n(cached, length, block{});
 		return *this;
 	}
 
@@ -1023,6 +1028,7 @@ void config_weight(utils::options::option opt) {
 template<typename statistic, typename option = options::option>
 statistic invoke(statistic(*run)(option), option opt) {
 	if (opt("alpha")) config_weight(opt);
+	if (opt("search", "refresh")) cache::refresh();
 	u32 thdnum = opt["thread"].value(1), thdid = thdnum;
 #if defined(__linux__)
 	if (shm::enable()) {
