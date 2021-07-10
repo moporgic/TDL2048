@@ -1714,7 +1714,7 @@ struct method {
 
 struct state : board {
 	numeric esti;
-	inline state() : board(0ull, 0u, -1u), esti(0) {}
+	inline state(const board& b = {0ull, 0u, -1u}, numeric e = 0) : board(b), esti(e) {}
 	inline state(const state& s) = default;
 	declare_comparators(const state&, esti, inline);
 
@@ -1724,29 +1724,25 @@ struct state : board {
 	inline i32 score() const { return info(); }
 
 	inline numeric estimate(
-			clip<feature> range = feature::feats(),
-			method::estimator estim = method::estimate) {
+			clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
 		esti = score() + estim(*this, range);
 		return esti;
 	}
 	inline numeric optimize(numeric exact, numeric alpha = method::alpha(),
-			clip<feature> range = feature::feats(),
-			method::optimizer optim = method::optimize) {
+			clip<feature> range = feature::feats(), method::optimizer optim = method::optimize) {
 		numeric update = (exact - value()) * alpha;
 		esti = score() + optim(*this, update, range);
 		return esti;
 	}
 	inline numeric evaluate(
-			clip<feature> range = feature::feats(),
-			method::estimator estim = method::estimate) {
+			clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
 		estim = info() != -1u ? estim : method::illegal;
 		return estimate(range, estim);
 	}
 	inline numeric instruct(numeric exact, numeric alpha = method::alpha(),
-			clip<feature> range = feature::feats(),
-			method spec = {method::estimate, method::optimize}) {
-		numeric update = (exact - spec(*this, range)) * alpha;
-		esti = score() + spec(*this, update, range);
+			clip<feature> range = feature::feats(), method esopt = {method::estimate, method::optimize}) {
+		numeric update = (exact - esopt(*this, range)) * alpha;
+		esti = score() + esopt(*this, update, range);
 		return esti;
 	}
 };
