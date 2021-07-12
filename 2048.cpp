@@ -1720,7 +1720,7 @@ struct state : board {
 
 	inline operator bool() const { return info() != -1u; }
 	inline numeric value() const { return esti - info(); }
-	inline u32 reward() const { return std::max(i32(info()), 0); }
+	inline u32 reward() const { return std::max(score(), 0); }
 	inline i32 score() const { return info(); }
 
 	inline numeric estimate(
@@ -1748,8 +1748,9 @@ struct state : board {
 };
 struct select {
 	state move[4], *best;
-	inline select() : best(move) {}
-	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
+	inline select() : move{}, best(move) {}
+	inline select& operator ()(const board& b,
+			clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
 		b.moves(move[0], move[1], move[2], move[3]);
 		move[0].evaluate(range, estim);
 		move[1].evaluate(range, estim);
@@ -1763,13 +1764,16 @@ struct select {
 	inline const select& operator >>(state& s) const { s = *best; return *this; }
 	inline const select& operator >>(board& b) const { b = *best; return *this; }
 
-	inline operator bool() const { return best->operator bool(); }
+	inline operator bool() const { return best->info() != -1u; }
+	inline operator state&() { return *best; }
+	inline state* operator ->() { return best; }
 	inline numeric esti() const { return best->esti; }
+	inline numeric value() const { return best->value(); }
 	inline i32 score() const { return best->score(); }
 	inline u32 opcode() const { return best - move; }
 
-	inline state* begin() { return move; }
-	inline state* end() { return move + 4; }
+	inline bool safe() const { return best->info() < 65536u; }
+	inline bool validate() const { return safe() || board(*best).move(opcode()) == -1; }
 };
 struct statistic {
 	struct execinfo {
