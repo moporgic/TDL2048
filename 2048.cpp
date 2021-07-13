@@ -2363,7 +2363,8 @@ utils::options parse(int argc, const char* argv[]) {
 		for (std::string item : {"info=none"})
 			opts[recipe].remove(item);
 		// set recipe display, final mode, and other options
-		opts[recipe]["what"] = form + ": " + opts[recipe];
+		std::string what = form + ": " + opts[recipe];
+		opts[recipe]["what"] = what;
 		opts[recipe]["mode"] = mode;
 		for (std::string item : {"alpha", "lambda", "step", "thread", "make", "search"})
 			if (opts(item)) opts[recipe][item] << opts[item];
