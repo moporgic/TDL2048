@@ -44,7 +44,7 @@ moporgic/TDL2048+ - The Most Efficient TD Learning Framework for 2048
 
 Networks:
   -n, --network [TOKEN]...  specify the n-tuple network, default is 4x6patt
-                            TOKEN is provided as built-in ALIAS or custom PATTERN
+                            TOKEN is either a built-in ALIAS or a custom PATTERN
                             - ALIAS can be 4x6patt, 8x6patt, mono, num, ...
                             - PATTERN specifies cell locations using hex number
 
@@ -70,14 +70,12 @@ Parameters:
 Executions:
   -s, --seed [SEED]         set the seed for the pseudo-random number
   -p, --parallel [THREAD]   enable lock-free parallelism for all recipes
-  -d, --depth DEPTH [OPT]   enable the search with DEPTH layer (1p,2p,3p,...)
-  -c, --cache SIZE          enable the transposition table as NUMBER[K|M|G]
+  -d, --depth DEPTH [OPT]   enable the search with DEPTH layers (1p,2p,3p,...)
+  -c, --cache SIZE          set the transposition table size
 
 Input/Output:
   -i, --input [FILE]...     specify inputs, support weight.w and cache.c
   -o, --output [FILE]...    specify outputs, support weight.w, cache.c, and log.x
-                            for a weight, LUT range can be selected as RANGE|PATH,
-                            where RANGE specifies the LUT indexes as [0,1-2,3:4]
   -io [FILE]...             alias for -i [FILE]... -o [FILE]...
 
 Miscellaneous:
