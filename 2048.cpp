@@ -1385,15 +1385,10 @@ void list_network() {
 		std::stringstream buf;
 
 		buf << w.sign();
+		u32 p = math::log2(w.size() ?: 1) / 10;
 		buf << "[";
-		if (w.size() >> 30)
-			buf << (w.size() >> 30) << "G";
-		else if (w.size() >> 20)
-			buf << (w.size() >> 20) << "M";
-		else if (w.size() >> 10)
-			buf << (w.size() >> 10) << "k";
-		else
-			buf << (w.size());
+		buf << (w.size() / std::pow(2, p * 10));
+		buf << ("\0\0k\0M\0G\0T\0" + (p << 1));
 		buf << "]";
 
 		buf << " :";
