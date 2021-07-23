@@ -44,7 +44,7 @@ moporgic/TDL2048+ - The Most Efficient TD Learning Framework for 2048
 
 Networks:
   -n, --network [TOKEN]...  specify the n-tuple network, default is 4x6patt
-                            TOKEN is provided as built-in ALIAS or custom PATTERN
+                            TOKEN is either a built-in ALIAS or a custom PATTERN
                             - ALIAS can be 4x6patt, 8x6patt, mono, num, ...
                             - PATTERN specifies cell locations using hex number
 
@@ -71,14 +71,12 @@ Parameters:
 Executions:
   -s, --seed [SEED]         set the seed for the pseudo-random number
   -p, --parallel [THREAD]   enable lock-free parallelism for all recipes
-  -d, --depth DEPTH [OPT]   enable the search with DEPTH layer (1p,2p,3p,...)
-  -c, --cache SIZE          enable the transposition table as NUMBER[K|M|G]
+  -d, --depth DEPTH [OPT]   enable the search with DEPTH layers (1p,2p,3p,...)
+  -c, --cache SIZE          set the transposition table size
 
 Input/Output:
   -i, --input [FILE]...     specify inputs, support weight.w and cache.c
   -o, --output [FILE]...    specify outputs, support weight.w, cache.c, and log.x
-                            for a weight, LUT range can be selected as RANGE|PATH,
-                            where RANGE specifies the LUT indexes as [0,1-2,3:4]
   -io [FILE]...             alias for -i [FILE]... -o [FILE]...
 
 Miscellaneous:
@@ -545,6 +543,7 @@ public:
 
 	static inline block::access find(const board& b, u32 n) { return instance()(b, n); }
 	static inline cache& make(size_t len, bool peek = false) { return instance().init(std::max(len, size_t(1)), peek); }
+	static inline cache& refresh() { return instance().reset(); }
 	static inline cache& instance() { static cache tp; return tp; }
 
 private:
@@ -558,6 +557,10 @@ private:
 		cached = length > 1 ? alloc(length) : &initial;
 		for (size_t i = 0; i < nmap.size(); i++)
 			nmap[i] = peek ? 0 : math::fmix64(i);
+		return *this;
+	}
+	cache& reset() {
+		std::fill_n(cached, length, block{});
 		return *this;
 	}
 
@@ -1024,6 +1027,7 @@ void config_weight(utils::options::option opt) {
 template<typename statistic, typename option = options::option>
 statistic invoke(statistic(*run)(option), option opt) {
 	if (opt("alpha")) config_weight(opt);
+	if (opt("search", "refresh")) cache::refresh();
 	u32 thdnum = opt["thread"].value(1), thdid = thdnum;
 #if defined(__linux__)
 	if (shm::enable()) {
@@ -1382,15 +1386,10 @@ void list_network() {
 		std::stringstream buf;
 
 		buf << w.sign();
+		u32 p = math::log2(w.size() ?: 1) / 10;
 		buf << "[";
-		if (w.size() >> 30)
-			buf << (w.size() >> 30) << "G";
-		else if (w.size() >> 20)
-			buf << (w.size() >> 20) << "M";
-		else if (w.size() >> 10)
-			buf << (w.size() >> 10) << "k";
-		else
-			buf << (w.size());
+		buf << (w.size() / std::pow(2, p * 10));
+		buf << ("\0\0k\0M\0G\0T\0" + (p << 1));
 		buf << "]";
 
 		buf << " :";
@@ -1709,46 +1708,43 @@ struct method {
 
 struct state : board {
 	numeric esti;
-	inline state() : board(0ull, 0u, -1u), esti(0) {}
+	inline state(const board& b = {0ull, 0u, -1u}, numeric e = 0) : board(b), esti(e) {}
 	inline state(const state& s) = default;
 	declare_comparators(const state&, esti, inline);
 
 	inline operator bool() const { return info() != -1u; }
 	inline numeric value() const { return esti - info(); }
-	inline u32 reward() const { return std::max(i32(info()), 0); }
+	inline u32 reward() const { return std::max(score(), 0); }
 	inline i32 score() const { return info(); }
 
 	inline numeric estimate(
-			clip<feature> range = feature::feats(),
-			method::estimator estim = method::estimate) {
+			clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
 		esti = score() + estim(*this, range);
 		return esti;
 	}
 	inline numeric optimize(numeric exact, numeric alpha = method::alpha(),
-			clip<feature> range = feature::feats(),
-			method::optimizer optim = method::optimize) {
+			clip<feature> range = feature::feats(), method::optimizer optim = method::optimize) {
 		numeric update = (exact - value()) * alpha;
 		esti = score() + optim(*this, update, range);
 		return esti;
 	}
 	inline numeric evaluate(
-			clip<feature> range = feature::feats(),
-			method::estimator estim = method::estimate) {
+			clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
 		estim = info() != -1u ? estim : method::illegal;
 		return estimate(range, estim);
 	}
 	inline numeric instruct(numeric exact, numeric alpha = method::alpha(),
-			clip<feature> range = feature::feats(),
-			method spec = {method::estimate, method::optimize}) {
-		numeric update = (exact - spec(*this, range)) * alpha;
-		esti = score() + spec(*this, update, range);
+			clip<feature> range = feature::feats(), method esopt = {method::estimate, method::optimize}) {
+		numeric update = (exact - esopt(*this, range)) * alpha;
+		esti = score() + esopt(*this, update, range);
 		return esti;
 	}
 };
 struct select {
 	state move[4], *best;
-	inline select() : best(move) {}
-	inline select& operator ()(const board& b, clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
+	inline select() : move{}, best(move) {}
+	inline select& operator ()(const board& b,
+			clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
 		b.moves(move[0], move[1], move[2], move[3]);
 		move[0].evaluate(range, estim);
 		move[1].evaluate(range, estim);
@@ -1762,13 +1758,16 @@ struct select {
 	inline const select& operator >>(state& s) const { s = *best; return *this; }
 	inline const select& operator >>(board& b) const { b = *best; return *this; }
 
-	inline operator bool() const { return best->operator bool(); }
+	inline operator bool() const { return best->info() != -1u; }
+	inline operator state&() { return *best; }
+	inline state* operator ->() { return best; }
 	inline numeric esti() const { return best->esti; }
+	inline numeric value() const { return best->value(); }
 	inline i32 score() const { return best->score(); }
 	inline u32 opcode() const { return best - move; }
 
-	inline state* begin() { return move; }
-	inline state* end() { return move + 4; }
+	inline bool safe() const { return best->info() < 65536u; }
+	inline bool validate() const { return safe() || board(*best).move(opcode()) == -1; }
 };
 struct statistic {
 	struct execinfo {
@@ -2421,7 +2420,8 @@ utils::options parse(int argc, const char* argv[]) {
 		for (std::string item : {"info=none"})
 			opts[recipe].remove(item);
 		// set recipe display, final mode, and other options
-		opts[recipe]["what"] = form + ": " + opts[recipe];
+		std::string what = form + ": " + opts[recipe];
+		opts[recipe]["what"] = what;
 		opts[recipe]["mode"] = mode;
 		for (std::string item : {"alpha", "lambda", "step", "block", "thread", "make", "search"})
 			if (opts(item)) opts[recipe][item] << opts[item];
