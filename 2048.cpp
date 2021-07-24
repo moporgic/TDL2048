@@ -2190,13 +2190,13 @@ statistic run(utils::options::option opt) {
 			for (u32 which = o.hash(); which < limit; which = o.hash() + block) {
 				o.expect(which | 1u);
 
-				a.set(-1ull);
-				for ((b = o).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
+				a.set(which >= block ? o : -1ull);
+				for ((b = o).next(); best(b, feats, spec).safe(); b.next()) {
 					a.instruct(best.esti(), alpha, feats, spec);
 					score += best.score();
 					opers += 1;
 					best >> a >> b;
-					if (b.info() >= block && (b.hash() ^ o.hash()) >= block) best >> o;
+					o = a.info() >= block ? a : o;
 				}
 				a.instruct(0, alpha, feats, spec);
 
@@ -2216,15 +2216,15 @@ statistic run(utils::options::option opt) {
 			for (u32 which = o.hash(); which < limit; which = o.hash() + block) {
 				o.expect(which | 1u);
 
-				for ((b = o).next(); best(b, feats, spec) & (best.score() < 65536); b.next()) {
+				for ((b = o).next(); best(b, feats, spec).safe(); b.next()) {
 					best >> path >> b;
+					o = b.info() >= block ? b : o;
 				}
-				u32 score = 0, scale = b.hash(), opers = path.size();
+				u32 score = 0, opers = path.size();
 				for (numeric esti = 0; path.size(); path.pop_back()) {
 					state& a = path.back();
 					esti = a.instruct(esti, alpha, feats, spec);
 					score += a.info();
-					if (a.info() >= block && (a.hash() ^ scale) >= block) o.set(a);
 				}
 
 				stat = {score, b.hash(), opers};
