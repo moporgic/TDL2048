@@ -1766,9 +1766,10 @@ struct select {
 	inline i32 score() const { return best->score(); }
 	inline u32 opcode() const { return best - move; }
 
-	inline bool safe(u32 t = 65536u) const { return best->info() < t; }
-	inline bool validate(u32 t = 65536u) const { return safe(t) ||
-		(t < 65536u ? best->where(math::log2(t)) == 0 : board(*best).move(opcode()) == -1); }
+	inline bool safe(u32 h = 65536u) const { return best->info() < h; }
+	inline bool hold(u32 h = 65536u) const { return h < 65536u ? best->hash() >= h : board(*best).move(opcode()) != -1; }
+	inline bool validate(u32 h = 65536u) const { return safe(math::lsb32(h)) || (bool(*this) & !hold(h)); }
+	inline bool overflow(u32 h = 65536u) const { return score() >= i32(math::lsb32(h)) && hold(h); }
 };
 struct statistic {
 	struct execinfo {
