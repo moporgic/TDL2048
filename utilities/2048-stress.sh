@@ -1,4 +1,17 @@
 #!/bin/bash
+if (( ${1:-0} )); then
+	interrupt() { echo; echo Interrupted; exit 0; }
+	trap interrupt SIGINT
+	random-string () { tr -dc ${2:-[:alnum:]} < /dev/urandom | head -c ${1:-32}; }
+	for i in $(seq 1 1 ${1:-0}); do
+		while $0; do random-string 1 [:graph:]; done &
+	done
+	wait -n
+	echo; echo -n "Execution failed! "
+	pkill 2048 >/dev/null 2>&1
+fi
+[ -e 2048 ] || make OUTPUT=2048
+[ -e 2048-4x6patt ] || make 4x6patt OUTPUT=2048-4x6patt
 (( $RANDOM % 2 )) && run=./2048 || run=./2048-4x6patt
 if (( $RANDOM % 2 )); then
 	alpha=0.1
