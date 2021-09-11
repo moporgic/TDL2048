@@ -1,4 +1,6 @@
 #!/bin/bash
+[ -e 2048 ] || make OUTPUT=2048
+[ -e 2048-4x6patt ] || make 4x6patt OUTPUT=2048-4x6patt
 if (( ${1:-0} )); then
 	interrupt() { echo; echo Interrupted; exit 0; }
 	trap interrupt SIGINT
@@ -10,8 +12,6 @@ if (( ${1:-0} )); then
 	echo; echo -n "Execution failed! "
 	pkill 2048 >/dev/null 2>&1
 fi
-[ -e 2048 ] || make OUTPUT=2048
-[ -e 2048-4x6patt ] || make 4x6patt OUTPUT=2048-4x6patt
 (( $RANDOM % 2 )) && run=./2048 || run=./2048-4x6patt
 if (( $RANDOM % 2 )); then
 	alpha=0.1
