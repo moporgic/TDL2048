@@ -2180,6 +2180,79 @@ statistic run(utils::options::option opt) {
 		}
 		}(); break;
 
+	case to_hash("optimize:restart"):
+	case to_hash("optimize:restart-forward"): [&]() {
+		u32 start = 0;
+		u32 thres = opt["thres"].value(10);
+		numeric where = opt["where"].value(0.5);
+		for (stats.init(opt); stats; stats++) {
+			state b, a;
+			u32 score = 0;
+			u32 opers = 0;
+
+			if (path.size() - start < thres) {
+				start = 0;
+				path.clear();
+				b.init();
+				a.set(-1ull);
+			} else {
+				start += (path.size() - start) * where;
+				path.resize(start + 1);
+				score = path[start].esti;
+				b = a = path[start];
+				b.next();
+			}
+			while (best(b, feats, spec).safe()) {
+				a.instruct(best.esti(), alpha, feats, spec);
+				score += best.score();
+				opers += 1;
+				best >> path >> a >> b;
+				path.back().esti = score;
+				b.next();
+			}
+			a.instruct(0, alpha, feats, spec);
+
+			stats.update(score, b.hash(), opers);
+		}
+		}(); break;
+
+	case to_hash("optimize:restart-backward"): [&]() {
+		u32 start = 0;
+		u32 thres = opt["thres"].value(10);
+		numeric where = opt["where"].value(0.5);
+		for (stats.init(opt); stats; stats++) {
+			state b;
+			u32 score = 0;
+			u32 opers = 0;
+
+			if (path.size() - start < thres) {
+				start = 0;
+				path.clear();
+				b.init();
+			} else {
+				start += (path.size() - start) * where;
+				path.resize(start + 1);
+				score = path[start].esti;
+				b = path[start];
+				b.next();
+			}
+			while (best(b, feats, spec).safe()) {
+				score += best.score();
+				opers += 1;
+				best >> path >> b;
+				path.back().esti = score;
+				b.next();
+			}
+
+			numeric esti = 0;
+			for (auto st = path.end(); --st >= path.begin() + start;) {
+				esti = state(*st).instruct(esti, alpha, feats, spec);
+			}
+
+			stats.update(score, b.hash(), opers);
+		}
+		}(); break;
+
 	case to_hash("optimize:block"):
 	case to_hash("optimize:block-forward"): [&]() {
 		for (stats.init(opt); stats; stats++) {
