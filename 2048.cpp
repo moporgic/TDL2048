@@ -1966,8 +1966,6 @@ statistic run(utils::options::option opt) {
 	        alpha = method::alpha(opt["alpha"].value(alpha) / opt["norm"].value(feats.size()));
 	numeric lambda = method::lambda(opt["lambda"].value(0));
 	u32 step = method::step(opt["step"].value(lambda ? 5 : 1));
-	u32 block = opt["block"].value(2048);
-	u32 limit = opt["limit"].value(65536);
 
 	switch (to_hash(opt["mode"])) {
 	case to_hash("optimize"):
@@ -2255,6 +2253,8 @@ statistic run(utils::options::option opt) {
 
 	case to_hash("optimize:block"):
 	case to_hash("optimize:block-forward"): [&]() {
+		u32 block = opt["block"].value(2048);
+		u32 limit = opt["limit"].value(65536);
 		for (stats.init(opt); stats; stats++) {
 			struct stat { u32 score, scale, opers; };
 			once<stat> stat;
@@ -2283,6 +2283,8 @@ statistic run(utils::options::option opt) {
 		}(); break;
 
 	case to_hash("optimize:block-backward"): [&]() {
+		u32 block = opt["block"].value(2048);
+		u32 limit = opt["limit"].value(65536);
 		for (stats.init(opt); stats; stats++) {
 			struct stat { u32 score, scale, opers; };
 			once<stat> stat;
