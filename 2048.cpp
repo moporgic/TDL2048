@@ -2352,6 +2352,46 @@ statistic run(utils::options::option opt) {
 		}
 		}(); break;
 
+	case to_hash("optimize:stage-backward"): [&]() {
+		u32 block = opt["block"].value(2048);
+		u32 limit = opt["limit"].value(65536);
+		std::string res = opt["stage"].value("0") + ',';
+		u32 N = std::count(res.begin(), res.end(), ',');
+		u32 thres[N + 1]; thres[N] = limit;
+		clip<feature> multi[N + 1];
+		for (size_t i = 0, n = feats.size() / N, z; i < N; res.erase(0, z + 1), i++){
+			thres[i] = std::stoul(res, &z, 10);
+			multi[i] = feats.subc(n * i, n);
+		}
+		for (stats.init(opt); stats; stats++) {
+			struct stat { u32 score, scale, opers; };
+			once<stat> stat;
+			state b, o; o.next();
+
+			for (u32 k = 0, which = o.hash(); which < limit; which = o.hash() + block) {
+				while (which >= thres[k + 1]) k++;
+				o.expect(which | 1u);
+
+				for ((b = o).next(); best(b, multi[k], spec).safe(); b.next()) {
+					k += best.overflow(thres[k + 1]) ? 1 : 0;
+					best >> path >> b;
+					o = b.info() >= block ? b : o;
+				}
+				u32 score = 0, opers = path.size(), h = k;
+				for (numeric esti = 0; path.size(); path.pop_back()) {
+					state& a = path.back();
+					h -= a.hash() < thres[h] ? 1 : 0;
+					esti = a.instruct(esti, alpha, multi[h], spec);
+					score += a.info();
+				}
+
+				stat = {score, b.hash(), opers};
+			}
+
+			stats.update(stat.score, stat.scale, stat.opers);
+		}
+		}(); break;
+
 	case to_hash("evaluate"):
 	case to_hash("evaluate:best"): [&]() {
 		for (stats.init(opt); stats; stats++) {
