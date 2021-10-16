@@ -2282,18 +2282,17 @@ statistic run(utils::options::option opt) {
 		}
 		}(); break;
 
-	case to_hash("optimize:block@"):
-	case to_hash("optimize:block-forward@"): [&]() {
+	case to_hash("optimize:stage"):
+	case to_hash("optimize:stage-forward"): [&]() {
 		u32 block = opt["block"].value(2048);
 		u32 limit = opt["limit"].value(65536);
-		std::string res = opt["@"].value("0") + ',';
+		std::string res = opt["stage"].value("0") + ',';
 		u32 N = std::count(res.begin(), res.end(), ',');
-		u32 num = opt["|@|"].value(feats.size() / N);
 		u32 thres[N + 1]; thres[N] = limit;
 		clip<feature> multi[N + 1];
-		for (size_t z, i = 0; i < N; res.erase(0, z + 1), i++){
+		for (size_t i = 0, n = feats.size() / N, z; i < N; res.erase(0, z + 1), i++){
 			thres[i] = std::stoul(res, &z, 10);
-			multi[i] = feats.subc(num * i, num);
+			multi[i] = feats.subc(n * i, n);
 		}
 		for (stats.init(opt); stats; stats++) {
 			struct stat { u32 score, scale, opers; };
@@ -2370,16 +2369,15 @@ statistic run(utils::options::option opt) {
 		}
 		}(); break;
 
-	case to_hash("evaluate:best@"): [&]() {
+	case to_hash("evaluate:stage"): [&]() {
 		u32 limit = opt["limit"].value(65536);
-		std::string res = opt["@"].value("0") + ',';
+		std::string res = opt["stage"].value("0") + ',';
 		u32 N = std::count(res.begin(), res.end(), ',');
-		u32 num = opt["|@|"].value(feats.size() / N);
 		u32 thres[N + 1]; thres[N] = limit;
 		clip<feature> multi[N + 1];
-		for (size_t z, i = 0; i < N; res.erase(0, z + 1), i++){
+		for (size_t i = 0, n = feats.size() / N, z; i < N; res.erase(0, z + 1), i++){
 			thres[i] = std::stoul(res, &z, 10);
-			multi[i] = feats.subc(num * i, num);
+			multi[i] = feats.subc(n * i, n);
 		}
 		for (stats.init(opt); stats; stats++) {
 			board b, x;
