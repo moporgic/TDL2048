@@ -64,6 +64,7 @@ Parameters:
   -l, --lambda LAMBDA       the TD-lambda, default is 0
   -N, --step STEP           the n-step, default is 1 if LAMBDA is 0; otherwise 5
   -b, --block BLOCK         the minimal learning block, default is disabled
+  -@, --stage THRES         the multi-stage thresholds, default is disabled
   -u, --unit UNIT           the statistic display interval, default is 1000
   -w, --win TILE            the winning threshold, default is 2048
   -%, --info                whether to show the summary, default is auto
@@ -2512,6 +2513,9 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-b"): case to_hash("--block"):
 			opts["block"] = next_opts("2048");
 			break;
+		case to_hash("-@"): case to_hash("--stage"):
+			opts["stage"] = next_opts("0,16384");
+			break;
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
 			break;
@@ -2592,15 +2596,17 @@ utils::options parse(int argc, const char* argv[]) {
 		std::string mode = opts[recipe].find("mode"), type;
 		if (mode.empty()) mode = opts["mode"].find(form);
 		bool optimize = form == "optimize", evaluate = form == "evaluate";
-		auto alpha  = opts[""]["alpha"] = opts[recipe].find("alpha", opts.find("alpha"));
-		bool cohen  = optimize && (alpha.value(0) >= 1.0  || alpha("coh"));
-		bool block  = optimize && (opts[recipe]("block")  || opts("block"));
-		bool lambda = optimize && (opts[recipe]("lambda") || opts("lambda"));
-		bool step   = optimize && (opts[recipe]("step")   || opts("step"));
-		if (lambda)     type = step ? "lambda-forward" : "lambda";
-		else if (step)  type = "step";
-		else if (block) type = "block";
-		else if (cohen) type = mode.empty() ? "forward" : "";
+		auto alpha  = (opts[""]["alpha"] = opts[recipe].find("alpha", opts.find("alpha")));
+		bool stage  = (opts[recipe]("stage")  || opts("stage"));
+		bool block  = (opts[recipe]("block")  || opts("block")) && optimize;
+		bool lambda = (opts[recipe]("lambda") || opts("lambda")) && optimize;
+		bool step   = (opts[recipe]("step")   || opts("step")) && optimize;
+		bool cohen  = (alpha.value(0) >= 1.0  || alpha("coh")) && optimize;
+		if (stage)       type = "stage";
+		else if (block)  type = "block";
+		else if (lambda) type = step ? "lambda-forward" : "lambda";
+		else if (step)   type = "step";
+		else if (cohen)  type = mode.empty() ? "forward" : "";
 		if (type.size() && (mode == "backward" || mode == "forward"))
 			mode = type.substr(0, type.find('-')) + '-' + mode;
 		if (mode.empty()) mode = type.size() ? type : form;
@@ -2619,7 +2625,7 @@ utils::options parse(int argc, const char* argv[]) {
 		std::string what = form + ": " + opts[recipe];
 		opts[recipe]["what"] = what;
 		opts[recipe]["mode"] = mode;
-		for (std::string item : {"alpha", "lambda", "step", "block", "thread", "make", "search"})
+		for (std::string item : {"alpha", "lambda", "step", "stage", "block", "thread", "make", "search"})
 			if (opts(item)) opts[recipe][item] << opts[item];
 		if (opts("alpha",   "norm")) opts[recipe]["norm"] << opts["alpha"]["norm"];
 		if (opts("block",  "limit")) opts[recipe]["limit"] << opts["block"]["limit"];
@@ -2641,6 +2647,7 @@ int main(int argc, const char* argv[]) {
 	std::cout << "seed = " << opts["seed"].value() << std::endl;
 	std::cout << "alpha = " << opts["alpha"].value(weight::type() != weight::coherence::code ? "0.1" : "1.0") << std::endl;
 	std::cout << "lambda = " << opts["lambda"].value(0) << ", step = " << opts["step"].value(1) << std::endl;
+	std::cout << "stage = " << "{" << opts["stage"].value("0") << "}, block = " << opts["block"].value(65536) << std::endl;
 	std::cout << "search = " << opts["search"].value("1p") << ", cache = " << opts["cache"].value("none") << std::endl;
 	std::cout << "thread = " << opts["thread"].value(1) << "x" << std::endl;
 	std::cout << std::endl;
