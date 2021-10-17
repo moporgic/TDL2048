@@ -544,7 +544,7 @@ template<typename type, typename = void>
 class once { // for fundamental types
 public:
 	constexpr inline once() : data{}, pass(0) {}
-	constexpr inline once(const type& v, u32 p = 0) : data{v}, pass(p) { reset(v); }
+	constexpr inline once(const type& v, u32 p = 0) : data{v}, pass(p) {}
 	constexpr inline once(const once& o) = default;
 	constexpr inline operator type&() { return data; }
 	constexpr inline operator const type&() const { return data; }
@@ -560,7 +560,7 @@ template<typename type>
 class once<type, enable_if_is_class<type>> : public type { // for class types
 public:
 	constexpr inline once() : type(), pass(0) {}
-	constexpr inline once(const type& v, u32 p = 0) : type(v), pass(p) { reset(v); }
+	constexpr inline once(const type& v, u32 p = 0) : type(v), pass(p) {}
 	constexpr inline once(const once& o) = default;
 	template<typename save>
 	constexpr inline type& operator =(const save& v) { return pass++ ? *this : type::operator =(v); }

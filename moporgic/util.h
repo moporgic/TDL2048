@@ -65,14 +65,14 @@ declare_comparators_with(type, cmp, v.cmp, __VA_ARGS__)
 
 
 #define declare_extern_comparators_rel(ltype, rtype, ...)\
-VA_PASS(__VA_ARGS__ inline bool operator) !=(ltype lv, rtype rv) { return !(lv == rv); }\
-VA_PASS(__VA_ARGS__ inline bool operator) > (ltype lv, rtype rv) { return  (rv < lv); }\
-VA_PASS(__VA_ARGS__ inline bool operator) <=(ltype lv, rtype rv) { return !(rv < lv); }\
-VA_PASS(__VA_ARGS__ inline bool operator) >=(ltype lv, rtype rv) { return !(lv < rv); }
+VA_PASS(__VA_ARGS__ bool operator) !=(ltype lv, rtype rv) { return !(lv == rv); }\
+VA_PASS(__VA_ARGS__ bool operator) > (ltype lv, rtype rv) { return  (rv < lv); }\
+VA_PASS(__VA_ARGS__ bool operator) <=(ltype lv, rtype rv) { return !(rv < lv); }\
+VA_PASS(__VA_ARGS__ bool operator) >=(ltype lv, rtype rv) { return !(lv < rv); }
 
 #define declare_extern_comparators_with(ltype, rtype, lhs, rhs, ...)\
-VA_PASS(__VA_ARGS__ inline bool operator) ==(ltype lv, rtype rv) { return lhs == rhs; }\
-VA_PASS(__VA_ARGS__ inline bool operator) < (ltype lv, rtype rv) { return lhs <  rhs; }\
+VA_PASS(__VA_ARGS__ bool operator) ==(ltype lv, rtype rv) { return lhs == rhs; }\
+VA_PASS(__VA_ARGS__ bool operator) < (ltype lv, rtype rv) { return lhs <  rhs; }\
 declare_extern_comparators_rel(ltype, rtype, __VA_ARGS__)
 
 #define declare_extern_comparators(ltype, rtype, cmp, ...)\
