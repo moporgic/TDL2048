@@ -2627,9 +2627,10 @@ utils::options parse(int argc, const char* argv[]) {
 		opts[recipe]["mode"] = mode;
 		for (std::string item : {"alpha", "lambda", "step", "stage", "block", "thread", "make", "search"})
 			if (opts(item)) opts[recipe][item] << opts[item];
-		if (opts("alpha",   "norm")) opts[recipe]["norm"] << opts["alpha"]["norm"];
-		if (opts("block",  "limit")) opts[recipe]["limit"] << opts["block"]["limit"];
-		if (opts("options", "spec")) opts[recipe]["spec"] << opts["options"]["spec"];
+		for (std::string item : {"spec", "norm", "limit", "thres", "where"})
+			if (opts("options", item)) opts[recipe][item] << opts["options"][item];
+		if (opts("alpha", "norm")) opts[recipe]["norm"] << opts["alpha"]["norm"];
+		if (opts("block", "limit")) opts[recipe]["limit"] << opts["block"]["limit"];
 	}
 	return opts;
 }
