@@ -2290,65 +2290,7 @@ statistic run(utils::options::option opt) {
 		}(); break;
 
 	case to_hash("optimize:block"):
-	case to_hash("optimize:block-forward"): [&]() {
-		u32 block = opt["block"].value(2048);
-		u32 limit = opt["limit"].value(65536);
-		for (stats.init(opt); stats; stats++) {
-			struct stat { u32 score, scale, opers; };
-			once<stat> stat;
-			state b, a, o; o.next();
-			u32 score = 0;
-			u32 opers = 0;
-
-			for (u32 which = o.hash(); which < limit; which = o.hash() + block) {
-				o.expect(which | 1u);
-
-				a.set(which >= block ? o : -1ull);
-				for ((b = o).next(); best(b, feats, spec).safe(); b.next()) {
-					a.instruct(best.esti(), alpha, feats, spec);
-					score += best.score();
-					opers += 1;
-					best >> a >> b;
-					o = a.info() >= block ? a : o;
-				}
-				a.instruct(0, alpha, feats, spec);
-
-				stat = {score, b.hash(), opers};
-			}
-
-			stats.update(stat.score, stat.scale, stat.opers);
-		}
-		}(); break;
-
-	case to_hash("optimize:block-backward"): [&]() {
-		u32 block = opt["block"].value(2048);
-		u32 limit = opt["limit"].value(65536);
-		for (stats.init(opt); stats; stats++) {
-			struct stat { u32 score, scale, opers; };
-			once<stat> stat;
-			state b, o; o.next();
-
-			for (u32 which = o.hash(); which < limit; which = o.hash() + block) {
-				o.expect(which | 1u);
-
-				for ((b = o).next(); best(b, feats, spec).safe(); b.next()) {
-					best >> path >> b;
-					o = b.info() >= block ? b : o;
-				}
-				u32 score = 0, opers = path.size();
-				for (numeric esti = 0; path.size(); path.pop_back()) {
-					state& a = path.back();
-					esti = a.instruct(esti, alpha, feats, spec);
-					score += a.info();
-				}
-
-				stat = {score, b.hash(), opers};
-			}
-
-			stats.update(stat.score, stat.scale, stat.opers);
-		}
-		}(); break;
-
+	case to_hash("optimize:block-forward"):
 	case to_hash("optimize:stage"):
 	case to_hash("optimize:stage-forward"): [&]() {
 		u32 block = opt["block"].value(2048);
@@ -2383,6 +2325,7 @@ statistic run(utils::options::option opt) {
 		}
 		}(); break;
 
+	case to_hash("optimize:block-backward"):
 	case to_hash("optimize:stage-backward"): [&]() {
 		u32 block = opt["block"].value(2048);
 		u32 limit = opt["limit"].value(65536);
