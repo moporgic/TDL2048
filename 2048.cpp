@@ -1136,6 +1136,20 @@ void make_network(utils::options::option opt) {
 	const auto npos = std::string::npos;
 	for (size_t i; (i = tokens.find(" norm")) != npos; tokens[i] = '/');
 
+	std::stringstream unstage(tokens); tokens.clear();
+	for (std::string token; unstage >> token; tokens += (token + ' ')) {
+		if (token.find("patt@") == npos) continue;
+		std::string name = token.substr(0, token.find('@'));
+		std::string info = token.substr((token + '#').find_first_not_of("@0123456789", name.size()));
+		u32 stage = std::stoul(token.substr(name.size() + 1));
+		token.clear();
+		for (u32 i = 0; i < stage; i++) {
+			std::string hash = format("%08x", i);
+			std::reverse(hash.begin(), hash.end());
+			token += (name + '|' + hash + info + ' ');
+		}
+	}
+
 	std::stringstream unalias(tokens); tokens.clear();
 	for (std::string token; unalias >> token; tokens += (token + ' ')) {
 		if (token.find(':') != npos) continue;
@@ -1684,11 +1698,10 @@ struct method {
 			}
 			if (m) { // if features are assumed as isomorphic
 				std::string list = "4x6patt 5x6patt 6x6patt 7x6patt 8x6patt 2x7patt 3x7patt 1x8patt 2x8patt ";
-				std::string make = opt["make"].value("?");
-				make = make.substr(0, make.find_first_of("&|="));
+				std::string make = opt["make"].value("?"), patt = make.substr(0, make.find_first_of("@&|="));
 				std::string form = format("%ux%upatt", m, n);
-				if (list.find(make) != std::string::npos) {
-					spec = make;
+				if (list.find(patt) != std::string::npos && make.find(' ') == std::string::npos) {
+					spec = patt;
 				} else if (list.find(form) != std::string::npos &&
 					std::accumulate(weight::wghts().begin(), weight::wghts().end(), std::string{},
 						[](std::string s, weight w) { return s + w.sign() + ' '; }) == utils::resolve(form)) {
