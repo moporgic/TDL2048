@@ -2218,7 +2218,6 @@ statistic run(utils::options::option opt) {
 
 	case to_hash("optimize:restart"):
 	case to_hash("optimize:restart-forward"): [&]() {
-		u32 start = 0;
 		u32 thres = opt["thres"].value(10);
 		numeric where = opt["where"].value(0.5);
 		for (stats.init(opt); stats; stats++) {
@@ -2226,25 +2225,20 @@ statistic run(utils::options::option opt) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			if (path.size() - start < thres) {
-				start = 0;
-				path.clear();
+			if (path.size() < thres) {
 				b.init();
 				a.set(-1ull);
 			} else {
-				start += (path.size() - start) * where;
-				path.resize(start + 1);
-				score = path[start].esti;
-				b = a = path[start];
+				b = a = path[(path.size() - 1) * where];
+				score = b.esti;
 				b.next();
 			}
-			while (best(b, feats, spec).safe()) {
+			for (path.clear(); best(b, feats, spec).safe(); b.next()) {
 				a.instruct(best.esti(), alpha, feats, spec);
 				score += best.score();
 				opers += 1;
 				best >> path >> a >> b;
 				path.back().esti = score;
-				b.next();
 			}
 			a.instruct(0, alpha, feats, spec);
 
@@ -2253,7 +2247,6 @@ statistic run(utils::options::option opt) {
 		}(); break;
 
 	case to_hash("optimize:restart-backward"): [&]() {
-		u32 start = 0;
 		u32 thres = opt["thres"].value(10);
 		numeric where = opt["where"].value(0.5);
 		for (stats.init(opt); stats; stats++) {
@@ -2261,27 +2254,22 @@ statistic run(utils::options::option opt) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			if (path.size() - start < thres) {
-				start = 0;
-				path.clear();
+			if (path.size() < thres) {
 				b.init();
 			} else {
-				start += (path.size() - start) * where;
-				path.resize(start + 1);
-				score = path[start].esti;
-				b = path[start];
+				b = path[(path.size() - 1) * where];
+				score = b.esti;
 				b.next();
 			}
-			while (best(b, feats, spec).safe()) {
+			for (path.clear(); best(b, feats, spec).safe(); b.next()) {
 				score += best.score();
 				opers += 1;
 				best >> path >> b;
 				path.back().esti = score;
-				b.next();
 			}
 
 			numeric esti = 0;
-			for (auto st = path.end(); --st >= path.begin() + start;) {
+			for (auto st = path.end(); --st >= path.begin();) {
 				esti = state(*st).instruct(esti, alpha, feats, spec);
 			}
 
