@@ -978,7 +978,7 @@ struct stage {
 		list<stage> multi(N + 1);
 		clip<feature> feats = feature::feats();
 		for (size_t i = 0, n = feats.size() / N, z; i < N; res.erase(0, z + 1), i++){
-			multi[i] = { feats.subc(n * i, n), std::stoul(res, &z, 10) };
+			multi[i] = { feats.subc(n * i, n), u32(std::stoul(res, &z, 10)) };
 		}
 		multi[N].thres = limit;
 		return multi;
