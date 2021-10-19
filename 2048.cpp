@@ -2530,7 +2530,7 @@ utils::options parse(int argc, const char* argv[]) {
 
 	for (std::string recipe : opts["recipes"]) {
 		std::string form = recipe.substr(0, recipe.find('#'));
-		// priority: built-in > global > auto-detect > form
+		// the priority of mode: built-in > global > auto-detect > form
 		std::string mode = opts[recipe].find("mode"), type;
 		if (mode.empty()) mode = opts["mode"].find(form);
 		bool optimize = form == "optimize", evaluate = form == "evaluate";
@@ -2552,23 +2552,24 @@ utils::options parse(int argc, const char* argv[]) {
 		if (mode.find(form))   opts[recipe]["mode"] = mode, mode = form + ':' + mode;
 		else if (mode != form) opts[recipe]["mode"] = mode.substr(form.size() + 1);
 		else if (mode == form) opts[recipe].remove("mode=" + form);
-		// touch other flags
+		// set other options (visible in the display)
 		if (opts("thread")) opts["thread"][form];
 		if (evaluate && !opts("info")) opts[recipe]["info"];
 		for (std::string item : {"loop", "unit", "win", "info"})
 			if (opts(item)) opts[recipe][item] << opts[item];
 		for (std::string item : {"info=none"})
 			opts[recipe].remove(item);
-		// set recipe display, final mode, and other options
 		std::string what = form + ": " + opts[recipe];
-		opts[recipe]["what"] = what;
-		opts[recipe]["mode"] = mode;
+		// set other options (invisible in the display)
 		for (std::string item : {"alpha", "lambda", "step", "stage", "block", "thread", "make", "search"})
 			if (opts(item)) opts[recipe][item] << opts[item];
 		for (utils::options::opinion item : opts["options"])
 			opts[recipe][item.label()] << item.value();
 		if (opts("alpha", "norm")) opts[recipe]["norm"] << opts["alpha"]["norm"];
 		if (opts("block", "limit")) opts[recipe]["limit"] << opts["block"]["limit"];
+		// set the final mode and the display
+		opts[recipe]["mode"] = mode;
+		opts[recipe]["what"] = what;
 	}
 	return opts;
 }
