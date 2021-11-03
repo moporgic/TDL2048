@@ -972,7 +972,7 @@ struct stage {
 	declare_extern_comparators_with(const stage&, u32, lv.thres, rv, constexpr inline friend);
 	declare_extern_comparators_with(u32, const stage&, lv, rv.thres, constexpr inline friend);
 
-	static list<stage> parse(std::string res, u32 limit = 65536) { // e.g., 4 stages: 0,16384,32768,49152
+	static list<stage> parse(std::string res) { // e.g., 4 stages: 0,16384,32768,49152
 		res.append(res.empty() ? "0," : ",");
 		size_t N = std::count(res.begin(), res.end(), ',');
 		list<stage> multi(N + 1);
@@ -980,7 +980,7 @@ struct stage {
 		for (size_t i = 0, n = feats.size() / N, z; i < N; res.erase(0, z + 1), i++){
 			multi[i] = { feats.subc(n * i, n), u32(std::stoul(res, &z, 10)) };
 		}
-		multi[N].thres = limit;
+		multi[N].thres = 65536;
 		return multi;
 	}
 };
@@ -2007,7 +2007,7 @@ statistic run(utils::options::option opt) {
 
 	u32 block = opt["block"].value(2048);
 	u32 limit = opt["limit"].value(65536);
-	list<utils::stage> stage = utils::stage::parse(opt["stage"].value("0"), limit);
+	list<utils::stage> stage = utils::stage::parse(opt["stage"].value("0"));
 	u32 thres = opt["thres"].value(10);
 	numeric where = opt["where"].value(0.5);
 
