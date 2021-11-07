@@ -776,26 +776,26 @@ public:
 		}
 	}
 
-	inline constexpr u32 shift(u32 k = 0, u32 u = 0) { return shift64(k, u); }
-	inline constexpr u32 shift64(u32 k = 0, u32 u = 0) {
+	inline constexpr u32 shift(u32 u = 0) { return shift64(u); }
+	inline constexpr u32 shift64(u32 u = 0) {
 		u32 hash = hash64();
 		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
-		u32 hole = math::msb(~hash & (hash >= (1u << k) ? mask : 0));
+		u32 hole = math::msb(~hash & mask);
 		for (hash &= ~(hole - 1); hash; hash &= hash - 1) {
 			u32 tile = math::tzcnt(hash);
 			put64(where64(tile), tile - 1);
 		}
-		return math::tzcnt(hole ?: 1);
+		return hole;
 	}
-	inline constexpr u32 shift80(u32 k = 0, u32 u = 0) {
+	inline constexpr u32 shift80(u32 u = 0) {
 		u32 hash = hash80();
 		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
-		u32 hole = math::msb(~hash & (hash >= (1u << k) ? mask : 0));
+		u32 hole = math::msb(~hash & mask);
 		for (hash &= ~(hole - 1); hash; hash &= hash - 1) {
 			u32 tile = math::tzcnt(hash);
 			put80(where80(tile), tile - 1);
 		}
-		return math::tzcnt(hole ?: 1);
+		return hole;
 	}
 
 	inline constexpr u32 expect(u32 scale, u32 thres = 0) { return expect64(scale, thres); }
