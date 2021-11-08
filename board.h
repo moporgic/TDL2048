@@ -782,7 +782,11 @@ public:
 		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
 		u32 hole = ~hash & mask;
 		u32 hcnt = std::max(math::popcnt(hole), n);
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_SHIFT)
 		hole &= ~(math::nthset(hole, hcnt - n) - 1);
+#else
+		while (hcnt-- > n) hole &= (hole - 1);
+#endif
 		hash &= ~(math::lsb(hole) - 1);
 		for (u32 last = 0, tile = 0, step = 0; hash; hash ^= last) {
 			last = math::lsb(hash);
@@ -797,7 +801,11 @@ public:
 		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
 		u32 hole = ~hash & mask;
 		u32 hcnt = std::max(math::popcnt(hole), n);
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_SHIFT)
 		hole &= ~(math::nthset(hole, hcnt - n) - 1);
+#else
+		while (hcnt-- > n) hole &= (hole - 1);
+#endif
 		hash &= ~(math::lsb(hole) - 1);
 		for (u32 last = 0, tile = 0, step = 0; hash; hash ^= last) {
 			last = math::lsb(hash);
