@@ -776,24 +776,34 @@ public:
 		}
 	}
 
-	inline constexpr u32 shift(u32 u = 0) { return shift64(u); }
-	inline constexpr u32 shift64(u32 u = 0) {
+	inline constexpr u32 shift(u32 n = 1, u32 u = 0) { return shift64(n, u); }
+	inline constexpr u32 shift64(u32 n = 1, u32 u = 0) {
 		u32 hash = hash64();
 		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
-		u32 hole = math::msb(~hash & mask);
-		for (hash &= ~(hole - 1); hash; hash &= hash - 1) {
-			u32 tile = math::tzcnt(hash);
-			put64(where64(tile), tile - 1);
+		u32 hole = ~hash & mask;
+		u32 hcnt = std::max(math::popcnt(hole), n);
+		hole &= ~(math::nthset(hole, hcnt - n) - 1);
+		hash &= ~(math::lsb(hole) - 1);
+		for (u32 last = 0, tile = 0, step = 0; hash; hash ^= last) {
+			last = math::lsb(hash);
+			tile = math::tzcnt(last);
+			step = math::popcnt(hole & (last - 1));
+			put64(where64(tile), tile - step);
 		}
 		return hole;
 	}
-	inline constexpr u32 shift80(u32 u = 0) {
+	inline constexpr u32 shift80(u32 n = 1, u32 u = 0) {
 		u32 hash = hash80();
 		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
-		u32 hole = math::msb(~hash & mask);
-		for (hash &= ~(hole - 1); hash; hash &= hash - 1) {
-			u32 tile = math::tzcnt(hash);
-			put80(where80(tile), tile - 1);
+		u32 hole = ~hash & mask;
+		u32 hcnt = std::max(math::popcnt(hole), n);
+		hole &= ~(math::nthset(hole, hcnt - n) - 1);
+		hash &= ~(math::lsb(hole) - 1);
+		for (u32 last = 0, tile = 0, step = 0; hash; hash ^= last) {
+			last = math::lsb(hash);
+			tile = math::tzcnt(last);
+			step = math::popcnt(hole & (last - 1));
+			put80(where80(tile), tile - step);
 		}
 		return hole;
 	}
