@@ -846,8 +846,8 @@ public:
 		return hole;
 	}
 
-	inline constexpr u32 expect(u32 scale, u32 thres = 0) { return expect64(scale, thres); }
-	inline constexpr u32 expect64(u32 scale, u32 thres = 0) {
+	inline constexpr u32 scale(u32 scale, u32 thres = 0) { return scale64(scale, thres); }
+	inline constexpr u32 scale64(u32 scale, u32 thres = 0) {
 		u32 hash = hash64();
 		i32 dist = math::lg(hash) - math::lg(scale);
 		while (dist-- > 0 && shift64()) hash = hash64();
@@ -879,14 +879,14 @@ public:
 		}
 		return hash;
 	}
-	inline constexpr u32 expect80(u32 scale, u32 thres = 0) {
+	inline constexpr u32 scale80(u32 scale, u32 thres = 0) {
 		scale &= ~(math::msb(thres | 1) - 1);
 		u32 hash = hash80();
 		while (hash >= 65536 && shift80()) hash = hash80();
 		i32 dist = math::popcnt(scale & -2u) - math::popcnt(hash);
 		while (dist-- > 0) hash |= math::msb(~hash & 0xffff);
 		hash |= (scale & 1);
-		hash = expect64(hash, math::lsb(hash));
+		hash = scale64(hash, math::lsb(hash));
 		for (u32 s = 0, h = 0; scale; scale ^= s, hash ^= s ^ h) {
 			s = math::msb(scale);
 			h = math::msb(hash & (s ^ (s - 1)));

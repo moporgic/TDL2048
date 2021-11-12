@@ -2292,7 +2292,7 @@ statistic run(utils::options::option opt) {
 
 			for (u32 k = 0, which = o.hash(); which < limit; which = o.hash() + block) {
 				while (which >= stage[k + 1]) k++;
-				o.expect(which | 1u);
+				o.scale(which | 1u);
 
 				a.set(which >= block ? o : -1ull);
 				for ((b = o).next(); best(b, stage[k], spec).safe(); b.next()) {
@@ -2321,7 +2321,7 @@ statistic run(utils::options::option opt) {
 
 			for (u32 k = 0, which = o.hash(); which < limit; which = o.hash() + block) {
 				while (which >= stage[k + 1]) k++;
-				o.expect(which | 1u);
+				o.scale(which | 1u);
 
 				for ((b = o).next(); best(b, stage[k], spec).safe(); b.next()) {
 					k += best.overflow(stage[k + 1]) ? 1 : 0;
