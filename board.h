@@ -816,6 +816,36 @@ public:
 		return hole;
 	}
 
+	inline constexpr u32 upscale(u32 n = 1, u32 u = 0) { return upscale64(n, u); }
+	inline constexpr u32 upscale64(u32 n = 1, u32 u = 0) {
+		u32 hash = hash64();
+		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
+		u32 hole = ~hash & mask;
+		u32 hmax = math::msb(hole);
+		hole = ((hmax << n) - 1) & ~(hmax - 1);
+		hash &= ~(math::lsb(hole) - 1);
+		for (u32 last = 0, tile = 0; hash; hash ^= last) {
+			last = math::msb(hash);
+			tile = math::tzcnt(last);
+			put64(where64(tile), (tile + n) & 0x0fu);
+		}
+		return hole;
+	}
+	inline constexpr u32 upscale80(u32 n = 1, u32 u = 0) {
+		u32 hash = hash80();
+		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
+		u32 hole = ~hash & mask;
+		u32 hmax = math::msb(hole);
+		hole = ((hmax << n) - 1) & ~(hmax - 1);
+		hash &= ~(math::lsb(hole) - 1);
+		for (u32 last = 0, tile = 0; hash; hash ^= last) {
+			last = math::msb(hash);
+			tile = math::tzcnt(last);
+			put80(where80(tile), (tile + n) & 0x1fu);
+		}
+		return hole;
+	}
+
 	inline constexpr u32 expect(u32 scale, u32 thres = 0) { return expect64(scale, thres); }
 	inline constexpr u32 expect64(u32 scale, u32 thres = 0) {
 		u32 hash = hash64();
