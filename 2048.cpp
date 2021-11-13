@@ -2199,8 +2199,45 @@ statistic run(utils::options::option opt) {
 		}
 		}(); break;
 
-	case to_hash("optimize:lambda"):
 	case to_hash("optimize:lambda-backward"): [&]() {
+		for (stats.init(opt); stats; stats++) {
+			board b;
+			u32 score = 0;
+			u32 opers = 0;
+
+			for (b.init(); best(b, feats, spec); b.next()) {
+				score += best.score();
+				opers += 1;
+				best >> path >> b;
+			}
+
+			for (u32 i = opers - 1; i >= opers - std::min(step, opers); i--) {
+				numeric z = 0;
+				for (u32 k = opers - 1; k > i; k--) {
+					path[k].estimate(feats, spec);
+					numeric r = path[k].score();
+					numeric v = path[k].value();
+					z = r + (lambda * z + (1 - lambda) * v);
+				}
+				path[i].instruct(z, alpha, feats, spec);
+			}
+			for (u32 i = opers - step - 1; i < opers; i--) {
+				numeric z = path[i + step].estimate(feats, spec);
+				for (u32 k = i + step - 1; k > i; k--) {
+					path[k].estimate(feats, spec);
+					numeric r = path[k].score();
+					numeric v = path[k].value();
+					z = r + (lambda * z + (1 - lambda) * v);
+				}
+				path[i].instruct(z, alpha, feats, spec);
+			}
+			path.clear();
+
+			stats.update(score, b.hash(), opers);
+		}
+		}(); break;
+
+	case to_hash("optimize:lambda"): [&]() {
 		for (stats.init(opt); stats; stats++) {
 			board b;
 			u32 score = 0;
