@@ -816,8 +816,8 @@ public:
 		return hole;
 	}
 
-	inline constexpr u32 upscale(u32 n = 1, u32 u = 0) { return upscale64(n, u); }
-	inline constexpr u32 upscale64(u32 n = 1, u32 u = 0) {
+	inline constexpr u32 advance(u32 n = 1, u32 u = 0) { return advance64(n, u); }
+	inline constexpr u32 advance64(u32 n = 1, u32 u = 0) {
 		u32 hash = hash64();
 		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
 		u32 hole = ~hash & mask;
@@ -831,7 +831,7 @@ public:
 		}
 		return hole;
 	}
-	inline constexpr u32 upscale80(u32 n = 1, u32 u = 0) {
+	inline constexpr u32 advance80(u32 n = 1, u32 u = 0) {
 		u32 hash = hash80();
 		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
 		u32 hole = ~hash & mask;
