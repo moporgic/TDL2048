@@ -348,23 +348,54 @@ num@st    = the number of small tiles
 ```
 </details>
 
-#### More Training Methods
+#### More Methods
 
 The default training mode is TD(0).
 
-To enable n-step TD(0), use ```-N``` to specify a step size.
+To enable n-step TD training, use ```-N``` to specify a step size.
 ```bash
-./2048 -n 4x6patt -t 1000 -N 10 # use 10-step TD(0) training
+./2048 -n 4x6patt -t 1000 -N 10 # use 10-step TD training
 ```
 
-To enable TD(λ), use ```-l``` to specify a lambda value.
+To enable TD(λ) training, use ```-l``` to specify a lambda value.
 ```bash
 ./2048 -n 4x6patt -t 1000 -l 0.5 # use TD(0.5) training
 ```
 
+To enable multistage TD(0), use ```-@``` to specify the stage thresholds.
+```bash
+./2048 -n 4x6patt@2 -@ 0,16384 -t 1000 -o 4x6patt@2.w # use 2-stage TD(0) training
+./2048 -n 4x6patt@2 -@ 0,16384 -e 1000 -i 4x6patt@2.w # testing the above network
+./2048 -n 4x6patt@4 -@ 0,16384,32768,49152 -t 1000 # 4 stages, 49152 = 32768+16384
+```
+
+To enable TD(0) training with carousel shaping, use ```-b``` to specify the block size.
+Note that differ from the original proposed one, this also applies to a single stage.
+```bash
+./2048 -n 4x6patt -b 2048 -t 1000 # block size is 2048, shaping up to 65536
+./2048 -n 4x6patt -b 2048 -L 49152 -t 1000 # shaping up to 32768+16384
+./2048 -n 4x6patt@2 -@ 0,32768 -b 16384 -t 1000 # also works together with multistage
+```
+
+To enable TD(0) training with restart, set the recipe mode as ```restart```.
+```bash
+./2048 -n 4x6patt -t 1000 mode=restart # use Matsuzaki's restart strategy
+```
+
+To enable optimistic TD training, set the initial value when declaring networks.
+```bash
+./2048 -n 4x6patt=320000/norm -t 1000 # initial V is 320000
+./2048 -n 8x6patt=5000 -t 1000 # initial V is 320000 (weight is initialized to 5000)
+```
+
+To enable testing with tile-downgrading, use ```-h``` the declare the threshold.
+```bash
+./2048 -n 4x6patt -e 1000 -h 32768 # start tile-downgrading once 32768-tile is reached
+```
+
 <details><summary>Show advanced options</summary><br>
 
-The three training modes, TD, n-step TD, and TD(λ), are with both forward and backward training variants. By default, TD and n-step TD use forward, while TD(λ) uses backward training.
+The training modes, TD, n-step TD, TD(λ), and MSTD, are with both forward and backward training variants. By default, TD and n-step TD use forward, while TD(λ) uses backward training.
 
 Compared with forward training, backward training for TD and n-step is slightly inefficient in terms of speed, but it achieves a higher average score with the same learned episodes.
 
@@ -754,6 +785,14 @@ grep local 2048.x | ./2048-parse.sh | ./2048-thick.sh 10 # average every 10 bloc
 ```
 </details>
 
+<details><summary>2048-stress.sh - stress test for CPU, cache, and memory</summary>
+
+As TDL2048+ is highly optimized, it can be used as a tool for system stability testing, by stressing CPU, cache, and memory.
+```bash
+./2048-stress.sh $(nproc) # stress all available threads
+```
+</details>
+
 ## Development
 
 TDL2048+ is written in C++14 with optimizations including [AVX2](https://en.wikipedia.org/wiki/Advanced_Vector_Extensions#Advanced_Vector_Extensions_2), [BMI2](https://en.wikipedia.org/wiki/Bit_manipulation_instruction_set#BMI2_(Bit_Manipulation_Instruction_Set_2)), [bitwise operations](https://en.wikipedia.org/wiki/Bitwise_operation), [function pointer](https://en.wikipedia.org/wiki/Function_pointer), [reinterpret cast](https://en.cppreference.com/w/cpp/language/reinterpret_cast), [template specialization](https://en.cppreference.com/w/cpp/language/template_specialization), [template with std::enable_if](https://en.cppreference.com/w/cpp/types/enable_if), [constexpr function](https://en.cppreference.com/w/cpp/language/constexpr), and so on. Development instructions will be released soon.
@@ -1077,5 +1116,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 * W. Jaśkowski, “Mastering 2048 with delayed temporal coherence learning, multistage weight promotion, redundant encoding and carousel shaping,” IEEE Trans. Games, vol. 10, no. 1, pp. 3–14, Mar. 2018. DOI: [10.1109/TCIAIG.2017.2651887](https://doi.org/10.1109/TCIAIG.2017.2651887).
 * K. Matsuzaki, “Systematic selection of N tuple networks with consideration of interinfluence for game 2048,” in Proc. 21st Int. Conf. Technol. Appl. Artif. Intell., Hsinchu, Taiwan, 2016, pp. 186–193. DOI: [10.1109/TAAI.2016.7880154](https://doi.org/10.1109/TAAI.2016.7880154).
 * H. Guei, T.-H. Wei, and I-C. Wu, “2048-like games for teaching reinforcement learning,” ICGA J., vol. 42, no. 1, pp. 14–37, May 28, 2020. DOI: [10.3233/ICG-200144](https://doi.org/10.3233/ICG-200144).
+* K. Matsuzaki, “Developing a 2048 player with backward temporal coherence learning and restart,” in Proc. 15th Int. Conf. Adv. Comput. Games, Leiden, The Netherlands, 2017, pp. 176–187. DOI: [10.1007/978-3-319-71649-7_15](https://doi.org/10.1007/978-3-319-71649-7_15).
+* H. Guei, L.-P. Chen and I-C. Wu, "Optimistic Temporal Difference Learning for 2048," in IEEE Trans. Games, Sep 3, 2021. DOI: [10.1109/TG.2021.3109887](https://doi.org/10.1109/TG.2021.3109887).
 * K.-H. Yeh. “2048 AI.” [Online]. Available: https://github.com/tnmichael309/2048AI.
 * K.-C. Wu. “2048-c.” [Online]. Available: https://github.com/kcwu/2048-c.
+* H. Guei. “moporgic/TDL2048+.” [Online]. Available: https://github.com/moporgic/TDL2048.
