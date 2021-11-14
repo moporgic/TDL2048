@@ -2477,7 +2477,11 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["step"] = next_opt("5");
 			break;
 		case to_hash("-b"): case to_hash("--block"):
-			opts["block"] = next_opts("2048");
+			opts["block"] = (opts[""] = next_opts("2048")).front();
+			if (opts[""].size() > 1) (opts["limit"] = opts[""]).pop_front();
+			break;
+		case to_hash("-L"): case to_hash("--limit"):
+			opts["limit"] = next_opt("65536");
 			break;
 		case to_hash("-@"): case to_hash("--stage"):
 			opts["stage"] = next_opts("0,16384");
@@ -2589,12 +2593,11 @@ utils::options parse(int argc, const char* argv[]) {
 			opts[recipe].remove(item);
 		std::string what = form + ": " + opts[recipe];
 		// set other options (invisible in the display)
-		for (std::string item : {"alpha", "lambda", "step", "stage", "block", "thread", "make", "search"})
+		for (std::string item : {"alpha", "lambda", "step", "stage", "block", "limit", "thread", "make", "search"})
 			if (opts(item)) opts[recipe][item] << opts[item];
 		for (utils::options::opinion item : opts["options"])
 			opts[recipe][item.label()] << item.value();
 		if (opts("alpha", "norm")) opts[recipe]["norm"] << opts["alpha"]["norm"];
-		if (opts("block", "limit")) opts[recipe]["limit"] << opts["block"]["limit"];
 		// set the final mode and the display
 		opts[recipe]["mode"] = mode;
 		opts[recipe]["what"] = what;
