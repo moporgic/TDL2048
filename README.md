@@ -1151,7 +1151,7 @@ TDL2048+ is under development by [Hung Guei](mailto:hguei@moporgic.info) since J
 
 ## Acknowledgments
 
-The author is with [Computer Games and Intelligence (CGI) Lab](https://cgilab.nctu.edu.tw/), [NYCU, Taiwan](https://www.nycu.edu.tw/en/), under the supervision of Professor [I-Chen Wu](https://cgilab.nctu.edu.tw/~icwu/).
+The author is with [Computer Games and Intelligence (CGI) Lab](https://cgilab.nctu.edu.tw/), [Department of Computer Science](https://www.cs.nycu.edu.tw/), [National Yang Ming Chiao Tung University (NYCU)](https://www.nycu.edu.tw/en/), under the supervision of Professor [I-Chen Wu](https://cgilab.nctu.edu.tw/~icwu/).
 
 Some parts of this program, e.g., the 16-bit floating-point support, use other open sources.
 
