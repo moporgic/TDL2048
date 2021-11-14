@@ -2099,20 +2099,19 @@ statistic run(utils::options::option opt) {
 				best >> path >> b;
 				b.next();
 			}
-			while (best(b, feats, spec)) {
-				state& update = path[opers - step];
-				rsum -= update.info();
-				update.instruct(rsum + best.esti(), alpha, feats, spec);
+			for (u32 i = 0; best(b, feats, spec); i++) {
+				rsum -= path[i].info();
+				path[i].instruct(rsum + best.esti(), alpha, feats, spec);
 				rsum += best.score();
 				score += best.score();
 				opers += 1;
 				best >> path >> b;
 				b.next();
+
 			}
 			for (u32 i = opers - std::min(step, opers); i < opers; i++) {
-				state& update = path[i];
-				rsum -= update.info();
-				update.instruct(rsum, alpha, feats, spec);
+				rsum -= path[i].info();
+				path[i].instruct(rsum, alpha, feats, spec);
 			}
 			path.clear();
 
@@ -2133,18 +2132,15 @@ statistic run(utils::options::option opt) {
 			}
 
 			u32 rsum = 0;
-			for (u32 i = opers - 1; i >= opers - std::min(step, opers); i--) {
-				state& update = path[i];
-				update.instruct(rsum, alpha, feats, spec);
-				rsum += update.info();
+			for (i32 i = opers - 1; i >= std::max<i32>(opers - step, 0); i--) {
+				path[i].instruct(rsum, alpha, feats, spec);
+				rsum += path[i].info();
 			}
-			for (u32 i = opers - 1; i >= step; i--) {
-				state& source = path[i];
-				rsum -= source.info();
-				numeric esti = source.estimate(feats, spec);
-				state& update = path[i - step];
-				update.instruct(rsum + esti, alpha, feats, spec);
-				rsum += update.info();
+			for (i32 i = opers - step - 1; i >= 0; i--) {
+				rsum -= path[i + step].info();
+				numeric esti = path[i + step].estimate(feats, spec);
+				path[i].instruct(rsum + esti, alpha, feats, spec);
+				rsum += path[i].info();
 			}
 			path.clear();
 
@@ -2165,33 +2161,27 @@ statistic run(utils::options::option opt) {
 				best >> path >> b;
 				b.next();
 			}
-			while (best(b, feats, spec)) {
+			for (u32 i = 0; best(b, feats, spec); i++) {
 				numeric z = best.esti();
-				for (u32 k = 1; k < step; k++) {
-					state& source = path[opers - k];
-					source.estimate(feats, spec);
-					numeric r = source.score();
-					numeric v = source.value();
+				for (u32 k = opers - 1; k > i; k--) {
+					path[k].estimate(feats, spec);
+					numeric r = path[k].score(), v = path[k].value();
 					z = r + (lambda * z + (1 - lambda) * v);
 				}
-				state& update = path[opers - step];
-				update.instruct(z, alpha, feats, spec);
+				path[i].instruct(z, alpha, feats, spec);
 				score += best.score();
 				opers += 1;
 				best >> path >> b;
 				b.next();
 			}
-			for (u32 i = std::min(step, opers); i > 0; i--) {
+			for (u32 i = opers - std::min(step, opers); i < opers; i++) {
 				numeric z = 0;
-				for (u32 k = 1; k < i; k++) {
-					state& source = path[opers - k];
-					source.estimate(feats, spec);
-					numeric r = source.score();
-					numeric v = source.value();
+				for (u32 k = opers - 1; k > i; k--) {
+					path[k].estimate(feats, spec);
+					numeric r = path[k].score(), v = path[k].value();
 					z = r + (lambda * z + (1 - lambda) * v);
 				}
-				state& update = path[opers - i];
-				update.instruct(z, alpha, feats, spec);
+				path[i].instruct(z, alpha, feats, spec);
 			}
 			path.clear();
 
@@ -2211,22 +2201,20 @@ statistic run(utils::options::option opt) {
 				best >> path >> b;
 			}
 
-			for (u32 i = opers - 1; i >= opers - std::min(step, opers); i--) {
+			for (i32 i = opers - 1; i >= std::max<i32>(opers - step, 0); i--) {
 				numeric z = 0;
-				for (u32 k = opers - 1; k > i; k--) {
+				for (i32 k = opers - 1; k > i; k--) {
 					path[k].estimate(feats, spec);
-					numeric r = path[k].score();
-					numeric v = path[k].value();
+					numeric r = path[k].score(), v = path[k].value();
 					z = r + (lambda * z + (1 - lambda) * v);
 				}
 				path[i].instruct(z, alpha, feats, spec);
 			}
-			for (u32 i = opers - step - 1; i < opers; i--) {
+			for (i32 i = opers - step - 1; i >= 0; i--) {
 				numeric z = path[i + step].estimate(feats, spec);
-				for (u32 k = i + step - 1; k > i; k--) {
+				for (i32 k = i + step - 1; k > i; k--) {
 					path[k].estimate(feats, spec);
-					numeric r = path[k].score();
-					numeric v = path[k].value();
+					numeric r = path[k].score(), v = path[k].value();
 					z = r + (lambda * z + (1 - lambda) * v);
 				}
 				path[i].instruct(z, alpha, feats, spec);
