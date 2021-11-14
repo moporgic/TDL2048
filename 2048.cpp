@@ -1891,6 +1891,9 @@ struct statistic {
 	inline operator bool() const { return info.loop <= info.limit; }
 	inline bool checked() const { return (info.loop % info.unit) == 0; }
 
+	struct stat { u32 score, scale, opers; };
+	void update(const stat& stat) { update(stat.score, stat.scale, stat.opers); }
+
 	void update(u32 score, u32 scale, u32 opers) {
 		local.score += score;
 		local.scale |= scale;
@@ -2249,8 +2252,7 @@ statistic run(utils::options::option opt) {
 		numeric at = opt["at"].value(0.5);
 
 		for (stats.init(opt); stats; stats++) {
-			struct stat { u32 score, scale, opers; };
-			once<stat> stat;
+			once<statistic::stat> stat;
 			state b, a;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2272,7 +2274,7 @@ statistic run(utils::options::option opt) {
 			} while (path.size() >= L);
 			path.clear();
 
-			stats.update(stat.score, stat.scale, stat.opers);
+			stats.update(stat);
 		}
 		}(); break;
 
@@ -2281,8 +2283,7 @@ statistic run(utils::options::option opt) {
 		numeric at = opt["at"].value(0.5);
 
 		for (stats.init(opt); stats; stats++) {
-			struct stat { u32 score, scale, opers; };
-			once<stat> stat;
+			once<statistic::stat> stat;
 			state b;
 			u32 score = 0;
 			u32 opers = 0;
@@ -2307,7 +2308,7 @@ statistic run(utils::options::option opt) {
 			} while (path.size() >= L);
 			path.clear();
 
-			stats.update(stat.score, stat.scale, stat.opers);
+			stats.update(stat);
 		}
 		}(); break;
 
@@ -2316,8 +2317,7 @@ statistic run(utils::options::option opt) {
 	case to_hash("optimize:stage"):
 	case to_hash("optimize:stage-forward"): [&]() {
 		for (stats.init(opt); stats; stats++) {
-			struct stat { u32 score, scale, opers; };
-			once<stat> stat;
+			once<statistic::stat> stat;
 			state b, a, o; o.next();
 			u32 score = 0;
 			u32 opers = 0;
@@ -2340,15 +2340,14 @@ statistic run(utils::options::option opt) {
 				stat = {score, b.hash(), opers};
 			}
 
-			stats.update(stat.score, stat.scale, stat.opers);
+			stats.update(stat);
 		}
 		}(); break;
 
 	case to_hash("optimize:block-backward"):
 	case to_hash("optimize:stage-backward"): [&]() {
 		for (stats.init(opt); stats; stats++) {
-			struct stat { u32 score, scale, opers; };
-			once<stat> stat;
+			once<statistic::stat> stat;
 			state b, o; o.next();
 
 			for (u32 k = 0, which = o.hash(); which < limit; which = o.hash() + block) {
@@ -2371,7 +2370,7 @@ statistic run(utils::options::option opt) {
 				stat = {score, b.hash(), opers};
 			}
 
-			stats.update(stat.score, stat.scale, stat.opers);
+			stats.update(stat);
 		}
 		}(); break;
 
