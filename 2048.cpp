@@ -65,6 +65,7 @@ Parameters:
   -N, --step STEP           the n-step, default is 1 if LAMBDA is 0; otherwise 5
   -b, --block BLOCK         the minimal learning block, default is disabled
   -@, --stage THRES         the multi-stage thresholds, default is disabled
+  -h, --shift THRES         the tile-downgrading threshold, default is 65536
   -u, --unit UNIT           the statistic display interval, default is 1000
   -w, --win TILE            the winning threshold, default is 2048
   -%, --info                whether to show the summary, default is auto
@@ -2388,26 +2389,32 @@ statistic run(utils::options::option opt) {
 		}
 		}(); break;
 
-	case to_hash("evaluate:stage"): [&]() {
+	case to_hash("evaluate:stage"):
+	case to_hash("evaluate:shift"): [&]() {
+		u32 shift = opt["shift"].value(65536);
+		u32 limit = opt["shift-limit"].value(-1);
+
 		for (stats.init(opt); stats; stats++) {
 			board b, x;
 			u32 score = 0;
 			u32 opers = 0;
+			u32 t = shift;
 			u32 k = 0;
 
-			for (b.init(); best(b, stage[k], spec).safe(); b.next()) {
-				if (best.overflow(stage[k + 1])) k += 1;
+			for (b.init(); best(b, stage[k], spec).validate(t); b.next()) {
+				k += best.overflow(stage[k + 1]) ? 1 : 0;
 				score += best.score();
 				opers += 1;
 				best >> b;
 			}
-			while ((x = b).shift80(), stage[k] > x.hash()) k--;
-			while ((x = b).shift80(), best(x, stage[k], spec)) {
-				if (best.overflow(stage[k + 1])) k += 1;
-				score += best.score();
-				opers += 1;
-				b.move80(best.opcode());
-				b.next80();
+			for (u32 n = 1; best; n += 1) {
+				for ((x = b).shift80(n); stage[k] > x.hash(); k -= 1);
+				for (t = n < limit ? t : 65536;
+					(x = b).shift80(n), best(x, stage[k], spec).validate(t); b.next80()) {
+					k += best.overflow(stage[k + 1]) ? 1 : 0;
+					score += b.move80(best.opcode());
+					opers += 1;
+				}
 			}
 
 			stats.update(score, b.hash80(), opers);
@@ -2485,6 +2492,9 @@ utils::options parse(int argc, const char* argv[]) {
 			break;
 		case to_hash("-@"): case to_hash("--stage"):
 			opts["stage"] = next_opts("0,16384");
+			break;
+		case to_hash("-h"): case to_hash("--shift"):
+			opts["shift"] = next_opts("32768");
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
@@ -2572,12 +2582,14 @@ utils::options parse(int argc, const char* argv[]) {
 		bool lambda = (opts[recipe]("lambda") || opts("lambda")) && optimize;
 		bool step   = (opts[recipe]("step")   || opts("step")) && optimize;
 		bool cohen  = (alpha.value(0) >= 1.0  || alpha("coh")) && optimize;
+		bool shift  = (opts[recipe]("shift")  || opts("shift")) && evaluate;
 		if (stage)       type = "stage";
 		else if (block)  type = "block";
 		else if (lambda) type = step ? "lambda-forward" : "lambda";
 		else if (step)   type = "step";
 		else if (cohen)  type = mode.empty() ? "forward" : "";
-		if (type.size() && (mode == "backward" || mode == "forward"))
+		else if (shift)  type = "shift";
+		if (type.size() && optimize && (mode == "backward" || mode == "forward"))
 			mode = type.substr(0, type.find('-')) + '-' + mode;
 		if (mode.empty()) mode = type.size() ? type : form;
 		// standardize mode and remove form from built-in
