@@ -2005,11 +2005,8 @@ statistic run(utils::options::option opt) {
 	numeric lambda = method::lambda(opt["lambda"].value(0));
 	u32 step = method::step(opt["step"].value(lambda ? 5 : 1));
 
-	u32 block = opt["block"].value(2048);
-	u32 limit = opt["limit"].value(65536);
+	u32 block = opt["block"].value(2048), limit = opt["limit"].value(65536);
 	list<utils::stage> stage = utils::stage::parse(opt["stage"].value("0"));
-	u32 thres = opt["thres"].value(10);
-	numeric where = opt["where"].value(0.5);
 
 	switch (to_hash(opt["mode"])) {
 	case to_hash("optimize"):
@@ -2249,6 +2246,9 @@ statistic run(utils::options::option opt) {
 
 	case to_hash("optimize:restart"):
 	case to_hash("optimize:restart-forward"): [&]() {
+		u32 thres = opt["thres"].value(10);
+		numeric where = opt["where"].value(0.5);
+
 		for (stats.init(opt); stats; stats++) {
 			state b, a;
 			u32 score = 0;
@@ -2276,6 +2276,9 @@ statistic run(utils::options::option opt) {
 		}(); break;
 
 	case to_hash("optimize:restart-backward"): [&]() {
+		u32 thres = opt["thres"].value(10);
+		numeric where = opt["where"].value(0.5);
+
 		for (stats.init(opt); stats; stats++) {
 			state b;
 			u32 score = 0;
