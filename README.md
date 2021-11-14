@@ -348,71 +348,6 @@ num@st    = the number of small tiles
 ```
 </details>
 
-#### More Methods
-
-The default training mode is TD(0).
-
-To enable n-step TD training, use ```-N``` to specify a step size.
-```bash
-./2048 -n 4x6patt -t 1000 -N 10 # use 10-step TD training
-```
-
-To enable TD(λ) training, use ```-l``` to specify a lambda value.
-```bash
-./2048 -n 4x6patt -t 1000 -l 0.5 # use TD(0.5) training
-```
-
-To enable multistage TD(0), use ```-@``` to specify the stage thresholds.
-```bash
-./2048 -n 4x6patt@2 -@ 0,16384 -t 1000 -o 4x6patt@2.w # use 2-stage TD(0) training
-./2048 -n 4x6patt@2 -@ 0,16384 -e 1000 -i 4x6patt@2.w # testing the above network
-./2048 -n 4x6patt@4 -@ 0,16384,32768,49152 -t 1000 # 4 stages, 49152 = 32768+16384
-```
-
-To enable TD(0) training with carousel shaping, use ```-b``` to specify the block size.
-Note that differ from the original proposed one, this also applies to a single stage.
-```bash
-./2048 -n 4x6patt -b 2048 -t 1000 # block size is 2048, shaping up to 65536
-./2048 -n 4x6patt -b 2048 -L 49152 -t 1000 # shaping up to 32768+16384
-./2048 -n 4x6patt@2 -@ 0,32768 -b 16384 -t 1000 # also works together with multistage
-```
-
-To enable TD(0) training with restart, set the recipe mode as ```restart```.
-```bash
-./2048 -n 4x6patt -t 1000 mode=restart # use Matsuzaki's restart strategy
-```
-
-To enable optimistic TD training, set the initial value when declaring networks.
-```bash
-./2048 -n 4x6patt=320000/norm -t 1000 # initial V is 320000
-./2048 -n 8x6patt=5000 -t 1000 # initial V is 320000 (weight is initialized to 5000)
-```
-
-To enable testing with tile-downgrading, use ```-h``` the declare the threshold.
-```bash
-./2048 -n 4x6patt -e 1000 -h 32768 # start tile-downgrading once 32768-tile is reached
-```
-
-<details><summary>Show advanced options</summary><br>
-
-The training modes, TD, n-step TD, TD(λ), and MSTD, are with both forward and backward training variants. By default, TD and n-step TD use forward, while TD(λ) uses backward training.
-
-Compared with forward training, backward training for TD and n-step is slightly inefficient in terms of speed, but it achieves a higher average score with the same learned episodes.
-
-Option ```-tt``` specifies an advanced training mode as follows.
-```bash
-./2048 -n 4x6patt -t 1000 -tt backward # backward TD(0)
-./2048 -n 4x6patt -t 1000 -tt step-backward -N 5 # backward 5-step TD(0)
-```
-
-You may enable the forward TD(λ) with ```-tt lambda-forward``` with a step size with ```-N``` as follows.
-```bash
-./2048 -n 4x6patt -t 1000 -tt lambda-forward -l 0.5 -N 5 # forward 5-step TD(0.5)
-```
-
-In addition, ensemble learning is supported. Check the loading options below for more details.
-</details>
-
 #### Learning Rate and TC
 
 The learning rate is 0.1 by default, but you may want to manually modulate the value especially when the network is saturated. This can be done by using ```-a``` as follows.
@@ -437,6 +372,118 @@ However, you may use ```norm``` together with ```-a``` to override the default b
 ./2048 -n 4x6patt -t 1000 -a 0.0025 norm=1 # adjust each weight with a rate of 0.0025/1
 ```
 </details>
+
+#### TD(λ) and N-Step TD
+
+The default training method is 1-step TD(0). Follow instructions below to enable other methods.
+
+To enable n-step TD training, use ```-N``` to specify a step size.
+```bash
+./2048 -n 4x6patt -t 1000 -N 10 # use 10-step TD training
+```
+
+To enable TD(λ) training, use ```-l``` to specify a lambda value.
+```bash
+./2048 -n 4x6patt -t 1000 -l 0.5 # use TD(0.5) training
+```
+
+#### Multistage TD
+
+Multistage TD is a kind of hierarchical TD learning that divides the entire episode into multiple stages, in which each stage has an independent value function. This technique significantly improves the performance at the cost of additional storage for stages.
+
+To enable multistage TD(0), use ```-@``` to specify the stage thresholds.
+```bash
+./2048 -n 4x6patt@2 -@ 0,16384 -t 1000 -o 4x6patt@2.w # use 2-stage TD(0) training
+./2048 -n 4x6patt@2 -@ 0,16384 -e 1000 -i 4x6patt@2.w # testing the above network
+./2048 -n 4x6patt@4 -@ 0,16384,32768,49152 -t 1000 # 4 stages, 49152 = 32768+16384
+```
+
+<details><summary>Show advanced options</summary><br>
+
+If the base network has an alias, its multistage form can be declared with ```@N```, where ```N``` is the number of stages. However, if the base network does not have an alias, use ```|``` operator to separate network stages. For example, if the base network is ```"01234 45678 01245 45689"```, its 2-stage form can be declared as follows.
+```bash
+# the 2-stage form of "01234 45678 01245 45689"
+./2048 -n "01234|00000000 45678|00000000 01245|00000000 45689|00000000"
+          "01234|10000000 45678|10000000 01245|10000000 45689|10000000"
+```
+
+Note that due to a current limitations, each stage must have the same structure.
+</details>
+
+#### Carousel Shaping and Restart
+
+Carousel shaping is a technique that prevents the network from overfiting at the beginning of the episodes, by starting with non-initial states.
+
+To enable TD(0) training with carousel shaping, use ```-b``` to specify the block size. Note that differ from the originally proposed method, the implementation here also applies to a single stage.
+```bash
+./2048 -n 4x6patt -b 2048 -t 1000 # block size is 2048
+./2048 -n 4x6patt@2 -@ 0,32768 -b 16384 -t 1000 # also works together with multistage
+```
+
+Similar to the carousel shaping, restart is a technique that uses the states recorded in the previous episode to restart the game, to focus on the later game stages.
+
+To enable TD(0) training with restart, set the training mode as ```restart```.
+```bash
+./2048 -n 4x6patt -t 1000 -tt restart # use restart strategy
+```
+
+<details><summary>Show advanced options</summary><br>
+
+When using carousel shaping ```-b```, each episode will run until a 65536-tile is reached by default.
+However, the limitation of shaping can be changed by specifying ```-L``` as follows.
+```bash
+./2048 -n 4x6patt -b 2048 -L 49152 -t 1000 # shaping up to 32768+16384
+```
+
+When using restart, options ```L``` and ```at``` can be specified to control its behavior, as shown below.
+```bash
+# restart when episode length >= 10, at 50% of the recorded states (default)
+./2048 -t 1000 mode=restart L=10 at=0.5
+# restart when episode length >= 100, at 30% of the recorded states
+./2048 -t 1000 mode=restart L=100 at=0.3
+```
+</details>
+
+#### Optimistic Initialization
+
+To enable optimistic initialization, set the initial value when declaring networks.
+```bash
+./2048 -n 4x6patt=320000/norm -t 1000 # initial V is 320000
+./2048 -n 8x6patt=5000 -t 1000 # initial V is 320000 (weight is initialized to 5000)
+```
+
+<details><summary>Show advanced options</summary><br>
+
+Note that when using ```/norm```, the value will be evenly distributed to weights. For example, a ```4x6patt``` has 32 features, setting ```320000/norm``` will actully initialize each weights as ```10000```.
+
+Due to a framework limitation, the ```/norm``` will use the total number of features of all stages when combining OI with multistage network. To prevent network from being unexpectedly initialized, please declare the weight value explicitly for multistage networks, e.g., ```4x6patt@2=10000```.
+</details>
+
+#### Ensemble Learning
+
+By using ensemble learning, multiple networks can be averaged to improve the final performance.
+To enable ensemble learning, specify multiple weight files as input as follows.
+```bash
+./2048 -n 4x6patt -e 100 -i 4x6-0.w 4x6-1.w # evaluate the ensemble of 2 x 4x6patt
+```
+Check the loading options below for more details about using ensemble learning.
+
+#### Forward and Backward Training
+
+Training modes (TD, n-step TD, TD(λ), MSTD, and restart) are implemented with both forward and backward variants. These methods use forward variants by default, except of TD(λ).
+
+Compared with forward training, backward training for TD and n-step is slightly inefficient in terms of speed, but it achieves a higher average score with the same learned episodes.
+
+Option ```-tt``` specifies an advanced training mode as follows.
+```bash
+./2048 -n 4x6patt -t 1000 -tt backward # backward TD(0)
+./2048 -n 4x6patt -t 1000 -tt step-backward -N 5 # backward 5-step TD(0)
+```
+
+You may enable the forward TD(λ) with ```-tt lambda-forward``` with a step size with ```-N``` as follows.
+```bash
+./2048 -n 4x6patt -t 1000 -tt lambda-forward -l 0.5 -N 5 # forward 5-step TD(0.5)
+```
 
 #### Expectimax Search
 
@@ -479,6 +526,19 @@ In addition, it is possible to allow the search to use a deeper TT cache when av
 
 More specifically, if the search requires the 3-ply result of a puzzle, while TT only caches the 5-ply result, setting ```peek``` allows the search to directly obtain the 5-ply result for current use.
 </details>
+
+#### Tile-Downgrading
+
+Tile-downgrading is a technique that searches states by translating them into downgraded states, which can improve the performance when reaching large tiles.
+
+To enable testing with tile-downgrading, use ```-h``` the declare the threshold.
+```bash
+./2048 -n 4x6patt -i 4x6patt.w -e 10 -h 32768 # activate once 32768-tile is reached
+./2048 -n 4x6patt -i 4x6patt.w -e 10 -h 49152 # threshold is 32768-tile + 16384-tile
+./2048 -n 4x6patt -i 4x6patt.w -e 10 -d 2p -h 32768 # together with expectimax search
+```
+
+Note that this is necessary for 65536-tiles, since n-tuple networks do not recognize them.
 
 #### Saving/Loading and Logging
 
