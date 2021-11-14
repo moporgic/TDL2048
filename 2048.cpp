@@ -66,15 +66,11 @@ Parameters:
   -b, --block BLOCK         the minimal learning block, default is disabled
   -@, --stage THRES         the multi-stage thresholds, default is disabled
   -h, --shift THRES         the tile-downgrading threshold, default is 65536
+  -d, --depth DEPTH [OPT]   enable the search with DEPTH layers (1p,2p,3p,...)
+  -c, --cache SIZE          set the transposition table size
   -u, --unit UNIT           the statistic display interval, default is 1000
   -w, --win TILE            the winning threshold, default is 2048
   -%, --info                whether to show the summary, default is auto
-
-Executions:
-  -s, --seed [SEED]         set the seed for the pseudo-random number
-  -p, --parallel [THREAD]   enable lock-free parallelism for all recipes
-  -d, --depth DEPTH [OPT]   enable the search with DEPTH layers (1p,2p,3p,...)
-  -c, --cache SIZE          set the transposition table size
 
 Input/Output:
   -i, --input [FILE]...     specify inputs, support weight.w and cache.c
@@ -82,6 +78,8 @@ Input/Output:
   -io [FILE]...             alias for -i [FILE]... -o [FILE]...
 
 Miscellaneous:
+  -s, --seed [SEED]         set the seed for the pseudo-random number
+  -p, --parallel [THREAD]   enable lock-free parallelism for all recipes
   -x, --options [OPT]...    specify other options as KEY[=VALUE]
   -#, --comment [TEXT]...   specify command line comments
   -?, --help                display this message and quit
