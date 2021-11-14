@@ -2270,6 +2270,7 @@ statistic run(utils::options::option opt) {
 
 				stat = {score, b.hash(), opers};
 			} while (path.size() >= L);
+			path.clear();
 
 			stats.update(stat.score, stat.scale, stat.opers);
 		}
@@ -2304,6 +2305,7 @@ statistic run(utils::options::option opt) {
 
 				stat = {score, b.hash(), opers};
 			} while (path.size() >= L);
+			path.clear();
 
 			stats.update(stat.score, stat.scale, stat.opers);
 		}
