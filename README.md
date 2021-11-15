@@ -18,8 +18,20 @@ A highly effective bitboard is implemented, which features with
 
 ### Performance
 
+As of September 2021, TDL2048+ [achieves the state-of-the-art results](https://doi.org/10.1109/TG.2021.3109887) (in terms of average score and reaching rates of large tiles) by using a 2-stage 8x6-tuple network, trained by optimistic TD learning (OTD), tested by a 6-ply tile-downgrading (DG) expectimax search.
+|Search Depth|   Score|8192 [%]|16384 [%]|32768 [%]|  # Games|
+|------------|--------|-------:|--------:|--------:|--------:|
+|1-ply w/ DG | 412,785|  97.24%|   85.39%|   30.16%|1,000,000|
+|2-ply w/ DG | 513,301|  99.17%|   94.40%|   48.92%|  100,000|
+|3-ply w/ DG | 563,316|  99.63%|   96.88%|   57.90%|   10,000|
+|4-ply w/ DG | 586,720|  99.60%|   98.60%|   62.00%|    1,000|
+|5-ply w/ DG | 608,679|  99.80%|   97.80%|   67.40%|      100|
+|6-ply w/ DG | 625,377|  99.80%|   98.80%|   72.00%|      100|
+
+In addition, for sufficiently large tests, 65536-tiles are reached at a rate of 0.02%.
+
 As of April 2021, TDL2048+ is the most efficient framework for 2048 in terms of speed.
-Its single-thread (ST) and multi-thread (MT) speed (moves/s) are summarized as follows.
+Its single-thread (ST) and multi-thread (MT) speed (moves/s) for the 4x6-tuple network are summarized as follows.
 
 |Processor         |ST Training|ST  Testing|MT Training|MT  Testing|
 |------------------|----------:|----------:|----------:|----------:|
