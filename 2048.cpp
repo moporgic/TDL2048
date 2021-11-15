@@ -2411,7 +2411,7 @@ statistic run(utils::options::option opt) {
 			}
 			for (u32 n = 1; best; n += 1) {
 				for ((x = b).shift80(n); stage[k] > x.hash(); k -= 1);
-				for (t = n < limit ? t : 65536;
+				for (t = (n <= limit) ? t : 65536;
 					(x = b).shift80(n), best(x, stage[k], spec).validate(t); b.next80()) {
 					k += best.overflow(stage[k + 1]) ? 1 : 0;
 					score += b.move80(best.opcode());
