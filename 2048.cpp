@@ -2563,8 +2563,9 @@ utils::options parse(int argc, const char* argv[]) {
 			std::exit(0);
 			break;
 		default:
-			label = label.substr(label.find_first_not_of('-'));
-			opts["options"][label] += next_opts();
+			if (label.find('-') == 0) label += ('=' + next_opt());
+			opts["options"] += label.substr(label.find_first_not_of('-'));
+			opts["options"] += next_opts();
 			break;
 		}
 	}
