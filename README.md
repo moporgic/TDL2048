@@ -442,10 +442,11 @@ To enable TD(0) training with restart, set the training mode as ```restart```.
 
 <details><summary>Show advanced options</summary><br>
 
-When using carousel shaping ```-b```, each episode will run until a 65536-tile is reached by default.
-However, the limitation of shaping can be changed by specifying ```-L``` as follows.
+When using carousel shaping ```-b```, each episode will run until a 65536-tile is reached by default. More specifically, when an episode ends at 16384-tile+8192-tile, a new episode with 16384-tile+8192-tile+2048-tile will start. This process continues until it reaches the upper bound of shaping, i.e., 65536-tile by default.
+
+To change the upper bound of shaping, specify the tiles as follows.
 ```bash
-./2048 -n 4x6patt -b 2048 -L 49152 -t 1000 # shaping up to 32768+16384
+./2048 -n 4x6patt -b 2048 49152 -t 1000 # block size 2048, shape up to 32768+16384
 ```
 
 When using restart, options ```L``` and ```at``` can be specified to control its behavior, as shown below.

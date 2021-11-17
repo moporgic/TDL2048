@@ -2486,9 +2486,8 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["step"] = next_opt("5");
 			break;
 		case to_hash("-b"): case to_hash("--block"):
-			opts["block"] = (opts[""] = next_opts("2048")).front();
-			if (opts[""].size() > 1) (opts["limit"] = opts[""]).pop_front();
-			break;
+			opts["block"] = next_opt("2048");
+			// no break, limit can be declared after block
 		case to_hash("-L"): case to_hash("--limit"):
 			opts["limit"] = next_opt("65536");
 			break;
