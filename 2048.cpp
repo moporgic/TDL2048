@@ -2479,16 +2479,14 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["alpha"] = next_opts("1.0");
 			break;
 		case to_hash("-l"): case to_hash("--lambda"):
-			opts["lambda"] = (opts[""] = next_opts("0.5")).front();
-			if (opts[""].size() > 1) (opts["step"] = opts[""]).pop_front();
+			opts["lambda"] = next_opt("0.5");
+			if ((opts[""] = next_opts()).size()) opts["step"] = opts[""];
 			break;
 		case to_hash("-N"): case to_hash("--step"):
 			opts["step"] = next_opt("5");
 			break;
 		case to_hash("-b"): case to_hash("--block"):
 			opts["block"] = next_opt("2048");
-			// no break, limit can be declared after block
-		case to_hash("-L"): case to_hash("--limit"):
 			opts["limit"] = next_opt("65536");
 			break;
 		case to_hash("-@"): case to_hash("--stage"):
