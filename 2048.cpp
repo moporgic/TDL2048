@@ -2394,7 +2394,7 @@ statistic run(utils::options::option opt) {
 	case to_hash("evaluate:stage"):
 	case to_hash("evaluate:shift"): [&]() {
 		u32 shift = opt["shift"].value(65536);
-		u32 limit = opt["shift-limit"].value(-1);
+		u32 stint = opt["stint"].value(1);
 
 		for (stats.init(opt); stats; stats++) {
 			board b, x;
@@ -2411,7 +2411,7 @@ statistic run(utils::options::option opt) {
 			}
 			for (u32 n = 1; best; n += 1) {
 				for ((x = b).shift80(n); stage[k] > x.hash(); k -= 1);
-				for (t = (n <= limit) ? t : 65536;
+				for (t = (n <= stint) ? t : 65536;
 					(x = b).shift80(n), best(x, stage[k], spec).validate(t); b.next80()) {
 					k += best.overflow(stage[k + 1]) ? 1 : 0;
 					score += b.move80(best.opcode());
@@ -2495,7 +2495,8 @@ utils::options parse(int argc, const char* argv[]) {
 			opts["stage"] = next_opts("0,16384");
 			break;
 		case to_hash("-h"): case to_hash("--shift"):
-			opts["shift"] = next_opts("32768");
+			opts["shift"] = next_opt("32768");
+			if ((opts[""] = next_opts()).size()) opts["options"]["stint"] = opts[""];
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
