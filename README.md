@@ -18,8 +18,9 @@ A highly effective bitboard is implemented, which features with
 
 ### Performance
 
-As of September 2021, TDL2048+ achieves the [state-of-the-art results](https://doi.org/10.1109/TG.2021.3109887) (in terms of average score and reaching rates of large tiles) by using a 2-stage 8x6-tuple network, trained by optimistic TD learning (OTD), tested by 6-ply tile-downgrading (DG) expectimax search.
-|Search Depth|   Score|8192 [%]|16384 [%]|32768 [%]|  # Games|
+As of September 2021, TDL2048+ achieves the [state-of-the-art](https://doi.org/10.1109/TG.2021.3109887) in terms of average score and reaching rates of 32768-tile, by using optimistic TD+TC (OTD+TC) learning for training and tile-downgrading (DG) expectimax search for testing. The results of different search depths in the specified number of tested games are summarized as follows.
+
+|Search      | Score  |8192 [%]|16384 [%]|32768 [%]|  # Games|
 |:-----------|:------:|:------:|:-------:|:-------:|--------:|
 |1-ply w/ DG | 412,785|  97.24%|   85.39%|   30.16%|1,000,000|
 |2-ply w/ DG | 513,301|  99.17%|   94.40%|   48.92%|  100,000|
