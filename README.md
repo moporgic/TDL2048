@@ -464,6 +464,14 @@ To enable optimistic initialization, set the initial value when declaring networ
 ./2048 -n 8x6patt=5000 -t 1000 # initial V is 320000 (weight is initialized to 5000)
 ```
 
+The above examples are optimistic TD (OTD) learning. Note that OI can be enabled together with any training mode, e.g., specify both ```-a 1.0``` and OI to use optimistic TC (OTC) learning.
+
+To use optimistic TD+TC (OTD+TC) learning, train a network with OTD then follow by TC as follows.
+```bash
+./2048 -n 4x6patt=320000/norm -t 9000 -a 0.1 -o 4x6patt.w # traing with 90% OTD
+./2048 -n 4x6patt -t 1000 -e 100 -a 1.0 -io 4x6patt.w # train with 10% OTC and test
+```
+
 <details><summary>Show advanced options</summary><br>
 
 Note that when using ```/norm```, the value will be evenly distributed to weights. For example, a ```4x6patt``` has 32 features, setting ```320000/norm``` will actully initialize each weights as ```10000```.
