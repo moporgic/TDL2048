@@ -2394,7 +2394,7 @@ statistic run(utils::options::option opt) {
 	case to_hash("evaluate:stage"):
 	case to_hash("evaluate:shift"): [&]() {
 		u32 shift = opt["shift"].value(65536);
-		u32 stint = opt["stint"].value(1);
+		u32 stint = u32(opt["stint"].value(1)) ?: -1u;
 
 		for (stats.init(opt); stats; stats++) {
 			board b, x;
@@ -2606,7 +2606,7 @@ utils::options parse(int argc, const char* argv[]) {
 			opts[recipe].remove(item);
 		std::string what = form + ": " + opts[recipe];
 		// set other options (invisible in the display)
-		for (std::string item : {"alpha", "lambda", "step", "stage", "block", "limit", "thread", "make", "search"})
+		for (std::string item : {"alpha", "lambda", "step", "stage", "block", "shift", "limit", "thread", "make", "search"})
 			if (opts(item)) opts[recipe][item] << opts[item];
 		for (utils::options::opinion item : opts["options"])
 			opts[recipe][item.label()] << item.value();
