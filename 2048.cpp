@@ -2360,11 +2360,12 @@ statistic run(utils::options::option opt) {
 					o = b.info() >= block ? b : o;
 				}
 				u32 score = 0, opers = path.size(), h = k;
-				for (numeric esti = 0; path.size(); path.pop_back()) {
-					state& a = path.back();
-					h -= a.hash() < stage[h] ? 1 : 0;
-					esti = a.instruct(esti, alpha, stage[h], spec);
-					score += a.info();
+				for (numeric z = 0, r = 0, v = 0; path.size(); path.pop_back()) {
+					h -= path.back().hash() < stage[h] ? 1 : 0;
+					z = r + (lambda * z + (1 - lambda) * v);
+					r = path.back().score();
+					v = path.back().instruct(z, alpha, stage[h], spec) - r;
+					score += path.back().score();
 				}
 
 				stat = {score, b.hash(), opers};
@@ -2584,8 +2585,8 @@ utils::options parse(int argc, const char* argv[]) {
 		bool step   = (opts[recipe]("step")   || opts("step")) && optimize;
 		bool cohen  = (alpha.value(0) >= 1.0  || alpha("coh")) && optimize;
 		bool shift  = (opts[recipe]("shift")  || opts("shift")) && evaluate;
-		if (stage)       type = "stage";
-		else if (block)  type = "block";
+		if (stage)       type = lambda ? "stage-backward" : "stage";
+		else if (block)  type = lambda ? "block-backward" : "block";
 		else if (lambda) type = step ? "lambda-forward" : "lambda";
 		else if (step)   type = "step";
 		else if (cohen)  type = mode.empty() ? "forward" : "";
