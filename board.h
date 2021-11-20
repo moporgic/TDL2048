@@ -1143,12 +1143,14 @@ public:
 
 	inline bool movable() const   { return movable64(); }
 	inline bool movable64() const {
-		return (qrow16(0).moved & qrow16(1).moved & qrow16(2).moved & qrow16(3).moved
-		      & qcol16(0).moved & qcol16(1).moved & qcol16(2).moved & qcol16(3).moved) == 0;
+		return empty64() > 0 ||
+			(qrow16(0).moved & qrow16(1).moved & qrow16(2).moved & qrow16(3).moved) == 0 ||
+			(qcol16(0).moved & qcol16(1).moved & qcol16(2).moved & qcol16(3).moved) == 0;
 	}
 	inline bool movable80() const {
-		return (qrow20(0).moved & qrow20(1).moved & qrow20(2).moved & qrow20(3).moved
-		      & qcol20(0).moved & qcol20(1).moved & qcol20(2).moved & qcol20(3).moved) == 0;
+		return empty80() > 0 ||
+			(qrow20(0).moved & qrow20(1).moved & qrow20(2).moved & qrow20(3).moved) == 0 ||
+			(qcol20(0).moved & qcol20(1).moved & qcol20(2).moved & qcol20(3).moved) == 0;
 	}
 
 	class tile {
