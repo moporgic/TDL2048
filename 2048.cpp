@@ -2300,8 +2300,8 @@ statistic run(utils::options::option opt) {
 				}
 
 				numeric esti = 0;
-				for (auto s = path.end(); --s >= path.begin();) {
-					esti = state(*s).instruct(esti, alpha, feats, spec);
+				for (u32 i = path.size(); i-- > 0; ) {
+					esti = path[i].instruct(esti, alpha, feats, spec);
 				}
 
 				stat = {score, b.hash(), opers};
