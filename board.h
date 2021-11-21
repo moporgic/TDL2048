@@ -950,9 +950,9 @@ public:
 		return qrow20(0).species | qrow20(1).species | qrow20(2).species | qrow20(3).species;
 	}
 
-	inline u32 scale() const   { return scale64(); }
-	inline u32 scale64() const { return species64(); }
-	inline u32 scale80() const { return species80(); }
+	inline constexpr u32 scale() const   { return scale64(); }
+	inline constexpr u32 scale64() const { return hash64(); }
+	inline constexpr u32 scale80() const { return hash80(); }
 
 	inline constexpr u32 hash() const { return hash64(); }
 	inline constexpr u32 hash64() const {
@@ -966,13 +966,13 @@ public:
 		return h;
 	}
 
-	inline u32 max()   const { return max64(); }
-	inline u32 max64() const { return math::log2(scale64()); }
-	inline u32 max80() const { return math::log2(scale80()); }
+	inline constexpr u32 max()   const { return max64(); }
+	inline constexpr u32 max64() const { return math::log2(scale64()); }
+	inline constexpr u32 max80() const { return math::log2(scale80()); }
 
-	inline u32 min()   const { return min64(); }
-	inline u32 min64() const { return math::tzcnt32(scale64()); }
-	inline u32 min80() const { return math::tzcnt32(scale80()); }
+	inline constexpr u32 min()   const { return min64(); }
+	inline constexpr u32 min64() const { return math::tzcnt32(scale64()); }
+	inline constexpr u32 min80() const { return math::tzcnt32(scale80()); }
 
 	inline hex numof() const {
 		return qrow(0).numof + qrow(1).numof + qrow(2).numof + qrow(3).numof;
