@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : moporgic/TDL2048+ - board.h
 // Author      : Hung Guei @ moporgic
-// Version     : 6.2
+// Version     : 6.3
 // Description : The Most Effective Bitboard Implementation for 2048
 //============================================================================
 
@@ -778,18 +778,18 @@ public:
 
 	inline constexpr u32 shift(u32 n = 1, u32 u = 0) { return shift64(n, u); }
 	inline constexpr u32 shift64(u32 n = 1, u32 u = 0) {
-		u32 hash = hash64();
-		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
-		u32 hole = ~hash & mask;
+		u32 rank = scale64();
+		u32 mask = (math::msb(rank) - 1) & ~((2 << u) - 1);
+		u32 hole = ~rank & mask;
 		u32 hcnt = std::max(math::popcnt(hole), n);
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_SHIFT)
 		hole &= ~(math::nthset(hole, hcnt - n) - 1);
 #else
 		while (hcnt-- > n) hole &= (hole - 1);
 #endif
-		hash &= ~(math::lsb(hole) - 1);
-		for (u32 last = 0, tile = 0, step = 0; hash; hash ^= last) {
-			last = math::lsb(hash);
+		rank &= ~(math::lsb(hole) - 1);
+		for (u32 last = 0, tile = 0, step = 0; rank; rank ^= last) {
+			last = math::lsb(rank);
 			tile = math::tzcnt(last);
 			step = math::popcnt(hole & (last - 1));
 			put64(where64(tile), tile - step);
@@ -797,18 +797,18 @@ public:
 		return hole;
 	}
 	inline constexpr u32 shift80(u32 n = 1, u32 u = 0) {
-		u32 hash = hash80();
-		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
-		u32 hole = ~hash & mask;
+		u32 rank = scale80();
+		u32 mask = (math::msb(rank) - 1) & ~((2 << u) - 1);
+		u32 hole = ~rank & mask;
 		u32 hcnt = std::max(math::popcnt(hole), n);
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_SHIFT)
 		hole &= ~(math::nthset(hole, hcnt - n) - 1);
 #else
 		while (hcnt-- > n) hole &= (hole - 1);
 #endif
-		hash &= ~(math::lsb(hole) - 1);
-		for (u32 last = 0, tile = 0, step = 0; hash; hash ^= last) {
-			last = math::lsb(hash);
+		rank &= ~(math::lsb(hole) - 1);
+		for (u32 last = 0, tile = 0, step = 0; rank; rank ^= last) {
+			last = math::lsb(rank);
 			tile = math::tzcnt(last);
 			step = math::popcnt(hole & (last - 1));
 			put80(where80(tile), tile - step);
@@ -818,28 +818,28 @@ public:
 
 	inline constexpr u32 advance(u32 n = 1, u32 u = 0) { return advance64(n, u); }
 	inline constexpr u32 advance64(u32 n = 1, u32 u = 0) {
-		u32 hash = hash64();
-		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
-		u32 hole = ~hash & mask;
+		u32 rank = scale64();
+		u32 mask = (math::msb(rank) - 1) & ~((2 << u) - 1);
+		u32 hole = ~rank & mask;
 		u32 hmax = math::msb(hole);
 		hole = ((hmax << n) - 1) & ~(hmax - 1);
-		hash &= ~(math::lsb(hole) - 1);
-		for (u32 last = 0, tile = 0; hash; hash ^= last) {
-			last = math::msb(hash);
+		rank &= ~(math::lsb(hole) - 1);
+		for (u32 last = 0, tile = 0; rank; rank ^= last) {
+			last = math::msb(rank);
 			tile = math::tzcnt(last);
 			put64(where64(tile), (tile + n) & 0x0fu);
 		}
 		return hole;
 	}
 	inline constexpr u32 advance80(u32 n = 1, u32 u = 0) {
-		u32 hash = hash80();
-		u32 mask = (math::msb(hash) - 1) & ~((2 << u) - 1);
-		u32 hole = ~hash & mask;
+		u32 rank = scale80();
+		u32 mask = (math::msb(rank) - 1) & ~((2 << u) - 1);
+		u32 hole = ~rank & mask;
 		u32 hmax = math::msb(hole);
 		hole = ((hmax << n) - 1) & ~(hmax - 1);
-		hash &= ~(math::lsb(hole) - 1);
-		for (u32 last = 0, tile = 0; hash; hash ^= last) {
-			last = math::msb(hash);
+		rank &= ~(math::lsb(hole) - 1);
+		for (u32 last = 0, tile = 0; rank; rank ^= last) {
+			last = math::msb(rank);
 			tile = math::tzcnt(last);
 			put80(where80(tile), (tile + n) & 0x1fu);
 		}
@@ -848,18 +848,18 @@ public:
 
 	inline constexpr u32 scale(u32 scale, u32 thres = 0) { return scale64(scale, thres); }
 	inline constexpr u32 scale64(u32 scale, u32 thres = 0) {
-		u32 hash = hash64();
-		i32 dist = math::lg(hash) - math::lg(scale);
-		while (dist-- > 0 && shift64()) hash = hash64();
+		u32 rank = scale64();
+		i32 dist = math::lg(rank) - math::lg(scale);
+		while (dist-- > 0 && shift64()) rank = scale64();
 		u32 mask = ~(math::msb(thres | 1) - 1);
-		u32 diff = (scale ^ hash) & mask;
+		u32 diff = (scale ^ rank) & mask;
 		for (u32 u = 0; diff != 0; diff ^= u) {
 			u = math::msb(diff);
 			if (scale & u) { // if u is expected but not present
-				u32 t = math::msb(hash & (u - 1));
+				u32 t = math::msb(rank & (u - 1));
 				u64 w = t ? where64(math::tzcnt(t)) : 0;
 				u32 n = math::popcnt(w);
-				for (u32 k = hash & ~(u - 1); !n && k; k ^= t) {
+				for (u32 k = rank & ~(u - 1); !n && k; k ^= t) {
 					t = math::lsb(k);
 					w = where64(math::tzcnt(t));
 					n = math::popcnt(w);
@@ -868,31 +868,31 @@ public:
 				if (n == 0) continue;
 				put64(math::lsb(w), math::tzcnt(u));
 				diff ^= (n == 1) ? (scale ^ diff) & t : 0;
-				hash = (hash ^ (n > 1 ? 0 : t)) | u;
+				rank = (rank ^ (n > 1 ? 0 : t)) | u;
 			} else { // if u is unexpected but present
 				u64 w = where64(math::tzcnt(u));
 				u32 t = math::msb((scale | ~mask) & (u - 1)) ?:
-				       (math::lsb(hash ^ u) ?: 1);
+				       (math::lsb(rank ^ u) ?: 1);
 				put64(w, math::tzcnt(t));
-				hash = (hash ^ u) | t;
+				rank = (rank ^ u) | t;
 			}
 		}
-		return hash;
+		return rank;
 	}
 	inline constexpr u32 scale80(u32 scale, u32 thres = 0) {
 		scale &= ~(math::msb(thres | 1) - 1);
-		u32 hash = hash80();
-		while (hash >= 65536 && shift80()) hash = hash80();
-		i32 dist = math::popcnt(scale & -2u) - math::popcnt(hash);
-		while (dist-- > 0) hash |= math::msb(~hash & 0xffff);
-		hash |= (scale & 1);
-		hash = scale64(hash, math::lsb(hash));
-		for (u32 s = 0, h = 0; scale; scale ^= s, hash ^= s ^ h) {
+		u32 rank = scale80();
+		while (rank >= 65536 && shift80()) rank = scale80();
+		i32 dist = math::popcnt(scale & -2u) - math::popcnt(rank);
+		while (dist-- > 0) rank |= math::msb(~rank & 0xffff);
+		rank |= (scale & 1);
+		rank = scale64(rank, math::lsb(rank));
+		for (u32 s = 0, h = 0; scale; scale ^= s, rank ^= s ^ h) {
 			s = math::msb(scale);
-			h = math::msb(hash & (s ^ (s - 1)));
+			h = math::msb(rank & (s ^ (s - 1)));
 			put80(where80(math::tzcnt(h)), math::tzcnt(s));
 		}
-		return hash;
+		return rank;
 	}
 
 	inline constexpr void isomax() { return isomax64(); }
@@ -951,19 +951,32 @@ public:
 	}
 
 	inline constexpr u32 scale() const   { return scale64(); }
-	inline constexpr u32 scale64() const { return hash64(); }
-	inline constexpr u32 scale80() const { return hash80(); }
-
-	inline constexpr u32 hash() const { return hash64(); }
-	inline constexpr u32 hash64() const {
+	inline constexpr u32 scale64() const {
 		register u32 h = 0;
 		for (u32 i = 0; i < 16; i++) h |= (1 << at4(i));
 		return h;
 	}
-	inline constexpr u32 hash80() const {
+	inline constexpr u32 scale80() const {
 		register u32 h = 0;
 		for (u32 i = 0; i < 16; i++) h |= (1 << at5(i));
 		return h;
+	}
+
+	inline constexpr u64 hash() const { return hash64(); }
+	inline constexpr u64 hash64() const { return math::fmix64(raw); }
+	inline constexpr u64 hash80() const {
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_HASH)
+		return hash64() ^ math::fmix64(math::pdep64(ext >> 16, 0x1111111111111111ull));
+#else
+		u64 e = ext >> 16;
+		e |= (e << 24);
+		e |= (e << 12);
+		e &= 0x000f000f000f000full;
+		e |= (e << 6);
+		e |= (e << 3);
+		e &= 0x1111111111111111ull;
+		return hash64() ^ math::fmix64(e);
+#endif
 	}
 
 	inline constexpr u32 max()   const { return max64(); }

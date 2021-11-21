@@ -1804,7 +1804,7 @@ struct select {
 	inline u32 opcode() const { return best - move; }
 
 	inline bool safe(u32 h = 65536u) const { return best->info() < h; }
-	inline bool hold(u32 h = 65536u) const { return h < 65536u ? best->hash() >= h : board(*best).move(opcode()) != -1; }
+	inline bool hold(u32 h = 65536u) const { return h < 65536u ? best->scale() >= h : board(*best).move(opcode()) != -1; }
 	inline bool validate(u32 h = 65536u) const { return safe(math::lsb32(h)) || (bool(*this) & !hold(h)); }
 	inline bool overflow(u32 h = 65536u) const { return score() >= i32(math::lsb32(h)) && hold(h); }
 };
@@ -2033,7 +2033,7 @@ statistic run(utils::options::option opt) {
 			}
 			a.optimize(0, alpha, feats, spec);
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.scale(), opers);
 		}
 		}(); break;
 
@@ -2058,7 +2058,7 @@ statistic run(utils::options::option opt) {
 			}
 			a.instruct(0, alpha, feats, spec);
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.scale(), opers);
 		}
 		}(); break;
 
@@ -2078,7 +2078,7 @@ statistic run(utils::options::option opt) {
 				esti = path.back().instruct(esti, alpha, feats, spec);
 			}
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.scale(), opers);
 		}
 		}(); break;
 
@@ -2114,7 +2114,7 @@ statistic run(utils::options::option opt) {
 			}
 			path.clear();
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.scale(), opers);
 		}
 		}(); break;
 
@@ -2143,7 +2143,7 @@ statistic run(utils::options::option opt) {
 			}
 			path.clear();
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.scale(), opers);
 		}
 		}(); break;
 
@@ -2184,7 +2184,7 @@ statistic run(utils::options::option opt) {
 			}
 			path.clear();
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.scale(), opers);
 		}
 		}(); break;
 
@@ -2220,7 +2220,7 @@ statistic run(utils::options::option opt) {
 			}
 			path.clear();
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.scale(), opers);
 		}
 		}(); break;
 
@@ -2242,7 +2242,7 @@ statistic run(utils::options::option opt) {
 				v = path.back().instruct(z, alpha, feats, spec) - r;
 			}
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.scale(), opers);
 		}
 		}(); break;
 
@@ -2270,7 +2270,7 @@ statistic run(utils::options::option opt) {
 				}
 				a.instruct(0, alpha, feats, spec);
 
-				stat = {score, b.hash(), opers};
+				stat = {score, b.scale(), opers};
 			} while (path.size() >= L);
 			path.clear();
 
@@ -2304,7 +2304,7 @@ statistic run(utils::options::option opt) {
 					esti = path[i].instruct(esti, alpha, feats, spec);
 				}
 
-				stat = {score, b.hash(), opers};
+				stat = {score, b.scale(), opers};
 			} while (path.size() >= L);
 			path.clear();
 
@@ -2322,7 +2322,7 @@ statistic run(utils::options::option opt) {
 			u32 score = 0;
 			u32 opers = 0;
 
-			for (u32 k = 0, which = o.hash(); which < limit; which = o.hash() + block) {
+			for (u32 k = 0, which = o.scale(); which < limit; which = o.scale() + block) {
 				while (which >= stage[k + 1]) k++;
 				o.scale(which | 1u);
 
@@ -2337,7 +2337,7 @@ statistic run(utils::options::option opt) {
 				}
 				a.instruct(0, alpha, stage[k], spec);
 
-				stat = {score, b.hash(), opers};
+				stat = {score, b.scale(), opers};
 			}
 
 			stats.update(stat);
@@ -2350,7 +2350,7 @@ statistic run(utils::options::option opt) {
 			once<statistic::stat> stat;
 			state b, o; o.next();
 
-			for (u32 k = 0, which = o.hash(); which < limit; which = o.hash() + block) {
+			for (u32 k = 0, which = o.scale(); which < limit; which = o.scale() + block) {
 				while (which >= stage[k + 1]) k++;
 				o.scale(which | 1u);
 
@@ -2361,14 +2361,14 @@ statistic run(utils::options::option opt) {
 				}
 				u32 score = 0, opers = path.size(), h = k;
 				for (numeric z = 0, r = 0, v = 0; path.size(); path.pop_back()) {
-					h -= path.back().hash() < stage[h] ? 1 : 0;
+					h -= path.back().scale() < stage[h] ? 1 : 0;
 					z = r + (lambda * z + (1 - lambda) * v);
 					r = path.back().score();
 					v = path.back().instruct(z, alpha, stage[h], spec) - r;
 					score += path.back().score();
 				}
 
-				stat = {score, b.hash(), opers};
+				stat = {score, b.scale(), opers};
 			}
 
 			stats.update(stat);
@@ -2388,7 +2388,7 @@ statistic run(utils::options::option opt) {
 				best >> b;
 			}
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.scale(), opers);
 		}
 		}(); break;
 
@@ -2411,7 +2411,7 @@ statistic run(utils::options::option opt) {
 				best >> b;
 			}
 			for (u32 n = 1; best; n += 1) {
-				for ((x = b).shift80(n); stage[k] > x.hash(); k -= 1);
+				for ((x = b).shift80(n); stage[k] > x.scale(); k -= 1);
 				for (t = (n <= stint) ? t : 65536;
 					(x = b).shift80(n), best(x, stage[k], spec).validate(t); b.next80()) {
 					k += best.overflow(stage[k + 1]) ? 1 : 0;
@@ -2420,7 +2420,7 @@ statistic run(utils::options::option opt) {
 				}
 			}
 
-			stats.update(score, b.hash80(), opers);
+			stats.update(score, b.scale80(), opers);
 		}
 		}(); break;
 
@@ -2436,7 +2436,7 @@ statistic run(utils::options::option opt) {
 				opers += 1;
 			}
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.scale(), opers);
 		}
 		}(); break;
 
@@ -2454,7 +2454,7 @@ statistic run(utils::options::option opt) {
 				opers += 1;
 			}
 
-			stats.update(score, b.hash(), opers);
+			stats.update(score, b.scale(), opers);
 		}
 		}(); break;
 	}
