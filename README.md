@@ -35,7 +35,7 @@ As of April 2021, TDL2048+ is the most efficient framework for 2048 in terms of 
 Its single-thread (ST) and multi-thread (MT) speed (moves/s) for the 4x6-tuple network are summarized as follows.
 
 |Processor         |ST Training|ST  Testing|MT Training|MT  Testing|
-|------------------|----------:|----------:|----------:|----------:|
+|:-----------------|----------:|----------:|----------:|----------:|
 |Core i9-7980XE    |  3,789,824|  4,307,902| 34,947,198| 67,576,154|
 |Xeon E5-2698 v4   |  2,911,945|  3,551,124| 30,013,758| 49,707,145|
 |Core i7-6950X     |  3,237,049|  3,860,228| 22,646,286| 35,324,773|
