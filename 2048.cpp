@@ -1654,15 +1654,11 @@ struct method {
 			numeric best = 0;
 			u32 step = 0;
 			for (const board& after : before.moves()) {
-				auto search = after.info() != -1u ? search_expt : search_illegal;
-				best = std::max(best, after.info() + search(after, depth - 1, range));
-				step |= after.info() != -1u ? 1 : 0;
+				if (after.info() == -1u) continue;
+				best = std::max(best, after.info() + search_expt(after, depth - 1, range));
+				step = 1;
 			}
 			return best + step;
-		}
-
-		static inline numeric search_illegal(const board& after, u32 depth, clip<feature> range = feature::feats()) {
-			return -std::numeric_limits<numeric>::max();
 		}
 
 		static inline numeric estimate(const board& after, clip<feature> range = feature::feats()) {
