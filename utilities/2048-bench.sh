@@ -4,10 +4,10 @@
 # default benchmarking kernel, will be invoked by "bench" and "compare"
 test() { command -v ${1:-./2048} >/dev/null 2>&1 && test-st ${@:-./2048} || test-st ./${@:-./2048}; }
 # specialized benchmarking kernels, should be wrapped with "test" before use
-test-st() { ${1:-./2048} -s -t 1x${2:-10000} -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
-test-mt() { ${1:-./2048} -s -t ${2:-$(nproc)0} -e ${2:-$(nproc)0} -p ${3:-$(nproc)} -% | grep summary | egrep -o [0-9.]+ops; }
-test-e-st() { echo nanops; ${1:-./2048} -s -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
-test-e-mt() { echo nanops; ${1:-./2048} -s -e ${2:-$(nproc)0} -p ${3:-$(nproc)} -% | grep summary | egrep -o [0-9.]+ops; }
+test-st() { ${1:-./2048} ${TEST_FLAGS} -s -t 1x${2:-10000} -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
+test-mt() { ${1:-./2048} ${TEST_FLAGS} -s -t ${2:-$(nproc)0} -e ${2:-$(nproc)0} -p ${3:-$(nproc)} -% | grep summary | egrep -o [0-9.]+ops; }
+test-e-st() { echo nanops; ${1:-./2048} ${TEST_FLAGS} -s -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
+test-e-mt() { echo nanops; ${1:-./2048} ${TEST_FLAGS} -s -e ${2:-$(nproc)0} -p ${3:-$(nproc)} -% | grep summary | egrep -o [0-9.]+ops; }
 
 # benchmarking routine
 # usage: bench [binary:./2048] [attempt:10]
@@ -75,10 +75,6 @@ benchmark() {
 	networks=${networks:-4x6patt 8x6patt}
 	threads=${threads:-single multi}
 
-	if [ -e init ] || [ -e load ]; then
-		echo "Error: \"init\" and \"load\" are reserved names" >&2
-		exit 7
-	fi
 	(( ${N_load:-2} )) && for network in $networks; do
 		[ -e $network.w ] && continue
 		echo "Retrieving \"$network.w\" from moporgic.info..." >&2
@@ -94,25 +90,23 @@ benchmark() {
 		command -v $runas >/dev/null 2>&1 || continue
 
 		for network in $networks; do
-			init() { $runas -n $network $@; }
-			load() { $runas -n $network -i $network.w -a 0 $@; }
 
 			for thread in $threads; do
 				echo "[$recipe] $network $thread-thread"
 				echo -n ">"
 
 				if (( ${N_init:-4} )); then
-					test() { test-${thread:0:1}t $@; }
-					bench init ${N_init:-4} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+					test() { TEST_FLAGS="-n $network" test-${thread:0:1}t $@; }
+					bench $runas ${N_init:-4} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
 				fi
 				if (( ${N_load:-2} )) && [ -e $network.w ]; then
-					test() { test-${thread:0:1}t $@; }
-					bench load ${N_load:-2} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+					test() { TEST_FLAGS="-n $network -i $network.w -a 0" test-${thread:0:1}t $@; }
+					bench $runas ${N_load:-2} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
 
-					test() { test-e-${thread:0:1}t $@; }
-					bench load ${N_load:-2} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+					test() { TEST_FLAGS="-n $network -i $network.w -a 0" test-e-${thread:0:1}t $@; }
+					bench $runas ${N_load:-2} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
 				fi
 
