@@ -39,6 +39,7 @@ Its single-thread (ST) and multi-thread (MT) speed (moves/s) for the 4x6-tuple n
 |Core i9-7980XE    |  3,789,824|  4,307,902| 34,947,198| 67,576,154|
 |Xeon E5-2698 v4   |  2,911,945|  3,551,124| 30,013,758| 49,707,145|
 |Core i7-6950X     |  3,237,049|  3,860,228| 22,646,286| 35,324,773|
+|Ryzen 9 5950X     |  5,753,458|  6,554,100| 21,808,224|100,496,244|
 |Core i7-6900K     |  3,080,106|  3,679,456| 17,707,134| 27,486,805|
 |Xeon E5-2696 v3   |  1,776,048|  1,983,475| 16,294,325| 21,588,230|
 |Xeon E5-2683 v3 x2|  1,442,213|  1,670,918| 14,483,794| 30,096,929|
@@ -136,6 +137,7 @@ Install [Cygwin](https://www.cygwin.com/) for a Bash environment, make sure that
 |Core i7-10510U |Windows 10 Pro 20H2|GCC 7.3 |
 |Celeron J4005  |Arch Linux 5.4 LTS |GCC 10.1|
 |Ryzen 9 3900X  |Arch Linux 5.7     |GCC 10.1|
+|Ryzen 9 5950X  |Arch Linux 5.16    |GCC 11.2|
 |Raspberry Pi 2B|Arch Linux 5.10    |GCC 10.2|
 
 </details>
