@@ -79,7 +79,7 @@ benchmark() {
 		echo "Error: \"init\" and \"load\" are reserved names" >&2
 		exit 7
 	fi
-	(( ${N_load:-4} )) && for network in $networks; do
+	(( ${N_load:-2} )) && for network in $networks; do
 		[ -e $network.w ] && continue
 		echo "Retrieving \"$network.w\" from moporgic.info..." >&2
 		curl -OJRfs moporgic.info/data/2048/$network.w.xz && xz -d $network.w.xz || {
@@ -101,18 +101,18 @@ benchmark() {
 				echo "[$recipe] $network $thread-thread"
 				echo -n ">"
 
-				if (( ${N_init:-8} )); then
+				if (( ${N_init:-4} )); then
 					test() { test-${thread:0:1}t $@; }
-					bench init ${N_init:-8} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+					bench init ${N_init:-4} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
 				fi
-				if (( ${N_load:-4} )) && [ -e $network.w ]; then
+				if (( ${N_load:-2} )) && [ -e $network.w ]; then
 					test() { test-${thread:0:1}t $@; }
-					bench load ${N_load:-4} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+					bench load ${N_load:-2} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
 
 					test() { test-e-${thread:0:1}t $@; }
-					bench load ${N_load:-4} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+					bench load ${N_load:-2} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 10
 				fi
 
