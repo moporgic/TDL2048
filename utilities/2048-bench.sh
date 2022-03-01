@@ -6,8 +6,28 @@ test() { command -v ${1:-./2048} >/dev/null 2>&1 && test-st ${@:-./2048} || test
 # specialized benchmarking kernels, should be wrapped with "test" before use
 test-st() { ${1:-./2048} ${TEST_FLAGS} -s -t 1x${2:-10000} -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
 test-mt() { ${1:-./2048} ${TEST_FLAGS} -s -t ${2:-$(nproc)0} -e ${2:-$(nproc)0} -p ${3:-$(nproc)} -% | grep summary | egrep -o [0-9.]+ops; }
+test-nt() { # for 2-die NUMA architecture
+	nproc=$(($(nproc)/${#NUMA[@]}))
+	res=($({
+		{ taskset -c ${NUMA[0]} ${1:-./2048} ${TEST_FLAGS} -s -t ${2:-${nproc}0} -e ${2:-${nproc}0} -p ${3:-${nproc}} -% | stdbuf -o0 grep summary | stdbuf -o0 egrep -o [0-9.]+ops; } &
+		{ taskset -c ${NUMA[1]} ${1:-./2048} ${TEST_FLAGS} -s -t ${2:-${nproc}0} -e ${2:-${nproc}0} -p ${3:-${nproc}} -% | stdbuf -o0 grep summary | stdbuf -o0 egrep -o [0-9.]+ops; } &
+		wait
+	}))
+	res=(${res[@]//ops/});
+	echo $(bc -l <<< "scale=2; ${res[0]}+${res[1]}")ops $(bc -l <<< "scale=2; ${res[2]}+${res[3]}")ops | egrep --color=auto [0-9.]+ops
+}
 test-e-st() { echo nanops; ${1:-./2048} ${TEST_FLAGS} -s -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
 test-e-mt() { echo nanops; ${1:-./2048} ${TEST_FLAGS} -s -e ${2:-$(nproc)0} -p ${3:-$(nproc)} -% | grep summary | egrep -o [0-9.]+ops; }
+test-e-nt() { # for 2-die NUMA architecture
+	nproc=$(($(nproc)/${#NUMA[@]}))
+	res=($({
+		{ taskset -c ${NUMA[0]} ${1:-./2048} ${TEST_FLAGS} -s -e ${2:-${nproc}0} -p ${3:-${nproc}} -% | stdbuf -o0 grep summary | stdbuf -o0 egrep -o [0-9.]+ops; } &
+		{ taskset -c ${NUMA[1]} ${1:-./2048} ${TEST_FLAGS} -s -e ${2:-${nproc}0} -p ${3:-${nproc}} -% | stdbuf -o0 grep summary | stdbuf -o0 egrep -o [0-9.]+ops; } &
+		wait
+	}))
+	res=(${res[@]//ops/});
+	echo nanops $(bc -l <<< "scale=2; ${res[0]}+${res[1]}")ops | egrep --color=auto .+ops
+}
 
 # benchmarking routine
 # usage: bench [binary:./2048] [attempt:10]
@@ -67,13 +87,14 @@ compare() {
 # usage: benchmark [binary:./2048]
 # note: kernel functions "bench" and "test-*" should be defined before use
 #       this procedure will automatically bind "test-*" as "test" for "bench"
-#       configurable variables: recipes, networks, threads, N_init, N_load
+#       configurable variables: recipes, networks, threads, NUMA, N_init, N_load
 benchmark() {
 	echo TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")
 
 	recipes=${@:-${recipes:-2048}}
 	networks=${networks:-4x6patt 8x6patt}
-	threads=${threads:-single multi}
+	threads=${threads:-single ${NUMA:+numa-}multi}
+	NUMA=(${NUMA[@]/;/ })
 
 	(( ${N_load:-2} )) && for network in $networks; do
 		[ -e $network.w ] && continue
