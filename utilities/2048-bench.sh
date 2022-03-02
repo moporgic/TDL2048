@@ -4,30 +4,28 @@
 # default benchmarking kernel, will be invoked by "bench" and "compare"
 test() { command -v ${1:-./2048} >/dev/null 2>&1 && test-st ${@:-./2048} || test-st ./${@:-./2048}; }
 # specialized benchmarking kernels, should be wrapped with "test" before use
-test-st() { ${1:-./2048} ${TEST_FLAGS} -s -t 1x${2:-10000} -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
-test-mt() { ${1:-./2048} ${TEST_FLAGS} -s -t ${2:-$(nproc)0} -e ${2:-$(nproc)0} -p ${3:-$(nproc)} -% | grep summary | egrep -o [0-9.]+ops; }
-test-nt() { # for 2-die NUMA architecture
-	nproc=$(($(nproc)/${#NUMA[@]}))
-	res=($({
-		{ taskset -c ${NUMA[0]} ${1:-./2048} ${TEST_FLAGS} -s -t ${2:-${nproc}0} -e ${2:-${nproc}0} -p ${3:-${nproc}} -% | stdbuf -o0 grep summary | stdbuf -o0 egrep -o [0-9.]+ops; } &
-		{ taskset -c ${NUMA[1]} ${1:-./2048} ${TEST_FLAGS} -s -t ${2:-${nproc}0} -e ${2:-${nproc}0} -p ${3:-${nproc}} -% | stdbuf -o0 grep summary | stdbuf -o0 egrep -o [0-9.]+ops; } &
-		wait
-	}))
-	res=(${res[@]//ops/});
-	echo $(bc -l <<< "scale=2; ${res[0]}+${res[1]}")ops $(bc -l <<< "scale=2; ${res[2]}+${res[3]}")ops | egrep --color=auto [0-9.]+ops
+test-st() { ${1:-./2048} ${TEST_FLAGS} -s -t ${2:-1x10000} -e ${3:-${2:-1x10000}} -% | grep summary | egrep -o [0-9.]+ops; }
+test-mt() {
+	NUMA=${NUMA[@]:-0-$(($(nproc)-1))}; NUMA=(${NUMA/;/ })
+	N_proc=${4:-$(($(nproc)/${#NUMA[@]}))}
+	N_opti=${2:-${N_proc}0}
+	N_eval=${3:-${2:-${N_proc}0}}
+	{ # handling NUMA architecture
+		for cores in ${NUMA[@]}; do
+			taskset -c $cores ${1:-./2048} ${TEST_FLAGS} -s \
+				$((( $N_opti )) && echo "-t $N_opti") $((( $N_eval )) && echo "-e $N_eval") \
+				$((( $N_proc )) && echo "-p $N_proc") -% &
+		done; wait
+	} | grep summary | egrep -o [0-9.]+ops | xargs $((( $N_opti )) && (( $N_eval )) && echo "-L2") | \
+		sed -e "s/ /+/g" -e "s/ops//g" | xargs printf "scale=2;%s;\n" | bc | eval sed -e "s/$/ops/g" $(
+			(( $N_opti )) && ! (( $N_eval )) && echo "-e 's/$/ nanops/g'"
+			(( $N_eval )) && ! (( $N_opti )) && echo "-e 's/^/nanops /g'"
+		) | egrep --color=auto .
 }
-test-e-st() { echo nanops; ${1:-./2048} ${TEST_FLAGS} -s -e 1x${2:-10000} -% none | egrep -o [0-9.]+ops; }
-test-e-mt() { echo nanops; ${1:-./2048} ${TEST_FLAGS} -s -e ${2:-$(nproc)0} -p ${3:-$(nproc)} -% | grep summary | egrep -o [0-9.]+ops; }
-test-e-nt() { # for 2-die NUMA architecture
-	nproc=$(($(nproc)/${#NUMA[@]}))
-	res=($({
-		{ taskset -c ${NUMA[0]} ${1:-./2048} ${TEST_FLAGS} -s -e ${2:-${nproc}0} -p ${3:-${nproc}} -% | stdbuf -o0 grep summary | stdbuf -o0 egrep -o [0-9.]+ops; } &
-		{ taskset -c ${NUMA[1]} ${1:-./2048} ${TEST_FLAGS} -s -e ${2:-${nproc}0} -p ${3:-${nproc}} -% | stdbuf -o0 grep summary | stdbuf -o0 egrep -o [0-9.]+ops; } &
-		wait
-	}))
-	res=(${res[@]//ops/});
-	echo nanops $(bc -l <<< "scale=2; ${res[0]}+${res[1]}")ops | egrep --color=auto .+ops
-}
+test-t-st() { test-st ${1:-./2048} ${2:-1x10000} 0; echo nanops; }
+test-e-st() { echo nanops; test-st ${1:-./2048} 0 ${2:-1x10000}; }
+test-t-mt() { test-mt ${1:-./2048} ${2:-""} 0 ${3}; }
+test-e-mt() { test-mt ${1:-./2048} 0 ${2:-""} ${3}; }
 
 # benchmarking routine
 # usage: bench [binary:./2048] [attempt:10]
@@ -93,8 +91,7 @@ benchmark() {
 
 	recipes=${@:-${recipes:-2048}}
 	networks=${networks:-4x6patt 8x6patt}
-	threads=${threads:-single ${NUMA:+numa-}multi}
-	NUMA=(${NUMA[@]/;/ })
+	threads=${threads:-single multi}
 
 	(( ${N_load:-2} )) && for network in $networks; do
 		[ -e $network.w ] && continue
