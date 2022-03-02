@@ -17,13 +17,10 @@ test-mt() {
 				$((( $N_proc )) && echo "-p $N_proc") -% &
 		done; wait
 	} | grep summary | egrep -o [0-9.]+ops | xargs $((( $N_opti )) && (( $N_eval )) && echo "-L2") | \
-		sed -e "s/ /+/g" -e "s/ops//g" | xargs printf "scale=2;%s;\n" | bc | eval sed -e "s/$/ops/g" $(
-			(( $N_opti )) && ! (( $N_eval )) && echo "-e 's/$/ nanops/g'"
-			(( $N_eval )) && ! (( $N_opti )) && echo "-e 's/^/nanops /g'"
-		) | egrep --color=auto .
+		sed -e "s/ /+/g" -e "s/ops//g" | xargs printf "scale=2;%s;\n" | bc -l | sed -e "s/$/ops/g" | grep .
 }
-test-t-st() { test-st ${1:-./2048} ${2:-1x10000} 0; echo nanops; }
-test-e-st() { echo nanops; test-st ${1:-./2048} 0 ${2:-1x10000}; }
+test-t-st() { test-st ${1:-./2048} ${2:-1x10000} 0; }
+test-e-st() { test-st ${1:-./2048} 0 ${2:-1x10000}; }
 test-t-mt() { test-mt ${1:-./2048} ${2:-""} 0 ${3}; }
 test-e-mt() { test-mt ${1:-./2048} 0 ${2:-""} ${3}; }
 
@@ -33,21 +30,20 @@ test-e-mt() { test-mt ${1:-./2048} 0 ${2:-""} ${3}; }
 bench () {
 	run=${1:-2048}; [ -e $run ] && run=./$run
 	command -v $run >/dev/null 2>&1 || exit 1
-	optimize=();
-	evaluate=();
+	unset ops0 ops1
 	for i in $(seq -w 1 1 ${2:-10}); do
-		echo -n "#$i: ";
-		res=($(test $run));
-		echo ${res[@]};
-		res=(${res[@]//ops/});
-		optimize+=(${res[0]});
-		evaluate+=(${res[1]});
+		echo -n "#$i: "
+		res=($(test $run))
+		echo ${res[@]}
+		res=(${res[@]//ops/})
+		ops0=${ops0:+${ops0}+}${res[0]}
+		ops1=${ops1:+${ops1}+}${res[1]}
 		sleep 1;
 	done;
-	optimize=${optimize[@]};
-	evaluate=${evaluate[@]};
 	echo -n ">$(sed "s/./>/g" <<< $i)> "
-	echo $(bc -l <<< "scale=2; (${optimize// /+})/${2:-10}")ops $(bc -l <<< "scale=2; (${evaluate// /+})/${2:-10}")ops | egrep --color=auto [0-9.]+ops
+	for ops in $ops0 $ops1; do
+		<<< "scale=2; (${ops})/${2:-10}" bc -l
+	done | sed "s/$/ops/g" | tr '\n' ' ' | grep .
 }
 
 # comparing two binaries
@@ -58,7 +54,8 @@ compare() {
 	Rc=${2:-2048}; [ -e $Rc ] && Rc=./$Rc
 	command -v $Lc >/dev/null 2>&1 || exit 1
 	command -v $Rc >/dev/null 2>&1 || exit 2
-	Lx=(); Rx=();
+	Lx=0
+	Rx=0
 	for i in $(seq -w 1 1 ${3:-10}); do
 		echo -n "#$i: "
 		if (( ${i: -1} % 2 == 0 )); then
@@ -68,17 +65,16 @@ compare() {
 			R=($(test $Rc))
 			L=($(test $Lc))
 		fi
-		L=(${L[@]%ops})
-		R=(${R[@]%ops})
-		Lx+=($(bc -l <<< "scale=2; (${L[0]}+${L[1]})/2"))
-		Rx+=($(bc -l <<< "scale=2; (${R[0]}+${R[1]})/2"))
-		echo ${Lx[-1]}ops ${Rx[-1]}ops
+		L=(${L[@]//ops/+}0)/${#L[@]}
+		R=(${R[@]//ops/+}0)/${#R[@]}
+		Lx=$Lx+$(<<< "scale=2; $L" bc -l)
+		Rx=$Rx+$(<<< "scale=2; $R" bc -l)
+		echo ${Lx##*+}ops ${Rx##*+}ops
 		sleep 1
 	done
-	Lx=${Lx[@]};
-	Rx=${Rx[@]};
 	echo -n ">$(sed "s/./>/g" <<< $i)> "
-	echo $(bc -l <<< "scale=2; (${Lx// /+})/${3:-10}")ops $(bc -l <<< "scale=2; (${Rx// /+})/${3:-10}")ops | egrep --color=auto [0-9.]+ops
+	echo $(<<< "scale=2; (${Lx})/${3:-10}" bc -l)ops \
+	     $(<<< "scale=2; (${Rx})/${3:-10}" bc -l)ops | grep .
 }
 
 # full benchmarking routine
@@ -181,8 +177,8 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmar
 	) fi
 elif [ "$0" != "$BASH_SOURCE" ]; then # otherwise print help info if script is sourced
 	echo "=========== Benchmarking Scripts Manual ============"
-	echo "usage: test [binary:./2048] [attempt:10000|$(nproc)0]"
-	echo "       available suffixes are -st -mt -e-st -e-mt"
+	echo "usage: test [binary:./2048] [attempt:1x10000|$(nproc)0]"
+	echo "       available suffixes are -st -mt -t-st|mt -e-st|mt"
 	echo "usage: bench [binary:./2048] [attempt:10]"
 	echo "       this function uses \"test\" as kernel"
 	echo "usage: compare [binary1:./base] [binary2:./2048] [attempt:10]"
