@@ -7,11 +7,10 @@ test() { command -v ${1:-./2048} >/dev/null 2>&1 && test-st ${@:-./2048} || test
 test-st() { ${1:-./2048} ${TEST_FLAGS} -s -t ${2:-1x10000} -e ${3:-${2:-1x10000}} -% | grep summary | egrep -o [0-9.]+ops; }
 test-mt() {
 	NUMA=${NUMA[@]:-0-$(($(nproc)-1))}; NUMA=(${NUMA/;/ })
-	N_proc=${4:-$(($(nproc)/${#NUMA[@]}))}
-	N_opti=${2:-${N_proc}0}
-	N_eval=${3:-$((${2%x*}?${2}:${N_proc}0))}
-	{ # handling NUMA architecture
-		for cores in ${NUMA[@]}; do
+	{	for cores in ${NUMA[@]}; do
+			N_proc=${4:-$(taskset -c $cores nproc)}
+			N_opti=${2:-${N_proc}0}
+			N_eval=${3:-$((${2%x*}?${2}:${N_proc}0))}
 			taskset -c $cores ${1:-./2048} ${TEST_FLAGS} -s \
 				$((( $N_opti )) && echo "-t $N_opti") $((( $N_eval )) && echo "-e $N_eval") \
 				$((( $N_proc )) && echo "-p $N_proc") -% &
