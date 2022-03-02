@@ -9,7 +9,7 @@ test-mt() {
 	NUMA=${NUMA[@]:-0-$(($(nproc)-1))}; NUMA=(${NUMA/;/ })
 	N_proc=${4:-$(($(nproc)/${#NUMA[@]}))}
 	N_opti=${2:-${N_proc}0}
-	N_eval=${3:-${2:-${N_proc}0}}
+	N_eval=${3:-$((${2%x*}?${2}:${N_proc}0))}
 	{ # handling NUMA architecture
 		for cores in ${NUMA[@]}; do
 			taskset -c $cores ${1:-./2048} ${TEST_FLAGS} -s \
