@@ -9,23 +9,23 @@ test() { test-st "${@:-./2048}"; }
 test-st() {
 	run=$(name "${1:-./2048}")
 	invoke=${taskset:+taskset -c ${taskset[@]//;/,}}
-	$invoke $run -s -t ${2:-1x10000} -e $(basename ${3:-${2/#0*/}} 1x10000) -% | sum-ops
+	$invoke $run -s -t ${2:-1x10000} -e $(echo-1st ${3} ${2/#0*/} 1x10000) -% | sum-ops
 }
 test-mt() {
 	run=$(name "${1:-./2048}")
-	tasks=(${taskset[@]//;/ })
-	N_exec=$(($(nproc)0 / (${#tasks[@]} ? ${#tasks[@]} : 1)))
+	tasks=(${taskset[@]//;/ }); tasks=(${tasks[@]:-""})
+	N_exec=$(($(nproc)0/${#tasks[@]}))
 	N_opti=${2:-$N_exec}
-	N_eval=${3:-$(($N_opti ? $N_opti : $N_exec))}
-	both=-L2
-	(( $N_opti )) || unset N_opti both
-	(( $N_eval )) || unset N_eval both
+	N_eval=$(echo-1st ${3} ${2/#0*/} $N_exec)
+	xsplit=-L${#tasks[@]}
+	(( ${N_opti/x*/} )) || unset N_opti xsplit
+	(( ${N_eval/x*/} )) || unset N_eval xsplit
 	{	for cores in ${tasks[@]:-""}; do
 			invoke=${cores:+taskset -c $cores}
 			N_proc=${4:-$($invoke nproc)}
 			$invoke $run -s ${N_opti:+-t $N_opti} ${N_eval:+-e $N_eval} -p $N_proc -% &
 		done; wait
-	} | sum-ops | xargs $both | sed -e "s/ /+/g" -e "s/ops//g" | \
+	} | sum-ops | xargs $xsplit | sed -e "s/ /+/g" -e "s/ops//g" | \
 		xargs printf "scale=2;%s;\n" | bc -l | sed -e "s/$/ops/g" | grep .
 }
 # usage: test-[t|e]-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0] [thread:N/A|$(nproc)]
@@ -149,6 +149,9 @@ name() {
 
 # extract ops from summary block
 sum-ops() { grep summary | egrep -o [0-9.]+ops; }
+
+# echo the 1st argument
+echo-1st() { echo "$1"; }
 
 # script main routine: check whether is running as benchmark or as source
 # usage (as benchmark): $0 -[D|P|p][=45678sm] [binary]...
