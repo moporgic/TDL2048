@@ -97,8 +97,8 @@ benchmark() {
 	N_init=${N_init:-4}
 	N_load=${N_load:-2}
 
-	echo "TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")"
-	echo "# $(lscpu | grep "Model name" | sed -E "s/^[^:]+: +| @.+$//g") @ $(nproc)x ($taskset)"
+	echo "TDL2048+ Benchmark @ $(hostname) @ $(date +'%F %T')"
+	echo "# $(lscpu | grep 'Model name' | sed -E 's/^[^:]+: +| @.+$//g') @ $(nproc)x ($taskset)"
 
 	for network in $networks; do
 		[ -e $network.w ] || ! (( $N_load )) && continue
@@ -200,7 +200,7 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmar
 		for network in ${networks:-4x6patt 8x6patt}; do
 			recipes=$(eval echo 2048-$network$profiled)
 			networks=$network threads=$threads benchmark $recipes | output-fix || exit $?
-			output-fix() { stdbuf -o0 tail -n+2 | output; }
+			output-fix() { stdbuf -o0 tail -n+3 | output; }
 		done
 	) fi
 elif [ "$0" != "$BASH_SOURCE" ]; then # otherwise print help info if script is sourced
