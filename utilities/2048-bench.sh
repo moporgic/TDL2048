@@ -95,6 +95,7 @@ benchmark() {
 	recipes=${@:-${recipes:-2048}}
 	networks=${networks:-4x6patt 8x6patt}
 	threads=${threads:-single multi}
+	taskset=${taskset:-$(taskset -cp $$ | sed -E "s/.+: //g")}
 
 	(( ${N_load:-2} )) && for network in $networks; do
 		[ -e $network.w ] && continue
@@ -112,7 +113,7 @@ benchmark() {
 		for network in $networks; do
 
 			for thread in $threads; do
-				echo "[$recipe] $network $thread-thread"
+				echo "[$recipe] $network $thread-thread ($taskset)"
 				echo -n ">"
 
 				if (( ${N_init:-4} )); then
