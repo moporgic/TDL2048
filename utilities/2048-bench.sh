@@ -45,8 +45,8 @@ bench () {
 		res=($(test "$run"))
 		echo ${res[@]}
 		res=(${res[@]//ops/})
-		ops0=${ops0:+${ops0}+}${res[0]}
-		ops1=${ops1:+${ops1}+}${res[1]}
+		ops0+=${ops0:++}${res[0]}
+		ops1+=${ops1:++}${res[1]}
 		sleep 1
 	done
 	echo -n ">$(sed "s/./>/g" <<< $i)> "
@@ -74,8 +74,8 @@ compare() {
 		fi
 		L=(${L[@]//ops/+}0)/${#L[@]}
 		R=(${R[@]//ops/+}0)/${#R[@]}
-		Lx=$Lx+$(<<< "scale=2;$L" bc -l)
-		Rx=$Rx+$(<<< "scale=2;$R" bc -l)
+		Lx+=+$(<<< "scale=2;$L" bc -l)
+		Rx+=+$(<<< "scale=2;$R" bc -l)
 		echo ${Lx##*+}ops ${Rx##*+}ops
 		sleep 1
 	done
@@ -94,6 +94,7 @@ benchmark() {
 	networks=${networks:-4x6patt 8x6patt}
 	threads=${threads:-single multi}
 	taskset=${taskset:-$(taskset -cp $$ | sed -E "s/.+: //g")}
+	tasksav=($(taskset -cp ${taskset[@]//;/,} $$ | head -n1 | cut -d':' -f2))
 	N_init=${N_init:-4}
 	N_load=${N_load:-2}
 
@@ -135,6 +136,8 @@ benchmark() {
 			done
 		done
 	done
+
+	taskset -cp $tasksav $$ >/dev/null
 }
 
 # output the correct executable for command line
@@ -179,7 +182,6 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmar
 	prefix() { xargs -d\\n -n1 echo \>; }
 	x6patt() { sed -u "s/x6patt//g" | egrep -o [0-9] | xargs -I% echo %x6patt; }
 	declare -A thdname=([s]=single [m]=multi)
-	taskset -cp ${taskset[@]//;/,} $$ >/dev/null || exit $?
 	if [[ $recipes ]]; then ( # execute dedicated benchmarks
 		[[ $default$profile ]] && echo ========== Benchmarking Dedicated TDL2048+ ==========
 		benchmark $recipes | output || exit $?
