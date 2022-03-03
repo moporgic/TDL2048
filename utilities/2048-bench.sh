@@ -90,11 +90,12 @@ compare() {
 #       this procedure will automatically bind "test-*" as "test" for "bench"
 #       configurable variables: recipes, networks, threads, taskset, N_init, N_load
 benchmark() {
+	PID=$BASHPID
 	recipes=${@:-${recipes:-2048}}
 	networks=${networks:-4x6patt 8x6patt}
 	threads=${threads:-single multi}
-	taskset=${taskset:-$(taskset -cp $$ | sed -E "s/.+: //g")}
-	tasksav=($(taskset -cp ${taskset[@]//;/,} $$ | head -n1 | cut -d':' -f2))
+	taskset=${taskset:-$(taskset -cp $PID | sed -E "s/.+: //g")}
+	tasksav=($(taskset -cp ${taskset[@]//;/,} $PID | head -n1 | cut -d':' -f2))
 	N_init=${N_init:-4}
 	N_load=${N_load:-2}
 
@@ -137,7 +138,7 @@ benchmark() {
 		done
 	done
 
-	taskset -cp $tasksav $$ >/dev/null
+	taskset -cp $tasksav $PID >/dev/null
 }
 
 # output the correct executable for command line
