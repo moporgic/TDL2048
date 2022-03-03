@@ -163,7 +163,7 @@ cpu-perf() {
 
 # ======================================== main routine ========================================
 # check whether is running as benchmark or as source
-# usage as benchmark: $0 -[D|P|p][=45678sm] [binary]...
+# usage as benchmark: $0 [-D|-P|-p][=45678sm] [-c=cpu_list] [binary]...
 #       as source:    . $0
 if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmarks
 	while (( $# )); do
@@ -171,6 +171,7 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmar
 		-D*) default=$1; ;;
 		-p*) prof_type=lite; ;&
 		-P*) profile=$1; ;;
+		-c*) taskset=${1:3}; ;;
 		*)   recipes+=${recipes:+ }$1; ;;
 		esac; shift
 	done
@@ -178,6 +179,7 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmar
 	prefix() { xargs -d\\n -n1 echo \>; }
 	x6patt() { sed -u "s/x6patt//g" | egrep -o [0-9] | xargs -I% echo %x6patt; }
 	declare -A thdname=([s]=single [m]=multi)
+	taskset -cp ${taskset[@]//;/,} $$ >/dev/null || exit $?
 	if [[ $recipes ]]; then ( # execute dedicated benchmarks
 		[[ $default$profile ]] && echo ========== Benchmarking Dedicated TDL2048+ ==========
 		benchmark $recipes | output || exit $?
