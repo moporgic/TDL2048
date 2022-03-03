@@ -98,7 +98,8 @@ benchmark() {
 	N_load=${N_load:-2}
 
 	echo "TDL2048+ Benchmark @ $(hostname) @ $(date +'%F %T')"
-	echo "# $(lscpu | grep 'Model name' | sed -E 's/^[^:]+: +| @.+$//g') @ $(nproc)x ($taskset)"
+	echo "# $(lscpu | grep 'Model name' | sed -E 's/^[^:]+: +| @.+$//g')" \
+	     "@ $(nproc)x $(cpu-perf 1)G-$(cpu-perf $(nproc))G ($taskset)"
 
 	for network in $networks; do
 		[ -e $network.w ] || ! (( $N_load )) && continue
@@ -150,6 +151,15 @@ name() {
 sum-ops() { grep summary | egrep -o [0-9.]+ops; }
 # echo the 1st argument
 echo-1st() { echo "$1"; }
+# measure CPU performance in GHz
+cpu-perf() {
+    $(ls ./2048* | head -n1) -n 4x6patt -t ${1:-1}00 -p ${1:-1} >/dev/null &
+    sleep ${2:-5}
+    speed=$(grep MHz /proc/cpuinfo | cut -d':' -f2 | cut -b2- | sort -rn | head -n${1:-1})
+    pkill -P $(jobs -p)
+    kill $(jobs -p)
+    <<< "scale=1;(${speed//$'\n'/+})/$(<<< $speed wc -l)000" bc -l
+}
 
 # ======================================== main routine ========================================
 # check whether is running as benchmark or as source
