@@ -5,7 +5,8 @@
 # note: this function is usually linked to a specialized function below
 test() { test-st "${@:-./2048}"; }
 # specialized benchmarking kernels, should be wrapped with "test" before use
-# usage: test-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0]{2} [thread:N/A|$(nproc)]
+# usage: test-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0]{2} [thread:1|$(nproc)]
+#        test-[t|e]-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0] [thread:1|$(nproc)]
 test-st() {
 	run=$(name "${1:-./2048}")
 	invoke=${taskset:+taskset -c ${taskset[@]//;/,}}
@@ -28,7 +29,6 @@ test-mt() {
 	} | sum-ops | xargs $xsplit | sed -e "s/ /+/g" -e "s/ops//g" | \
 		xargs printf "scale=2;%s;\n" | bc -l | sed -e "s/$/ops/g" | grep .
 }
-# usage: test-[t|e]-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0] [thread:N/A|$(nproc)]
 test-t-st() { test-st "${1:-./2048}" ${2:-1x10000} 0; }
 test-e-st() { test-st "${1:-./2048}" 0 ${2:-1x10000}; }
 test-t-mt() { test-mt "${1:-./2048}" ${2:-""} 0 ${3}; }
@@ -90,15 +90,18 @@ compare() {
 #       this procedure will automatically bind "test-*" as "test" for "bench"
 #       configurable variables: recipes, networks, threads, taskset, N_init, N_load
 benchmark() {
-	echo TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")
-
 	recipes=${@:-${recipes:-2048}}
 	networks=${networks:-4x6patt 8x6patt}
 	threads=${threads:-single multi}
 	taskset=${taskset:-$(taskset -cp $$ | sed -E "s/.+: //g")}
+	N_init=${N_init:-4}
+	N_load=${N_load:-2}
 
-	(( ${N_load:-2} )) && for network in $networks; do
-		[ -e $network.w ] && continue
+	echo "TDL2048+ Benchmark @ $(hostname) @ $(date +"%F %T")"
+	echo "# $(lscpu | grep "Model name" | sed -E "s/^[^:]+: +| @.+$//g") @ $(nproc)x ($taskset)"
+
+	for network in $networks; do
+		[ -e $network.w ] || ! (( $N_load )) && continue
 		echo "Retrieving \"$network.w\" from moporgic.info..." >&2
 		curl -OJRfs moporgic.info/data/2048/$network.w.xz && xz -d $network.w.xz || {
 			echo "Error: \"$network.w\" not available" >&2
@@ -109,28 +112,24 @@ benchmark() {
 
 	for recipe in $recipes; do
 		runas=$(name "$recipe")
-
 		for network in $networks; do
-
 			for thread in $threads; do
-				echo "[$recipe] $network $thread-thread ($taskset)"
+				echo "[$recipe] $network $thread-thread"
 				echo -n ">"
-
-				if (( ${N_init:-4} )); then
+				if (( $N_init )); then
 					test() { test-${thread:0:1}t "$1 -n $network" ${@:2}; }
-					bench $runas ${N_init:-4} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+					bench $runas $N_init | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 1
 				fi
-				if (( ${N_load:-2} )) && [ -e $network.w ]; then
+				if (( $N_load )) && [ -e $network.w ]; then
 					test() { test-${thread:0:1}t "$1 -n $network -i $network.w -a 0" ${@:2}; }
-					bench $runas ${N_load:-2} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+					bench $runas $N_load | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 1
 
 					test() { test-e-${thread:0:1}t "$1 -n $network -i $network.w -a 0" ${@:2}; }
-					bench $runas ${N_load:-2} | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+					bench $runas $N_load | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
 					sleep 1
 				fi
-
 				echo
 			done
 		done
@@ -147,16 +146,15 @@ name() {
 	unset 2048
 	echo ${run:?\'$@\'}
 }
-
 # extract ops from summary block
 sum-ops() { grep summary | egrep -o [0-9.]+ops; }
-
 # echo the 1st argument
 echo-1st() { echo "$1"; }
 
-# script main routine: check whether is running as benchmark or as source
-# usage (as benchmark): $0 -[D|P|p][=45678sm] [binary]...
-# usage (as source):    . $0
+# ======================================== main routine ========================================
+# check whether is running as benchmark or as source
+# usage as benchmark: $0 -[D|P|p][=45678sm] [binary]...
+#       as source:    . $0
 if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmarks
 	while (( $# )); do
 		case $1 in
