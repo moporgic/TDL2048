@@ -91,17 +91,17 @@ compare() {
 #       configurable variables: recipes, networks, threads, taskset, N_init, N_load
 benchmark() {
 	PID=$BASHPID
+	tasksav=$(taskset -cp ${taskset[@]//;/,} $PID | head -n1 | cut -d':' -f2 | xargs)
+	taskset=${taskset:-$tasksav}
+
 	recipes=${@:-${recipes:-2048}}
 	networks=${networks:-4x6patt 8x6patt}
 	threads=${threads:-single multi}
-	taskset=${taskset:-$(taskset -cp $PID | sed -E "s/.+: //g")}
-	tasksav=($(taskset -cp ${taskset[@]//;/,} $PID | head -n1 | cut -d':' -f2))
-	N_init=${N_init:-4}
+	N_init=${N_init:=4}
 	N_load=${N_load:-2}
 
-	echo "TDL2048+ Benchmark @ $(hostname) @ $(date +'%F %T')"
-	echo "# $(lscpu | grep name | sed -E 's/.+: +|\(\S+\)| CPU| [0-9]+-Core.+| @.+//g')" \
-	     "@ $(nproc)x $(cpu-perf 1)G-$(cpu-perf $(nproc))G ($taskset)"
+	echo "TDL2048+ Benchmark @ $(hostname) @ ${when:=$(date +'%F %T')}"
+	envinfo | stdbuf -o0 sed "s/^/# /g"
 
 	for network in $networks; do
 		[ -e $network.w ] || ! (( $N_load )) && continue
@@ -164,6 +164,53 @@ cpu-perf() {
 	kill $(jobs -p)
 	printf "%.1f\n" $(<<< "(${speed//$'\n'/+})/$(<<< $speed wc -l)000" bc -l)
 }
+# display the current environment
+envinfo() { (
+	# CPU model
+	cpuinfo=$(grep -m1 name /proc/cpuinfo | sed -E 's/.+:|\(\S+\)|CPU|[0-9]+-Core.+|@.+//g' | xargs)
+	nodes=$(lscpu | grep 'NUMA node(s)' | cut -d: -f2 | xargs)
+	(( ${nodes:-1} > 1 )) && cpuinfo+=" x$nodes"
+	# available cores
+	nproc=($(for cpus in ${taskset[@]//;/ }; do echo $(taskset -c $cpus nproc)x; done))
+	nproc=$(<<< ${nproc[@]:-$(nproc)x} tr ' ' '|')
+	[[ ${taskset[@]} ]] && nproc+=" (${taskset[@]// /;})"
+	# CPU speed
+	perf=$(cpu-perf 1)G-$(cpu-perf $(nproc))G
+	# memory info
+	meminfo=$(sudo -n lshw -short -c memory 2>/dev/null | egrep -v "BIOS|cache|empty")
+	if [[ $meminfo ]]; then
+	    dimm=$(<<< $meminfo grep "DIMM" | cut -d' ' -f2-)
+	    type=($(<<< $dimm grep -o "DDR."))
+	    speed=($(<<< $dimm egrep -o "\S+ MHz"))
+	    size=$(<<< $meminfo grep "System Memory" | egrep -Eo "[0-9]+[MGT]")B
+	    meminfo="$type-$speed x$(<<< $dimm wc -l) $size"
+	else # if memory info cannot be retrieved
+	    size=($(head -n1 /proc/meminfo))
+	    meminfo=$(printf "DRAM %.1fG" $(<<< "${size[1]}/1024/1024" bc -l))
+	fi
+
+	echo "$cpuinfo @ $nproc $perf + $meminfo"
+
+	# git commit
+	commit=($(git log 2>/dev/null | head -n1 | cut -b8-14) "???????")
+	git status -uno 2>/dev/null | grep -iq changes && commit+="+?"
+	# OS name and version
+	osinfo=$(uname -o 2>/dev/null | sed "s|GNU/||")
+	[[ $(uname -r) == *lts* ]] && osinfo+=" LTS"
+	osinfo+=" $(uname -r | sed -E 's/[^0-9.]+.+$//g')"
+	if [[ $OSTYPE =~ cygwin|msys ]]; then
+		ver=($(cmd /c ver 2>/dev/null | tr "[\r\n]" " "))
+		(( ${#ver[@]} )) && osinfo+=" (Windows ${ver[-1]})"
+	fi
+	# GCC version
+	gccinfo=($(gcc --version | head -n1))
+	gccinfo="GCC ${gccinfo[-1]}"
+	[[ $gcccmt ]] && gccinfo+=" $gcccmt"
+	# current time
+	when=${when:=$(date +'%F %T')}
+
+	echo "$commit @ $osinfo + $gccinfo @ $when"
+) }
 
 # ======================================== main routine ========================================
 # check whether is running as benchmark or as source
@@ -172,24 +219,22 @@ cpu-perf() {
 if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmarks
 	while (( $# )); do
 		case $1 in
-		-D*) default=$1; ;;
+		-D*) default=${1:1}; default=${default//x6patt/}; ;;
 		-p*) prof_type=lite; ;&
-		-P*) profile=$1; ;;
-		-c*) taskset=${1:3}; ;;
+		-P*) profile=${1:1}; profile=${profile//x6patt/}; ;;
+		-c*) taskset=${1:2}; taskset=${taskset/=/}; ;;
 		*)   recipes+=${recipes:+ }$1; ;;
 		esac; shift
 	done
 	output() { tee -a 2048-bench.log; }
 	prefix() { xargs -d\\n -n1 echo \>; }
-	x6patt() { sed -u "s/x6patt//g" | egrep -o [0-9] | xargs -I% echo %x6patt; }
 	declare -A thdname=([s]=single [m]=multi)
 	if [[ $recipes ]]; then ( # execute dedicated benchmarks
 		[[ $default$profile ]] && echo ========== Benchmarking Dedicated TDL2048+ ==========
 		benchmark $recipes | output || exit $?
 	) fi
 	if [[ $default ]]; then ( # build and benchmark default target
-		[[ $default =~ ^-.[0-9]+$ ]] && networks=$(x6patt <<< $default)
-		[[ $default =~ ^-.+=(.+)$ ]] && networks=${BASH_REMATCH[1]//,/ }
+		networks=$(<<< $default egrep -o [0-9] | xargs -I% echo %x6patt)
 		threads=$(eval echo $(<<< $default egrep -Eo [sm] | xargs -I{} echo "\${thdname[{}]}"))
 		echo ============= Building Default TDL2048+ =============
 		make OUTPUT=2048 | prefix || exit $?
@@ -197,10 +242,9 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmar
 		networks=$networks threads=$threads benchmark 2048 | output || exit $?
 	) fi
 	if [[ $profile ]]; then ( # build and benchmark profiled target
-		[[ $profile =~ ^-.[0-9]+$ ]] && networks=$(x6patt <<< $profile)
-		[[ $profile =~ ^-.+=(.+)$ ]] && networks=${BASH_REMATCH[1]//,/ }
-		[ ${prof_type:-full} == full ] && profiled="{,-t,-e}" || profiled=
+		networks=$(<<< $profile egrep -o [0-9] | xargs -I% echo %x6patt)
 		threads=$(eval echo $(<<< $profile egrep -Eo [sm] | xargs -I{} echo "\${thdname[{}]}"))
+		[ ${prof_type:-full} == full ] && profiled="{,-t,-e}" || profiled=
 		output-fix() { output; }
 		prefix-fix() { sed -u "/^>/d" | prefix; }
 		for network in ${networks:-4x6patt 8x6patt}; do
@@ -214,8 +258,8 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmar
 		echo ========== Benchmarking Profiled TDL2048+ ===========
 		for network in ${networks:-4x6patt 8x6patt}; do
 			recipes=$(eval echo 2048-$network$profiled)
-			networks=$network threads=$threads benchmark $recipes | output-fix || exit $?
-			output-fix() { stdbuf -o0 tail -n+3 | output; }
+			networks=$network threads=$threads gcccmt=profile benchmark $recipes | output-fix || exit $?
+			output-fix() { stdbuf -o0 tail -n+4 | output; }
 		done
 	) fi
 elif [ "$0" != "$BASH_SOURCE" ]; then # otherwise print help info if script is sourced
