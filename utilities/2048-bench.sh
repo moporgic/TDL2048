@@ -7,12 +7,12 @@ test() { test-st "${@:-./2048}"; }
 # specialized benchmarking kernels, should be wrapped with "test" before use
 # usage: test-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0]{2} [thread:1|$(nproc)]
 #        test-[t|e]-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0] [thread:1|$(nproc)]
-test-st() {
+test-st() { (
 	run=$(name "${1:-./2048}")
 	invoke=${taskset:+taskset -c ${taskset[@]//;/,}}
 	$invoke $run -s -t ${2:-1x10000} -e $(echo-1st ${3} ${2/#0*/} 1x10000) -% | sum-ops
-}
-test-mt() {
+) }
+test-mt() { (
 	run=$(name "${1:-./2048}")
 	tasks=(${taskset[@]//;/ }); tasks=(${tasks[@]:-""})
 	N_exec=$(($(nproc)0/${#tasks[@]}))
@@ -28,7 +28,7 @@ test-mt() {
 		done; wait
 	} | sum-ops | xargs $xsplit | sed -e "s/ /+/g" -e "s/ops//g" | \
 		xargs printf "scale=2;%s;\n" | bc -l | sed -e "s/$/ops/g" | grep .
-}
+) }
 test-t-st() { test-st "${1:-./2048}" ${2:-1x10000} 0; }
 test-e-st() { test-st "${1:-./2048}" 0 ${2:-1x10000}; }
 test-t-mt() { test-mt "${1:-./2048}" ${2:-""} 0 ${3}; }
@@ -37,7 +37,7 @@ test-e-mt() { test-mt "${1:-./2048}" 0 ${2:-""} ${3}; }
 # benchmarking routine
 # usage: bench [binary:./2048] [attempt:10]
 # note: kernel function "test" should be defined before use
-bench () {
+bench () { (
 	run=$(name "${1:-./2048}")
 	unset ops0 ops1
 	for i in $(seq -w 1 1 ${2:-10}); do
@@ -53,12 +53,12 @@ bench () {
 	for ops in $ops0 $ops1; do
 		<<< "scale=2;(${ops})/${2:-10}" bc -l
 	done | sed "s/$/ops/g" | tr '\n' ' ' | grep .
-}
+) }
 
 # comparing two binaries
 # usage: compare [binary1:./2048] [binary2:./2048] [attempt:10]
 # note: kernel function "test" should be defined before use
-compare() {
+compare() { (
 	Lc=$(name "${1:-./base}")
 	Rc=$(name "${2:-./2048}")
 	Lx=0
@@ -82,14 +82,14 @@ compare() {
 	echo -n ">$(sed "s/./>/g" <<< $i)> "
 	echo $(<<< "scale=2;(${Lx})/${3:-10}" bc -l)ops \
 	     $(<<< "scale=2;(${Rx})/${3:-10}" bc -l)ops | grep .
-}
+) }
 
 # full benchmarking routine
-# usage: benchmark [binary:./2048]
+# usage: benchmark [binary:./2048]...
 # note: kernel functions "bench" and "test-*" should be defined before use
 #       this procedure will automatically bind "test-*" as "test" for "bench"
 #       configurable variables: recipes, networks, threads, taskset, N_init, N_load
-benchmark() {
+benchmark() { (
 	PID=$BASHPID
 	tasksav=$(taskset -cp ${taskset[@]//;/,} $PID | head -n1 | cut -d':' -f2 | xargs)
 	taskset=${taskset:-$tasksav}
@@ -139,10 +139,10 @@ benchmark() {
 	done
 
 	taskset -cp $tasksav $PID >/dev/null
-}
+) }
 
 # output the correct executable for command line
-name() {
+name() { (
 	2048() { return 1; }
 	run="$@"
 	for run in "$run" "./$run" ""; do
@@ -150,20 +150,20 @@ name() {
 	done >/dev/null 2>&1
 	unset 2048
 	echo ${run:?\'$@\'}
-}
+) }
 # extract ops from summary block
 sum-ops() { grep summary | egrep -o [0-9.]+ops; }
 # echo the 1st argument
 echo-1st() { echo "$1"; }
 # measure CPU performance in GHz
-cpu-perf() {
+cpu-perf() { (
 	$(ls ./2048* | head -n1) -n 4x6patt -t ${1:-1}00 -p ${1:-1} >/dev/null &
 	sleep ${2:-5}
 	speed=$(grep MHz /proc/cpuinfo | cut -d':' -f2 | cut -b2- | sort -n | tail -n${1:-1})
 	pkill -P $(jobs -p)
 	kill $(jobs -p)
 	printf "%.1f\n" $(<<< "(${speed//$'\n'/+})/$(<<< $speed wc -l)000" bc -l)
-}
+) }
 # display the current environment
 envinfo() { (
 	# CPU model
@@ -216,53 +216,53 @@ envinfo() { (
 # check whether is running as benchmark or as source
 # usage as benchmark: $0 [-D|-P|-p][=45678sm] [-c=cpu_list] [binary]...
 #       as source:    . $0
-if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then # execute benchmarks
+if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then ( # execute benchmarks
 	while (( $# )); do
 		case $1 in
-		-D*) default=${1:1}; default=${default//x6patt/}; ;;
-		-p*) prof_type=lite; ;&
-		-P*) profile=${1:1}; profile=${profile//x6patt/}; ;;
 		-c*) taskset=${1:2}; taskset=${taskset/=/}; ;;
+		-*)  options=${1:1}; ;;
 		*)   recipes+=${recipes:+ }$1; ;;
 		esac; shift
 	done
+
+	networks=$(<<< $options egrep -o [0-9] | sort | uniq | xargs -I% echo %x6patt)
+	threads=$(<<< $options egrep -o [sm] | sort -r | uniq | sed -e "s/s/single/g" -e "s/m/multi/g")
+	networks=${networks:-4x6patt 8x6patt}
+	threads=${threads:-single multi}
+
 	output() { tee -a 2048-bench.log; }
 	prefix() { xargs -d\\n -n1 echo \>; }
-	declare -A thdname=([s]=single [m]=multi)
-	if [[ $recipes ]]; then ( # execute dedicated benchmarks
-		[[ $default$profile ]] && echo ========== Benchmarking Dedicated TDL2048+ ==========
+
+	if [[ $recipes ]]; then # execute dedicated benchmarks
+		[[ $options =~ [DPp] ]] && echo ========== Benchmarking Dedicated TDL2048+ ==========
 		benchmark $recipes | output || exit $?
-	) fi
-	if [[ $default ]]; then ( # build and benchmark default target
-		networks=$(<<< $default egrep -o [0-9] | xargs -I% echo %x6patt)
-		threads=$(eval echo $(<<< $default egrep -Eo [sm] | xargs -I{} echo "\${thdname[{}]}"))
+	fi
+	if [[ $options =~ [D] ]]; then # build and benchmark default target
 		echo ============= Building Default TDL2048+ =============
 		make OUTPUT=2048 | prefix || exit $?
 		echo =========== Benchmarking Default TDL2048+ ===========
-		networks=$networks threads=$threads benchmark 2048 | output || exit $?
-	) fi
-	if [[ $profile ]]; then ( # build and benchmark profiled target
-		networks=$(<<< $profile egrep -o [0-9] | xargs -I% echo %x6patt)
-		threads=$(eval echo $(<<< $profile egrep -Eo [sm] | xargs -I{} echo "\${thdname[{}]}"))
-		[ ${prof_type:-full} == full ] && profiled="{,-t,-e}" || profiled=
+		benchmark 2048 | output || exit $?
+	fi
+	if [[ $options =~ [Pp] ]]; then # build and benchmark profiled target
 		output-fix() { output; }
 		prefix-fix() { sed -u "/^>/d" | prefix; }
 		for network in ${networks:-4x6patt 8x6patt}; do
 			echo ======== Building $network-Profiled TDL2048+ =========
 			make $network OUTPUT=2048-$network | prefix-fix || exit $?
-			if [ ${prof_type:-full} == full ]; then
+			if ! [ $options =~ [p] ]; then
 				make $network PGO_EVAL=0 OUTPUT=2048-$network-t | prefix-fix || exit $?
 				make $network PGO_OPTI=0 OUTPUT=2048-$network-e | prefix-fix || exit $?
 			fi
 		done
+		[[ $options =~ [P] ]] && profiled="{,-t,-e}"
 		echo ========== Benchmarking Profiled TDL2048+ ===========
 		for network in ${networks:-4x6patt 8x6patt}; do
 			recipes=$(eval echo 2048-$network$profiled)
-			networks=$network threads=$threads gcccmt=profile benchmark $recipes | output-fix || exit $?
+			networks=$network gcccmt=profile benchmark $recipes | output-fix || exit $?
 			output-fix() { stdbuf -o0 tail -n+4 | output; }
 		done
-	) fi
-elif [ "$0" != "$BASH_SOURCE" ]; then # otherwise print help info if script is sourced
+	fi
+) elif [ "$0" != "$BASH_SOURCE" ]; then # otherwise print help info if script is sourced
 	echo "=========== Benchmarking Scripts Manual ============"
 	echo "usage: test [binary:./2048] [attempt:1x10000|$(nproc)0]"
 	echo "       available suffixes are -st -mt -t-st|mt -e-st|mt"
