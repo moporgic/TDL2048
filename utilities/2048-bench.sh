@@ -88,54 +88,60 @@ compare() { (
 # usage: benchmark [binary:./2048]...
 # note: kernel functions "bench" and "test-*" should be defined before use
 #       this procedure will automatically bind "test-*" as "test" for "bench"
-#       configurable variables: recipes, networks, threads, taskset, N_init, N_load
+#       configurable variables: recipes, networks, threads, order, taskset, N_init, N_load
 benchmark() { (
 	PID=$BASHPID
 	tasksav=$(taskset -cp ${taskset[@]//;/,} $PID | head -n1 | cut -d':' -f2 | xargs)
 	taskset=${taskset:-$tasksav}
 
-	recipes=${@:-${recipes:-2048}}
-	networks=${networks:-4x6patt 8x6patt}
-	threads=${threads:-single multi}
-	N_init=${N_init:=4}
-	N_load=${N_load:-2}
-
 	echo "TDL2048+ Benchmark @ $(hostname) @ ${when:=$(date +'%F %T')}"
 	envinfo | stdbuf -o0 sed "s/^/# /g"
 
-	for network in $networks; do
+	recipes=(${@:-${recipes[@]:-2048}})
+	networks=(${networks[@]:-4x6patt 8x6patt})
+	threads=(${threads[@]:-single multi})
+	order=(${order:-recipe network thread})
+	N_init=${N_init:-4}
+	N_load=${N_load:-2}
+
+	tokens=$(eval echo $(for o in ${order[@]}; do
+		vars=$(eval 'for var in ${'${o}'s[@]}; do echo _${var}_; done' | xargs | tr ' ' ',')
+		<<< $vars grep -q , && vars={$vars}
+		echo -n $vars
+	done))
+
+	for network in ${networks[@]}; do
 		[ -e $network.w ] || ! (( $N_load )) && continue
 		echo "Retrieving \"$network.w\" from moporgic.info..." >&2
-		curl -OJRfs moporgic.info/data/2048/$network.w.xz && xz -d $network.w.xz || {
-			echo "Error: \"$network.w\" not available" >&2
-			exit 8
-		}
+		curl -OJRfs moporgic.info/data/2048/$network.w.xz && xz -d $network.w.xz || \
+			echo "Error: \"$network.w\" is unavailable" >&2
 	done
 	sleep 4
 
-	for recipe in $recipes; do
-		runas=$(name "$recipe")
-		for network in $networks; do
-			for thread in $threads; do
-				echo "[$recipe] $network $thread-thread"
-				echo -n ">"
-				if (( $N_init )); then
-					test() { test-${thread:0:1}t "$1 -n $network" ${@:2}; }
-					bench $runas $N_init | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
-					sleep 1
-				fi
-				if (( $N_load )) && [ -e $network.w ]; then
-					test() { test-${thread:0:1}t "$1 -n $network -i $network.w -a 0" ${@:2}; }
-					bench $runas $N_load | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
-					sleep 1
+	for token in ${tokens[@]}; do
+		token=(${token//_/ })
+		unset recipe network thread
+		declare ${order[0]}=${token[0]} ${order[1]}=${token[1]} ${order[2]}=${token[2]}
 
-					test() { test-e-${thread:0:1}t "$1 -n $network -i $network.w -a 0" ${@:2}; }
-					bench $runas $N_load | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
-					sleep 1
-				fi
-				echo
-			done
-		done
+		runas=$(name "${recipe:?}")
+		echo "[${recipe:?}] ${network:?} ${thread:?}-thread"
+		echo -n ">"
+
+		if (( $N_init )); then
+			test() { test-${thread:0:1}t "$1 -n $network" ${@:2}; }
+			bench $runas $N_init | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+			sleep 1
+		fi
+		if (( $N_load )) && [ -e $network.w ]; then
+			test() { test-${thread:0:1}t "$1 -n $network -i $network.w -a 0" ${@:2}; }
+			bench $runas $N_load | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+			sleep 1
+
+			test() { test-e-${thread:0:1}t "$1 -n $network -i $network.w -a 0" ${@:2}; }
+			bench $runas $N_load | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+			sleep 1
+		fi
+		echo
 	done
 
 	taskset -cp $tasksav $PID >/dev/null
@@ -179,14 +185,14 @@ envinfo() { (
 	# memory info
 	meminfo=$(sudo -n lshw -short -c memory 2>/dev/null | egrep -v "BIOS|cache|empty")
 	if [[ $meminfo ]]; then
-	    dimm=$(<<< $meminfo grep "DIMM" | cut -d' ' -f2-)
-	    type=($(<<< $dimm grep -o "DDR."))
-	    speed=($(<<< $dimm egrep -o "\S+ MHz"))
-	    size=$(<<< $meminfo grep "System Memory" | egrep -Eo "[0-9]+[MGT]")B
-	    meminfo="$type-$speed x$(<<< $dimm wc -l) $size"
+		dimm=$(<<< $meminfo grep "DIMM" | cut -d' ' -f2-)
+		type=($(<<< $dimm grep -o "DDR."))
+		speed=($(<<< $dimm egrep -o "\S+ MHz"))
+		size=$(<<< $meminfo grep "System Memory" | egrep -Eo "[0-9]+[MGT]")B
+		meminfo="$type-$speed x$(<<< $dimm wc -l) $size"
 	else # if memory info cannot be retrieved
-	    size=($(head -n1 /proc/meminfo))
-	    meminfo=$(printf "DRAM %.1fG" $(<<< "${size[1]}/1024/1024" bc -l))
+		size=($(head -n1 /proc/meminfo))
+		meminfo=$(printf "DRAM %.1fG" $(<<< "${size[1]}/1024/1024" bc -l))
 	fi
 
 	echo "$cpuinfo @ $nproc $perf + $meminfo"
@@ -246,19 +252,20 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then ( # execute benchm
 	if [[ $options =~ [Pp] ]]; then # build and benchmark profiled target
 		output-fix() { output; }
 		prefix-fix() { sed -u "/^>/d" | prefix; }
+		declare -A profiled
 		for network in ${networks:-4x6patt 8x6patt}; do
 			echo ======== Building $network-Profiled TDL2048+ =========
 			make $network OUTPUT=2048-$network | prefix-fix || exit $?
+			profiled[$network]="2048-$network"
 			if ! [ $options =~ [p] ]; then
 				make $network PGO_EVAL=0 OUTPUT=2048-$network-t | prefix-fix || exit $?
 				make $network PGO_OPTI=0 OUTPUT=2048-$network-e | prefix-fix || exit $?
+				profiled[$network]+=" 2048-$network-t 2048-$network-e"
 			fi
 		done
-		[[ $options =~ [P] ]] && profiled="{,-t,-e}"
 		echo ========== Benchmarking Profiled TDL2048+ ===========
 		for network in ${networks:-4x6patt 8x6patt}; do
-			recipes=$(eval echo 2048-$network$profiled)
-			networks=$network gcccmt=profile benchmark $recipes | output-fix || exit $?
+			networks=$network gcccmt=profile benchmark ${profiled[$network]} | output-fix || exit $?
 			output-fix() { stdbuf -o0 tail -n+4 | output; }
 		done
 	fi
