@@ -100,7 +100,7 @@ benchmark() { (
 	recipes=(${@:-${recipes[@]:-2048}})
 	networks=(${networks[@]:-4x6patt 8x6patt})
 	threads=(${threads[@]:-single multi})
-	order=(${order:-recipe network thread})
+	order=(${order:-network thread recipe})
 	N_init=${N_init:-4}
 	N_load=${N_load:-2}
 
@@ -211,7 +211,7 @@ envinfo() { (
 	# GCC version
 	gccinfo=($(gcc --version | head -n1))
 	gccinfo="GCC ${gccinfo[-1]}"
-	[[ $gcccmt ]] && gccinfo+=" $gcccmt"
+	[[ $makeinfo ]] && gccinfo+=" $makeinfo"
 	# current time
 	when=${when:=$(date +'%F %T')}
 
@@ -226,23 +226,19 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then ( # execute benchm
 	while (( $# )); do
 		case $1 in
 		-c*) taskset=${1:2}; taskset=${taskset/=/}; ;;
-		-*)  options=${1:1}; ;;
+		-*)  options+=${1:1}; ;;
 		*)   recipes+=${recipes:+ }$1; ;;
 		esac; shift
 	done
-
 	networks=$(<<< $options egrep -o [0-9] | sort | uniq | xargs -I% echo %x6patt)
 	threads=$(<<< $options egrep -o [sm] | sort -r | uniq | sed -e "s/s/single/g" -e "s/m/multi/g")
-	networks=${networks:-4x6patt 8x6patt}
-	threads=${threads:-single multi}
 
 	output() { tee -a 2048-bench.log; }
-	prefix() { xargs -d\\n -n1 echo \>; }
-
 	if [[ $recipes ]]; then # execute dedicated benchmarks
 		[[ $options =~ [DPp] ]] && echo ========== Benchmarking Dedicated TDL2048+ ==========
 		benchmark $recipes | output || exit $?
 	fi
+	prefix() { xargs -d\\n -n1 echo \>; }
 	if [[ $options =~ [D] ]]; then # build and benchmark default target
 		echo ============= Building Default TDL2048+ =============
 		make OUTPUT=2048 | prefix || exit $?
@@ -250,22 +246,22 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then ( # execute benchm
 		benchmark 2048 | output || exit $?
 	fi
 	if [[ $options =~ [Pp] ]]; then # build and benchmark profiled target
-		output-fix() { output; }
 		prefix-fix() { sed -u "/^>/d" | prefix; }
 		declare -A profiled
 		for network in ${networks:-4x6patt 8x6patt}; do
 			echo ======== Building $network-Profiled TDL2048+ =========
 			make $network OUTPUT=2048-$network | prefix-fix || exit $?
 			profiled[$network]="2048-$network"
-			if ! [ $options =~ [p] ]; then
+			if [[ $options =~ [P] ]]; then
 				make $network PGO_EVAL=0 OUTPUT=2048-$network-t | prefix-fix || exit $?
 				make $network PGO_OPTI=0 OUTPUT=2048-$network-e | prefix-fix || exit $?
 				profiled[$network]+=" 2048-$network-t 2048-$network-e"
 			fi
 		done
+		output-fix() { output; }
 		echo ========== Benchmarking Profiled TDL2048+ ===========
 		for network in ${networks:-4x6patt 8x6patt}; do
-			networks=$network gcccmt=profile benchmark ${profiled[$network]} | output-fix || exit $?
+			networks=$network makeinfo=profile benchmark ${profiled[$network]} | output-fix || exit $?
 			output-fix() { stdbuf -o0 tail -n+4 | output; }
 		done
 	fi
@@ -275,8 +271,8 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then ( # execute benchm
 	echo "       available suffixes are -st -mt -t-st|mt -e-st|mt"
 	echo "usage: bench [binary:./2048] [attempt:10]"
 	echo "       this function uses \"test\" as kernel"
-	echo "usage: compare [binary1:./base] [binary2:./2048] [attempt:10]"
+	echo "usage: compare [binary:./base] [binary:./2048] [attempt:10]"
 	echo "       this function uses \"test\" as kernel"
-	echo "usage: benchmark [binaries:./2048]..."
+	echo "usage: benchmark [binary:./2048]..."
 	echo "       this function uses \"bench\" as kernel"
 fi
