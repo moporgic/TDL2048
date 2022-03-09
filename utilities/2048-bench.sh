@@ -42,18 +42,18 @@ test-e-mt() { test-mt "${1:-./2048}" 0 ${2:-""} ${3}; }
 # note: kernel function "test" should be defined before use
 bench () (
 	run=$(runas "${1:-./2048}")
-	unset ops0 ops1
+	res=()
 	for i in $(seq -w 1 1 ${2:-10}); do
 		echo -n "#$i: "
-		res=($(test "$run"))
-		echo ${res[@]}
-		res=(${res[@]//ops/})
-		ops0+=${ops0:++}${res[0]}
-		ops1+=${ops1:++}${res[1]}
+		ops=($(test "$run"))
+		echo ${ops[@]}
+		ops=(${ops[@]//ops/})
+		res[0]+=${res[0]:++}${ops[0]}
+		res[1]+=${res[1]:++}${ops[1]}
 		sleep 1
 	done
 	echo -n ">$(sed "s/./>/g" <<< $i)> "
-	for ops in $ops0 $ops1; do
+	for ops in ${res[@]}; do
 		<<< "scale=2;(${ops})/${2:-10}" bc -l
 	done | xargs -I% echo %ops | xargs | grep .
 )
@@ -62,28 +62,25 @@ bench () (
 # usage: compare [binary1:./2048] [binary2:./2048] [attempt:10]
 # note: kernel function "test" should be defined before use
 compare() (
-	Lc=$(runas "${1:-./base}")
-	Rc=$(runas "${2:-./2048}")
-	Lx=0 Rx=0
+	run=()
+	run[0]=$(runas "${1:-./2048}")
+	run[1]=$(runas "${2:-./2048}")
+	res=(0 0)
 	for i in $(seq -w 1 1 ${3:-10}); do
 		echo -n "#$i: "
-		if (( ${i: -1} % 2 == 0 )); then
-			L=($(test "$Lc"))
-			R=($(test "$Rc"))
-		else
-			R=($(test "$Rc"))
-			L=($(test "$Lc"))
-		fi
-		L=(${L[@]//ops/+}0)/${#L[@]}
-		R=(${R[@]//ops/+}0)/${#R[@]}
-		Lx+=+$(<<< "scale=2;$L" bc -l)
-		Rx+=+$(<<< "scale=2;$R" bc -l)
-		echo ${Lx##*+}ops ${Rx##*+}ops
+		ops=($(test "${run[0]}"))
+		ops=(${ops[@]//ops/+}0)/${#ops[@]}
+		res[0]+=+$(<<< "scale=2;$ops" bc -l)
+		ops=($(test "${run[1]}"))
+		ops=(${ops[@]//ops/+}0)/${#ops[@]}
+		res[1]+=+$(<<< "scale=2;$ops" bc -l)
+		echo ${res[0]##*+}ops ${res[1]##*+}ops
 		sleep 1
 	done
 	echo -n ">$(sed "s/./>/g" <<< $i)> "
-	echo $(<<< "scale=2;(${Lx})/${3:-10}" bc -l)ops \
-	     $(<<< "scale=2;(${Rx})/${3:-10}" bc -l)ops | grep .
+	for ops in ${res[@]}; do
+		<<< "scale=2;(${ops})/${3:-10}" bc -l
+	done | xargs -I% echo %ops | xargs | grep .
 )
 
 # full benchmarking routine
@@ -96,10 +93,10 @@ benchmark() (
 	taskset -cp $(<<< ${taskset[@]} tr "; " ,) $BASHPID >/dev/null
 	envinfo | stdbuf -o0 sed "s/^/# /g"
 
-	recipes=(${@:-${recipes[@]:-2048}})
-	networks=(${networks[@]:-4x6patt 8x6patt})
-	threads=(${threads[@]:-single multi})
-	order=(${order[@]:-network thread recipe})
+	recipes=($(<<< ${@:-${recipes[@]:-2048}} tr ";" " "))
+	networks=($(<<< ${networks[@]:-4x6patt 8x6patt} tr ";" " "))
+	threads=($(<<< ${threads[@]:-single multi} tr ";" " "))
+	order=($(<<< ${order[@]:-network thread recipe} tr ";" " "))
 	N_init=${N_init:-4}
 	N_load=${N_load:-2}
 
