@@ -43,7 +43,8 @@ test-e-mt() { test-mt "${1:-./2048}" 0 ${2:-""} ${3}; }
 bench () (
 	run=$(runas "${1:-./2048}")
 	res=()
-	for i in $(seq -w 1 1 ${2:-10}); do
+	num=${2:-10}
+	for i in $(seq -w 1 $num); do
 		echo -n "#$i: "
 		ops=($(test "$run"))
 		echo ${ops[@]}
@@ -54,32 +55,38 @@ bench () (
 	done
 	echo -n ">$(sed "s/./>/g" <<< $i)> "
 	for ops in ${res[@]}; do
-		<<< "scale=2;(${ops})/${2:-10}" bc -l
+		<<< "scale=2;($ops)/$num" bc -l
 	done | xargs -I% echo %ops | xargs | grep .
 )
 
-# comparing two binaries
-# usage: compare [binary1:./2048] [binary2:./2048] [attempt:10]
+# comparing binaries
+# usage: compare [binary:./2048]... [attempt:10]
 # note: kernel function "test" should be defined before use
 compare() (
 	run=()
-	run[0]=$(runas "${1:-./2048}")
-	run[1]=$(runas "${2:-./2048}")
-	res=(0 0)
-	for i in $(seq -w 1 1 ${3:-10}); do
-		echo -n "#$i: "
-		ops=($(test "${run[0]}"))
-		ops=(${ops[@]//ops/+}0)/${#ops[@]}
-		res[0]+=+$(<<< "scale=2;$ops" bc -l)
-		ops=($(test "${run[1]}"))
-		ops=(${ops[@]//ops/+}0)/${#ops[@]}
-		res[1]+=+$(<<< "scale=2;$ops" bc -l)
-		echo ${res[0]##*+}ops ${res[1]##*+}ops
+	while opt=$(runas "$1") && run+=("$opt"); do
+		shift
+	done 2>/dev/null
+	res=()
+	num=${1:-10}
+	norm() { <<< ${@//ops/} tr ' ' '\n'; }
+	if [ ${mode:-none} == mean ]; then
+		norm() { <<< "scale=2;(${@//ops/+}0)/$#" bc -l; }
+	fi
+	for i in $(seq -w 1 $num); do
+		echo -n "#$i:"
+		#buf=($(for opt in "${run[@]}"; do norm $(test "$opt"); done))
+		#res=($(paste -d+ <(<<< ${res[@]} tr ' ' '\n') <(<<< ${buf[@]} tr ' ' '\n')))
+		#echo ${buf[@]/%/ops}
+		{ res=($(paste -d+ <(<<< ${res[@]} tr ' ' '\n') \
+		         <(for opt in "${run[@]}"; do norm $(test "$opt"); done | tee /dev/fd/3)))
+		} 3> >(while read ops; do echo -n " ${ops}ops"; done; echo)
 		sleep 1
 	done
 	echo -n ">$(sed "s/./>/g" <<< $i)> "
 	for ops in ${res[@]}; do
-		<<< "scale=2;(${ops})/${3:-10}" bc -l
+		echo [${ops#+}]
+		<<< "scale=2;(${ops#+})/$num" bc -l
 	done | xargs -I% echo %ops | xargs | grep .
 )
 
