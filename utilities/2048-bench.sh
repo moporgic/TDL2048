@@ -175,10 +175,10 @@ envinfo() (
 	nodes=$(lscpu | grep 'NUMA node(s)' | cut -d: -f2 | xargs)
 	(( ${nodes:-1} > 1 )) && cpuinfo+=" x$nodes"
 	# available cores
+	taskset -cp $(<<< ${taskset[@]} tr "; " ,) $BASHPID >/dev/null
 	taskset=$(<<< ${taskset[@]} tr ' ' ';')
-	nproc=($(for cpus in ${taskset//;/ }; do echo $(taskset -c $cpus nproc)x; done))
-	nproc=$(<<< ${nproc[@]:-$(taskset -c ${taskset//;/,} nproc)x} tr ' ' '|')
-	[[ $taskset ]] && nproc+=" ($taskset)"
+	nproc=$(for cpus in ${taskset//;/ }; do echo $(taskset -c $cpus nproc)x; done | xargs)
+	[[ $taskset ]] && nproc="${nproc// /|} ($taskset)" || nproc=$(nproc)x
 	# CPU speed
 	perf=$(cpu-perf 1)G-$(cpu-perf $(nproc))G
 	# memory info
