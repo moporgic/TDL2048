@@ -9,15 +9,15 @@ test() { ${test:-test-st} "${@:-./2048}"; }
 #        test-[t|e]-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0] [thread:1|$(nproc)]
 test-st() (
 	run=$(runas "${1:-./2048}")
-	taskset -cp $(<<< ${taskset[@]} tr "; " ,) $BASHPID >/dev/null
+	taskset -cp $(<<< "${taskset[@]}" tr "; " ,) $BASHPID >/dev/null
 	opti=(${2} 1x${ratio:-10}000)
 	eval=(${3} ${2/#0*/} 1x${ratio:-10}000)
 	$run -s -t $opti -e $eval -% | grep summary | egrep -o [0-9.]+ops
 )
 test-mt() (
 	run=$(runas "${1:-./2048}")
-	taskset -cp $(<<< ${taskset[@]} tr "; " ,) $BASHPID >/dev/null
-	taskset=($(<<< ${taskset[@]} tr ";" " "))
+	taskset -cp $(<<< "${taskset[@]}" tr "; " ,) $BASHPID >/dev/null
+	taskset=($(<<< "${taskset[@]}" tr ";" " "))
 	taskset=(${taskset[@]:-""})
 	num=$(($(nproc)*${ratio:-10}/${#taskset[@]}))
 	opti=(${2} $num)
@@ -69,7 +69,7 @@ compare() (
 	done 2>/dev/null
 	res=()
 	num=${1:-10}
-	norm() { <<< ${@//ops/} tr ' ' '\n'; }
+	norm() { <<< "${@//ops/}" tr ' ' '\n'; }
 	if [ ${mode:-none} == mean ]; then
 		norm() { <<< "scale=2;(${@//ops/+}0)/$#" bc -l; }
 	fi
@@ -78,7 +78,7 @@ compare() (
 		#buf=($(for opt in "${run[@]}"; do norm $(test "$opt"); done))
 		#res=($(paste -d+ <(<<< ${res[@]} tr ' ' '\n') <(<<< ${buf[@]} tr ' ' '\n')))
 		#echo ${buf[@]/%/ops}
-		{ res=($(paste -d+ <(<<< ${res[@]} tr ' ' '\n') \
+		{ res=($(paste -d+ <(<<< "${res[@]}" tr ' ' '\n') \
 		         <(for opt in "${run[@]}"; do norm $(test "$opt"); done | tee /dev/fd/3)))
 		} 3> >(while read ops; do echo -n " ${ops}ops"; done; echo)
 		sleep 1
@@ -97,19 +97,19 @@ compare() (
 #       configurable variables: recipes, networks, threads, order, taskset, N_init, N_load
 benchmark() (
 	echo "TDL2048+ Benchmark @ $(hostname) @ ${when:=$(date +'%F %T')}"
-	taskset -cp $(<<< ${taskset[@]} tr "; " ,) $BASHPID >/dev/null
+	taskset -cp $(<<< "${taskset[@]}" tr "; " ,) $BASHPID >/dev/null
 	envinfo | stdbuf -o0 sed "s/^/# /g"
 
-	recipes=($(<<< ${@:-${recipes[@]:-2048}} tr ";" " "))
-	networks=($(<<< ${networks[@]:-4x6patt 8x6patt} tr ";" " "))
-	threads=($(<<< ${threads[@]:-single multi} tr ";" " "))
-	order=($(<<< ${order[@]:-network thread recipe} tr ";" " "))
+	recipes=($(<<< "${@:-${recipes[@]:-2048}}" tr ";" " "))
+	networks=($(<<< "${networks[@]:-4x6patt 8x6patt}" tr ";" " "))
+	threads=($(<<< "${threads[@]:-single multi}" tr ";" " "))
+	order=($(<<< "${order[@]:-network thread recipe}" tr ";" " "))
 	N_init=${N_init:-4}
 	N_load=${N_load:-2}
 
 	tokens=$(eval echo $(for o in ${order[@]}; do
 		vars=$(eval 'for var in ${'${o}'s[@]}; do echo _${var}_; done' | xargs | tr ' ' ',')
-		<<< $vars grep -q , && vars={$vars}
+		<<< "$vars" grep -q , && vars={$vars}
 		echo -n $vars
 	done))
 
@@ -166,7 +166,7 @@ cpu-perf() (
 	speed=$(grep MHz /proc/cpuinfo | cut -d':' -f2 | cut -b2- | sort -n | tail -n${1:-1})
 	pkill -P $(jobs -p)
 	kill $(jobs -p)
-	printf "%.1f\n" $(<<< "(${speed//$'\n'/+})/$(<<< $speed wc -l)000" bc -l)
+	printf "%.1f\n" $(<<< "(${speed//$'\n'/+})/$(<<< "$speed" wc -l)000" bc -l)
 )
 # display the current environment
 envinfo() (
@@ -175,8 +175,8 @@ envinfo() (
 	nodes=$(lscpu | grep 'NUMA node(s)' | cut -d: -f2 | xargs)
 	(( ${nodes:-1} > 1 )) && cpuinfo+=" x$nodes"
 	# available cores
-	taskset -cp $(<<< ${taskset[@]} tr "; " ,) $BASHPID >/dev/null
-	taskset=$(<<< ${taskset[@]} tr ' ' ';')
+	taskset -cp $(<<< "${taskset[@]}" tr "; " ,) $BASHPID >/dev/null
+	taskset=$(<<< "${taskset[@]}" tr ' ' ';')
 	nproc=$(for cpus in ${taskset//;/ }; do echo $(taskset -c $cpus nproc)x; done | xargs)
 	[[ $taskset ]] && nproc="${nproc// /|} ($taskset)" || nproc=$(nproc)x
 	# CPU speed
@@ -184,11 +184,11 @@ envinfo() (
 	# memory info
 	meminfo=$(sudo -n lshw -short -c memory 2>/dev/null | egrep -v "BIOS|cache|empty")
 	if [[ $meminfo ]]; then
-		dimm=$(<<< $meminfo grep "DIMM" | cut -d' ' -f2-)
-		type=($(<<< $dimm grep -o "DDR."))
-		speed=($(<<< $dimm egrep -o "\S+ MHz"))
-		size=$(<<< $meminfo grep "System Memory" | egrep -Eo "[0-9]+[MGT]")B
-		meminfo="$type-$speed x$(<<< $dimm wc -l) $size"
+		dimm=$(<<< "$meminfo" grep "DIMM" | cut -d' ' -f2-)
+		type=($(<<< "$dimm" grep -o "DDR."))
+		speed=($(<<< "$dimm" egrep -o "\S+ MHz"))
+		size=$(<<< "$meminfo" grep "System Memory" | egrep -Eo "[0-9]+[MGT]")B
+		meminfo="$type-$speed x$(<<< "$dimm" wc -l) $size"
 	else # if memory info cannot be retrieved
 		size=($(head -n1 /proc/meminfo))
 		meminfo=$(printf "DRAM %.1fG" $(<<< "${size[1]}/1024/1024" bc -l))
@@ -229,8 +229,8 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then ( # execute benchm
 		*)   recipes+=${recipes:+ }$1; ;;
 		esac; shift
 	done
-	networks=$(<<< $options egrep -o [0-9] | sort | uniq | xargs -I% echo %x6patt)
-	threads=$(<<< $options egrep -o [sm] | sort -r | uniq | sed -e "s/s/single/g" -e "s/m/multi/g")
+	networks=$(<<< "$options" egrep -o [0-9] | sort | uniq | xargs -I% echo %x6patt)
+	threads=$(<<< "$options" egrep -o [sm] | sort -r | uniq | sed -e "s/s/single/g" -e "s/m/multi/g")
 
 	output() { tee -a 2048-bench.log; }
 	if [[ $recipes ]]; then # execute dedicated benchmarks
