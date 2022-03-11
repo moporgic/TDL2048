@@ -63,29 +63,25 @@ bench () (
 # usage: compare [binary:./2048]... [attempt:10]
 # note: kernel function "test" should be defined before use
 compare() (
-	run=()
-	while opt=$(runas "$1") && run+=("$opt"); do
+	(( $# )) || set -- ./2048
+	run=() res=()
+	while opt=$(runas "$1") || (( $# > 1 )); do
+		[[ $opt ]] && run+=("$opt")
 		shift
 	done 2>/dev/null
-	res=()
 	num=${1:-10}
-	norm() { <<< "${@//ops/}" tr ' ' '\n'; }
-	if [ ${mode:-none} == mean ]; then
-		norm() { <<< "scale=2;(${@//ops/+}0)/$#" bc -l; }
-	fi
+	line() { <<< "${@//ops/}" tr ' ' '\n'; }
+	mean() { <<< "scale=2;(${@//ops/+}0)/$#" bc -l; }
+	alias norm=${mode:-line}
 	for i in $(seq -w 1 $num); do
-		echo -n "#$i:"
-		#buf=($(for opt in "${run[@]}"; do norm $(test "$opt"); done))
-		#res=($(paste -d+ <(<<< ${res[@]} tr ' ' '\n') <(<<< ${buf[@]} tr ' ' '\n')))
-		#echo ${buf[@]/%/ops}
-		{ res=($(paste -d+ <(<<< "${res[@]}" tr ' ' '\n') \
-		         <(for opt in "${run[@]}"; do norm $(test "$opt"); done | tee /dev/fd/3)))
+		{	echo -n "#$i:"
+			new=($(for opt in "${run[@]}"; do norm $(test "$opt"); done | tee /dev/fd/3))
+			res=($(paste -d+ <(line "${res[@]}") <(line "${new[@]}")))
 		} 3> >(while read ops; do echo -n " ${ops}ops"; done; echo)
 		sleep 1
 	done
-	echo -n ">$(sed "s/./>/g" <<< $i)> "
+	echo -n ">$(sed 's/./>/g' <<< $i)> "
 	for ops in ${res[@]}; do
-		echo [${ops#+}]
 		<<< "scale=2;(${ops#+})/$num" bc -l
 	done | xargs -I% echo %ops | xargs | grep .
 )
