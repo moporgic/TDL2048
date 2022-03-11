@@ -37,32 +37,9 @@ test-e-st() { test-st "${1:-./2048}" 0 ${2:-1x10000}; }
 test-t-mt() { test-mt "${1:-./2048}" ${2:-""} 0 ${3}; }
 test-e-mt() { test-mt "${1:-./2048}" 0 ${2:-""} ${3}; }
 
-# benchmarking routine
-# usage: bench [binary:./2048] [attempt:10]
-# note: kernel function "test" should be defined before use
+# benchmark binaries
+# usage: bench [binary:./2048]... [attempt:10]
 bench () (
-	run=$(runas "${1:-./2048}")
-	res=()
-	num=${2:-10}
-	for i in $(seq -w 1 $num); do
-		echo -n "#$i: "
-		ops=($(test "$run"))
-		echo ${ops[@]}
-		ops=(${ops[@]//ops/})
-		res[0]+=${res[0]:++}${ops[0]}
-		res[1]+=${res[1]:++}${ops[1]}
-		sleep 1
-	done
-	echo -n ">$(sed "s/./>/g" <<< $i)> "
-	for ops in ${res[@]}; do
-		<<< "scale=2;($ops)/$num" bc -l
-	done | xargs -I% echo %ops | xargs | grep .
-)
-
-# comparing binaries
-# usage: compare [binary:./2048]... [attempt:10]
-# note: kernel function "test" should be defined before use
-compare() (
 	(( $# )) || set -- ./2048
 	run=() res=()
 	while opt=$(runas "$1") || (( $# > 1 )); do
@@ -72,10 +49,9 @@ compare() (
 	num=${1:-10}
 	line() { <<< "${@//ops/}" tr ' ' '\n'; }
 	mean() { <<< "scale=2;(${@//ops/+}0)/$#" bc -l; }
-	alias norm=${mode:-line}
 	for i in $(seq -w 1 $num); do
 		{	echo -n "#$i:"
-			new=($(for opt in "${run[@]}"; do norm $(test "$opt"); done | tee /dev/fd/3))
+			new=($(for opt in "${run[@]}"; do ${norm:-line} $(test "$opt"); done | tee /dev/fd/3))
 			res=($(paste -d+ <(line "${res[@]}") <(line "${new[@]}")))
 		} 3> >(while read ops; do echo -n " ${ops}ops"; done; echo)
 		sleep 1
@@ -86,11 +62,9 @@ compare() (
 	done | xargs -I% echo %ops | xargs | grep .
 )
 
-# full benchmarking routine
-# usage: benchmark [binary:./2048]...
-# note: kernel functions "bench" and "test-*" should be defined before use
-#       this procedure will automatically bind "test-*" as "test" for "bench"
-#       configurable variables: recipes, networks, threads, order, taskset, N_init, N_load
+# benchmark binaries completely
+# usage: [option]... benchmark [binary:./2048]...
+# configurable options: recipes, networks, threads, order, taskset, N_init, N_load
 benchmark() (
 	echo "TDL2048+ Benchmark @ $(hostname) @ ${when:=$(date +'%F %T')}"
 	taskset -cp $(<<< "${taskset[@]}" tr "; " ,) $BASHPID >/dev/null
@@ -264,9 +238,7 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then ( # execute benchm
 	echo "=========== Benchmarking Scripts Manual ============"
 	echo "usage: test [binary:./2048] [attempt:1x10000|$(nproc)0]"
 	echo "       available suffixes are -st -mt -t-st|mt -e-st|mt"
-	echo "usage: bench [binary:./2048] [attempt:10]"
-	echo "       this function uses \"test\" as kernel"
-	echo "usage: compare [binary:./base] [binary:./2048] [attempt:10]"
+	echo "usage: bench [binary:./2048]... [attempt:10]"
 	echo "       this function uses \"test\" as kernel"
 	echo "usage: benchmark [binary:./2048]..."
 	echo "       this function uses \"bench\" as kernel"
