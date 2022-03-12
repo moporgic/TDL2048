@@ -5,17 +5,19 @@
 # note: this function links to a specialized function set by variable "test"
 test() { ${test:-test-st} "${@:-./2048}"; }
 # specialized benchmarking kernels, should be wrapped with "test" before use
-# usage: test-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0]{2} [thread:1|$(nproc)]
-#        test-[t|e]-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0] [thread:1|$(nproc)]
+# usage: test-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0]{2}
+#        test-[t|e]-[s|m]t [binary:./2048] [attempt:1x10000|$(nproc)0]
 test-st() (
-	run=$(runas "${1:-./2048}")
+	run=$(runas "${1:-./2048}") || return $?
 	taskset -cp $(<<< "${taskset[@]}" tr "; " ,) $BASHPID >/dev/null
 	opti=(${2} 1x${ratio:-10}000)
 	eval=(${3} ${2/#0*/} 1x${ratio:-10}000)
-	$run -s -t $opti -e $eval -% | grep summary | egrep -o [0-9.]+ops
+	(( ${opti/x*/} )) && run+=(-t $opti)
+	(( ${eval/x*/} )) && run+=(-e $eval)
+	${run[@]} -s -% | grep summary | egrep -o [0-9.]+ops
 )
 test-mt() (
-	run=$(runas "${1:-./2048}")
+	run=$(runas "${1:-./2048}") || return $?
 	taskset -cp $(<<< "${taskset[@]}" tr "; " ,) $BASHPID >/dev/null
 	taskset=($(<<< "${taskset[@]}" tr ";" " "))
 	taskset=(${taskset[@]:-""})
@@ -23,11 +25,11 @@ test-mt() (
 	opti=(${2} $num)
 	eval=(${3} ${2/#0*/} $num)
 	xsplit=-L${#taskset[@]}
-	(( ${opti/x*/} )) || unset opti xsplit
-	(( ${eval/x*/} )) || unset eval xsplit
+	(( ${opti/x*/} )) && run+=(-t $opti) || unset xsplit
+	(( ${eval/x*/} )) && run+=(-e $eval) || unset xsplit
 	{	for cores in ${taskset[@]:-""}; do
 			taskset -pc $cores $BASHPID >/dev/null
-			$run -s ${opti:+-t $opti} ${eval:+-e $eval} -p $(nproc) -% &
+			${run[@]} -p $(nproc) -s -% &
 		done; wait
 	} | grep summary | egrep -o [0-9.]+ops | xargs $xsplit | sed -e "s/ /+/g" -e "s/ops//g" | \
 		xargs printf "scale=2;%s;\n" | bc -l | xargs -I% echo %ops | grep .
@@ -50,10 +52,10 @@ bench () (
 	line() { <<< "${@//ops/}" tr ' ' '\n'; }
 	mean() { <<< "scale=2;(${@//ops/+}0)/$#" bc -l; }
 	for i in $(seq -w 1 $num); do
-		{	echo -n "#$i:"
-			new=($(for opt in "${run[@]}"; do ${norm:-line} $(test "$opt"); done | tee /dev/fd/3))
-			res=($(paste -d+ <(line "${res[@]}") <(line "${new[@]}")))
-		} 3> >(while read ops; do echo -n " ${ops}ops"; done; echo)
+		echo -n "#$i: "
+		new=($(for opt in "${run[@]}"; do ${norm:-line} $(test "$opt"); done))
+		res=($(paste -d+ <(line "${res[@]}") <(line "${new[@]}")))
+		echo ${new[@]//%/ops}
 		sleep 1
 	done
 	echo -n ">$(sed 's/./>/g' <<< $i)> "
@@ -99,8 +101,8 @@ benchmark() (
 		echo -n ">"
 
 		run=$(runas "${recipe:?}")
-		run_init="$run -n $network"
-		run_load="$run -n $network -i $network.w -a 0"
+		run_init="${run:?} -n $network"
+		run_load="${run:?} -n $network -i $network.w -a 0"
 
 		if (( $N_init )); then
 			test="test-${thread:0:1}t" \
