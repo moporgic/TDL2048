@@ -41,7 +41,7 @@ test-e-mt() { test-mt "${1:-./2048}" 0 ${2:-""} ${3}; }
 
 # benchmark binaries
 # usage: bench [binary:./2048]... [attempt:10]
-bench () (
+bench() (
 	(( $# )) || set -- ./2048
 	run=() res=()
 	while opt=$(runas "$1") || (( $# > 1 )); do
@@ -55,7 +55,7 @@ bench () (
 		echo -n "#$i: "
 		new=($(for opt in "${run[@]}"; do ${norm:-line} $(test "$opt"); done))
 		res=($(paste -d+ <(line "${res[@]}") <(line "${new[@]}")))
-		echo ${new[@]//%/ops}
+		echo ${new[@]/%/ops}
 		sleep 1
 	done
 	echo -n ">$(sed 's/./>/g' <<< $i)> "
@@ -63,6 +63,10 @@ bench () (
 		<<< "scale=2;(${ops#+})/$num" bc -l
 	done | xargs -I% echo %ops | xargs | grep .
 )
+
+# compare binaries
+# usage: compare [binary:./2048]... [attempt:10]
+compare() { norm=${norm:-mean} bench "$@"; }
 
 # benchmark binaries completely
 # usage: [option]... benchmark [binary:./2048]...
@@ -241,6 +245,8 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then ( # execute benchm
 	echo "usage: test [binary:./2048] [attempt:1x10000|$(nproc)0]"
 	echo "       available suffixes are -st -mt -t-st|mt -e-st|mt"
 	echo "usage: bench [binary:./2048]... [attempt:10]"
+	echo "       this function uses \"test\" as kernel"
+	echo "usage: compare [binary:./2048]... [attempt:10]"
 	echo "       this function uses \"test\" as kernel"
 	echo "usage: benchmark [binary:./2048]..."
 	echo "       this function uses \"bench\" as kernel"
