@@ -14,7 +14,7 @@ test-st() (
 	eval=(${3} ${2/#0*/} 1x${ratio:-10}000)
 	(( ${opti/x*/} )) && run+=(-t $opti)
 	(( ${eval/x*/} )) && run+=(-e $eval)
-	${run[@]} -s -% | grep summary | egrep -o [0-9.]+ops
+	${run[@]} -% -s | grep summary | egrep -o [0-9.]+ops
 )
 test-mt() (
 	run=$(runas "${1:-./2048}") || return $?
@@ -29,7 +29,7 @@ test-mt() (
 	(( ${eval/x*/} )) && run+=(-e $eval) || unset xsplit
 	{	for cores in ${taskset[@]:-""}; do
 			taskset -pc $cores $BASHPID >/dev/null
-			${run[@]} -p $(nproc) -s -% &
+			${run[@]} -p $(nproc) -% -s &
 		done; wait
 	} | grep summary | egrep -o [0-9.]+ops | xargs $xsplit | sed -e "s/ /+/g" -e "s/ops//g" | \
 		xargs printf "scale=2;%s;\n" | bc -l | xargs -I% echo %ops | grep .
@@ -73,8 +73,8 @@ compare() { norm=${norm:-mean} bench "$@"; }
 # configurable options: recipes, networks, threads, order, taskset, N_init, N_load
 benchmark() (
 	echo "TDL2048+ Benchmark @ $(hostname) @ ${when:=$(date +'%F %T')}"
-	taskset -cp $(<<< "${taskset[@]}" tr "; " ,) $BASHPID >/dev/null
 	envinfo | stdbuf -o0 sed "s/^/# /g"
+	sleep 5
 
 	recipes=($(<<< "${@:-${recipes[@]:-2048}}" tr ";" " "))
 	networks=($(<<< "${networks[@]:-4x6patt 8x6patt}" tr ";" " "))
@@ -84,18 +84,10 @@ benchmark() (
 	N_load=${N_load:-2}
 
 	tokens=$(eval echo $(for o in ${order[@]}; do
-		vars=$(eval 'for var in ${'${o}'s[@]}; do echo _${var}_; done' | xargs | tr ' ' ',')
+		vars=$(eval 'for var in ${'${o}'s[@]:?}; do echo _${var}_; done' | xargs | tr ' ' ',')
 		<<< "$vars" grep -q , && vars={$vars}
 		echo -n $vars
 	done))
-
-	for network in ${networks[@]}; do
-		[ -e $network.w ] || ! (( $N_load )) && continue
-		echo "Retrieving \"$network.w\" from moporgic.info..." >&2
-		curl -OJRfs moporgic.info/data/2048/$network.w.xz && xz -d $network.w.xz || \
-			echo "Error: \"$network.w\" is unavailable" >&2
-	done
-	sleep 4
 
 	for token in ${tokens[@]}; do
 		token=(${token//_/ })
@@ -133,7 +125,7 @@ runas() (
 	for run in "$run" "./$run" ""; do
 		$run -\| -n none -e 0 && break
 	done >/dev/null 2>&1
-	echo ${run:?\'$@\'}
+	echo ${run:?\'$@\' is unavailable}
 )
 # measure CPU performance in GHz
 cpu-perf() (
@@ -207,6 +199,13 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then ( # execute benchm
 	done
 	networks=$(<<< "$options" egrep -o [0-9] | sort | uniq | xargs -I% echo %x6patt)
 	threads=$(<<< "$options" egrep -o [sm] | sort -r | uniq | sed -e "s/s/single/g" -e "s/m/multi/g")
+
+	for network in ${networks:-4x6patt 8x6patt}; do
+		[ -e $network.w ] && continue
+		echo "Retrieving \"$network.w\" from moporgic.info..."
+		curl -OJRfs "moporgic.info/data/2048/$network.w.xz" && xz -d $network.w.xz || \
+			echo "Error: \"$network.w\" is unavailable"
+	done
 
 	output() { tee -a 2048-bench.log; }
 	if [[ $recipes ]]; then # execute dedicated benchmarks
