@@ -148,7 +148,8 @@ envinfo() (
 	nproc=$(for cpus in ${taskset//;/ }; do echo $(taskset -c $cpus nproc)x; done | xargs)
 	[[ $taskset ]] && nproc="${nproc// /|} ($taskset)" || nproc=$(nproc)x
 	# CPU speed
-	perf=$(cpu-perf 1)G-$(cpu-perf $(nproc))G
+	perf=$(cpu-perf 1)G
+	(( $(nproc) > 1 )) && perf+=-$(cpu-perf $(nproc))G
 	# memory info
 	meminfo=$(sudo -n lshw -short -c memory 2>/dev/null | egrep -v "BIOS|cache|empty")
 	if [[ $meminfo ]]; then
