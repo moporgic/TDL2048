@@ -43,49 +43,47 @@ auto what = R"(
 moporgic/TDL2048+ - The Most Efficient TD Learning Framework for 2048
 
 Networks:
-  -n, --network [TOKEN]...  specify the n-tuple network, default is 4x6patt
-                            TOKEN is either a built-in ALIAS or a custom PATTERN
-                            - ALIAS can be 4x6patt, 8x6patt, mono, num, ...
-                            - PATTERN specifies cell locations using hex number
+  -n, --network [TOKEN]... specify the n-tuple network, default: 4x6patt
+                           TOKEN is either an ALIAS or a custom PATTERN, where
+                           ALIAS can be 4x6patt, 8x6patt, mono, num, ...
+                           PATTERN specifies cell locations using hex digits
 
 Recipes:
-  -t, --optimize [OPT]...   issue a recipe to optimize the network
-  -e, --evaluate [OPT]...   issue a recipe to evaluate the network
-                            OPT begins with execution setting LOOP[xUNIT][:WIN],
-                            followed by a list of options KEY[=VALUE]..., where
-                            - KEY can be mode, alpha, lambda, step, search, ...
-                            if [OPT]... is unprovided, default is 1000x1000:2048
-  -tt MODE                  set default recipe mode for -t
-  -et MODE                  set default recipe mode for -e
+  -t, --optimize [OPT]...  issue a recipe to optimize the network
+  -e, --evaluate [OPT]...  issue a recipe to evaluate the network
+                           OPT begins with execution setting LOOP[xUNIT][:WIN],
+                           followed by a list of options KEY[=VALUE]..., where
+                           KEY can be mode, alpha, lambda, step, search, ...
+  -tt MODE                 set default recipe mode for -t
+  -et MODE                 set default recipe mode for -e
 
 Parameters:
-  -a, --alpha ALPHA         the learning rate, default is 0.1
-                            a high learning rate 1.0 enables TC learning
-  -l, --lambda LAMBDA       the TD-lambda, default is 0
-  -N, --step STEP           the n-step, default is 1 if LAMBDA is 0; otherwise 5
-  -b, --block BLOCK         the minimal learning block, default is disabled
-  -@, --stage THRES         the multi-stage thresholds, default is disabled
-  -h, --shift THRES         the tile-downgrading threshold, default is 65536
-  -d, --depth DEPTH [OPT]   enable the search with DEPTH layers (1p,2p,3p,...)
-  -c, --cache SIZE          set the transposition table size
-  -u, --unit UNIT           the statistic display interval, default is 1000
-  -w, --win TILE            the winning threshold, default is 2048
-  -%, --info                whether to show the summary, default is auto
+  -a, --alpha ALPHA        set the learning rate, default: 0.1 (1.0 enables TC)
+  -l, --lambda LAMBDA      set the TD-lambda, default: 0 (disabled)
+  -N, --step STEP          set the n-step, default: 1 or 5 if TD-lambda is on
+  -b, --block BLOCK        set the minimal learning block, default: disabled
+  -@, --stage THRES        set the multi-stage thresholds, default: disabled
+  -h, --shift THRES        set the tile-downgrading threshold, default is 65536
+  -d, --depth DEPTH [OPT]  enable the search with specified layers: 2p, 3p, ...
+  -c, --cache SIZE         enable the TT with specified size: 1G, 2G, ...
+  -u, --unit UNIT          set the statistic display interval, default: 1000
+  -w, --win TILE           set the winning threshold, default: 2048
+  -%, --info               set whether to show the summary, default: auto
 
 Input/Output:
-  -i, --input [FILE]...     specify inputs, support weight.w and cache.c
-  -o, --output [FILE]...    specify outputs, support weight.w, cache.c, and log.x
-  -io [FILE]...             alias for -i [FILE]... -o [FILE]...
+  -i, --input [FILE]...    specify inputs, support .w and .c files
+  -o, --output [FILE]...   specify outputs, support .w, .c, and .x files
+  -io [FILE]...            alias for -i [FILE]... -o [FILE]...
 
 Miscellaneous:
-  -s, --seed [SEED]         set the seed for the pseudo-random number
-  -p, --parallel [THREAD]   enable lock-free parallelism for all recipes
-  -x, --options [OPT]...    specify other options as KEY[=VALUE]
-  -#, --comment [TEXT]...   specify command line comments
-  -?, --help                display this message and quit
+  -s, --seed [SEED]        set the seed for the pseudo-random number
+  -p, --parallel [THREAD]  enable lock-free parallelism for all recipes
+  -x, --options [OPT]...   specify other options as KEY[=VALUE]
+  -#, --comment [TEXT]...  specify command line comments
+  -?, --help               display this message and quit
 
-Report bugs and comments to "Hung Guei" <hguei@moporgic.info>
-Please refer to https://moporgic.info/2048 for more details
+Report bugs and comments to "Hung Guei" <hguei@moporgic.info>.
+Please refer to https://moporgic.info/2048 for more details.
 )";
 
 typedef float numeric;
