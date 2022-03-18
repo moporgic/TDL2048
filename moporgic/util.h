@@ -41,6 +41,9 @@
 #define PASTE_PASS(a, b) a##b
 #define PASTE(a, b) PASTE_PASS(a, b)
 
+#define STRINGIFY_(x...) #x
+#define STRINGIFY(x...)  STRINGIFY_(x)
+
 #define declare_alias_spec(alias, name, head, tail, ...)\
 template <typename... types> VA_PASS(head inline) \
 auto alias(types&&... args) VA_PASS(tail -> decltype(name(std::forward<types>(args)...)))\
@@ -99,10 +102,12 @@ namespace moporgic {
 
 template<typename... types>
 static inline std::string format(const std::string& spec, types&&... args) {
-	size_t n = std::snprintf(nullptr, 0, spec.c_str(), std::forward<types>(args)...);
-	std::string buf(n + 1, '\0');
-	buf.resize(std::snprintf(&buf[0], buf.capacity(), spec.c_str(), std::forward<types>(args)...));
-	return buf;
+	char buf[2048];
+	size_t n = std::snprintf(buf, sizeof(buf), spec.c_str(), std::forward<types>(args)...);
+	if (n < sizeof(buf)) return std::string(buf, n);
+	std::string str(n + 1, '\0');
+	str.resize(std::snprintf(&(str[0]), n + 1, spec.c_str(), std::forward<types>(args)...));
+	return str;
 }
 
 static inline uint64_t millisec() {
@@ -134,9 +139,6 @@ static __attribute__((unused)) std::string put_time(uint64_t t) {
 	return put_time(std::time_t(t));
 }
 #endif
-
-#define __DATE_ISO__ ({ std::tm t = {}; std::string DATE(__DATE__); if (DATE[4] == ' ') DATE[4] = '0'; \
-std::istringstream(DATE) >> std::get_time(&t, "%b %d %Y"); std::put_time(&t, "%Y-%m-%d");})
 
 static inline constexpr uint32_t to_hash(const char* str) noexcept {
 	uint32_t hash = 0;
@@ -216,6 +218,20 @@ static inline auto rdtsc() {
 }
 
 } /* moporgic */
+
+#define __DATE_ISO__ ({ /* convert __DATE__ to ISO format */ \
+	char* date = moporgic::static_store<char[11], std::tm>(); \
+	std::snprintf(date, 11, "%.4s-%02zu-%c%c", __DATE__ + 7, \
+		std::string("anebarprayunulugepctovec").find(__DATE__ + 1, 0, 2) / 2 + 1, \
+		__DATE__[4] | 0x30 /* ' ' --> '0' */, __DATE__[5]); \
+	date; /* YYYY-MM-DD */ \
+})
+
+#if defined(COMMIT_ID)
+#define __COMMIT_ID__ STRINGIFY(COMMIT_ID)
+#else
+#define __COMMIT_ID__ "moporgious"
+#endif
 
 namespace moporgic {
 

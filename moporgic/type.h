@@ -579,6 +579,8 @@ public:
 	constexpr inline static_store(const static_store& s) = default;
 	constexpr inline operator type&() { return instance(); }
 	constexpr inline operator const type&() const { return instance(); }
+	constexpr inline type* operator->() { return &instance(); }
+	constexpr inline const type* operator->() const { return &instance(); }
 	constexpr inline type& operator =(const type& v) { return instance() = v; }
 	static inline type& instance() { static type v; return v;}
 };
