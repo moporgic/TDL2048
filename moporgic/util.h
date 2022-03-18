@@ -221,8 +221,8 @@ static inline auto rdtsc() {
 
 #define __DATE_ISO__ ({ /* convert __DATE__ to ISO format */ \
 	char* date = moporgic::static_store<char[11], std::tm>(); \
-	std::snprintf(date, 11, "%.4s-%02zu-%c%c", __DATE__ + 7, \
-		std::string("anebarprayunulugepctovec").find(__DATE__ + 1, 0, 2) / 2 + 1, \
+	std::snprintf(date, 11, "%.4s-%02u-%c%c", __DATE__ + 7, \
+		uint32_t(std::string("anebarprayunulugepctovec").find(__DATE__ + 1, 0, 2) / 2 + 1), \
 		__DATE__[4] | 0x30 /* ' ' --> '0' */, __DATE__[5]); \
 	date; /* YYYY-MM-DD */ \
 })
