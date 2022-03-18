@@ -40,6 +40,12 @@ ifneq ($(findstring x86_64, $(MACROS)), x86_64)
     FLAGS := -Wall -Wno-psabi -fmessage-length=0
 endif
 
+# git commit id for building
+COMMIT_ID ?= $(shell git log -n1 --format=%h 2>/dev/null)$(if $(shell git status -uno 2>&1 | grep -i changes),+?)
+ifneq ($(COMMIT_ID),)
+	FLAGS += -DCOMMIT_ID=$(COMMIT_ID)
+endif
+
 default: # build with default
 	$(CXX) -std=$(STD) -O$(OLEVEL) $(addprefix -m, $(ARCH) $(INSTS)) -pthread $(FLAGS) -o $(OUTPUT) $(SOURCE)
 

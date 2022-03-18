@@ -80,6 +80,7 @@ Miscellaneous:
   -p, --parallel [THREAD]  enable lock-free parallelism for all recipes
   -x, --options [OPT]...   specify other options as KEY[=VALUE]
   -#, --comment [TEXT]...  specify command line comments
+  -v, --version            display program build revision and quit
   -?, --help               display this message and quit
 
 Report bugs and comments to "Hung Guei" <hguei@moporgic.info>.
@@ -2553,6 +2554,11 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-|"):
 			opts = {};
 			break;
+		case to_hash("-v"): case to_hash("--version"):
+			std::cout << format("TDL2048+ Rev.%s (GCC %s C++%d @ %s %s)",
+				__COMMIT_ID__, __VERSION__, __cplusplus, __DATE_ISO__, __TIME__) << std::endl;
+			std::exit(0);
+			break;
 		case to_hash("-?"): case to_hash("--help"):
 			std::cout << "Usage: " << argv[0] << " [OPTION]..." << moporgic::what;
 			std::exit(0);
@@ -2620,8 +2626,7 @@ int main(int argc, const char* argv[]) {
 	utils::init_logging(opts["save"]);
 
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "Develop" << " (GCC " << __VERSION__ << " C++" << __cplusplus
-	          << " @ " << __DATE_ISO__ << " " << __TIME__ << ")" << std::endl;
+	std::cout << "Develop" << format(" Rev.%s (GCC %s C++%d @ %s %s)", __COMMIT_ID__, __VERSION__, __cplusplus, __DATE_ISO__, __TIME__) << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 	std::cout << "time = " << put_time(millisec()) << std::endl;
