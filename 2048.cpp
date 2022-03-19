@@ -2572,7 +2572,7 @@ utils::options parse(int argc, const char* argv[]) {
 	}
 
 	if (!opts("recipes")) opts["recipes"] = "optimize", opts["optimize"] = 1000;
-	if (!opts("seed")) opts["seed"] = format("%" PRIx64, u64(rdtsc()));
+	if (!opts("seed")) opts["seed"] = format("%" PRIx32, math::fmix32(millisec()));
 
 	for (std::string recipe : opts["recipes"]) {
 		std::string form = recipe.substr(0, recipe.find('#'));
