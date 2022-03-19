@@ -2626,7 +2626,8 @@ int main(int argc, const char* argv[]) {
 	utils::init_logging(opts["save"]);
 
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
-	std::cout << "Develop" << format(" Rev.%s (GCC %s C++%d @ %s %s)", __COMMIT_ID__, __VERSION__, __cplusplus, __DATE_ISO__, __TIME__) << std::endl;
+	std::cout << "Develop" << format(" Rev.%s (GCC %s C++%d @ %s %s)",
+	             __COMMIT_ID__, __VERSION__, __cplusplus, __DATE_ISO__, __TIME__) << std::endl;
 	std::copy(argv, argv + argc, std::ostream_iterator<const char*>(std::cout, " "));
 	std::cout << std::endl;
 	std::cout << "time = " << put_time(millisec()) << std::endl;
