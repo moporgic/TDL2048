@@ -32,17 +32,17 @@ As of September 2021, TDL2048+ achieves the [state-of-the-art](https://doi.org/1
 In addition, for sufficiently large tests, 65536-tiles are reached at a rate of 0.02%.
 
 As of April 2021, TDL2048+ is the most efficient framework for 2048 in terms of speed.
-Its single-thread (ST) and multi-thread (MT) speed (moves/s) for the 4x6-tuple network are summarized as follows.
+The single-thread (ST) and multi-thread (MT) speed (moves/s) for the 4x6-tuple network are summarized as follows.
 
 |Processor         |ST Training|ST  Testing|MT Training|MT  Testing|
 |:-----------------|----------:|----------:|----------:|----------:|
+|Ryzen 9 5950X     |  5,753,458|  6,554,100| 64,696,464|102,549,921|
+|Xeon E5-2698 v4 x2|  2,943,012|  3,547,508| 56,530,890| 98,233,894|
 |Core i9-7980XE    |  3,789,824|  4,307,902| 34,947,198| 67,576,154|
 |Xeon E5-2698 v4   |  2,911,945|  3,551,124| 30,013,758| 49,707,145|
 |Core i7-6950X     |  3,237,049|  3,860,228| 22,646,286| 35,324,773|
-|Ryzen 9 5950X     |  5,753,458|  6,554,100| 21,808,224|100,496,244|
 |Core i7-6900K     |  3,080,106|  3,679,456| 17,707,134| 27,486,805|
 |Xeon E5-2696 v3   |  1,776,048|  1,983,475| 16,294,325| 21,588,230|
-|Xeon E5-2683 v3 x2|  1,442,213|  1,670,918| 14,483,794| 30,096,929|
 |Ryzen 9 3900X     |  2,674,171|  2,985,003| 13,354,437| 35,577,365|
 |Core i9-9900K     |  3,947,512|  4,520,398| 11,822,327| 31,111,269|
 |Core i7-7700K     |  2,996,736|  3,353,651|  7,171,175| 10,909,549|
@@ -661,14 +661,29 @@ Note that on Linux platforms with SHM enabled, issuing both training and testing
 
 Due to a current limitation, the speed of testing in the former may be slightly slower than that in the latter. However, should still be faster than using ```std::thread```.
 
-Finally, TDL2048+ has not been optimized to support [multiprocessing](https://en.wikipedia.org/wiki/Multiprocessing) with [non-uniform memory access (NUMA)](https://en.wikipedia.org/wiki/Non-uniform_memory_access) architecture. Parallel training on such platforms may result in speed loss.
-Therefore, it is recommended to use [```taskset```](https://man7.org/linux/man-pages/man1/taskset.1.html) to limit the execution on only a single processor.
+Finally, TDL2048+ has not been optimized to support [multiprocessing](https://en.wikipedia.org/wiki/Multiprocessing) with [non-uniform memory access (NUMA)](https://en.wikipedia.org/wiki/Non-uniform_memory_access) (i.e., multiple CPUs), [multi-die](https://www.hardwaretimes.com/amd-ccd-and-ccx-in-ryzen-processors-explained) (e.g., an AMD Ryzen 9 5950X processor has two CCDs), and similar [multi-chip](https://en.wikipedia.org/wiki/Multi-chip_module) architectures.
 
-For example, on a machine with two Intel E5-2620 v4 (8C/16T x2), the program speeds (training and testing) without and with ```taskset``` are as follows.
+On such platforms, parallel execution may result in a significant loss of training speed. Therefore, it is recommended to use [```taskset```](https://man7.org/linux/man-pages/man1/taskset.1.html) to limit the execution on only a single processor (core die) for parallel training.
+
+For examples, on a machine with two Intel E5-2698 v4, and on a machine with an AMD Ryzen 9 5950X, the parallel training speeds without and with ```taskset``` are as follows.
 ```bash
-./2048 -n 4x6patt -t 320 -e 320 # 2.4M ops, 2.7M ops
-./2048 -n 4x6patt -t 320 -e 320 -p 32 # 8.1M ops (!), 33.3M ops
-taskset -c 0-7,16-23 ./2048 -n 4x6patt -t 320 -e 320 -p 16 # 12.8M ops, 18.2M ops
+# Intel E5-2698 v4 x2 (20C/40T x2, 2 CPUs)
+./2048 -n 4x6patt -t 400 -p 80 # execute across CPUs, 14M ops (slow!)
+taskset -c 0-19,40-59 ./2048 -n 4x6patt -t 400 -p 40 # execute on CPU0 only, 28M ops
+{ # run two recipes simultaneously to maximize the utilization
+    taskset -c 0-19,40-59  ./2048 -n 4x6patt -t 400 -p 40 & # on CPU0 only
+    taskset -c 20-39,60-79 ./2048 -n 4x6patt -t 400 -p 40 & # on CPU1 only
+    wait
+} # execute one recipe per CPU, 56M ops in total
+
+# AMD Ryzen 9 5950X (16C/32T, 2 CCDs)
+./2048 -n 4x6patt -t 160 -p 32 # execute across CCDs, 22M ops (slow!)
+taskset -c 0-7,16-23 ./2048 -n 4x6patt -t 160 -p 16 # execute on CCD0 only, 34M ops
+{ # run two recipes simultaneously to maximize the utilization
+    taskset -c 0-7,16-23  ./2048 -n 4x6patt -t 160 -p 16 & # on CCD0 only
+    taskset -c 8-15,24-31 ./2048 -n 4x6patt -t 160 -p 16 & # on CCD1 only
+    wait
+} # execute one recipe per CCD, 64M ops in total
 ```
 </details>
 
