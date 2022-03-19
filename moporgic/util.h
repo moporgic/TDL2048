@@ -219,13 +219,10 @@ static inline auto rdtsc() {
 
 } /* moporgic */
 
-#define __DATE_ISO__ ({ /* convert __DATE__ to ISO format */ \
-	char* date = moporgic::static_store<char[11], std::tm>(); \
-	std::snprintf(date, 11, "%.4s-%02d-%c%c", __DATE__ + 7, \
-		int(std::string("anebarprayunulugepctovec").find(__DATE__ + 1, 0, 2) / 2 + 1), \
-		__DATE__[4] | 0x30 /* ' ' --> '0' */, __DATE__[5]); \
-	date; /* YYYY-MM-DD */ \
-})
+#define __DATE_ISO__ moporgic::format("%.4s-%02d-%c%c" /* YYYY-MM-DD */, \
+	__DATE__ + 7, \
+	int(std::string("anebarprayunulugepctovec").find(__DATE__ + 1, 0, 2) / 2 + 1), \
+	__DATE__[4] | 0x30 /* ' ' --> '0' */, __DATE__[5]).c_str()
 
 #if defined(COMMIT_ID)
 #define __COMMIT_ID__ STRINGIFY(COMMIT_ID)
