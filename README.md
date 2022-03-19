@@ -688,6 +688,7 @@ To change the winning tile of statistics, specify ```-w``` with a tile value, e.
 <details><summary>Help Message</summary>
 
 Use ```-?``` to print a brief CLI usage.
+Use ```-v``` to print the program version.
 </details>
 
 ### Log Format
@@ -698,19 +699,20 @@ A log may contain version info, CLI arguments, parameters, statistic blocks, and
 
 <details><summary>Show log structure</summary><br>
 
-At the beginning, there is build info including build name, C++ version, and build time.
+At the beginning, there is build info including build revision, compiler version, and build time.
 ```
 TDL2048+ by Hung Guei
-Develop (GCC 10.2.0 C++201402 @ 2021-01-26 16:02:47)
+Develop Rev.6063c49 (GCC 11.2.0 C++201402 @ 2022-03-19 15:09:53)
 ```
 
 The next several lines print the program arguments and some important parameters.
 ```
 ./2048 -n 4x6patt -t 10 -e 10
-time = 2021-03-04 21:39:54.142
-seed = d1b2759358
+time = 2022-03-19 15:11:11.867
+seed = aaa16f54
 alpha = 0.1
 lambda = 0, step = 1
+stage = {0}, block = 65536
 search = 1p, cache = none
 thread = 1x
 ```
@@ -727,57 +729,56 @@ Then, the training part comes with a ```optimize``` label, in which the details 
 ```
 optimize: 10
 
-001/010 115ms 4465086.96ops
-local:  avg=7628 max=27088 tile=2048 win=0.40%
-total:  avg=7628 max=27088 tile=2048 win=0.40%
+001/010 89ms 5445820.22ops
+local:  avg=7116 max=25384 tile=2048 win=0.30%
+total:  avg=7116 max=25384 tile=2048 win=0.30%
 
-002/010 152ms 4447631.58ops
-local:  avg=10757 max=28876 tile=2048 win=2.40%
-total:  avg=9193 max=28876 tile=2048 win=1.40%
+002/010 111ms 6075603.60ops
+local:  avg=10684 max=28456 tile=2048 win=1.60%
+total:  avg=8900 max=28456 tile=2048 win=0.95%
 
 ... (some lines are skipped here) ...
 
-009/010 271ms 4231693.73ops
-local:  avg=20394 max=58952 tile=4096 win=31.80%
-total:  avg=14859 max=60812 tile=4096 win=14.07%
+009/010 191ms 6037989.53ops
+local:  avg=20583 max=59268 tile=4096 win=33.10%
+total:  avg=14832 max=61324 tile=4096 win=14.21%
 
-010/010 290ms 4227275.86ops
-local:  avg=22122 max=62668 tile=4096 win=36.90%
-total:  avg=15585 max=62668 tile=4096 win=16.35%
+010/010 200ms 6040250.00ops
+local:  avg=21814 max=62996 tile=4096 win=39.60%
+total:  avg=15530 max=62996 tile=4096 win=16.75%
 ```
 
 Finally, the testing part comes with a ```evaluate``` label and ends with a summary block.
 ```
 evaluate: 10 info
 
-001/010 261ms 4688563.22ops
-local:  avg=22151 max=70588 tile=4096 win=39.20%
-total:  avg=22151 max=70588 tile=4096 win=39.20%
+001/010 177ms 6903401.13ops
+local:  avg=22022 max=72076 tile=4096 win=37.00%
+total:  avg=22022 max=72076 tile=4096 win=37.00%
 
-002/010 264ms 4674011.36ops
-local:  avg=22325 max=65016 tile=4096 win=40.00%
-total:  avg=22238 max=70588 tile=4096 win=39.60%
+002/010 175ms 6940114.29ops
+local:  avg=21870 max=72104 tile=4096 win=37.80%
+total:  avg=21946 max=72104 tile=4096 win=37.40%
 
 ... (some lines are skipped here) ...
 
-009/010 265ms 4662464.15ops
-local:  avg=22390 max=74996 tile=4096 win=39.60%
-total:  avg=22437 max=76716 tile=4096 win=39.49%
+009/010 175ms 6898908.57ops
+local:  avg=21765 max=63224 tile=4096 win=37.70%
+total:  avg=21915 max=72104 tile=4096 win=38.13%
 
-010/010 264ms 4671030.30ops
-local:  avg=22339 max=72336 tile=4096 win=40.40%
-total:  avg=22427 max=76716 tile=4096 win=39.58%
+010/010 178ms 6919629.21ops
+local:  avg=22253 max=68452 tile=4096 win=39.20%
+total:  avg=21948 max=72104 tile=4096 win=38.24%
 
-summary 2648ms 4671990.18ops
-total:  avg=22427 max=76716 tile=4096 win=39.58%
+summary 1764ms 6902075.96ops
+total:  avg=21948 max=72104 tile=4096 win=38.24%
 tile     count   score    move     rate      win
-64           1     712      95    0.01%  100.00%
-128          8    2081     201    0.08%   99.99%
-256         84    3931     318    0.84%   99.91%
-512       1207    8660     593   12.07%   99.07%
-1024      4742   17511    1037   47.42%   87.00%
-2048      3688   31325    1633   36.88%   39.58%
-4096       270   55217    2536    2.70%    2.70%
+128          6    1677     166    0.06%  100.00%
+256         93    3952     319    0.93%   99.94%
+512       1299    8712     595   12.99%   99.01%
+1024      4778   17532    1038   47.78%   86.02%
+2048      3650   31352    1635   36.50%   38.24%
+4096       174   55087    2539    1.74%    1.74%
 ```
 </details>
 
@@ -785,15 +786,15 @@ tile     count   score    move     rate      win
 
 A statistic block is the result of 1000 episodes by default, with three lines as follows.
 ```
-002/010 264ms 4674011.36ops
-local:  avg=22325 max=65016 tile=4096 win=40.00%
-total:  avg=22238 max=70588 tile=4096 win=39.60%
+002/010 175ms 6940114.29ops
+local:  avg=21870 max=72104 tile=4096 win=37.80%
+total:  avg=21946 max=72104 tile=4096 win=37.40%
 ```
 
-The first line shows the index number (```002/010```, current/total), the time used for this block (```264ms```), and the measured speed in moves/s (```4674011.36ops```).
+The first line shows the index number (```002/010```, current/total), the time used for this block (```175ms```), and the measured speed in moves/s (```6940114.29ops```).
 When using parallel execution, there is an additional ```[#]``` to display the executor id of this block.
 
-The second line, ```local```, shows the statistic of this block, including the average score (```avg=22325```), the maximum score (```max=65016```), the maximum tile (```tile=4096```), and the win rate (```win=40.00%```).
+The second line, ```local```, shows the statistic of this block, including the average score (```avg=21870```), the maximum score (```max=72104```), the maximum tile (```tile=4096```), and the win rate (```win=37.80%```).
 
 The third line, ```total```, has the same format as the second line, but shows the statistics starting from the first index (```001/xxx```) of this session. Note that ```-t 10 -e 10``` are two separate sessions.
 
@@ -801,23 +802,22 @@ The third line, ```total```, has the same format as the second line, but shows t
 
 A summary block only be attached at the end of a testing session (```-e```) by default.
 ```
-summary 2648ms 4671990.18ops
-total:  avg=22427 max=76716 tile=4096 win=39.58%
+summary 1764ms 6902075.96ops
+total:  avg=21948 max=72104 tile=4096 win=38.24%
 tile     count   score    move     rate      win
-64           1     712      95    0.01%  100.00%
-128          8    2081     201    0.08%   99.99%
-256         84    3931     318    0.84%   99.91%
-512       1207    8660     593   12.07%   99.07%
-1024      4742   17511    1037   47.42%   87.00%
-2048      3688   31325    1633   36.88%   39.58%
-4096       270   55217    2536    2.70%    2.70%
+128          6    1677     166    0.06%  100.00%
+256         93    3952     319    0.93%   99.94%
+512       1299    8712     595   12.99%   99.01%
+1024      4778   17532    1038   47.78%   86.02%
+2048      3650   31352    1635   36.50%   38.24%
+4096       174   55087    2539    1.74%    1.74%
 ```
 
-The first line shows the total time usage (```2648ms```) and the measured speed (```4671990.18ops```) of this session. The second line is the same as the ```total``` of the last statistic block.
+The first line shows the total time usage (```1764ms```) and the measured speed (```6902075.96ops```) of this session. The second line is the same as the ```total``` of the last statistic block.
 
 The tile-specific statistic is printed starting from the third line, in which ```count``` shows how many episodes end with only ```tile```; ```score``` and ```move``` show the average score and average moves of such episodes; ```rate``` shows the percentage of such episodes; and ```win``` shows the reaching rate.
 
-Take ```2048-tile``` as an example, there are ```3688``` games end with it, their average score and average moves are ```31325``` and ```1633```, respectively. Since this session has 10k games, the percentage of games ending with it is ```36.88%```; and the reaching rate is ```39.58%```, calculated from ```100% - (0.01% + 0.08% + 0.84% + 12.07% + 47.42%)```.
+Take ```2048-tile``` as an example, there are ```3650``` games end with it, their average score and average moves are ```31352``` and ```1635```, respectively. Since this session has 10k games, the percentage of games ending with it is ```36.50%```; and the reaching rate is ```38.24%```, calculated from ```100% - (0.06% + 0.93% + 12.99% + 47.78%)```.
 
 ### Utilities
 
