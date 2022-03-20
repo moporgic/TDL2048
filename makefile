@@ -41,9 +41,10 @@ ifneq ($(findstring x86_64, $(MACROS)), x86_64)
 endif
 
 # git commit id for building
-COMMIT_ID ?= $(shell git log -n1 --format=%h 2>/dev/null)$(if $(shell git status -uno 2>&1 | grep -i changes),+?)
-ifneq ($(COMMIT_ID),)
-	FLAGS += -DCOMMIT_ID=$(COMMIT_ID)
+COMMIT_ID ?= $(shell git log -n1 --format=%h 2>/dev/null)
+ifneq ($(if $(filter -DCOMMIT_ID=%, $(FLAGS)),, $(COMMIT_ID)),)
+	DIRTY := $(if $(shell git status -uno 2>&1 | grep -i changes)$(filter-out 2048.cpp, $(SOURCE)),+x)
+	FLAGS += -DCOMMIT_ID=$(COMMIT_ID)$(DIRTY)
 endif
 
 default: # build with default

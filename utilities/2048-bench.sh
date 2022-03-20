@@ -166,8 +166,8 @@ envinfo() (
 	echo "$cpuinfo @ $nproc $perf + $meminfo"
 
 	# git commit
-	commit=($(git log 2>/dev/null | head -n1 | cut -b8-14) "???????")
-	git status -uno 2>/dev/null | grep -iq changes && commit+="+?"
+	commit=($(git log -n1 --format=%h 2>/dev/null) "???????")
+	git status -uno 2>/dev/null | grep -iq changes && commit+="+x"
 	# OS name and version
 	osinfo=$(uname -o 2>/dev/null | sed "s|GNU/||")
 	[[ $(uname -r) == *lts* ]] && osinfo+=" LTS"
