@@ -47,8 +47,8 @@ public:
 
 	public:
 		cache(const cache& c) = default;
-		cache() : raw(0), ext(0), species(0), merge(0), moved(-1), legal(0) {}
-		cache(u32 r) : raw(r & 0x0ffff), ext(r & 0xf0000), species(0), merge(0), left(r, false), right(r, true), moved(-1), legal(0) {
+		cache() : raw(0), ext(0), species(0), merge(0), moved(-1), legal(0), mono(0) {}
+		cache(u32 r) : raw(r & 0x0ffff), ext(r & 0xf0000), species(0), merge(0), left(r, false), right(r, true), moved(-1), legal(0), mono(0) {
 			for (int i = 0; i < 4; i++) {
 				u32 t = ((r >> (i << 2)) & 0x0f) | ((r >> (12 + i)) & 0x10);
 				species |= (1 << t);
@@ -62,6 +62,14 @@ public:
 			moved = left.moved & right.moved;
 			if (left.moved == 0)  legal |= (0x08 | 0x01);
 			if (right.moved == 0) legal |= (0x02 | 0x04);
+
+			u32 row[] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
+						((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
+			const u32 monores[6][2] = { { 0, 1 }, { 0, 2 }, { 0, 3 }, { 1, 2 }, { 1, 3 }, { 2, 3 }, };
+			for (u32 i = 0; i < 6; i++) {
+				u32 a = row[monores[i][0]], b = row[monores[i][1]];
+				mono |= ((a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b01 : 0b10)) << (i << 1));
+			}
 		}
 
 	public:
@@ -86,8 +94,8 @@ public:
 
 		public:
 			move(const move& op) = default;
-			move() : rawh(0), exth(0), rawv(0), extv(0), score(0), moved(-1), merge(0), mono(0) {}
-			move(u32 r, bool reverse) : rawh(0), exth(0), rawv(0), extv(0), score(0), moved(-1), merge(0), mono(0) {
+			move() : rawh(0), exth(0), rawv(0), extv(0), score(0), moved(-1), merge(0) {}
+			move(u32 r, bool reverse) : rawh(0), exth(0), rawv(0), extv(0), score(0), moved(-1), merge(0) {
 				u32 row[] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
 							((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
 				if (reverse) std::reverse(row, row + 4);
@@ -120,12 +128,6 @@ public:
 				rawv = (u64(lo[0]) << 0) | (u64(lo[1]) << 16) | (u64(lo[2]) << 32) | (u64(lo[3]) << 48);
 				extv = ((hi[0] << 0) | (hi[1] << 4) | (hi[2] << 8) | (hi[3] << 12)) << 16;
 				moved = ((rawh | exth) == r) ? -1 : 0;
-
-				const u32 monores[6][2] = { { 0, 1 }, { 0, 2 }, { 0, 3 }, { 1, 2 }, { 1, 3 }, { 2, 3 }, };
-				for (u32 i = 0; i < 6; i++) {
-					u32 a = row[monores[i][0]], b = row[monores[i][1]];
-					mono |= ((a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b01 : 0b10)) << (i << 1));
-				}
 			}
 
 		public:
@@ -136,7 +138,6 @@ public:
 			u32 score; // merge score (reward)
 			i32 moved; // moved or not (moved: 0, otherwise -1)
 			u16 merge; // number of merged tiles
-			u16 mono; // monotonic decreasing value (12-bit)
 		};
 
 		template<int i> inline void moveh64(board& L, board& R) const {
@@ -168,6 +169,7 @@ public:
 		hexa layout; // layout of board-type
 		i32 moved; // moved or not
 		u32 legal; // legal actions
+		u16 mono; // cell relationship (12-bit)
 	};
 
 	inline const cache& qrow(u32 i) const { return qrow16(i); }
@@ -1100,36 +1102,24 @@ public:
 	inline hexa find64(u32 t) const { return cache::load(mask64(t)).layout; }
 	inline hexa find80(u32 t) const { return cache::load(mask80(t)).layout; }
 
-	inline u64 mono(bool left = true) const { return mono64(left); }
-	inline u64 mono64(bool left = true) const {
-		register u64 mono = 0;
-		if (left) {
-			mono |= u64(qrow16(0).left.mono) <<  0;
-			mono |= u64(qrow16(1).left.mono) << 12;
-			mono |= u64(qrow16(2).left.mono) << 24;
-			mono |= u64(qrow16(3).left.mono) << 36;
-		} else {
-			mono |= u64(qrow16(0).right.mono) <<  0;
-			mono |= u64(qrow16(1).right.mono) << 12;
-			mono |= u64(qrow16(2).right.mono) << 24;
-			mono |= u64(qrow16(3).right.mono) << 36;
-		}
-		return mono;
+	inline u64 monorow() const { return monorow64(); }
+	inline u64 monorow64() const {
+		return (u64(qrow16(0).mono) <<  0) | (u64(qrow16(1).mono) << 12) |
+		       (u64(qrow16(2).mono) << 24) | (u64(qrow16(3).mono) << 36);
 	}
-	inline u64 mono80(bool left = true) const {
-		register u64 mono = 0;
-		if (left) {
-			mono |= u64(qrow20(0).left.mono) <<  0;
-			mono |= u64(qrow20(1).left.mono) << 12;
-			mono |= u64(qrow20(2).left.mono) << 24;
-			mono |= u64(qrow20(3).left.mono) << 36;
-		} else {
-			mono |= u64(qrow20(0).right.mono) <<  0;
-			mono |= u64(qrow20(1).right.mono) << 12;
-			mono |= u64(qrow20(2).right.mono) << 24;
-			mono |= u64(qrow20(3).right.mono) << 36;
-		}
-		return mono;
+	inline u64 monorow80() const {
+		return (u64(qrow20(0).mono) <<  0) | (u64(qrow20(1).mono) << 12) |
+		       (u64(qrow20(2).mono) << 24) | (u64(qrow20(3).mono) << 36);
+	}
+
+	inline u64 monocol() const { return monocol64(); }
+	inline u64 monocol64() const {
+		return (u64(qcol16(0).mono) <<  0) | (u64(qcol16(1).mono) << 12) |
+		       (u64(qcol16(2).mono) << 24) | (u64(qcol16(3).mono) << 36);
+	}
+	inline u64 monocol80() const {
+		return (u64(qcol20(0).mono) <<  0) | (u64(qcol20(1).mono) << 12) |
+		       (u64(qcol20(2).mono) << 24) | (u64(qcol20(3).mono) << 36);
 	}
 
 	inline u32 legal() const { return legal64(); }
