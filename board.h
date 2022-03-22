@@ -80,15 +80,15 @@ public:
 			}
 			template<int i> inline void moveh80(board& mv) const {
 				moveh64<i>(mv);
-				mv.ext |= exth << (i << 2);
+				mv.ext |= u32(exth) << (16 + (i << 2));
 			}
 			template<int i> inline void movev64(board& mv) const {
-				mv.raw |= rawv << (i << 2);
+				mv.raw |= u64(rawv) << (i << 2);
 				mv.inf += score;
 			}
 			template<int i> inline void movev80(board& mv) const {
 				movev64<i>(mv);
-				mv.ext |= extv << i;
+				mv.ext |= u32(extv) << (16 + i);
 			}
 
 		public:
@@ -123,17 +123,17 @@ public:
 				u32 lo[] = { (row[0] & 0x0f), (row[1] & 0x0f), (row[2] & 0x0f), (row[3] & 0x0f) };
 				u32 hi[] = { (row[0] & 0x10) >> 4, (row[1] & 0x10) >> 4, (row[2] & 0x10) >> 4, (row[3] & 0x10) >> 4 };
 				rawh = ((lo[0] << 0) | (lo[1] << 4) | (lo[2] << 8) | (lo[3] << 12));
-				exth = ((hi[0] << 0) | (hi[1] << 1) | (hi[2] << 2) | (hi[3] << 3)) << 16;
+				exth = ((hi[0] << 0) | (hi[1] << 1) | (hi[2] << 2) | (hi[3] << 3));
 				rawv = (u64(lo[0]) << 0) | (u64(lo[1]) << 16) | (u64(lo[2]) << 32) | (u64(lo[3]) << 48);
-				extv = ((hi[0] << 0) | (hi[1] << 4) | (hi[2] << 8) | (hi[3] << 12)) << 16;
-				moved = ((rawh | exth) != r) ? -1 : 0;
+				extv = ((hi[0] << 0) | (hi[1] << 4) | (hi[2] << 8) | (hi[3] << 12));
+				moved = ((u32(rawh) | (u32(exth) << 16)) != r) ? -1 : 0;
 			}
 
 		public:
-			u32 rawh; // horizontal move (16-bit raw)
-			u32 exth; // horizontal move (4-bit extra)
+			u16 rawh; // horizontal move (16-bit raw)
+			u8 exth; // horizontal move (4-bit extra)
 			u64 rawv; // vertical move (64-bit raw)
-			u32 extv; // vertical move (16-bit extra)
+			u16 extv; // vertical move (16-bit extra)
 			u32 score; // merge score (reward)
 			i32 moved; // moved (-1) or not (0)
 			u16 merge; // number of merged tiles
