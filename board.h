@@ -388,9 +388,12 @@ public:
 		iso[5].flip80();
 	}
 
-	inline std::array<board, 8> isoms() const { return isoms64(); }
-	inline std::array<board, 8> isoms64() const { std::array<board, 8> iso; isoms64(iso.data()); return iso; }
-	inline std::array<board, 8> isoms80() const { std::array<board, 8> iso; isoms80(iso.data()); return iso; }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::array<btype, 8> isoms() const { return isoms64(); }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::array<btype, 8> isoms64() const { std::array<btype, 8> iso; isoms64(iso.data()); return iso; }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::array<btype, 8> isoms80() const { std::array<btype, 8> iso; isoms80(iso.data()); return iso; }
 
 	inline constexpr u32 empty() const { return empty64(); }
 	inline constexpr u32 empty64() const { return count64(0); }
@@ -466,9 +469,12 @@ public:
 		return i;
 	}
 
-	inline std::vector<board> popups() const   { std::vector<board> popup(empty() * 2); popups(popup.data()); return popup; }
-	inline std::vector<board> popups64() const { std::vector<board> popup(empty64() * 2); popups64(popup.data()); return popup; }
-	inline std::vector<board> popups80() const { std::vector<board> popup(empty80() * 2); popups80(popup.data()); return popup; }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::vector<btype> popups() const   { std::vector<btype> popup(empty() * 2); popups(popup.data()); return popup; }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::vector<btype> popups64() const { std::vector<btype> popup(empty64() * 2); popups64(popup.data()); return popup; }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::vector<btype> popups80() const { std::vector<btype> popup(empty80() * 2); popups80(popup.data()); return popup; }
 
 	inline i32 left()  { return left64(); }
 	inline i32 right() { return right64(); }
@@ -705,9 +711,12 @@ public:
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves80(btype move[]) const { moves80(move[0], move[1], move[2], move[3]); }
 
-	inline std::array<board, 4> moves() const   { std::array<board, 4> move; moves(move.data()); return move; }
-	inline std::array<board, 4> moves64() const { std::array<board, 4> move; moves64(move.data()); return move; }
-	inline std::array<board, 4> moves80() const { std::array<board, 4> move; moves80(move.data()); return move; }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::array<btype, 4> moves() const   { std::array<btype, 4> move; moves(move.data()); return move; }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::array<btype, 4> moves64() const { std::array<btype, 4> move; moves64(move.data()); return move; }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::array<btype, 4> moves80() const { std::array<btype, 4> move; moves80(move.data()); return move; }
 
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline u32 movals(btype move[]) const { return movals64(move); }
@@ -732,9 +741,12 @@ public:
 		return i;
 	}
 
-	inline std::vector<board> movals() const   { std::vector<board> move(4); move.resize(movals(move.data())); return move; }
-	inline std::vector<board> movals64() const { std::vector<board> move(4); move.resize(movals64(move.data())); return move; }
-	inline std::vector<board> movals80() const { std::vector<board> move(4); move.resize(movals80(move.data())); return move; }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::vector<btype> movals() const   { std::vector<btype> move(4); move.resize(movals(move.data())); return move; }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::vector<btype> movals64() const { std::vector<btype> move(4); move.resize(movals64(move.data())); return move; }
+	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
+	inline std::vector<btype> movals80() const { std::vector<btype> move(4); move.resize(movals80(move.data())); return move; }
 
 	class action {
 	public:
