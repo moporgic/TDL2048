@@ -41,14 +41,13 @@ public:
 			return pointer_cast<cache>(block)[i];
 		}
 		static __attribute__((constructor)) void make() {
-			if (load(0).moved) return;
 			for (u32 i = 0; i < (1 << 20); i++) new (const_cast<board::cache*>(&load(i))) board::cache(i);
 		}
 
 	public:
 		cache(const cache& c) = default;
-		cache() : raw(0), ext(0), species(0), merge(0), moved(-1), legal(0), mono(0) {}
-		cache(u32 r) : raw(r & 0x0ffff), ext(r & 0xf0000), species(0), merge(0), left(r, false), right(r, true), moved(-1), legal(0), mono(0) {
+		cache() : raw(0), ext(0), species(0), merge(0), moved(0), legal(0), mono(0) {}
+		cache(u32 r) : raw(r & 0x0ffff), ext(r & 0xf0000), species(0), merge(0), left(r, false), right(r, true), moved(0), legal(0), mono(0) {
 			for (int i = 0; i < 4; i++) {
 				u32 t = ((r >> (i << 2)) & 0x0f) | ((r >> (12 + i)) & 0x10);
 				species |= (1 << t);
@@ -59,9 +58,9 @@ public:
 				if ((r >> i) & 1) layout.push_back(i);
 			}
 			merge = left.merge | right.merge;
-			moved = left.moved & right.moved;
-			if (left.moved == 0)  legal |= (0x08 | 0x01);
-			if (right.moved == 0) legal |= (0x02 | 0x04);
+			moved = left.moved | right.moved;
+			if (left.moved != 0)  legal |= (0x08 | 0x01);
+			if (right.moved != 0) legal |= (0x02 | 0x04);
 
 			u32 row[] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
 						((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
@@ -94,8 +93,8 @@ public:
 
 		public:
 			move(const move& op) = default;
-			move() : rawh(0), exth(0), rawv(0), extv(0), score(0), moved(-1), merge(0) {}
-			move(u32 r, bool reverse) : rawh(0), exth(0), rawv(0), extv(0), score(0), moved(-1), merge(0) {
+			move() : rawh(0), exth(0), rawv(0), extv(0), score(0), moved(0), merge(0) {}
+			move(u32 r, bool reverse) : rawh(0), exth(0), rawv(0), extv(0), score(0), moved(0), merge(0) {
 				u32 row[] = {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >> 4) & 0x0f) | ((r >> 13) & 0x10),
 							((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
 				if (reverse) std::reverse(row, row + 4);
@@ -127,7 +126,7 @@ public:
 				exth = ((hi[0] << 0) | (hi[1] << 1) | (hi[2] << 2) | (hi[3] << 3)) << 16;
 				rawv = (u64(lo[0]) << 0) | (u64(lo[1]) << 16) | (u64(lo[2]) << 32) | (u64(lo[3]) << 48);
 				extv = ((hi[0] << 0) | (hi[1] << 4) | (hi[2] << 8) | (hi[3] << 12)) << 16;
-				moved = ((rawh | exth) == r) ? -1 : 0;
+				moved = ((rawh | exth) != r) ? -1 : 0;
 			}
 
 		public:
@@ -136,7 +135,7 @@ public:
 			u64 rawv; // vertical move (64-bit raw)
 			u32 extv; // vertical move (16-bit extra)
 			u32 score; // merge score (reward)
-			i32 moved; // moved or not (moved: 0, otherwise -1)
+			i32 moved; // moved (-1) or not (0)
 			u16 merge; // number of merged tiles
 		};
 
@@ -167,7 +166,7 @@ public:
 		hexa numof; // number of each tile-type
 		hexa mask; // mask of each tile-type
 		hexa layout; // layout of board-type
-		i32 moved; // moved or not
+		i32 moved; // moved (-1) or not (0)
 		u32 legal; // legal actions
 		u16 mono; // cell relationship (12-bit)
 	};
@@ -1158,14 +1157,12 @@ public:
 
 	inline bool movable() const   { return movable64(); }
 	inline bool movable64() const {
-		return empty64() > 0 ||
-			(qrow16(0).moved & qrow16(1).moved & qrow16(2).moved & qrow16(3).moved) == 0 ||
-			(qcol16(0).moved & qcol16(1).moved & qcol16(2).moved & qcol16(3).moved) == 0;
+		return empty64() > 0 || (qrow16(0).moved | qrow16(1).moved | qrow16(2).moved | qrow16(3).moved)
+		                     || (qcol16(0).moved | qcol16(1).moved | qcol16(2).moved | qcol16(3).moved);
 	}
 	inline bool movable80() const {
-		return empty80() > 0 ||
-			(qrow20(0).moved & qrow20(1).moved & qrow20(2).moved & qrow20(3).moved) == 0 ||
-			(qcol20(0).moved & qcol20(1).moved & qcol20(2).moved & qcol20(3).moved) == 0;
+		return empty80() > 0 || (qrow20(0).moved | qrow20(1).moved | qrow20(2).moved | qrow20(3).moved)
+		                     || (qcol20(0).moved | qcol20(1).moved | qcol20(2).moved | qcol20(3).moved);
 	}
 
 	class tile {
