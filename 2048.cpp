@@ -1467,9 +1467,6 @@ struct method {
 			esti += (feat[state] += error);
 		return esti;
 	}
-	constexpr static inline numeric illegal(const board& state, clip<feature> range = feature::feats()) {
-		return -std::numeric_limits<numeric>::max();
-	}
 
 	template<typename mode = weight::segment>
 	struct common {
@@ -1764,8 +1761,8 @@ struct state : board {
 	}
 	inline numeric evaluate(
 			clip<feature> range = feature::feats(), method::estimator estim = method::estimate) {
-		estim = info() != -1u ? estim : method::illegal;
-		return estimate(range, estim);
+		esti = info() != -1u ? estimate(range, estim) : -std::numeric_limits<numeric>::max();
+		return esti;
 	}
 	inline numeric instruct(numeric exact, numeric alpha = method::alpha(),
 			clip<feature> range = feature::feats(), method esopt = {method::estimate, method::optimize}) {
