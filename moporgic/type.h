@@ -21,8 +21,12 @@ class byte;
 class half;
 class hexadeca;
 class bihexadeca;
+template<typename raw_t> class bitset_iterator;
 typedef hexadeca hex;
 typedef bihexadeca hexa;
+typedef bitset_iterator<u32> nthit;
+typedef bitset_iterator<u32> nthit32;
+typedef bitset_iterator<u64> nthit64;
 }
 typedef moporgic::byte byte;
 typedef moporgic::half f16;
@@ -465,6 +469,43 @@ public:
 	constexpr void pop_back() noexcept { resize(size() - 1); }
 protected:
 	u64 ext;
+};
+
+namespace math {
+static inline constexpr u32 tzcnt(u32) noexcept;
+static inline constexpr u32 nthset(u32, u32) noexcept;
+static inline constexpr u32 popcnt(u32) noexcept;
+}
+
+template<typename raw_t>
+class bitset_iterator {
+public:
+	typedef u32 value_type;
+	typedef std::forward_iterator_tag iterator_category;
+public:
+	constexpr bitset_iterator(raw_t x = 0) noexcept : x(x) {}
+	constexpr operator raw_t&() noexcept { return x; }
+	constexpr operator raw_t() const noexcept { return x; }
+public:
+	constexpr u32 operator [](u32 i) const noexcept { return math::tzcnt(math::nthset(x, i)); }
+	constexpr u32 at(u32 i) const noexcept { return operator [](i); }
+	constexpr u32 front() const noexcept { return at(0); }
+	constexpr u32 back() const noexcept { return at(size() - 1); }
+	constexpr size_t size() const noexcept { return math::popcnt(x); }
+	constexpr bool   empty() const noexcept { return size() == 0; }
+	constexpr bitset_iterator begin() const noexcept { return bitset_iterator(x); }
+	constexpr bitset_iterator end() const noexcept { return bitset_iterator(0); }
+public:
+	constexpr u32  operator *() const noexcept { return math::tzcnt(x); }
+	constexpr bool operator ==(const bitset_iterator& it) const noexcept { return x == it.x; }
+	constexpr bool operator !=(const bitset_iterator& it) const noexcept { return x != it.x; }
+	constexpr bool operator < (const bitset_iterator& it) const noexcept { return math::tzcnt(x) < math::tzcnt(it.x); }
+	constexpr bitset_iterator  operator + (u32 n) const noexcept { bitset_iterator it(x); return it += n; }
+	constexpr bitset_iterator& operator +=(u32 n) noexcept { while (n--) x &= (x - 1);; return *this; }
+	constexpr bitset_iterator& operator ++() noexcept { x &= (x - 1); return *this; }
+	constexpr bitset_iterator  operator ++(int) noexcept { return iter(x & (x - 1)); }
+protected:
+	raw_t x;
 };
 
 } /* namespace moporgic */
