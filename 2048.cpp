@@ -1632,15 +1632,15 @@ struct method {
 
 		static inline numeric search_expt(const board& after, u32 depth, clip<feature> range = feature::feats()) {
 			numeric expt = 0;
-			u64 where = after.where(0);
-			u32 empty = math::popcnt(where);
+			u64it slots = after.where(0);
+			u32 empty = slots.size();
 			depth = std::min(depth, limit(empty));
 			cache::block::access lookup = cache::find(after, depth);
 			if (lookup) return lookup.fetch();
 			if (!depth) return source::estimate(after, range);
-			for (u64 which; (which = where & -where); where &= where - 1) {
-				expt += 0.9 * search_best(u64(after) | (which << 0), depth - 1, range);
-				expt += 0.1 * search_best(u64(after) | (which << 1), depth - 1, range);
+			for (u64 slot; (slot = *slots) != 0; slots++) {
+				expt += 0.9 * search_best(u64(after) | (slot << 0), depth - 1, range);
+				expt += 0.1 * search_best(u64(after) | (slot << 1), depth - 1, range);
 			}
 			expt = lookup.store(expt / empty);
 			return expt;
