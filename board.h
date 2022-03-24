@@ -41,14 +41,15 @@ public:
 			return pointer_cast<cache>(block)[i];
 		}
 		static __attribute__((constructor)) void make() {
-			for (u32 i = 0; i < (1 << 20); i++) new (const_cast<board::cache*>(&load(i))) board::cache(i);
+			for (u32 i = 0; i < (1 << 20); i++) new (const_cast<cache*>(&load(i))) cache(i);
 		}
 
 	public:
 		cache(const cache& c) = default;
 		cache(u32 src) : raw(src & 0xffffu), ext(src >> 16) {
-			auto row = unpack(src);
-			for (u32 t : row) {
+			std::array<u32, 4> row;
+			for (u32 i = 0; i < 4; i++) {
+				u32 t = row[i] = ((src >> (i << 2)) & 0x0f) | ((src >> (i + 12)) & 0x10);
 				species |= (1 << t);
 				numof[t] += 1;
 			}
@@ -63,7 +64,6 @@ public:
 			mvr = std::get<0>(res_r);
 			score = std::get<1>(res_l);
 			merge = std::get<2>(res_l);
-
 			moved = (mvl.moved | mvr.moved);
 			legal = (mvl.moved & 0b1001) | (mvr.moved & 0b0110);
 		}
@@ -103,10 +103,6 @@ public:
 		};
 
 	protected:
-		std::array<u32, 4> unpack(u32 src) const {
-			return {((src >>  0) & 0x0f) | ((src >> 12) & 0x10), ((src >>  4) & 0x0f) | ((src >> 13) & 0x10),
-			        ((src >>  8) & 0x0f) | ((src >> 14) & 0x10), ((src >> 12) & 0x0f) | ((src >> 15) & 0x10)};
-		}
 		std::tuple<move, u32, u32> slide(std::array<u32, 4> row, u32 src, int step = 1) const {
 			u32 score = 0, merge = 0;
 			u32 idx[4] = {0, 1, 2, 3};
@@ -149,7 +145,6 @@ public:
 			case action::left:  mvl.moveh80<i>(mv); mv.inf += score; break;
 			}
 		}
-
 		template<int i> inline void moveh64(board& L, board& R) const {
 			move64<action::left,  i>(L);
 			move64<action::right, i>(R);
