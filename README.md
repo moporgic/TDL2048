@@ -643,6 +643,8 @@ To prevent this from happening, set the unit instead of using the default (1000)
 ./2048 -n 4x6patt -i 4x6patt.w -d 5p -c 64G -e 20x500 -p 20
 ```
 
+Due to lock-free parallelism, when there are too many agents (threads) asynchronously updating the n-tuple weights of a newly initialized network, the network is likely to be corrupted by lock-free writes. Therefore, it is recommended to turn off the parallelism at the beginning of training.
+
 In addition, the program will automatically toggle the use of [shared memory (SHM)](https://en.wikipedia.org/wiki/Shared_memory) on Linux platforms, since using ```fork``` with SHM performs better than using ```std::thread``` in speed.
 
 To explicitly disable the SHM, add ```noshm``` with ```-p``` to tell the program to use ```std::thread```.
