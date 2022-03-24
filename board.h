@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : moporgic/TDL2048+ - board.h
 // Author      : Hung Guei @ moporgic
-// Version     : 6.3
+// Version     : 6.4
 // Description : The Most Effective Bitboard Implementation for 2048
 //============================================================================
 
@@ -46,165 +46,139 @@ public:
 
 	public:
 		cache(const cache& c) = default;
-		cache() : raw(0), ext(0), species(0), merge(0), score(0),
-				l_rawh(0), l_exth(0), l_rawv(0), l_extv(0), l_moved(0),
-				r_rawh(0), r_exth(0), r_rawv(0), r_extv(0), r_moved(0),
-				numof{}, mask{}, layout{}, moved(0), legal(0), mono(0) {}
-		cache(u32 r) : cache() {
-			for (int i = 0; i < 4; i++) {
-				u32 t = ((r >> (i << 2)) & 0x0f) | ((r >> (12 + i)) & 0x10);
+		cache(u32 src) : raw(src & 0xffffu), ext(src >> 16) {
+			auto row = unpack(src);
+			for (u32 t : row) {
 				species |= (1 << t);
 				numof[t] += 1;
-				mask[t] |= (1 << i);
 			}
-
-			std::array<u32, 4> row = idx_to_row(r);
-
-			auto l_row = row;
-			u64 msbuf = slide_to_lowest(l_row);
-			merge = msbuf >> 32;
-			score = msbuf & 0xffffffffu;
-			store_res(l_row, l_rawh, l_exth, l_rawv, l_extv);
-			l_moved = ((u32(l_rawh) | (u32(l_exth) << 16)) != r) ? -1 : 0;
-
-			auto r_row = row;
-			std::reverse(r_row.begin(), r_row.end());
-			slide_to_lowest(r_row);
-			std::reverse(r_row.begin(), r_row.end());
-			store_res(r_row, r_rawh, r_exth, r_rawv, r_extv);
-			r_moved = ((u32(r_rawh) | (u32(r_exth) << 16)) != r) ? -1 : 0;
-
-			for (int i = 0; i < 16; i++) {
-				if ((r >> i) & 1) layout.push_back(i);
-			}
-			moved = l_moved | r_moved;
-			if (l_moved != 0) legal |= (0x08 | 0x01);
-			if (r_moved != 0) legal |= (0x02 | 0x04);
-
-			const u32 monores[6][2] = { { 0, 1 }, { 0, 2 }, { 0, 3 }, { 1, 2 }, { 1, 3 }, { 2, 3 }, };
+			u32 cmp[6][2] = {{0, 1}, {0, 2}, {0, 3}, {1, 2}, {1, 3}, {2, 3}};
 			for (u32 i = 0; i < 6; i++) {
-				u32 a = row[monores[i][0]], b = row[monores[i][1]];
-				mono |= ((a == b ? (a ? 0b11 : 0b00) : (a > b ? 0b01 : 0b10)) << (i << 1));
+				u32 t0 = row[cmp[i][0]], t1 = row[cmp[i][1]];
+				mono |= ((t0 | t1) ? ((t0 >= t1) | ((t1 >= t0) << 1)) : 0) << (i << 1);
 			}
+			auto res_l = slide(row, src, +1);
+			auto res_r = slide(row, src, -1);
+			mvl = std::get<0>(res_l);
+			mvr = std::get<0>(res_r);
+			score = std::get<1>(res_l);
+			merge = std::get<2>(res_l);
+
+			moved = (mvl.moved | mvr.moved);
+			legal = (mvl.moved & 0b1001) | (mvr.moved & 0b0110);
 		}
 
-	private:
-		std::array<u32, 4> idx_to_row(u32 r) const {
-			return {((r >> 0) & 0x0f) | ((r >> 12) & 0x10), ((r >>  4) & 0x0f) | ((r >> 13) & 0x10),
-			        ((r >> 8) & 0x0f) | ((r >> 14) & 0x10), ((r >> 12) & 0x0f) | ((r >> 15) & 0x10)};
+		class move {
+		public:
+			move() : rawh(), exth(), moved(), extv(), rawv() {}
+			move(const std::array<u32, 4>& row, u32 src) {
+				u32 lo[] = { (row[0] & 0x0f),      (row[1] & 0x0f),      (row[2] & 0x0f),      (row[3] & 0x0f) };
+				u32 hi[] = { (row[0] & 0x10) >> 4, (row[1] & 0x10) >> 4, (row[2] & 0x10) >> 4, (row[3] & 0x10) >> 4 };
+				rawh  = (     (lo[0]  <<  0)  | (    lo[1]  <<  4)  | (    lo[2]  <<  8)  | (    lo[3]  << 12) );
+				exth  = (     (hi[0]  <<  0)  | (    hi[1]  <<  1)  | (    hi[2]  <<  2)  | (    hi[3]  <<  3) );
+				rawv  = ( (u64(lo[0]) <<  0)  | (u64(lo[1]) << 16)  | (u64(lo[2]) << 32)  | (u64(lo[3]) << 48) );
+				extv  = (     (hi[0]  <<  0)  | (    hi[1]  <<  4)  | (    hi[2]  <<  8)  | (    hi[3]  << 12) );
+				moved = ( (u32(rawh) | (u32(exth) << 16)) != src) ? -1 : 0;
+			}
+			template<int i> inline void moveh64(board& mv) const {
+				mv.raw |= u64(rawh) << (i << 4);
+			}
+			template<int i> inline void moveh80(board& mv) const {
+				mv.raw |= u64(rawh) << (i << 4);
+				mv.ext |= u32(exth) << (16 + (i << 2));
+			}
+			template<int i> inline void movev64(board& mv) const {
+				mv.raw |= u64(rawv) << (i << 2);
+			}
+			template<int i> inline void movev80(board& mv) const {
+				mv.raw |= u64(rawv) << (i << 2);
+				mv.ext |= u32(extv) << (16 + i);
+			}
+		public:
+			u16 rawh;  // horizontal move (16-bit raw)
+			u8  exth;  // horizontal move (4-bit extra)
+			i8  moved; // moved (-1) or not (0)
+			u16 extv;  // vertical move (16-bit extra)
+			u64 rawv;  // vertical move (64-bit raw)
+		};
+
+	protected:
+		std::array<u32, 4> unpack(u32 src) const {
+			return {((src >>  0) & 0x0f) | ((src >> 12) & 0x10), ((src >>  4) & 0x0f) | ((src >> 13) & 0x10),
+			        ((src >>  8) & 0x0f) | ((src >> 14) & 0x10), ((src >> 12) & 0x0f) | ((src >> 15) & 0x10)};
 		}
-		void store_res(const std::array<u32, 4>& row, u16& rawh, u8& exth, u64& rawv, u16& extv) const {
-			u32 lo[] = { (row[0] & 0x0f), (row[1] & 0x0f), (row[2] & 0x0f), (row[3] & 0x0f) };
-			u32 hi[] = { (row[0] & 0x10) >> 4, (row[1] & 0x10) >> 4, (row[2] & 0x10) >> 4, (row[3] & 0x10) >> 4 };
-			rawh = ((lo[0] << 0) | (lo[1] << 4) | (lo[2] << 8) | (lo[3] << 12));
-			exth = ((hi[0] << 0) | (hi[1] << 1) | (hi[2] << 2) | (hi[3] << 3));
-			rawv = (u64(lo[0]) << 0) | (u64(lo[1]) << 16) | (u64(lo[2]) << 32) | (u64(lo[3]) << 48);
-			extv = ((hi[0] << 0) | (hi[1] << 4) | (hi[2] << 8) | (hi[3] << 12));
-		}
-		u64 slide_to_lowest(std::array<u32, 4>& row) const {
+		std::tuple<move, u32, u32> slide(std::array<u32, 4> row, u32 src, int step = 1) const {
 			u32 score = 0, merge = 0;
-			u32 top = 0, hold = 0;
-			for (u32 i = 0; i < 4; i++) {
+			u32 idx[4] = {0, 1, 2, 3};
+			if (step == -1) std::reverse(idx, idx + 4);
+			u32 top = idx[0], hold = 0;
+			for (u32 i : idx) {
 				u32 tile = row[i];
 				if (tile == 0) continue;
 				row[i] = 0;
 				if (hold) {
 					if (tile == hold) {
-						row[top++] = ++tile;
+						hold = ++tile;
 						score += (1 << tile);
 						merge++;
-						hold = 0;
-					} else {
-						row[top++] = hold;
-						hold = tile;
+						tile = 0;
 					}
-				} else {
-					hold = tile;
+					row[top] = hold;
+					top += step;
 				}
+				hold = tile;
 			}
-			if (hold) row[top] = hold;
-			return (u64(merge) << 32) | u64(score);
+			row[top] = hold;
+			return {move(row, src), score, merge};
 		}
 
 	public:
-		template<int i> inline void movel64(board& mv) const {
-			mv.raw |= u64(l_rawh) << (i << 4);
-			mv.inf += score;
+		template<u32 op, u32 i> inline void move64(board& mv) const {
+			switch (op) {
+			case action::up:    mvl.movev64<i>(mv); mv.inf += score; break;
+			case action::right: mvr.moveh64<i>(mv); mv.inf += score; break;
+			case action::down:  mvr.movev64<i>(mv); mv.inf += score; break;
+			case action::left:  mvl.moveh64<i>(mv); mv.inf += score; break;
+			}
 		}
-		template<int i> inline void movel80(board& mv) const {
-			movel64<i>(mv);
-			mv.ext |= u32(l_exth) << (16 + (i << 2));
-		}
-		template<int i> inline void moveu64(board& mv) const {
-			mv.raw |= u64(l_rawv) << (i << 2);
-			mv.inf += score;
-		}
-		template<int i> inline void moveu80(board& mv) const {
-			moveu64<i>(mv);
-			mv.ext |= u32(l_extv) << (16 + i);
-		}
-
-		template<int i> inline void mover64(board& mv) const {
-			mv.raw |= u64(l_rawh) << (i << 4);
-			mv.inf += score;
-		}
-		template<int i> inline void mover80(board& mv) const {
-			mover64<i>(mv);
-			mv.ext |= u32(l_exth) << (16 + (i << 2));
-		}
-		template<int i> inline void moved64(board& mv) const {
-			mv.raw |= u64(l_rawv) << (i << 2);
-			mv.inf += score;
-		}
-		template<int i> inline void moved80(board& mv) const {
-			moved64<i>(mv);
-			mv.ext |= u32(l_extv) << (16 + i);
+		template<u32 op, u32 i> inline void move80(board& mv) const {
+			switch (op) {
+			case action::up:    mvl.movev80<i>(mv); mv.inf += score; break;
+			case action::right: mvr.moveh80<i>(mv); mv.inf += score; break;
+			case action::down:  mvr.movev80<i>(mv); mv.inf += score; break;
+			case action::left:  mvl.moveh80<i>(mv); mv.inf += score; break;
+			}
 		}
 
 		template<int i> inline void moveh64(board& L, board& R) const {
-			movel64<i>(L);
-			mover64<i>(R);
+			move64<action::left,  i>(L);
+			move64<action::right, i>(R);
 		}
 		template<int i> inline void moveh80(board& L, board& R) const {
-			movel80<i>(L);
-			mover80<i>(R);
+			move80<action::left,  i>(L);
+			move80<action::right, i>(R);
 		}
 		template<int i> inline void movev64(board& U, board& D) const {
-			moveu64<i>(U);
-			moved64<i>(D);
+			move64<action::up,   i>(U);
+			move64<action::down, i>(D);
 		}
 		template<int i> inline void movev80(board& U, board& D) const {
-			moveu80<i>(U);
-			moved80<i>(D);
+			move80<action::up,   i>(U);
+			move80<action::down, i>(D);
 		}
 
 	public:
-		u32 raw; // base row (16-bit raw)
-		u32 ext; // base row (4-bit extra)
-		u32 species; // species of this row
-		u32 merge; // number of merged tiles
-		u32 score; // merge score (reward)
-
-//		move left; // left operation
-		u16 l_rawh; // horizontal move (16-bit raw)
-		u8  l_exth; // horizontal move (4-bit extra)
-		u64 l_rawv; // vertical move (64-bit raw)
-		u16 l_extv; // vertical move (16-bit extra)
-		i32 l_moved; // moved (-1) or not (0)
-
-//		move right; // right operation
-		u16 r_rawh; // horizontal move (16-bit raw)
-		u8  r_exth; // horizontal move (4-bit extra)
-		u64 r_rawv; // vertical move (64-bit raw)
-		u16 r_extv; // vertical move (16-bit extra)
-		i32 r_moved; // moved (-1) or not (0)
-
-		hexa numof; // number of each tile-type
-		hexa mask; // mask of each tile-type
-		hexa layout; // layout of board-type
-		i32 moved; // moved (-1) or not (0)
-		u32 legal; // legal actions
-		u16 mono; // cell relationship (12-bit)
+		u16  raw;     // 16-bit raw of this row
+		u8   ext;     // 4-bit extra of this row
+		u8   legal;   // legal actions (4-bit)
+		u32  species; // species of this row
+		hexa numof;   // number of each tile-type
+		move mvl;     // LUT for moving left/up
+		move mvr;     // LUT for moving right/down
+		u32  score;   // merge score (reward)
+		u8   merge;   // number of merged tiles
+		i8   moved;   // moved (-1) or not (0)
+		u16  mono;    // cell relationship (12-bit)
 	};
 
 	inline const cache& qrow(u32 i) const { return qrow16(i); }
@@ -436,9 +410,9 @@ public:
 	inline constexpr u32 empty64() const { return count64(0); }
 	inline constexpr u32 empty80() const { return count80(0); }
 
-	inline hexa spaces() const { return spaces64(); }
-	inline hexa spaces64() const { return find64(0); }
-	inline hexa spaces80() const { return find80(0); }
+	inline nthit spaces() const { return spaces64(); }
+	inline nthit spaces64() const { return find64(0); }
+	inline nthit spaces80() const { return find80(0); }
 
 	inline void init() {
 		u32 u = moporgic::rand();
@@ -520,74 +494,74 @@ public:
 
 	inline i32 left64() {
 		board move;
-		qrow16(0).movel64<0>(move);
-		qrow16(1).movel64<1>(move);
-		qrow16(2).movel64<2>(move);
-		qrow16(3).movel64<3>(move);
+		qrow16(0).move64<action::left, 0>(move);
+		qrow16(1).move64<action::left, 1>(move);
+		qrow16(2).move64<action::left, 2>(move);
+		qrow16(3).move64<action::left, 3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
 		return operator =(move).inf;
 	}
 	inline i32 right64() {
 		board move;
-		qrow16(0).mover64<0>(move);
-		qrow16(1).mover64<1>(move);
-		qrow16(2).mover64<2>(move);
-		qrow16(3).mover64<3>(move);
+		qrow16(0).move64<action::right, 0>(move);
+		qrow16(1).move64<action::right, 1>(move);
+		qrow16(2).move64<action::right, 2>(move);
+		qrow16(3).move64<action::right, 3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
 		return operator =(move).inf;
 	}
 	inline i32 up64() {
 		board move;
-		qcol16(0).moveu64<0>(move);
-		qcol16(1).moveu64<1>(move);
-		qcol16(2).moveu64<2>(move);
-		qcol16(3).moveu64<3>(move);
+		qcol16(0).move64<action::up, 0>(move);
+		qcol16(1).move64<action::up, 1>(move);
+		qcol16(2).move64<action::up, 2>(move);
+		qcol16(3).move64<action::up, 3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
 		return operator =(move).inf;
 	}
 	inline i32 down64() {
 		board move;
-		qcol16(0).moved64<0>(move);
-		qcol16(1).moved64<1>(move);
-		qcol16(2).moved64<2>(move);
-		qcol16(3).moved64<3>(move);
+		qcol16(0).move64<action::down, 0>(move);
+		qcol16(1).move64<action::down, 1>(move);
+		qcol16(2).move64<action::down, 2>(move);
+		qcol16(3).move64<action::down, 3>(move);
 		move.inf |= (move.raw ^ raw) ? 0 : -1;
 		return operator =(move).inf;
 	}
 
 	inline i32 left80() {
 		board move;
-		qrow20(0).movel80<0>(move);
-		qrow20(1).movel80<1>(move);
-		qrow20(2).movel80<2>(move);
-		qrow20(3).movel80<3>(move);
+		qrow20(0).move80<action::left, 0>(move);
+		qrow20(1).move80<action::left, 1>(move);
+		qrow20(2).move80<action::left, 2>(move);
+		qrow20(3).move80<action::left, 3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
 		return operator =(move).inf;
 	}
 	inline i32 right80() {
 		board move;
-		qrow20(0).mover80<0>(move);
-		qrow20(1).mover80<1>(move);
-		qrow20(2).mover80<2>(move);
-		qrow20(3).mover80<3>(move);
+		qrow20(0).move80<action::right, 0>(move);
+		qrow20(1).move80<action::right, 1>(move);
+		qrow20(2).move80<action::right, 2>(move);
+		qrow20(3).move80<action::right, 3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
 		return operator =(move).inf;
 	}
 	inline i32 up80() {
 		board move;
-		qcol20(0).moveu80<0>(move);
-		qcol20(1).moveu80<1>(move);
-		qcol20(2).moveu80<2>(move);
-		qcol20(3).moveu80<3>(move);
+		qcol20(0).move80<action::up, 0>(move);
+		qcol20(1).move80<action::up, 1>(move);
+		qcol20(2).move80<action::up, 2>(move);
+		qcol20(3).move80<action::up, 3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
 		return operator =(move).inf;
 	}
 	inline i32 down80() {
 		board move;
-		qcol20(0).moved80<0>(move);
-		qcol20(1).moved80<1>(move);
-		qcol20(2).moved80<2>(move);
-		qcol20(3).moved80<3>(move);
+		qcol20(0).move80<action::down, 0>(move);
+		qcol20(1).move80<action::down, 1>(move);
+		qcol20(2).move80<action::down, 2>(move);
+		qcol20(3).move80<action::down, 3>(move);
 		move.inf |= (move.raw ^ raw) | (move.ext ^ ext) ? 0 : -1;
 		return operator =(move).inf;
 	}
@@ -1133,9 +1107,9 @@ public:
 		for (u32 i = min; i < max; i++) msk[i] = mask80(i);
 	}
 
-	inline hexa find(u32 t) const { return find64(t); }
-	inline hexa find64(u32 t) const { return cache::load(mask64(t)).layout; }
-	inline hexa find80(u32 t) const { return cache::load(mask80(t)).layout; }
+	inline nthit find(u32 t) const { return find64(t); }
+	inline nthit find64(u32 t) const { return nthit(mask64(t)); }
+	inline nthit find80(u32 t) const { return nthit(mask80(t)); }
 
 	inline u64 monorow() const { return monorow64(); }
 	inline u64 monorow64() const {
@@ -1169,27 +1143,9 @@ public:
 		return (hori & 0x0a) | (vert & 0x05);
 	}
 
-	inline hex actions() const { return actions64(); }
-	inline hex actions64() const {
-		u32 o = legal64();
-		u32 n = math::popcnt(o);
-		u32 k = 0;
-		k |= (math::popcnt((o & -o) - 1) <<  0) & 0x000fu; o &= o - 1;
-		k |= (math::popcnt((o & -o) - 1) <<  4) & 0x00ffu; o &= o - 1;
-		k |= (math::popcnt((o & -o) - 1) <<  8) & 0x0fffu; o &= o - 1;
-		k |= (math::popcnt((o & -o) - 1) << 12) & 0xffffu; o &= o - 1;
-		return k | (u64(n) << 60);
-	}
-	inline hex actions80() const {
-		u32 o = legal80();
-		u32 n = math::popcnt(o);
-		u32 k = 0;
-		k |= (math::popcnt((o & -o) - 1) <<  0) & 0x000fu; o &= o - 1;
-		k |= (math::popcnt((o & -o) - 1) <<  4) & 0x00ffu; o &= o - 1;
-		k |= (math::popcnt((o & -o) - 1) <<  8) & 0x0fffu; o &= o - 1;
-		k |= (math::popcnt((o & -o) - 1) << 12) & 0xffffu; o &= o - 1;
-		return k | (u64(n) << 60);
-	}
+	inline nthit actions() const { return actions64(); }
+	inline nthit actions64() const { return nthit(legal64()); }
+	inline nthit actions80() const { return nthit(legal80()); }
 
 	inline bool movable() const   { return movable64(); }
 	inline bool movable64() const {

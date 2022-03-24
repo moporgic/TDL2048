@@ -2423,7 +2423,7 @@ statistic run(utils::options::option opt) {
 			board b;
 			u32 score = 0;
 			u32 opers = 0;
-			hex a;
+			nthit a;
 
 			for (b.init(); (a = b.actions()).size(); b.next()) {
 				score += b.move(a[moporgic::rand() % a.size()]);
