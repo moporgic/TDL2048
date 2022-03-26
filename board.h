@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : moporgic/TDL2048+ - board.h
 // Author      : Hung Guei @ moporgic
-// Version     : 6.4
+// Version     : 6.5
 // Description : The Most Effective Bitboard Implementation for 2048
 //============================================================================
 
@@ -15,12 +15,11 @@ namespace moporgic {
 class board {
 private:
 	u64 raw;
-	u32 ext;
+	u16 ext;
 	u32 inf;
 
 public:
-	inline constexpr board(u64 raw = 0, u32 ext = 0, u32 inf = 0) : raw(raw), ext(ext), inf(inf) {}
-	inline constexpr board(u64 raw, u16 ext) : board(raw, u32(ext) << 16) {}
+	inline constexpr board(u64 raw = 0, u16 ext = 0, u32 inf = 0) : raw(raw), ext(ext), inf(inf) {}
 	inline constexpr board(const board& b) = default;
 	inline constexpr board& operator =(u64 x) { raw = x; ext = 0; return *this; }
 	inline constexpr board& operator =(const board& b) = default;
@@ -30,7 +29,7 @@ public:
 	declare_comparators_with(const board&, raw_cast<u128>(*this), raw_cast<u128>(v), inline constexpr)
 
 	inline constexpr void set(u64 x) { raw = x; }
-	inline constexpr void set(u64 x, u16 e) { raw = x; ext = e << 16; }
+	inline constexpr void set(u64 x, u16 e) { raw = x; ext = e; }
 	inline constexpr void set(const board& b) { raw = b.raw; ext = b.ext; }
 
 public:
@@ -85,14 +84,14 @@ public:
 			}
 			template<int i> inline void moveh80(board& mv) const {
 				mv.raw |= u64(rawh) << (i << 4);
-				mv.ext |= u32(exth) << (16 + (i << 2));
+				mv.ext |= u16(exth) << (i << 2);
 			}
 			template<int i> inline void movev64(board& mv) const {
 				mv.raw |= u64(rawv) << (i << 2);
 			}
 			template<int i> inline void movev80(board& mv) const {
 				mv.raw |= u64(rawv) << (i << 2);
-				mv.ext |= u32(extv) << (16 + i);
+				mv.ext |= u16(extv) << (i);
 			}
 		public:
 			u16 rawh;  // horizontal move (16-bit raw)
@@ -186,10 +185,10 @@ public:
 
 	inline constexpr u32 row(u32 i) const { return row16(i); }
 	inline constexpr u32 row16(u32 i) const {
-		return ((raw >> (i << 4)) & 0xffff);
+		return u32(raw >> (i << 4)) & 0xffff;
 	}
 	inline constexpr u32 row20(u32 i) const {
-		return row16(i) | ((ext >> (i << 2)) & 0xf0000);
+		return row16(i) | ((u32(ext >> (i << 2)) << 16) & 0xf0000);
 	}
 	inline constexpr void row(u32 i, u32 r) { row16(i, r); }
 	inline constexpr void row16(u32 i, u32 r) {
@@ -197,7 +196,7 @@ public:
 	}
 	inline constexpr void row20(u32 i, u32 r) {
 		row16(i, r & 0xffff);
-		ext = (ext & ~(0xf0000 << (i << 2))) | ((r & 0xf0000) << (i << 2));
+		ext = (ext & ~(0x000f << (i << 2))) | ((r >> 16) << (i << 2));
 	}
 
 	inline constexpr u32 col(u32 i) const { return col16(i); }
@@ -210,9 +209,9 @@ public:
 	}
 	inline constexpr u32 col20(u32 i) const {
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_COL)
-		return col16(i) | (math::pext32(ext, 0x11110000u << i) << 16);
+		return col16(i) | (math::pext32(ext, 0x1111u << i) << 16);
 #else
-		return col16(i) | (((((ext >> i) & 0x11110000u) * 0x1248u) >> 12) & 0xf0000u);
+		return col16(i) | ((((ext >> i) & 0x1111u) * 0x12480u) & 0xf0000u);
 #endif
 	}
 	inline constexpr void col(u32 i, u32 c) { col16(i, c); }
@@ -227,13 +226,13 @@ public:
 	}
 	inline constexpr void col20(u32 i, u32 c) {
 		col16(i, c & 0xffff);
-		u32 m = 0x11110000u << i;
+		u32 m = 0x1111u << i;
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_COL)
 		ext = (ext & ~m) | math::pdep32(c >> 16, m);
 #else
-		u32 e = c & 0xf0000u;
+		u32 e = c >> 16;
 		u32 x = e | (e << 3) | (e << 6) | (e << 9);
-		ext = (ext & ~m) | ((x & 0x11110000u) << i);
+		ext = (ext & ~m) | ((x & 0x1111u) << i);
 #endif
 	}
 
@@ -242,7 +241,7 @@ public:
 		return (raw >> (i << 2)) & 0x0f;
 	}
 	inline constexpr u32 at5(u32 i) const {
-		return at4(i) | ((ext >> (i + 12)) & 0x10);
+		return at4(i) | ((ext >> i << 4) & 0x10);
 	}
 	inline constexpr void at(u32 i, u32 t) { at4(i, t); }
 	inline constexpr void at4(u32 i, u32 t) {
@@ -250,7 +249,7 @@ public:
 	}
 	inline constexpr void at5(u32 i, u32 t) {
 		at4(i, t & 0x0f);
-		ext = (ext & ~(1U << (i + 16))) | ((t & 0x10) << (i + 12));
+		ext = (ext & ~(1 << i)) | (t >> 4 << i);
 	}
 
 	inline constexpr void put(u64 where, u32 t) { return put64(where, t); }
@@ -260,16 +259,16 @@ public:
 	inline constexpr void put80(u64 where, u32 t) {
 		put64(where, t & 0x0f);
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_PUT)
-		u32 w = math::pext64(where, 0x1111111111111111ull) << 16;
+		u32 mask = math::pext64(where, 0x1111111111111111ull);
 #else
 		where |= where >> 3;
 		where |= where >> 6;
 		where &= 0x000f000f000f000full;
 		where |= where >> 12;
 		where |= where >> 24;
-		u32 w = (where & 0xffffu) << 16;
+		u32 mask = where & 0xffffu;
 #endif
-		ext = (ext ^ (ext & w)) | (t & 0x10 ? w : 0);
+		ext = (ext ^ (ext & mask)) | (t & 0x10 ? mask : 0);
 	}
 	inline constexpr void put(u16 mask, u32 t) { return put64(mask, t); }
 	inline constexpr void put64(u16 mask, u32 t) {
@@ -288,8 +287,7 @@ public:
 	}
 	inline constexpr void put80(u16 mask, u32 t) {
 		put64(mask, t & 0x0f);
-		u32 w = mask << 16;
-		ext = (ext ^ (ext & w)) | (t & 0x10 ? w : 0);
+		ext = (ext ^ (ext & mask)) | (t & 0x10 ? mask : 0);
 	}
 
 	inline constexpr void mirror() { mirror64(); }
@@ -299,8 +297,8 @@ public:
 	}
 	inline constexpr void mirror80() {
 		mirror64();
-		ext = ((ext & 0x11110000) << 3) | ((ext & 0x22220000) << 1)
-			| ((ext & 0x44440000) >> 1) | ((ext & 0x88880000) >> 3);
+		ext = ((ext & 0x1111) << 3) | ((ext & 0x2222) << 1)
+			| ((ext & 0x4444) >> 1) | ((ext & 0x8888) >> 3);
 	}
 
 	inline constexpr void flip() { flip64(); }
@@ -310,8 +308,8 @@ public:
 	}
 	inline constexpr void flip80() {
 		flip64();
-		u32 buf = ((ext >> 16) ^ math::rol16(ext >> 16, 4)) & 0x0f0fu;
-		ext ^= (buf | math::ror16(buf, 4)) << 16;
+		u16 buf = (ext ^ math::rol16(ext, 4)) & 0x0f0fu;
+		ext ^= (buf | math::ror16(buf, 4));
 	}
 
 	inline constexpr void transpose() { transpose64(); }
@@ -330,13 +328,13 @@ public:
 	inline constexpr void transpose80() {
 		transpose64();
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_TRANSPOSE)
-		ext = (math::pext32(ext, 0x11110000u) << 16) | (math::pext32(ext, 0x22220000u) << 20)
-			| (math::pext32(ext, 0x44440000u) << 24) | (math::pext32(ext, 0x88880000u) << 28);
+		ext = (math::pext32(ext, 0x1111u) <<  0) | (math::pext32(ext, 0x2222u) <<  4)
+			| (math::pext32(ext, 0x4444u) <<  8) | (math::pext32(ext, 0x8888u) << 12);
 #else
-		register u32 buf = 0;
-		buf = (ext ^ (ext >> 3)) & 0x0a0a0000;
+		register u16 buf = 0;
+		buf = (ext ^ (ext >> 3)) & 0x0a0a;
 		ext ^= buf ^ (buf << 3);
-		buf = (ext ^ (ext >> 6)) & 0x00cc0000;
+		buf = (ext ^ (ext >> 6)) & 0x00cc;
 		ext ^= buf ^ (buf << 6);
 #endif
 	}
@@ -984,9 +982,9 @@ public:
 	inline constexpr u64 hash64() const { return math::fmix64(raw); }
 	inline constexpr u64 hash80() const {
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_HASH)
-		return hash64() ^ math::fmix64(math::pdep64(ext >> 16, 0x1111111111111111ull));
+		return hash64() ^ math::fmix64(math::pdep64(ext, 0x1111111111111111ull));
 #else
-		u64 e = ext >> 16;
+		u64 e = ext;
 		e |= (e << 24);
 		e |= (e << 12);
 		e &= 0x000f000f000f000full;
@@ -1059,11 +1057,11 @@ public:
 		u64 x = raw ^ ((t & 0x0f) * 0x1111111111111111ull);
 		x |= (x >> 2);
 		x |= (x >> 1);
-		u32 e = ext ^ (i32((t & 0x10) << 27) >> 15 /*(t & 0x10) ? 0xffff0000 : 0x00000000*/);
+		u32 e = ext ^ ((t & 0x10) ? 0xffff : 0x0000);
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_WHERE)
-		return ~x & math::pdep64(~e >> 16, 0x1111111111111111ull);
+		return ~x & math::pdep64(~e, 0x1111111111111111ull);
 #else
-		u64 w = ~e >> 16;
+		u64 w = ~e;
 		w |= (w << 24);
 		w |= (w << 12);
 		w &= 0x000f000f000f000full;
@@ -1092,7 +1090,7 @@ public:
 #endif
 	}
 	inline constexpr u32 mask80(u32 t) const {
-		return mask64(t & 0x0f) & (~(ext ^ (i32((t & 0x10) << 27) >> 15)) >> 16);
+		return mask64(t & 0x0f) & ~(ext ^ ((t & 0x10) ? 0xffff : 0x0000));
 	}
 	inline constexpr void mask(u32 msk[], u32 min, u32 max) const { return mask64(msk, min, max); }
 	inline constexpr void mask64(u32 msk[], u32 min, u32 max) const {
@@ -1247,13 +1245,13 @@ public:
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
 		if (b.inf & style::binary) {
 			moporgic::write<u64>(out, b.raw);
-			if (b.inf & style::extend) moporgic::write_cast<u16>(out, b.ext >> 16);
-			if (b.inf & style::alter)  moporgic::write_cast<u16>(out, b.ext & 0xffff);
+			if (b.inf & style::extend) moporgic::write_cast<u16>(out, b.ext);
+			if (b.inf & style::alter)  moporgic::write_cast<u16>(out, b.ext /* FIXME */);
 			if (b.inf & style::exact)  moporgic::write<u32>(out, b.inf);
 		} else if (b.inf & style::alter) {
 			char buf[32];
 			std::snprintf(buf, sizeof(buf), "[%016" PRIx64 "]", b.raw);
-			if (b.inf & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext >> 16);
+			if (b.inf & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext);
 			out << buf;
 		} else {
 			char buf[64];
@@ -1274,13 +1272,13 @@ public:
 	friend std::istream& operator >>(std::istream& in, board& b) {
 		if (b.inf & style::binary) {
 			moporgic::read<u64>(in, b.raw);
-			if (b.inf & style::extend) moporgic::read_cast<u16>(in, raw_cast<u16, 1>(b.ext));
-			if (b.inf & style::alter)  moporgic::read_cast<u16>(in, raw_cast<u16, 0>(b.ext));
+			if (b.inf & style::extend) moporgic::read_cast<u16>(in, b.ext);
+			if (b.inf & style::alter)  moporgic::read_cast<u16>(in, b.ext /* FIXME */);
 			if (b.inf & style::exact)  moporgic::read<u32>(in, b.inf);
 		} else if (b.inf & style::alter) {
 			bool nobox(in >> std::hex >> b.raw);
 			if (!nobox) (in.clear(), in.ignore(1)) >> std::hex >> b.raw;
-			if (b.inf & style::extend) in.ignore(1) >> std::hex >> raw_cast<u16, 1>(b.ext);
+			if (b.inf & style::extend) in.ignore(1) >> std::hex >> b.ext;
 			if (!nobox) in.ignore(1);
 		} else {
 			for (u32 k, i = 0; i < 16; i++) {
