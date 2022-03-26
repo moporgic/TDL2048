@@ -1125,21 +1125,17 @@ public:
 		       (u64(qcol20(2).mono) << 24) | (u64(qcol20(3).mono) << 36);
 	}
 
-	inline u32 legal() const { return legal64(); }
-	inline u32 legal64() const {
+	inline nthit actions() const { return actions64(); }
+	inline nthit actions64() const {
 		u32 hori = qrow16(0).legal | qrow16(1).legal | qrow16(2).legal | qrow16(3).legal;
 		u32 vert = qcol16(0).legal | qcol16(1).legal | qcol16(2).legal | qcol16(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
-	inline u32 legal80() const {
+	inline nthit actions80() const {
 		u32 hori = qrow20(0).legal | qrow20(1).legal | qrow20(2).legal | qrow20(3).legal;
 		u32 vert = qcol20(0).legal | qcol20(1).legal | qcol20(2).legal | qcol20(3).legal;
 		return (hori & 0x0a) | (vert & 0x05);
 	}
-
-	inline nthit actions() const { return actions64(); }
-	inline nthit actions64() const { return nthit(legal64()); }
-	inline nthit actions80() const { return nthit(legal80()); }
 
 	inline bool movable() const   { return movable64(); }
 	inline bool movable64() const {
