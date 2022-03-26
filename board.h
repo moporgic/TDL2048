@@ -16,10 +16,11 @@ class board {
 private:
 	u64 raw;
 	u16 ext;
+	u16 fmt;
 	u32 inf;
 
 public:
-	inline constexpr board(u64 raw = 0, u16 ext = 0, u32 inf = 0) : raw(raw), ext(ext), inf(inf) {}
+	inline constexpr board(u64 raw = 0, u16 ext = 0, u32 inf = 0) : raw(raw), ext(ext), fmt(), inf(inf) {}
 	inline constexpr board(const board& b) = default;
 	inline constexpr board& operator =(u64 x) { raw = x; ext = 0; return *this; }
 	inline constexpr board& operator =(const board& b) = default;
@@ -1178,7 +1179,7 @@ public:
 		inline constexpr tile(const board& b, u32 i) : b(const_cast<board&>(b)), i(i) {}
 		board& b;
 		u32 i;
-		inline constexpr bool is(u32 item) const { return b.inf & item; }
+		inline constexpr bool is(u32 item) const { return b.fmt & item; }
 		inline constexpr u32 at(bool extend, bool exact) const {
 			u32 v = extend ? b.at5(i) : b.at4(i);
 			return exact ? tile::itov(v) : v;
@@ -1224,12 +1225,12 @@ public:
 	public:
 		style() = delete;
 		enum fmtcode : u32 {
-			index  = 0x00000000u, /* print (or write) tile indexes, this is the default option */
-			exact  = 0x10000000u, /* print tile values (string); write with board info (binary) */
-			alter  = 0x20000000u, /* use alternative: print board as hex string (string); write with extension placeholder (binary) */
-			binary = 0x40000000u, /* switch between string and binary mode */
-			extend = 0x80000000u, /* print (or write) with 16-bit extension */
-			full   = 0xf0000000u, /* enable all flags: will write the whole data structure (128-bit) */
+			index  = 0x0000u, /* print (or write) tile indexes, this is the default option */
+			exact  = 0x1000u, /* print tile values (string); write with board info (binary) */
+			alter  = 0x2000u, /* use alternative: print board as hex string (string); also write the format (binary) */
+			binary = 0x4000u, /* switch between string and binary mode */
+			extend = 0x8000u, /* print (or write) with 16-bit extension */
+			full   = 0xf000u, /* enable all flags: will write the whole data structure (128-bit) */
 
 			at     = index,
 			ext    = extend,
@@ -1237,25 +1238,25 @@ public:
 			raw    = binary,
 		};
 	};
-	inline constexpr board& format(u32 i = style::index) { info((i & style::full) | (inf & ~style::full)); return *this; }
+	inline constexpr board& format(u32 i = style::index) { fmt = (i & style::full) | (fmt & ~style::full); return *this; }
 
 	inline constexpr u32 info() const { return inf; }
 	inline constexpr void info(u32 i) { inf = i; }
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
-		if (b.inf & style::binary) {
+		if (b.fmt & style::binary) {
 			moporgic::write<u64>(out, b.raw);
-			if (b.inf & style::extend) moporgic::write_cast<u16>(out, b.ext);
-			if (b.inf & style::alter)  moporgic::write_cast<u16>(out, b.ext /* FIXME */);
-			if (b.inf & style::exact)  moporgic::write<u32>(out, b.inf);
-		} else if (b.inf & style::alter) {
+			if (b.fmt & style::extend) moporgic::write_cast<u16>(out, b.ext);
+			if (b.fmt & style::alter)  moporgic::write_cast<u16>(out, b.fmt);
+			if (b.fmt & style::exact)  moporgic::write<u32>(out, b.inf);
+		} else if (b.fmt & style::alter) {
 			char buf[32];
 			std::snprintf(buf, sizeof(buf), "[%016" PRIx64 "]", b.raw);
-			if (b.inf & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext);
+			if (b.fmt & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext);
 			out << buf;
 		} else {
 			char buf[64];
-			u32 w = (b.inf & style::exact) ? 6 : 4;
+			u32 w = (b.fmt & style::exact) ? 6 : 4;
 			std::snprintf(buf, sizeof(buf), "+%.*s+", (w * 4), "------------------------");
 			out << buf << std::endl;
 			for (u32 i = 0; i < 16; i += 4) {
@@ -1270,15 +1271,15 @@ public:
 	}
 
 	friend std::istream& operator >>(std::istream& in, board& b) {
-		if (b.inf & style::binary) {
+		if (b.fmt & style::binary) {
 			moporgic::read<u64>(in, b.raw);
-			if (b.inf & style::extend) moporgic::read_cast<u16>(in, b.ext);
-			if (b.inf & style::alter)  moporgic::read_cast<u16>(in, b.ext /* FIXME */);
-			if (b.inf & style::exact)  moporgic::read<u32>(in, b.inf);
-		} else if (b.inf & style::alter) {
+			if (b.fmt & style::extend) moporgic::read_cast<u16>(in, b.ext);
+			if (b.fmt & style::alter)  moporgic::read_cast<u16>(in, b.fmt);
+			if (b.fmt & style::exact)  moporgic::read<u32>(in, b.inf);
+		} else if (b.fmt & style::alter) {
 			bool nobox(in >> std::hex >> b.raw);
 			if (!nobox) (in.clear(), in.ignore(1)) >> std::hex >> b.raw;
-			if (b.inf & style::extend) in.ignore(1) >> std::hex >> b.ext;
+			if (b.fmt & style::extend) in.ignore(1) >> std::hex >> b.ext;
 			if (!nobox) in.ignore(1);
 		} else {
 			for (u32 k, i = 0; i < 16; i++) {
