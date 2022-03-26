@@ -1137,6 +1137,15 @@ public:
 		return (hori & 0x0a) | (vert & 0x05);
 	}
 
+	inline constexpr nthit actions(const board& U, const board& R, const board& D, const board& L) const {
+		return ~((U.inf & 0x10000000u) | (R.inf & 0x20000000u) |
+		         (D.inf & 0x40000000u) | (L.inf & 0x80000000u)) >> 28;
+	}
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline constexpr nthit actions(const btype move[]) const {
+		return actions(move[0], move[1], move[2], move[3]);
+	}
+
 	inline bool movable() const   { return movable64(); }
 	inline bool movable64() const {
 		return empty64() > 0 || (qrow16(0).moved | qrow16(1).moved | qrow16(2).moved | qrow16(3).moved)
