@@ -1239,13 +1239,13 @@ public:
 			raw    = binary,
 		};
 	};
-	inline constexpr board& format(u32 i = style::index) { opt = (i & style::full) | (opt & ~style::full); return *this; }
+	inline constexpr board& format(u32 i = style::index) { opts(i, style::full); return *this; }
 
 	inline constexpr u32 info() const { return inf; }
-	inline constexpr void info(u32 i) { inf = i; }
+	inline constexpr u32 info(u32 i) { u32 old = inf; inf = i; return old; }
 
-	inline constexpr u16 opts() const { return opt; }
-	inline constexpr void opts(u16 o) const { opt = o; }
+	inline constexpr u16 opts(u16 mask = -1) const { return opt & mask; }
+	inline constexpr u16 opts(u16 o, u16 mask = -1) { u16 old = opts(mask); opt = (opt & ~mask) | (o & mask); return old; }
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
 		if (b.opt & style::binary) {
