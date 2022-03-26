@@ -25,6 +25,7 @@ template<typename raw_t, bool idx> class bitset_iterator;
 typedef hexadeca hex;
 typedef bihexadeca hexa;
 typedef bitset_iterator<u32, true> nthit;
+typedef bitset_iterator<u64, true> xthit;
 typedef bitset_iterator<u32, true> nthit32;
 typedef bitset_iterator<u64, true> nthit64;
 typedef bitset_iterator<u32, false> u32it;
@@ -483,32 +484,32 @@ static inline constexpr u32 popcnt(u32) noexcept;
 template<typename raw_t, bool idx = true>
 class bitset_iterator {
 public:
-	typedef u32 value_type;
+	typedef raw_t value_type;
 	typedef std::forward_iterator_tag iterator_category;
 public:
 	constexpr bitset_iterator(raw_t x = 0) noexcept : x(x) {}
 	constexpr operator raw_t&() noexcept { return x; }
 	constexpr operator raw_t() const noexcept { return x; }
 public:
-	constexpr u32 operator [](u32 i) const noexcept { return extract(math::nthset(x, i)); }
-	constexpr u32 at(u32 i) const noexcept { return operator [](i); }
-	constexpr u32 front() const noexcept { return at(0); }
-	constexpr u32 back() const noexcept { return at(size() - 1); }
+	constexpr raw_t  operator [](u32 i) const noexcept { return extract(math::nthset(x, i)); }
+	constexpr raw_t  at(u32 i) const noexcept { return operator [](i); }
+	constexpr raw_t  front() const noexcept { return at(0); }
+	constexpr raw_t  back() const noexcept { return at(size() - 1); }
 	constexpr size_t size() const noexcept { return math::popcnt(x); }
 	constexpr bool   empty() const noexcept { return size() == 0; }
 	constexpr bitset_iterator begin() const noexcept { return bitset_iterator(x); }
 	constexpr bitset_iterator end() const noexcept { return bitset_iterator(0); }
 public:
-	constexpr u32  operator *() const noexcept { return extract(x); }
-	constexpr bool operator ==(const bitset_iterator& it) const noexcept { return x == it.x; }
-	constexpr bool operator !=(const bitset_iterator& it) const noexcept { return x != it.x; }
-	constexpr bool operator < (const bitset_iterator& it) const noexcept { return extract(x) < extract(it.x); }
+	constexpr raw_t operator *() const noexcept { return extract(x); }
+	constexpr bool  operator ==(const bitset_iterator& it) const noexcept { return x == it.x; }
+	constexpr bool  operator !=(const bitset_iterator& it) const noexcept { return x != it.x; }
+	constexpr bool  operator < (const bitset_iterator& it) const noexcept { return extract(x) < extract(it.x); }
 	constexpr bitset_iterator  operator + (u32 n) const noexcept { bitset_iterator it(x); return it += n; }
 	constexpr bitset_iterator& operator +=(u32 n) noexcept { while (n--) x &= (x - 1);; return *this; }
 	constexpr bitset_iterator& operator ++() noexcept { x &= (x - 1); return *this; }
 	constexpr bitset_iterator  operator ++(int) noexcept { return std::exchange(x, x & (x - 1)); }
 protected:
-	constexpr u32 extract(raw_t x) const noexcept { return idx ? math::tzcnt(x) : math::lsb(x); }
+	constexpr raw_t extract(raw_t x) const noexcept { return idx ? (x ? math::tzcnt(x) : ~x) : math::lsb(x); }
 	raw_t x;
 };
 
