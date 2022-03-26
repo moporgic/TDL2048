@@ -1154,40 +1154,36 @@ public:
 	class tile {
 	friend class board;
 	public:
-		inline constexpr tile(const tile& t) = default;
-		inline constexpr tile() = delete;
-		inline constexpr board& whole() const { return b; }
-		inline constexpr u32 where() const { return i; }
-		inline constexpr operator u32() const { return at(is(style::extend), is(style::exact)); }
-		inline constexpr tile& operator =(u32 k) { at(k, is(style::extend), is(style::exact)); return *this; }
-		inline constexpr tile& operator =(const tile& t) { return operator =(u32(t)); }
-	public:
 		inline static constexpr u32 itov(u32 i) { return (1u << i) & 0xfffffffeu; }
 		inline static constexpr u32 vtoi(u32 v) { return math::log2(v); }
 	public:
-		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
-			u32 v = t.at(t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
-			return t.is(style::binary) ? moporgic::write_cast<byte>(out, v) : (out << v);
+		inline constexpr tile(const tile& t) = default;
+		inline constexpr tile() = delete;
+		inline constexpr const board& source() const { return b; }
+		inline constexpr board& source() { return b; }
+		inline constexpr u32 index() const { return i; }
+	public:
+		inline constexpr operator u32() const {
+			u32 t = (b.fmt & style::extend) ? b.at5(i) : b.at4(i);
+			return  (b.fmt & style::exact)  ? tile::itov(t) : t;
 		}
-		friend std::istream& operator >>(std::istream& in, const tile& t) {
+		inline constexpr tile& operator =(u32 t) {
+			if (b.fmt & style::exact)  t = tile::itov(t);
+			if (b.fmt & style::extend) b.at5(i, t); else b.at4(i, t);
+			return *this;
+		}
+		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
+			return (out << u32(t));
+		}
+		friend std::istream& operator >>(std::istream& in, tile& t) {
 			u32 v;
-			if (t.is(style::binary) ? moporgic::read_cast<byte>(in, v) : (in >> v))
-				t.at(v, t.is(style::extend), !t.is(style::binary) && t.is(style::exact));
+			if (in >> v) t = v;
 			return in;
 		}
 	protected:
 		inline constexpr tile(const board& b, u32 i) : b(const_cast<board&>(b)), i(i) {}
 		board& b;
 		u32 i;
-		inline constexpr bool is(u32 item) const { return b.fmt & item; }
-		inline constexpr u32 at(bool extend, bool exact) const {
-			u32 v = extend ? b.at5(i) : b.at4(i);
-			return exact ? tile::itov(v) : v;
-		}
-		inline constexpr void at(u32 k, bool extend, bool exact) const {
-			u32 v = exact ? tile::itov(k) : k;
-			if (extend) b.at5(i, v); else b.at4(i, v);
-		}
 	};
 	class iter : tile {
 	friend class board;
