@@ -1245,7 +1245,7 @@ public:
 	inline constexpr u32 info(u32 i) { u32 old = inf; inf = i; return old; }
 
 	inline constexpr u16 opts(u16 mask = -1) const { return opt & mask; }
-	inline constexpr u16 opts(u16 o, u16 mask = -1) { u16 old = opts(mask); opt = (opt & ~mask) | (o & mask); return old; }
+	inline constexpr u16 opts(u16 o, u16 mask) { u16 old = opts(mask); opt = (opt & ~mask) | (o & mask); return old; }
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
 		if (b.opt & style::binary) {
