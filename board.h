@@ -394,19 +394,19 @@ public:
 	}
 
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline std::array<btype, 8> isoms() const { return isoms64(); }
+	inline constexpr std::array<btype, 8> isoms() const { return isoms64(); }
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline std::array<btype, 8> isoms64() const { std::array<btype, 8> iso; isoms64(iso.data()); return iso; }
+	inline constexpr std::array<btype, 8> isoms64() const { std::array<btype, 8> iso; isoms64(iso.data()); return iso; }
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline std::array<btype, 8> isoms80() const { std::array<btype, 8> iso; isoms80(iso.data()); return iso; }
+	inline constexpr std::array<btype, 8> isoms80() const { std::array<btype, 8> iso; isoms80(iso.data()); return iso; }
 
 	inline constexpr u32 empty() const { return empty64(); }
 	inline constexpr u32 empty64() const { return count64(0); }
 	inline constexpr u32 empty80() const { return count80(0); }
 
-	inline nthit spaces() const { return spaces64(); }
-	inline nthit spaces64() const { return find64(0); }
-	inline nthit spaces80() const { return find80(0); }
+	inline constexpr nthit spaces() const { return spaces64(); }
+	inline constexpr nthit spaces64() const { return find64(0); }
+	inline constexpr nthit spaces80() const { return find80(0); }
 
 	inline void init() {
 		u32 u = moporgic::rand();
@@ -452,9 +452,9 @@ public:
 	inline bool popup80() { return empty80() ? next80(), true : false; }
 
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline u32 popups(btype popup[]) const { return popups64(popup); }
+	inline constexpr u32 popups(btype popup[]) const { return popups64(popup); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline u32 popups64(btype popup[]) const {
+	inline constexpr u32 popups64(btype popup[]) const {
 		u32 i = 0;
 		u64 x = where64(0);
 		for (u64 t; (t = x & -x) != 0; x ^= t) {
@@ -464,7 +464,7 @@ public:
 		return i;
 	}
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline u32 popups80(btype popup[]) const {
+	inline constexpr u32 popups80(btype popup[]) const {
 		u32 i = 0;
 		u64 x = where80(0);
 		for (u64 t; (t = x & -x) != 0; x ^= t) {
@@ -475,11 +475,11 @@ public:
 	}
 
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline std::vector<btype> popups() const   { std::vector<btype> popup(empty() * 2); popups(popup.data()); return popup; }
+	inline constexpr std::vector<btype> popups() const   { std::vector<btype> popup(empty() * 2); popups(popup.data()); return popup; }
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline std::vector<btype> popups64() const { std::vector<btype> popup(empty64() * 2); popups64(popup.data()); return popup; }
+	inline constexpr std::vector<btype> popups64() const { std::vector<btype> popup(empty64() * 2); popups64(popup.data()); return popup; }
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline std::vector<btype> popups80() const { std::vector<btype> popup(empty80() * 2); popups80(popup.data()); return popup; }
+	inline constexpr std::vector<btype> popups80() const { std::vector<btype> popup(empty80() * 2); popups80(popup.data()); return popup; }
 
 	inline i32 left()  { return left64(); }
 	inline i32 right() { return right64(); }
@@ -1101,9 +1101,9 @@ public:
 		for (u32 i = min; i < max; i++) msk[i] = mask80(i);
 	}
 
-	inline nthit find(u32 t) const { return find64(t); }
-	inline nthit find64(u32 t) const { return nthit(mask64(t)); }
-	inline nthit find80(u32 t) const { return nthit(mask80(t)); }
+	inline constexpr nthit find(u32 t) const { return find64(t); }
+	inline constexpr nthit find64(u32 t) const { return nthit(mask64(t)); }
+	inline constexpr nthit find80(u32 t) const { return nthit(mask80(t)); }
 
 	inline u64 monorow() const { return monorow64(); }
 	inline u64 monorow64() const {
