@@ -3,7 +3,7 @@
 # History: 2022/04/11 Hung Guei
 
 # This tool fetches the results from summary blocks of log files and display them.
-# The typical scenarios of using this tool are, 
+# The typical scenarios of using this tool are,
 # (1) monitor the training progress of a long-term training with periodic evaluations.
 # (2) monitor different testing results for different settings such as networks or depths.
 
@@ -17,7 +17,7 @@ while [[ $1 == -* ]]; do
 		-o=*)  columns=${1#*=}; ;;
 		-a|-A) filter="cat"; ;; # always print all summary blocks
 		-l|-1) filter="tail -n1"; ;; # always print only the last summary blocks
-		-i)    index=1; ;; # always show index numbers
+		-i*)   index=1; minw=$(<<<${1:2} tr -d '='); ;; # always show index numbers (w/ minimal display digits)
 	esac
 	shift
 done
@@ -68,7 +68,8 @@ for (( i=0; i<${#src[@]}; i++ )); do
 	fmt=$format
 	[ "${index}${filter}" == cat ] && idx=$width || idx=$index
 	if (( ${idx:-0} )); then
-		result="$(<<<$result nl -v0 -w${#width} -s': ' -ba -nrz)"
+		width=$((${#width} > minw ? ${#width} : minw))
+		result="$(<<<$result nl -v0 -w$width -s': ' -ba -nrz)"
 		fmt="%-5s$format"
 	fi
 	fmt=%-${len}s${fmt}
