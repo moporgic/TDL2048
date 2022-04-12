@@ -16,8 +16,9 @@ while [[ $1 == -* ]]; do
 		-o)    shift; ;& # select output columns: e.g., "avg,max,8192,16384,32768"
 		-o=*)  columns=${1#*=}; ;;
 		-a|-A) filter="cat"; ;; # always print all summary blocks
-		-l|-1) filter="tail -n1"; ;; # always print only the last summary blocks
-		-i*)   index=1; minw=$(<<<${1:2} tr -d '='); ;; # always show index numbers (w/ minimal display digits)
+		-1|-L) filter="tail -n1"; ;; # always print only the last summary blocks
+		-i)    index=1; ;; # always show index numbers
+		-i*)   index=$(<<<${1:2} tr -d '='); ;; # set index minimal display digits (0 to disable)
 	esac
 	shift
 done
@@ -41,8 +42,8 @@ win=$(<<<$columns sed -E "s/[a-z]+,//g" | tr ',' '|')
 format+=$(<<<$win sed -E "s/[0-9]\||[0-9]$/_/g" | tr -d '[:digit:]' | sed "s/_/%8s/g")
 
 # fetch labels
-src=()
-if [[ $1 ]]; then # fetch from file(s)
+(( $# )) && src=() || src=("|") # fetch from stdin if no args
+while (( $# )); do # fetch from file labels...
 	[[ $1 == *.x ]] && name="$1" || name="$1*.x"
 	for x in $(find $(dirname ${1:-.}) -name "$name" | sort); do
 		label="$(basename $x):  "
@@ -50,17 +51,14 @@ if [[ $1 ]]; then # fetch from file(s)
 		len=$((${#label} > len ? ${#label} : len))
 		src+=("${label}|${x}")
 	done
-else # fetch from stdin
-	src=("|")
-fi
+	shift
+done
 
 # fetch results and print
 (( ${#src[@]} == 1 )) && filter=${filter:-cat} || filter=${filter:-tail -n1}
 for (( i=0; i<${#src[@]}; i++ )); do
-	token=${src[$i]}
-	label=${token%%|*}
-	blank=$(<<<$label tr '[:graph:]' ' ')
-	result=$(grep summary -A20 ${token##*|} | \
+	label=${src[$i]%|*}
+	result=$(grep summary -A20 ${src[$i]#*|} | \
 		grep -E "^(total${win:+|}$win)" | sed -E "s/^[0-9].+% +/ /g" | \
         sed -E "s/$avg/+/g" | sed -E "s/($max)|( tile=.+)//g" | \
 		xargs | sed -e "s/^\+//g" | tr '+' '\n' | sed -e "s/^ //g")
@@ -68,13 +66,13 @@ for (( i=0; i<${#src[@]}; i++ )); do
 	fmt=$format
 	[ "${index}${filter}" == cat ] && idx=$width || idx=$index
 	if (( ${idx:-0} )); then
-		width=$((${#width} > minw ? ${#width} : minw))
-		result="$(<<<$result nl -v0 -w$width -s': ' -ba -nrz)"
-		fmt="%-5s$format"
+		width=$((${#width} > index ? ${#width} : index))
+		result="$(<<<$result nl -v0 -w$width -s': ' -nrz)"
+		fmt="%-$((width + 3))s$format"
 	fi
 	fmt=%-${len}s${fmt}
 	<<<$result $filter | while IFS= read res; do
 		printf "${fmt}\n" "$label" $res
-		label=$blank
+		label=
 	done
 done
