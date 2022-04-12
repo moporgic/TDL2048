@@ -878,11 +878,29 @@ Extract win rates of large tiles from the summary block. Check the script for mo
 ```
 </details>
 
-<details><summary>2048-thick.sh - log concentrator for statistic block</summary>
+<details><summary>2048-compact.sh - log concentrator for statistic block</summary>
 
-Rearrange the statistics. To join every 10 statistic blocks and print the new statistics, do
+Compact the statistics by joining the blocks. To join every 10 statistic blocks and print the new statistics, do
 ```bash
-grep local 2048.x | ./2048-parse.sh | ./2048-thick.sh 10 # average every 10 blocks
+grep local 2048.x | ./2048-parse.sh | ./2048-compact.sh 10 # average every 10 blocks
+```
+</details>
+
+<details><summary>2048-fetch.sh - summarize evaluation results</summary>
+
+Extract all results from summary blocks of log files and display them.
+This is useful for monitoring the progress of a long-term training, as well as monitoring the progress of multiple evaluations.
+```bash
+./2048-fetch.sh 2048.x # extract results from 2048.x and display
+./2048-fetch.sh 4x6patt # extract results from all 4x6patt*.x log files and display
+```
+</details>
+
+<details><summary>2048-safe.sh - check for network corruption</summary>
+
+Check the latest log and verify whether the network is corrupted. This may be useful for performing parallel training.
+```bash
+./2048-safe.sh < 2048.x || echo the network seems to be corrupted
 ```
 </details>
 
