@@ -42,7 +42,7 @@ win=$(<<<$columns sed -E "s/[a-z]+,//g" | tr ',' '|')
 format+=$(<<<$win sed -E "s/[0-9]\||[0-9]$/_/g" | tr -d '[:digit:]' | sed "s/_/%8s/g")
 
 # fetch labels
-(( $# )) && src=() || src=("|") # fetch from stdin if no args
+(( $# )) && src=() || src=("|-") # fetch from stdin if no args
 while (( $# )); do # fetch from file labels...
 	[[ $1 == *.x ]] && name="$1" || name="$1*.x"
 	for x in $(find $(dirname ${1:-.}) -name "$name" | sort); do
@@ -58,9 +58,9 @@ done
 (( ${#src[@]} == 1 )) && filter=${filter:-cat} || filter=${filter:-tail -n1}
 for (( i=0; i<${#src[@]}; i++ )); do
 	label=${src[$i]%|*}
-	result=$(grep summary -A20 ${src[$i]#*|} | \
+	result=$(grep summary -A20 "${src[$i]#*|}" | \
 		grep -E "^(total${win:+|}$win)" | sed -E "s/^[0-9].+% +/ /g" | \
-        sed -E "s/$avg/+/g" | sed -E "s/($max)|( tile=.+)//g" | \
+		sed -E "s/$avg/+/g" | sed -E "s/($max)|( tile=.+)//g" | \
 		xargs | sed -e "s/^\+//g" | tr '+' '\n' | sed -e "s/^ //g")
 	width=$(($(<<<$result wc -l) - 1))
 	fmt=$format
