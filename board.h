@@ -21,6 +21,7 @@ private:
 
 public:
 	inline constexpr board(u64 raw = 0, u16 ext = 0, u32 inf = 0) : raw(raw), ext(ext), opt(), inf(inf) {}
+	inline constexpr board(u64 raw, u16 ext, u16 opt, u32 inf) : raw(raw), ext(ext), opt(opt), inf(inf) {}
 	inline constexpr board(const board& b) = default;
 	inline constexpr board& operator =(u64 x) { raw = x; ext = 0; return *this; }
 	inline constexpr board& operator =(const board& b) = default;
@@ -933,7 +934,7 @@ public:
 		flip80();      x = std::max(x, *this);
 		transpose80(); x = std::max(x, *this);
 		flip80();      x = std::max(x, *this);
-		operator =(x);
+		set(x.raw, x.ext);
 	}
 	inline constexpr void isomin() { return isomin64(); }
 	inline constexpr void isomin64() {
@@ -956,7 +957,7 @@ public:
 		flip80();      x = std::min(x, *this);
 		transpose80(); x = std::min(x, *this);
 		flip80();      x = std::min(x, *this);
-		operator =(x);
+		set(x.raw, x.ext);
 	}
 
 	inline u32 species() const { return species64(); }
