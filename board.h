@@ -488,7 +488,7 @@ public:
 	inline i32 down()  { return down64(); }
 
 	inline i32 left64() {
-		board move;
+		board move(0, ext, opt, 0);
 		qrow16(0).move64<action::left, 0>(move);
 		qrow16(1).move64<action::left, 1>(move);
 		qrow16(2).move64<action::left, 2>(move);
@@ -497,7 +497,7 @@ public:
 		return operator =(move).inf;
 	}
 	inline i32 right64() {
-		board move;
+		board move(0, ext, opt, 0);
 		qrow16(0).move64<action::right, 0>(move);
 		qrow16(1).move64<action::right, 1>(move);
 		qrow16(2).move64<action::right, 2>(move);
@@ -506,7 +506,7 @@ public:
 		return operator =(move).inf;
 	}
 	inline i32 up64() {
-		board move;
+		board move(0, ext, opt, 0);
 		qcol16(0).move64<action::up, 0>(move);
 		qcol16(1).move64<action::up, 1>(move);
 		qcol16(2).move64<action::up, 2>(move);
@@ -515,7 +515,7 @@ public:
 		return operator =(move).inf;
 	}
 	inline i32 down64() {
-		board move;
+		board move(0, ext, opt, 0);
 		qcol16(0).move64<action::down, 0>(move);
 		qcol16(1).move64<action::down, 1>(move);
 		qcol16(2).move64<action::down, 2>(move);
@@ -525,7 +525,7 @@ public:
 	}
 
 	inline i32 left80() {
-		board move;
+		board move(0, 0, opt, 0);
 		qrow20(0).move80<action::left, 0>(move);
 		qrow20(1).move80<action::left, 1>(move);
 		qrow20(2).move80<action::left, 2>(move);
@@ -534,7 +534,7 @@ public:
 		return operator =(move).inf;
 	}
 	inline i32 right80() {
-		board move;
+		board move(0, 0, opt, 0);
 		qrow20(0).move80<action::right, 0>(move);
 		qrow20(1).move80<action::right, 1>(move);
 		qrow20(2).move80<action::right, 2>(move);
@@ -543,7 +543,7 @@ public:
 		return operator =(move).inf;
 	}
 	inline i32 up80() {
-		board move;
+		board move(0, 0, opt, 0);
 		qcol20(0).move80<action::up, 0>(move);
 		qcol20(1).move80<action::up, 1>(move);
 		qcol20(2).move80<action::up, 2>(move);
@@ -552,7 +552,7 @@ public:
 		return operator =(move).inf;
 	}
 	inline i32 down80() {
-		board move;
+		board move(0, 0, opt, 0);
 		qcol20(0).move80<action::down, 0>(move);
 		qcol20(1).move80<action::down, 1>(move);
 		qcol20(2).move80<action::down, 2>(move);
