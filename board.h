@@ -370,7 +370,7 @@ public:
 	}
 
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr void isoms(btype iso[]) const { return isoms64(iso); }
+	inline constexpr void isoms(btype iso[]) const { isoms64(iso); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline constexpr void isoms64(btype iso[]) const {
 		iso[5] = *this;       iso[0] = iso[5];
