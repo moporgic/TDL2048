@@ -1255,22 +1255,20 @@ public:
 			if (b.opt & style::alter)  moporgic::write_cast<u16>(out, b.opt);
 			if (b.opt & style::exact)  moporgic::write<u32>(out, b.inf);
 		} else if (b.opt & style::alter) {
-			char buf[32];
+			char buf[24];
 			std::snprintf(buf, sizeof(buf), "[%016" PRIx64 "]", b.raw);
 			if (b.opt & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext);
 			out << buf;
 		} else {
-			char buf[64];
-			u32 w = (b.opt & style::exact) ? 6 : 4;
-			std::snprintf(buf, sizeof(buf), "+%.*s+", (w * 4), "------------------------");
-			out << buf << std::endl;
+			char buf[180];
+			u32 n = 0, w = (b.opt & style::exact) ? 6 : 4;
+			n += snprintf(buf + n, sizeof(buf) - n, "+%.*s+" "\n", (w * 4), "------------------------");
 			for (u32 i = 0; i < 16; i += 4) {
 				u32 t[4] = { b[i + 0], b[i + 1], b[i + 2], b[i + 3] };
-				std::snprintf(buf, sizeof(buf), "|%*u%*u%*u%*u|", w, t[0], w, t[1], w, t[2], w, t[3]);
-				out << buf << std::endl;
+				n += snprintf(buf + n, sizeof(buf) - n, "|%*u%*u%*u%*u|" "\n", w, t[0], w, t[1], w, t[2], w, t[3]);
 			}
-			std::snprintf(buf, sizeof(buf), "+%.*s+", (w * 4), "------------------------");
-			out << buf << std::endl;
+			n += snprintf(buf + n, sizeof(buf) - n, "+%.*s+" "\n", (w * 4), "------------------------");
+			out << buf;
 		}
 		return out;
 	}
