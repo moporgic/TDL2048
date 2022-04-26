@@ -44,10 +44,10 @@ format+=$(<<<$win sed -E "s/[0-9]\||[0-9]$/_/g" | tr -d '[:digit:]' | sed "s/_/%
 # fetch labels
 (( $# )) && src=() || src=("|-") # fetch from stdin if no args
 while (( $# )); do # fetch from file labels...
-	[[ $1 == *.x ]] && name="$1" || name="$1*.x"
+	[[ $1 == *.x ]] && name="${1##*/}" || name="${1##*/}*.x"
 	for x in $(find $(dirname ${1:-.}) -name "$name" | sort); do
 		label="$(basename $x):  "
-		[[ $1 ]] && label=$(<<<${label#$1} sed -E "s/^[:. -]+//g")
+		[[ $1 ]] && label=$(<<<${label#${1##*/}} sed -E "s/^[:. -]+//g")
 		len=$((${#label} > len ? ${#label} : len))
 		src+=("${label}|${x}")
 	done
