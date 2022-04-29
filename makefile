@@ -40,11 +40,11 @@ ifneq ($(findstring x86_64, $(MACROS)), x86_64)
     FLAGS := -Wall -Wno-psabi -fmessage-length=0
 endif
 
-# git commit id for building
-COMMIT_ID ?= $(shell git log -n1 --format=%h 2>/dev/null)
+# commit id for building
+COMMIT_ID ?= $(shell git log -n1 --format=%h 2>/dev/null)$(if \
+	$(shell git status -uno 2>&1 | grep -i changes)$(filter-out 2048.cpp, $(SOURCE)),+x)
 ifneq ($(if $(filter -DCOMMIT_ID=%, $(FLAGS)),, $(COMMIT_ID)),)
-	DIRTY := $(if $(shell git status -uno 2>&1 | grep -i changes)$(filter-out 2048.cpp, $(SOURCE)),+x)
-	FLAGS += -DCOMMIT_ID=$(COMMIT_ID)$(DIRTY)
+	FLAGS += -DCOMMIT_ID=$(COMMIT_ID)
 endif
 
 default: # build with default
