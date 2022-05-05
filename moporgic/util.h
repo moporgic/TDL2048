@@ -100,13 +100,31 @@ invoke_on_destruct_t<run> invoke_on_destruct(run fx) { return invoke_on_destruct
 
 namespace moporgic {
 
+namespace __format {
+// forward with unpack specific types
+template<typename src> struct forward_t { typedef typename std::remove_reference<src>::type&& type; };
+template<typename src, typename dst = typename forward_t<typename std::remove_reference<src>::type>::type>
+static inline constexpr dst forward(typename std::remove_reference<src>::type& t)  noexcept { return static_cast<dst>(t); }
+template<typename src, typename dst = typename forward_t<typename std::remove_reference<src>::type>::type>
+static inline constexpr dst forward(typename std::remove_reference<src>::type&& t) noexcept { return static_cast<dst>(t); }
+
+// invoke c_str() for std::string
+template<> struct forward_t<std::string>       { typedef const char* type; };
+template<> struct forward_t<const std::string> { typedef const char* type; };
+template<> inline const char* forward<std::string>(std::string& t)  noexcept { return t.c_str(); }
+template<> inline const char* forward<std::string>(std::string&& t) noexcept { return t.c_str(); }
+template<> inline const char* forward<std::string&>(std::string& t) noexcept { return t.c_str(); }
+template<> inline const char* forward<const std::string>(const std::string& t)  noexcept { return t.c_str(); }
+template<> inline const char* forward<const std::string&>(const std::string& t) noexcept { return t.c_str(); }
+}
+
 template<typename... types>
 static inline std::string format(const std::string& spec, types&&... args) {
 	char buf[2048];
-	size_t n = std::snprintf(buf, sizeof(buf), spec.c_str(), std::forward<types>(args)...);
+	size_t n = std::snprintf(buf, sizeof(buf), spec.c_str(), __format::forward<types>(args)...);
 	if (n < sizeof(buf)) return std::string(buf, n);
 	std::string str(n + 1, '\0');
-	str.resize(std::snprintf(&(str[0]), n + 1, spec.c_str(), std::forward<types>(args)...));
+	str.resize(std::snprintf(&(str[0]), n + 1, spec.c_str(), __format::forward<types>(args)...));
 	return str;
 }
 
