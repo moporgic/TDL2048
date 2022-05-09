@@ -45,7 +45,7 @@ format+=$(<<<$win sed -E "s/[0-9]\||[0-9]$/_/g" | tr -d '[:digit:]' | sed "s/_/%
 (( $# )) && src=() || src=("|-") # fetch from stdin if no args
 while (( $# )); do # fetch from file labels...
 	[[ $1 == *.x ]] && name="${1##*/}" || name="${1##*/}*.x"
-	for x in $(find $(dirname ${1:-.}) -name "$name" -maxdepth 1 | sort); do
+	for x in $(find $(dirname ${1:-.}) -maxdepth 1 -name "$name" | sort); do
 		label="$(basename $x):  "
 		[[ $1 ]] && label=$(<<<${label#${1##*/}} sed -E "s/^[:. -]+//g")
 		len=$((${#label} > len ? ${#label} : len))
