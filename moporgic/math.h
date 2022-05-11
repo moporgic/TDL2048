@@ -128,9 +128,9 @@ static inline constexpr int64_t avg(register int64_t x, register int64_t y) noex
  * instruction based count: popcnt, lzcnt, tzcnt
  * to optimize these functions, enable compile flags -mabm -mbmi -mbmi2
  */
-static inline constexpr uint64_t popcnt64(register uint64_t x) noexcept { return __builtin_popcountll(x); }
+static inline constexpr uint32_t popcnt64(register uint64_t x) noexcept { return __builtin_popcountll(x); }
 static inline constexpr uint32_t popcnt32(register uint32_t x) noexcept { return __builtin_popcount(x); }
-static inline constexpr uint64_t popcnt(register uint64_t x) noexcept { return popcnt64(x); }
+static inline constexpr uint32_t popcnt(register uint64_t x) noexcept { return popcnt64(x); }
 static inline constexpr uint32_t popcnt(register uint32_t x) noexcept { return popcnt32(x); }
 
 #if defined(__LZCNT__) || defined(__ABM__) // LZCNT intrinsic is available
