@@ -94,7 +94,7 @@ public:
 		return os;
 	}
 	friend std::istream& operator >>(std::istream& is, const byte& b) {
-		register char hi, lo;
+		char hi, lo;
 		is >> hi >> lo;
 		hi = (hi & 15) + (hi >> 6) * 9;
 		lo = (lo & 15) + (lo >> 6) * 9;
@@ -475,14 +475,14 @@ protected:
 };
 
 namespace math { // only declare necessary functions at here, math.h should also be included
-static inline constexpr uint32_t lsb(register uint32_t x) noexcept;
-static inline constexpr uint64_t lsb(register uint64_t x) noexcept;
-static inline constexpr uint32_t tzcnt(register uint64_t x) noexcept;
-static inline constexpr uint32_t tzcnt(register uint32_t x) noexcept;
-static inline constexpr uint64_t nthset(register uint64_t x, register uint32_t n) noexcept;
-static inline constexpr uint32_t nthset(register uint32_t x, register uint32_t n) noexcept;
-static inline constexpr uint32_t popcnt(register uint64_t x) noexcept;
-static inline constexpr uint32_t popcnt(register uint32_t x) noexcept;
+static inline constexpr uint32_t lsb(uint32_t x) noexcept;
+static inline constexpr uint64_t lsb(uint64_t x) noexcept;
+static inline constexpr uint32_t tzcnt(uint64_t x) noexcept;
+static inline constexpr uint32_t tzcnt(uint32_t x) noexcept;
+static inline constexpr uint64_t nthset(uint64_t x, uint32_t n) noexcept;
+static inline constexpr uint32_t nthset(uint32_t x, uint32_t n) noexcept;
+static inline constexpr uint32_t popcnt(uint64_t x) noexcept;
+static inline constexpr uint32_t popcnt(uint32_t x) noexcept;
 }
 
 template<typename raw_t, bool idx = true>

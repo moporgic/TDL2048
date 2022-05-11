@@ -128,6 +128,18 @@ static inline std::string format(const std::string& spec, types&&... args) {
 	return str;
 }
 
+#define src_format(msg, ...) moporgic::format(std::string("[%s:%d] %s: ") + msg + '\n', __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__);
+
+#ifdef DEBUG
+#define log_format(msg, ...) std::cerr << src_format(msg, ##__VA_ARGS__);
+#else
+#define log_format(msg, ...)
+#endif
+
+} // moporgic
+
+namespace moporgic {
+
 static inline uint64_t millisec() {
 	auto now = std::chrono::system_clock::now();
 	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
@@ -220,11 +232,11 @@ static inline uint32_t randx()  { return rand32(); }
 
 static inline auto rdtsc() {
 #if defined __GNUC__ && defined __x86_64__
-	register uint32_t lo, hi;
+	uint32_t lo, hi;
 	__asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
 	return ((uint64_t) hi << 32) | lo;
 #elif defined __GNUC__ && defined __i386__
-	register uint32_t lo;
+	uint32_t lo;
     __asm__ __volatile__ ("rdtsc" : "=a" (lo));
     return lo;
 #elif defined _MSC_VER
