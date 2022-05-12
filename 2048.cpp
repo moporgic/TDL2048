@@ -421,7 +421,7 @@ public:
 		class access {
 		public:
 			constexpr access(u64 sign, u32 hold, block& blk) : sign(sign), info(0), blk(blk) {
-				register block shot = blk;
+				block shot = blk;
 				bool safe = (shot.sign() == sign) & (shot.hold() >= hold);
 				u32 hits = std::min(shot.hits() + 1, 65535);
 				raw_cast<f32, 0>(info) = shot.esti();
@@ -622,14 +622,14 @@ inline constexpr typename std::enable_if<order<p, x...>() == 2, u64>::type index
 }
 
 u64 indexptv(const board& b, const std::vector<u32>& p) {
-	register u64 index = 0;
+	u64 index = 0;
 	for (size_t i = 0; i < p.size(); i++)
 		index += b.at(p[i]) << (i << 2);
 	return index;
 }
 
 u64 indexmerge(const board& b) { // 16-bit
-	register u32 hori = 0, vert = 0;
+	u32 hori = 0, vert = 0;
 	hori |= b.qrow(0).merge << 0;
 	hori |= b.qrow(1).merge << 2;
 	hori |= b.qrow(2).merge << 4;
@@ -643,7 +643,7 @@ u64 indexmerge(const board& b) { // 16-bit
 
 u64 indexnum(const board& b) { // 24-bit
 	auto num = b.numof();
-	register u64 index = 0;
+	u64 index = 0;
 	index |= (num[0] + num[1] + num[2] + num[3]) << 0; // 0+2+4+8, 4-bit
 	index |= (num[4] + num[5] + num[6]) << 4; // 16+32+64, 4-bit
 	index |= (num[7] + num[8]) << 8; // 128+256, 4-bit
@@ -658,7 +658,7 @@ u64 indexnum(const board& b) { // 24-bit
 
 u64 indexnumlt(const board& b) { // 24-bit
 	auto num = b.numof();
-	register u64 index = 0;
+	u64 index = 0;
 	index |= std::min(u32(num[8]),  7u) <<  0; // 256, 3-bit
 	index |= std::min(u32(num[9]),  7u) <<  3; // 512, 3-bit
 	index |= std::min(u32(num[10]), 7u) <<  6; // 1024, 3-bit
@@ -672,7 +672,7 @@ u64 indexnumlt(const board& b) { // 24-bit
 
 u64 indexnumst(const board& b) { // 24-bit
 	auto num = b.numof();
-	register u64 index = 0;
+	u64 index = 0;
 	index |= std::min(u32(num[0]), 7u) <<  0; // 0, 3-bit
 	index |= std::min(u32(num[1]), 7u) <<  3; // 2, 3-bit
 	index |= std::min(u32(num[2]), 7u) <<  6; // 4, 3-bit
@@ -1456,14 +1456,14 @@ struct method {
 	constexpr inline operator optimizer() const { return optim; }
 
 	constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
-		register numeric esti = 0;
-		for (register feature& feat : range)
+		numeric esti = 0;
+		for (feature& feat : range)
 			esti += feat[state];
 		return esti;
 	}
 	constexpr static inline numeric optimize(const board& state, numeric error, clip<feature> range = feature::feats()) {
-		register numeric esti = 0;
-		for (register feature& feat : range)
+		numeric esti = 0;
+		for (feature& feat : range)
 			esti += (feat[state] += error);
 		return esti;
 	}
@@ -1473,14 +1473,14 @@ struct method {
 		constexpr inline operator method() { return { common<mode>::estimate, common<mode>::optimize }; }
 
 		constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
-			register numeric esti = 0;
-			for (register feature& feat : range)
+			numeric esti = 0;
+			for (feature& feat : range)
 				esti += feat.at<mode>(state);
 			return esti;
 		}
 		constexpr static inline numeric optimize(const board& state, numeric error, clip<feature> range = feature::feats()) {
-			register numeric esti = 0;
-			for (register feature& feat : range)
+			numeric esti = 0;
+			for (feature& feat : range)
 				esti += (feat.at<mode>(state) += error);
 			return esti;
 		}
@@ -1491,22 +1491,22 @@ struct method {
 		constexpr inline operator method() { return { isomorphic::estimate, isomorphic::optimize }; }
 
 		constexpr static inline_always numeric invoke(const board& iso, clip<feature> f) {
-			register numeric esti = 0;
-			for (register auto feat = f.begin(); feat != f.end(); feat += 8)
+			numeric esti = 0;
+			for (auto feat = f.begin(); feat != f.end(); feat += 8)
 				esti += feat->at<mode>(iso);
 			return esti;
 		}
 		constexpr static inline_always numeric invoke(const board& iso, numeric updv, clip<feature> f) {
-			register numeric esti = 0;
-			for (register auto feat = f.begin(); feat != f.end(); feat += 8)
+			numeric esti = 0;
+			for (auto feat = f.begin(); feat != f.end(); feat += 8)
 				esti += (feat->at<mode>(iso) += updv);
 			return esti;
 		}
 
 		template<estimator estim = isomorphic::invoke>
 		constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
-			register numeric esti = 0;
-			register board iso;
+			numeric esti = 0;
+			board iso;
 			esti += estim(({ iso = state;     iso; }), range);
 			esti += estim(({ iso.flip();      iso; }), range);
 			esti += estim(({ iso.transpose(); iso; }), range);
@@ -1519,8 +1519,8 @@ struct method {
 		}
 		template<optimizer optim = isomorphic::invoke>
 		constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
-			register numeric esti = 0;
-			register board iso;
+			numeric esti = 0;
+			board iso;
 			esti += optim(({ iso = state;     iso; }), updv, range);
 			esti += optim(({ iso.flip();      iso; }), updv, range);
 			esti += optim(({ iso.transpose(); iso; }), updv, range);

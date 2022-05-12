@@ -320,7 +320,7 @@ public:
 		raw = (math::pext64(raw, 0x000f000f000f000full) <<  0) | (math::pext64(raw, 0x00f000f000f000f0ull) << 16)
 		    | (math::pext64(raw, 0x0f000f000f000f00ull) << 32) | (math::pext64(raw, 0xf000f000f000f000ull) << 48);
 #else
-		register u64 buf = 0;
+		u64 buf = 0;
 		buf = (raw ^ (raw >> 12)) & 0x0000f0f00000f0f0ull;
 		raw ^= buf ^ (buf << 12);
 		buf = (raw ^ (raw >> 24)) & 0x00000000ff00ff00ull;
@@ -333,7 +333,7 @@ public:
 		ext = (math::pext32(ext, 0x1111u) <<  0) | (math::pext32(ext, 0x2222u) <<  4)
 			| (math::pext32(ext, 0x4444u) <<  8) | (math::pext32(ext, 0x8888u) << 12);
 #else
-		register u16 buf = 0;
+		u16 buf = 0;
 		buf = (ext ^ (ext >> 3)) & 0x0a0a;
 		ext ^= buf ^ (buf << 3);
 		buf = (ext ^ (ext >> 6)) & 0x00cc;
@@ -970,12 +970,12 @@ public:
 
 	inline constexpr u32 scale() const   { return scale64(); }
 	inline constexpr u32 scale64() const {
-		register u32 h = 0;
+		u32 h = 0;
 		for (u32 i = 0; i < 16; i++) h |= (1 << at4(i));
 		return h;
 	}
 	inline constexpr u32 scale80() const {
-		register u32 h = 0;
+		u32 h = 0;
 		for (u32 i = 0; i < 16; i++) h |= (1 << at5(i));
 		return h;
 	}

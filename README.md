@@ -1086,22 +1086,22 @@ struct isomorphic {
     constexpr inline operator method() { return { isomorphic::estimate, isomorphic::optimize }; }
 
     constexpr static inline_always numeric invoke(const board& iso, clip<feature> f) {
-        register numeric esti = 0;
-        for (register auto feat = f.begin(); feat != f.end(); feat += 8)
+        numeric esti = 0;
+        for (auto feat = f.begin(); feat != f.end(); feat += 8)
             esti += feat->at<mode>(iso);
         return esti;
     }
     constexpr static inline_always numeric invoke(const board& iso, numeric updv, clip<feature> f) {
-        register numeric esti = 0;
-        for (register auto feat = f.begin(); feat != f.end(); feat += 8)
+        numeric esti = 0;
+        for (auto feat = f.begin(); feat != f.end(); feat += 8)
             esti += (feat->at<mode>(iso) += updv);
         return esti;
     }
 
     template<estimator estim = isomorphic::invoke>
     constexpr static inline numeric estimate(const board& state, clip<feature> range = feature::feats()) {
-        register numeric esti = 0;
-        register board iso;
+        numeric esti = 0;
+        board iso;
         esti += estim(({ iso = state;     iso; }), range);
         esti += estim(({ iso.flip();      iso; }), range);
         esti += estim(({ iso.transpose(); iso; }), range);
@@ -1114,8 +1114,8 @@ struct isomorphic {
     }
     template<optimizer optim = isomorphic::invoke>
     constexpr static inline numeric optimize(const board& state, numeric updv, clip<feature> range = feature::feats()) {
-        register numeric esti = 0;
-        register board iso;
+        numeric esti = 0;
+        board iso;
         esti += optim(({ iso = state;     iso; }), updv, range);
         esti += optim(({ iso.flip();      iso; }), updv, range);
         esti += optim(({ iso.transpose(); iso; }), updv, range);
