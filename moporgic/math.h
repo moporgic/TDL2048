@@ -8,9 +8,6 @@
  *      Author: moporgic
  */
 
-#include "half.h"
-#include "type.h"
-#include <math.h>
 #include <cmath>
 #include <numeric>
 #include <iterator>
@@ -18,6 +15,9 @@
 #if defined __x86_64__ || defined __i386__
 #include <x86intrin.h>
 #endif
+#include "unit.h"
+#include "type.h"
+#include "half.h"
 
 namespace moporgic {
 
@@ -56,12 +56,12 @@ static inline constexpr uint64_t abs(int64_t x) noexcept { return x & 0x80000000
  * A branchless, lookup-free, alternative to code like if (a<b) x=c; else x=d; is ((((a-b) >> (WORDBITS-1)) & (c^d)) ^ d).
  * This code assumes that the shift is signed, which, of course, C does not promise.
  */
-static inline constexpr int32_t select_lt(int32_t a, int32_t b, int32_t c, int32_t d) noexcept {
-	return ((((a-b) >> (32-1)) & (c^d)) ^ d);
-}
-static inline constexpr int64_t select_lt(int64_t a, int64_t b, int64_t c, int64_t d) noexcept {
-	return ((((a-b) >> (64-1)) & (c^d)) ^ d);
-}
+//static inline constexpr int32_t select_lt(int32_t a, int32_t b, int32_t c, int32_t d) noexcept {
+//	return ((((a-b) >> (32-1)) & (c^d)) ^ d);
+//}
+//static inline constexpr int64_t select_lt(int64_t a, int64_t b, int64_t c, int64_t d) noexcept {
+//	return ((((a-b) >> (64-1)) & (c^d)) ^ d);
+//}
 
 /**
  * Comparison of Float Values
@@ -71,15 +71,17 @@ static inline constexpr int64_t select_lt(int64_t a, int64_t b, int64_t c, int64
  * The only complication is the use of sign+magnitude representation in floats.
  * The AMD Athlon Processor x86 Code Optimization Guide gives a nice summary on Page 43. Here's a set of C routines that embody the same logic:
  */
-static inline constexpr bool isless0(float f) noexcept          { return raw_cast<uint32_t>(f) > 0x80000000u; }
-static inline constexpr bool islessequal0(float f) noexcept     { return raw_cast<int32_t>(f) <= 0; }
-static inline constexpr bool isgreater0(float f) noexcept       { return raw_cast<int32_t>(f) > 0; }
-static inline constexpr bool isgreaterequal0(float f) noexcept  { return raw_cast<uint32_t>(f) <= 0x80000000u; }
-
-static inline constexpr bool isless0(double f) noexcept         { return raw_cast<uint32_t, 1>(f) > 0x80000000u; }
-static inline constexpr bool islessequal0(double f) noexcept    { return raw_cast<int32_t, 1>(f) <= 0; }
-static inline constexpr bool isgreater0(double f) noexcept      { return raw_cast<int32_t, 1>(f) > 0; }
-static inline constexpr bool isgreaterequal0(double f) noexcept { return raw_cast<uint32_t, 1>(f) <= 0x80000000u; }
+//namespace cmp_0 {
+//static inline constexpr bool islt(float f) noexcept { return raw_cast<uint32_t>(f) > 0x80000000u; }
+//static inline constexpr bool isle(float f) noexcept { return raw_cast<int32_t>(f) <= 0; }
+//static inline constexpr bool isgt(float f) noexcept { return raw_cast<int32_t>(f) > 0; }
+//static inline constexpr bool isge(float f) noexcept { return raw_cast<uint32_t>(f) <= 0x80000000u; }
+//
+//static inline constexpr bool islt(double f) noexcept { return raw_cast<uint32_t, 1>(f) > 0x80000000u; }
+//static inline constexpr bool isle(double f) noexcept { return raw_cast<int32_t, 1>(f) <= 0; }
+//static inline constexpr bool isgt(double f) noexcept { return raw_cast<int32_t, 1>(f) > 0; }
+//static inline constexpr bool isge(double f) noexcept { return raw_cast<uint32_t, 1>(f) <= 0x80000000u; }
+//}
 
 /**
  * Integer Minimum or Maximum
