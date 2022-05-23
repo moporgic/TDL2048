@@ -458,7 +458,7 @@ public:
 	inline constexpr u32 popups64(btype popup[]) const {
 		u32 i = 0;
 		u64 x = where64(0);
-		for (u64 t; (t = x & -x) != 0; x ^= t) {
+		for (u64 t = 0; (t = x & -x) != 0; x ^= t) {
 			popup[i++] = board(raw | (t << 0), ext);
 			popup[i++] = board(raw | (t << 1), ext);
 		}
@@ -468,7 +468,7 @@ public:
 	inline constexpr u32 popups80(btype popup[]) const {
 		u32 i = 0;
 		u64 x = where80(0);
-		for (u64 t; (t = x & -x) != 0; x ^= t) {
+		for (u64 t = 0; (t = x & -x) != 0; x ^= t) {
 			popup[i++] = board(raw | (t << 0), ext);
 			popup[i++] = board(raw | (t << 1), ext);
 		}
