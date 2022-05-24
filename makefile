@@ -7,7 +7,7 @@ ARCH ?= tune=native
 INSTS ?= abm bmi bmi2 avx avx2
 FLAGS ?= -Wall -fmessage-length=0
 SOURCE ?= 2048.cpp
-OUTPUT ?= $(basename $(SOURCE))
+OUTPUT ?= $(basename $(word 1, $(SOURCE)))
 # other make options
 TARGET ?= default
 SCRIPT ?= make-profile.sh
