@@ -285,6 +285,7 @@ public:
 		else if (n < clip<type>::size()) erase(clip<type>::cbegin() + n, clip<type>::cend());
 	}
 	type* insert(const type* p, size_t n, const type& v) {
+		if (!n) return const_cast<type*>(p);
 		type* buf = alloc().allocate(clip<type>::size() + n);
 		new (buf) type[clip<type>::size() + n]();
 		type* pos = std::copy(clip<type>::cbegin(), p, buf);
@@ -328,7 +329,7 @@ public:
 protected:
 	void set(type* first, type* last) {
 		for (type* it = clip<type>::begin(); it != clip<type>::end(); it++) it->~type();
-		alloc().deallocate(clip<type>::begin(), clip<type>::size());
+		if (clip<type>::size()) alloc().deallocate(clip<type>::begin(), clip<type>::size());
 		clip<type>::operator=(clip<type>(first, last));
 	}
 };
