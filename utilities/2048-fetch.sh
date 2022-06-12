@@ -72,7 +72,7 @@ for (( i=0; i<${#src[@]}; i++ )); do
 	fi
 	fmt=%-${len}s${fmt}
 	<<<$result $filter | while IFS= read res; do
-		printf "${fmt}\n" "$label" $res
+		[[ $res ]] && printf "${fmt}\n" "$label" $res
 		label=
 	done
 done
