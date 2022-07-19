@@ -29,18 +29,21 @@ tiles=$({
 
 echo "${tiles// /[%]$'\t'}[%]"
 
-{ egrep "^[0-9]+ [0-9. ]+% +[0-9.]+%$" | while IFS= read -r res; do
-	tile=${res%% *}
-	win=${res##* }
-	[ "$win" == "100.00%" ] && echo
-	echo -n "$tile:$win "
-done | tail -n+2; echo; } | while IFS= read -r result; do
-	[[ $result ]] || continue
+sed -E '/^[0-9]+ [0-9. ]+% +[0-9.]+%$/!s/.*//g' | while IFS= read -r res; do
+	if [[ $res ]]; then
+		tile=${res%% *}
+		win=${res##* }
+		echo -n "$tile:$win "
+	else
+		echo
+	fi
+done | grep . | while IFS= read -r res; do
+	[[ $res ]] || continue
 	declare -A stat
 
 	tile=2
 	win="100.00%"
-	for res in $result; do
+	for res in $res; do
 		for (( this=${res%:*}; tile<this; tile+=tile )); do
 			stat[$tile]=$win
 		done
