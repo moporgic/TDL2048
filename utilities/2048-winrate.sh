@@ -16,8 +16,8 @@ tiles=${tiles//,/|}
 tiles=${tiles// /|}
 
 tiles=$({
-	egrep -o '[0-9]+' <<< "$tiles"
-	for range in $(egrep -o '[0-9]+\|\.\.\.\|[0-9]+'); do
+	grep -Eo '[0-9]+' <<< "$tiles"
+	for range in $(grep -Eo '[0-9]+\|\.\.\.\|[0-9]+'); do
 		[[ $range =~ ([0-9]+)[^0-9]+([0-9]+) ]]
 		lower=${BASH_REMATCH[1]}
 		upper=${BASH_REMATCH[2]}
@@ -25,7 +25,7 @@ tiles=$({
 			[ $tile -ge $lower ] && [ $tile -le $upper ] && echo $tile
 		done
 	done <<< "2|$tiles|65536"
-} | sort -h | uniq | egrep ${values// /|} | xargs)
+} | sort -h | uniq | grep -E ${values// /|} | xargs)
 
 echo "${tiles// /[%]$'\t'}[%]"
 

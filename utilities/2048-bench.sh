@@ -14,7 +14,7 @@ test-st() (
 	eval=(${3} ${2/#0*/} 1x${ratio:-10}000)
 	(( ${opti/x*/} )) && run+=(-t $opti)
 	(( ${eval/x*/} )) && run+=(-e $eval)
-	${run[@]} -% -s | grep summary | egrep -o [0-9.]+ops
+	${run[@]} -% -s | grep summary | grep -Eo [0-9.]+ops
 )
 test-mt() (
 	run=$(runas "${1:-./2048}") || return $?
@@ -31,7 +31,7 @@ test-mt() (
 			taskset -pc $cores $BASHPID >/dev/null
 			${run[@]} -p $(nproc) -% -s &
 		done; wait
-	} | grep summary | egrep -o [0-9.]+ops | xargs $xsplit | sed -e "s/ /+/g" -e "s/ops//g" | \
+	} | grep summary | grep -Eo [0-9.]+ops | xargs $xsplit | sed -e "s/ /+/g" -e "s/ops//g" | \
 		xargs printf "scale=2;%s;\n" | bc -l | xargs -I% echo %ops | grep .
 )
 test-t-st() { test-st "${1:-./2048}" ${2:-1x10000} 0; }
@@ -102,16 +102,16 @@ benchmark() (
 
 		if (( $N_init )); then
 			test="test-${thread:0:1}t" \
-				bench "$run_init" $N_init | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+				bench "$run_init" $N_init | tail -n1 | grep -Eo [0-9.][0-9.]+ops | xargs echo -n ""
 			sleep 1
 		fi
 		if (( $N_load )) && [ -e $network.w ]; then
 			test="test-${thread:0:1}t" \
-				bench "$run_load" $N_load | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+				bench "$run_load" $N_load | tail -n1 | grep -Eo [0-9.][0-9.]+ops | xargs echo -n ""
 			sleep 1
 
 			test="test-e-${thread:0:1}t" \
-				bench "$run_load" $N_load | tail -n1 | egrep -o [0-9.][0-9.]+ops | xargs echo -n ""
+				bench "$run_load" $N_load | tail -n1 | grep -Eo [0-9.][0-9.]+ops | xargs echo -n ""
 			sleep 1
 		fi
 		echo
@@ -151,12 +151,12 @@ envinfo() (
 	perf=$(cpu-perf 1)G
 	(( $(nproc) > 1 )) && perf+=-$(cpu-perf $(nproc))G
 	# memory info
-	meminfo=$(sudo -n lshw -short -c memory 2>/dev/null | egrep -v "BIOS|cache|empty")
+	meminfo=$(sudo -n lshw -short -c memory 2>/dev/null | grep -Ev "BIOS|cache|empty")
 	if [[ $meminfo ]]; then
 		dimm=$(<<< "$meminfo" grep "DIMM" | cut -d' ' -f2-)
 		type=($(<<< "$dimm" grep -o "DDR."))
-		speed=($(<<< "$dimm" egrep -o "\S+ MHz"))
-		size=$(<<< "$meminfo" grep "System Memory" | egrep -Eo "[0-9]+[MGT]")B
+		speed=($(<<< "$dimm" grep -Eo "\S+ MHz"))
+		size=$(<<< "$meminfo" grep "System Memory" | grep -Eo "[0-9]+[MGT]")B
 		meminfo="$type-$speed x$(<<< "$dimm" wc -l) $size"
 	else # if memory info cannot be retrieved
 		size=($(head -n1 /proc/meminfo))
@@ -198,8 +198,8 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then ( # execute benchm
 		*)   recipes+=${recipes:+ }$1; ;;
 		esac; shift
 	done
-	networks=$(<<< "$options" egrep -o [0-9] | sort | uniq | xargs -I% echo %x6patt)
-	threads=$(<<< "$options" egrep -o [sm] | sort -r | uniq | sed -e "s/s/single/g" -e "s/m/multi/g")
+	networks=$(<<< "$options" grep -Eo [0-9] | sort | uniq | xargs -I% echo %x6patt)
+	threads=$(<<< "$options" grep -Eo [sm] | sort -r | uniq | sed -e "s/s/single/g" -e "s/m/multi/g")
 
 	for network in ${networks:-4x6patt 8x6patt}; do
 		[ -e $network.w ] && continue
