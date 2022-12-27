@@ -40,6 +40,7 @@ format=
 [[ $columns == *max* ]] && { max="max="; format+="%8s"; } || max="max=[0-9]+"
 win=$(<<<$columns sed -E "s/[a-z]+,//g" | tr ',' '|')
 format+=$(<<<$win sed -E "s/[0-9]\||[0-9]$/_/g" | tr -d '[:digit:]' | sed "s/_/%8s/g")
+columns=($(<<<$columns sed -E "s/[^a-z0-9]/ /g"))
 
 # fetch labels
 (( $# )) && src=() || src=("|-") # fetch from stdin if no args
@@ -71,8 +72,14 @@ for (( i=0; i<${#src[@]}; i++ )); do
 		fmt="%-$((width + 3))s$format"
 	fi
 	fmt=%-${len}s${fmt}
-	<<<$result $filter | while IFS= read res; do
-		[[ $res ]] && printf "${fmt}\n" "$label" $res
+	<<<$result $filter | while IFS= read -r res; do
+		if [[ $res ]]; then
+			chk=($res)
+			for (( i=${#chk[@]}; i<${#columns[@]}; i++ )); do
+				res=${res/ 100.00%/ 100.00% 100.00%}
+			done
+			printf "${fmt}\n" "$label" $res
+		fi
 		label=
 	done
 done
