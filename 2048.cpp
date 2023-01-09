@@ -2405,6 +2405,9 @@ statistic run(utils::options::option opt) {
 				best >> b;
 			}
 			for (u32 n = 1; best; n += 1) {
+				score += b.move80(best.opcode());
+				opers += 1;
+				b.next80();
 				for ((x = b).shift80(n); stage[k] > x.scale(); k -= 1);
 				for (t = (n <= stint) ? t : 65536;
 					(x = b).shift80(n), best(x, stage[k], spec).validate(t); b.next80()) {
