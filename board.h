@@ -1170,12 +1170,12 @@ public:
 		inline constexpr u32 index() const { return i; }
 	public:
 		inline constexpr operator u32() const {
-			u32 t = (b.opt & style::extend) ? b.at5(i) : b.at4(i);
-			return  (b.opt & style::exact)  ? tile::itov(t) : t;
+			u32 t = (b.opts(style::extend)) ? b.at5(i) : b.at4(i);
+			return  (b.opts(style::exact))  ? tile::itov(t) : t;
 		}
 		inline constexpr tile& operator =(u32 t) {
-			if (b.opt & style::exact)  t = tile::itov(t);
-			if (b.opt & style::extend) b.at5(i, t); else b.at4(i, t);
+			if (b.opts(style::exact))  t = tile::itov(t);
+			if (b.opts(style::extend)) b.at5(i, t); else b.at4(i, t);
 			return *this;
 		}
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
@@ -1240,28 +1240,30 @@ public:
 			raw    = binary,
 		};
 	};
-	inline constexpr board& format(u32 i = style::index) { opts(i, style::full); return *this; }
+	inline constexpr board& format(u32 fmt = style::index) { opts(style::full, fmt); return *this; }
 
 	inline constexpr u32 info() const { return inf; }
-	inline constexpr u32 info(u32 i) { u32 old = inf; inf = i; return old; }
+	inline constexpr u32 info(u32 i) { u32 ix = inf; inf = i; return ix; }
 
-	inline constexpr u16 opts(u16 mask = -1) const { return opt & mask; }
-	inline constexpr u16 opts(u16 o, u16 mask) { u16 old = opts(mask); opt = (opt & ~mask) | (o & mask); return old; }
+	inline constexpr u16 opts(u16 ns = -1) const { return opt & ns; }
+	template<typename flag, typename = enable_if_is_integral<flag>>
+	inline constexpr u16 opts(u16 ns, flag o) { u16 ox = opts(ns); opt = (opt & ~ns) | (u16(o) & ns); return ox; }
+	inline constexpr u16 opts(u16 ns, bool o) { return opts(ns, o ? -1u : 0); }
 
 	friend std::ostream& operator <<(std::ostream& out, const board& b) {
-		if (b.opt & style::binary) {
+		if (b.opts(style::binary)) {
 			moporgic::write<u64>(out, b.raw);
-			if (b.opt & style::extend) moporgic::write_cast<u16>(out, b.ext);
-			if (b.opt & style::alter)  moporgic::write_cast<u16>(out, b.opt);
-			if (b.opt & style::exact)  moporgic::write<u32>(out, b.inf);
-		} else if (b.opt & style::alter) {
+			if (b.opts(style::extend)) moporgic::write<u16>(out, b.ext);
+			if (b.opts(style::alter))  moporgic::write<u16>(out, b.opt);
+			if (b.opts(style::exact))  moporgic::write<u32>(out, b.inf);
+		} else if (b.opts(style::alter)) {
 			char buf[24];
 			std::snprintf(buf, sizeof(buf), "[%016" PRIx64 "]", b.raw);
-			if (b.opt & style::extend) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext);
+			if (b.opts(style::extend)) std::snprintf(buf + 17, sizeof(buf) - 17, "|%04x]", b.ext);
 			out << buf;
 		} else {
 			char buf[180];
-			u32 n = 0, w = (b.opt & style::exact) ? 6 : 4;
+			u32 n = 0, w = (b.opts(style::exact)) ? 6 : 4;
 			n += snprintf(buf + n, sizeof(buf) - n, "+%.*s+" "\n", (w * 4), "------------------------");
 			for (u32 i = 0; i < 16; i += 4) {
 				u32 t[4] = { b[i + 0], b[i + 1], b[i + 2], b[i + 3] };
@@ -1274,15 +1276,15 @@ public:
 	}
 
 	friend std::istream& operator >>(std::istream& in, board& b) {
-		if (b.opt & style::binary) {
+		if (b.opts(style::binary)) {
 			moporgic::read<u64>(in, b.raw);
-			if (b.opt & style::extend) moporgic::read_cast<u16>(in, b.ext);
-			if (b.opt & style::alter)  moporgic::read_cast<u16>(in, b.opt);
-			if (b.opt & style::exact)  moporgic::read<u32>(in, b.inf);
-		} else if (b.opt & style::alter) {
+			if (b.opts(style::extend)) moporgic::read<u16>(in, b.ext);
+			if (b.opts(style::alter))  moporgic::read<u16>(in, b.opt);
+			if (b.opts(style::exact))  moporgic::read<u32>(in, b.inf);
+		} else if (b.opts(style::alter)) {
 			bool nobox(in >> std::hex >> b.raw);
 			if (!nobox) (in.clear(), in.ignore(1)) >> std::hex >> b.raw;
-			if (b.opt & style::extend) in.ignore(1) >> std::hex >> b.ext;
+			if (b.opts(style::extend)) in.ignore(1) >> std::hex >> b.ext;
 			if (!nobox) in.ignore(1);
 		} else {
 			for (u32 k, i = 0; i < 16; i++) {
