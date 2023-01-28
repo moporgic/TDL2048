@@ -177,8 +177,7 @@ envinfo() (
 		(( ${#ver[@]} )) && osinfo+=" (Windows ${ver[-1]})"
 	fi
 	# GCC version
-	gccinfo=($(gcc --version | head -n1))
-	gccinfo="GCC ${gccinfo[-1]}"
+	gccinfo="GCC $(gcc --version | head -n1 | cut -d' ' -f3-)"
 	[[ $makeinfo ]] && gccinfo+=" $makeinfo"
 	# current time
 	when=${when:=$(date +'%F %T')}
