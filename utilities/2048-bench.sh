@@ -151,17 +151,23 @@ envinfo() (
 	perf=$(cpu-perf 1)G
 	(( $(nproc) > 1 )) && perf+=-$(cpu-perf $(nproc))G
 	# memory info
-	meminfo=$(sudo -n lshw -short -c memory 2>/dev/null | grep -Ev "BIOS|cache|empty")
-	if [[ $meminfo ]]; then
+	size= type= speed= slot=
+	if meminfo=$(sudo -n dmidecode -t memory 2>/dev/null | grep -v "^#" | xargs -L1) && [[ $meminfo ]]; then
+		dimm=$(paste <(<<< $meminfo grep "^Size:") <(<<< $meminfo grep "^Type:") | grep -E "^Size: [0-9]+" | xargs -L1)
+		size=$(($(<<< $dimm cut -d' ' -f2 | tr '\n' '+')0))$(<<< ${dimm/$'\n'*/} cut -d' ' -f3)
+		type=$(<<< ${dimm/$'\n'*/} cut -d' ' -f5)
+		speed=$(<<< $meminfo grep -m1 "^Configured Memory Speed:" | cut -d' ' -f4)
+		slot=$(<<< "$dimm" wc -l)
+	elif meminfo=$(sudo -n lshw -short -c memory 2>/dev/null | grep -Ev "BIOS|cache|empty") && [[ $meminfo ]]; then
 		dimm=$(<<< "$meminfo" grep "DIMM" | cut -d' ' -f2-)
+		size=$(<<< "$meminfo" grep "System Memory" | grep -Eo "[0-9]+[MGT]")B
 		type=($(<<< "$dimm" grep -o "DDR."))
 		speed=($(<<< "$dimm" grep -Eo "\S+ MHz"))
-		size=$(<<< "$meminfo" grep "System Memory" | grep -Eo "[0-9]+[MGT]")B
-		meminfo="$type-$speed x$(<<< "$dimm" wc -l) $size"
-	else # if memory info cannot be retrieved
-		size=($(head -n1 /proc/meminfo))
-		meminfo=$(printf "DRAM %.1fG" $(<<< "${size[1]}/1024/1024" bc -l))
+		slot=$(<<< "$dimm" wc -l)
+	elif meminfo=$(grep "MemTotal:" /proc/meminfo 2>/dev/null) && [[ $meminfo ]]; then
+		size=$(<<< ${meminfo//[^0-9]/}/1024/1024 bc -l | xargs printf "%.0fGB")
 	fi
+	meminfo="${size:-n/a}${type:+ @ $type-$speed x$slot}"
 
 	echo "$cpuinfo @ $nproc $perf + $meminfo"
 
