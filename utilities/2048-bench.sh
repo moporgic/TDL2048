@@ -127,29 +127,28 @@ runas() (
 	done >/dev/null 2>&1
 	echo ${run:?\'$@\' is unavailable}
 )
-# measure CPU performance in GHz
-cpu-perf() (
-	$(ls ./2048* | head -n1) -n 4x6patt -t ${1:-1}00 -p ${1:-1} >/dev/null &
-	sleep ${2:-5}
-	speed=$(grep MHz /proc/cpuinfo | cut -d':' -f2 | cut -b2- | sort -n | tail -n${1:-1})
-	pkill -P $(jobs -p)
-	kill $(jobs -p)
-	printf "%.1f\n" $(<<< "(${speed//$'\n'/+})/$(<<< "$speed" wc -l)000" bc -l)
-)
 # display the current environment
 envinfo() (
 	# CPU model
 	cpuinfo=$(grep -m1 name /proc/cpuinfo | sed -E 's/.+:|\(\S+\)|CPU|[0-9]+-Core.+|@.+//g' | xargs)
 	nodes=$(lscpu | grep 'NUMA node(s)' | cut -d: -f2 | xargs)
 	(( ${nodes:-1} > 1 )) && cpuinfo+=" x$nodes"
-	# available cores
+	# CPU affinity
 	taskset -cp $(<<< "${taskset[@]}" tr "; " ,) $BASHPID >/dev/null
 	taskset=$(<<< "${taskset[@]}" tr ' ' ';')
 	nproc=$(for cpus in ${taskset//;/ }; do echo $(taskset -c $cpus nproc)x; done | xargs)
 	[[ $taskset ]] && nproc="${nproc// /|} ($taskset)" || nproc=$(nproc)x
 	# CPU speed
-	perf=$(cpu-perf 1)G
-	(( $(nproc) > 1 )) && perf+=-$(cpu-perf $(nproc))G
+	if [ -e 2048 ] || make OUTPUT=2048 >/dev/null; then
+		perf=$(for np in $(<<< 1$'\n'$(nproc) uniq); do
+			./2048 -n 4x6patt -t ${np}000 -p ${np} >/dev/null &
+			sleep 5
+			speed=$({ grep MHz /proc/cpuinfo || echo 0; } | xargs -L1 | cut -d' ' -f4 | sort -n | tail -n${np})
+			kill $! $(pgrep -P $! 2>/dev/null) 2>/dev/null
+			printf "%.1fG\n" $(bc -l <<< "(${speed//$'\n'/+})/$(<<< $speed wc -l)000")
+		done | uniq | xargs | tr ' ' '-')
+		[[ $perf != 0.0G ]] && nproc+=" $perf"
+	fi
 	# memory info
 	size= type= speed= slot=
 	if meminfo=$(sudo -n dmidecode -t memory 2>/dev/null | grep -v "^#" | xargs -L1) && [[ $meminfo ]]; then
@@ -169,9 +168,9 @@ envinfo() (
 	fi
 	meminfo="${size:-n/a}${type:+ @ $type-$speed x$slot}"
 
-	echo "$cpuinfo @ $nproc $perf + $meminfo"
+	echo "$cpuinfo @ $nproc + $meminfo"
 
-	# git commit
+	# GIT commit
 	commit=($(git log -n1 --format=%h 2>/dev/null) "???????")
 	git status -uno 2>/dev/null | grep -iq changes && commit+="+x"
 	# OS name and version
