@@ -80,8 +80,11 @@ benchmark() (
 	networks=($(<<< "${networks[@]:-4x6patt 8x6patt}" tr ";" " "))
 	threads=($(<<< "${threads[@]:-single multi}" tr ";" " "))
 	order=($(<<< "${order[@]:-network thread recipe}" tr ";" " "))
+
 	N_init=${N_init:-4}
-	N_load=${N_load:-2}
+	N_load=${N_load:-4}
+	ratio_init=${ratio_init:-${ratio:-10}}
+	ratio_load=${ratio_load:-${ratio:-1}}
 
 	tokens=$(eval echo $(for o in ${order[@]}; do
 		vars=$(eval 'for var in ${'${o}'s[@]:?}; do echo _${var}_; done' | xargs | tr ' ' ',')
@@ -101,16 +104,16 @@ benchmark() (
 		run_load="${run:?} -n $network -i $network.w -a 0"
 
 		if (( $N_init )); then
-			test="test-${thread:0:1}t" \
+			test="test-${thread:0:1}t" ratio=$ratio_init \
 				bench "$run_init" $N_init | tail -n1 | grep -Eo [0-9.][0-9.]+ops | xargs echo -n ""
 			sleep 1
 		fi
 		if (( $N_load )) && [ -e $network.w ]; then
-			test="test-${thread:0:1}t" \
+			test="test-${thread:0:1}t" ratio=$ratio_load \
 				bench "$run_load" $N_load | tail -n1 | grep -Eo [0-9.][0-9.]+ops | xargs echo -n ""
 			sleep 1
 
-			test="test-e-${thread:0:1}t" \
+			test="test-e-${thread:0:1}t" ratio=$ratio_load \
 				bench "$run_load" $N_load | tail -n1 | grep -Eo [0-9.][0-9.]+ops | xargs echo -n ""
 			sleep 1
 		fi
