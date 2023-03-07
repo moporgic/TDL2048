@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : moporgic/TDL2048+ - board.h
 // Author      : Hung Guei @ moporgic
-// Version     : 6.5
+// Version     : 6.6
 // Description : The Most Effective Bitboard Implementation for 2048
 //============================================================================
 
@@ -22,17 +22,27 @@ private:
 public:
 	inline constexpr board(u64 raw = 0, u16 ext = 0, u32 inf = 0) : raw(raw), ext(ext), opt(), inf(inf) {}
 	inline constexpr board(u64 raw, u16 ext, u16 opt, u32 inf) : raw(raw), ext(ext), opt(opt), inf(inf) {}
+	inline constexpr board(const u128& x) : board(u64(x), u16(x >> 64), u16(x >> 80), u32(x >> 96)) {}
 	inline constexpr board(const board& b) = default;
-	inline constexpr board& operator =(u64 x) { raw = x; ext = 0; return *this; }
-	inline constexpr board& operator =(const board& b) = default;
+	template<typename type, typename = enable_if_is_convertible<type, u64>>
+	inline constexpr board(const type& x) : board(u64(x)) {}
 
 	inline constexpr operator u64&() { return raw; }
 	inline constexpr operator u64() const { return raw; }
-	declare_comparators_with(const board&, raw_cast<u128>(*this), raw_cast<u128>(v), inline constexpr)
+	inline constexpr explicit operator u128() const { return u128(raw) | (u128(ext) << 64) | (u128(opt) << 80) | (u128(inf) << 96); }
 
-	inline constexpr void set(u64 x) { raw = x; }
-	inline constexpr void set(u64 x, u16 e) { raw = x; ext = e; }
-	inline constexpr void set(const board& b) { raw = b.raw; ext = b.ext; }
+	inline constexpr board& operator =(u64 x) { raw = x; ext = 0; return *this; }
+	inline constexpr board& operator =(const u128& x) { raw = u64(x); ext = u16(x >> 64); opt = u16(x >> 80); inf = u32(x >> 96); return *this; }
+	inline constexpr board& operator =(const board& b) = default;
+	template<typename type, typename = enable_if_is_convertible<type, u64>>
+	inline constexpr board& operator =(const type& x) { return operator =(u64(x)); }
+	declare_comparators(const board&, operator u128(), inline constexpr)
+
+	inline constexpr void set(u64 x, u16 e = 0) { raw = x; ext = e; }
+	inline constexpr void set(const u128& x) { set(u64(x), u16(x >> 64)); }
+	inline constexpr void set(const board& b) { set(b.raw, b.ext); }
+	template<typename type, typename = enable_if_is_convertible<type, u64>>
+	inline constexpr void set(const type& x) { set(u64(x), 0); }
 
 public:
 	class cache {

@@ -12,6 +12,7 @@
 #include <iterator>
 #include <vector>
 #include <array>
+#include <bitset>
 #include <iostream>
 #include <algorithm>
 #include <utility>
@@ -61,9 +62,6 @@ declare_enable_if(is_unsigned);
 
 declare_enable_if_with(is_convertible, is_iterator_convertible, typename std::iterator_traits<test>::iterator_category, std::input_iterator_tag);
 
-#define declare_trait(trait, detail...)\
-template<> struct std::trait<detail> : public std::true_type {};
-
 template<typename base, typename test> using enable_if_is_base_of = typename std::enable_if<std::is_base_of<base, test>::value>::type;
 template<typename base, typename test> using enable_if_not_is_base_of = typename std::enable_if<not std::is_base_of<base, test>::value>::type;
 
@@ -71,6 +69,9 @@ template<typename from, typename to> using enable_if_is_convertible = typename s
 template<typename from, typename to> using enable_if_not_is_convertible = typename std::enable_if<not std::is_convertible<from, to>::value>::type;
 
 } /* namespace moporgic */
+
+#define declare_trait(trait, detail...)\
+template<> struct std::trait<detail> : public std::true_type {};
 
 declare_trait(is_integral, moporgic::hexadeca);
 declare_trait(is_unsigned, moporgic::hexadeca);
