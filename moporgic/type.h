@@ -34,6 +34,20 @@ typedef bitset_iterator<u64, false> u64it;
 }
 typedef moporgic::byte byte;
 typedef moporgic::half f16;
+#ifndef __SIZEOF_INT128__
+template<typename num>
+struct x128_abort { num x[2] = {};
+	constexpr x128_abort(const num&) { std::abort(); }
+	constexpr operator num&() { return x[0]; }
+	constexpr operator const num&() const { return x[0]; }
+	constexpr x128_abort  operator >> (int) const { return *this; }
+	constexpr x128_abort  operator << (int) const { return *this; }
+	constexpr x128_abort& operator >>=(int) { return *this; }
+	constexpr x128_abort& operator <<=(int) { return *this; }
+};
+typedef x128_abort<u64> u128;
+typedef x128_abort<i64> i128;
+#endif
 
 namespace moporgic {
 
@@ -638,4 +652,3 @@ public:
 };
 
 } /* namespace moporgic */
-
