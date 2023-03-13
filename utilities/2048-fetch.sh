@@ -38,7 +38,7 @@ columns=${columns:-"avg,max,16384,32768"}
 format=
 [[ $columns == *avg* ]] && { avg=".+avg="; format+="%6s"; } || avg=".+avg=[0-9]+ "
 [[ $columns == *max* ]] && { max="max="; format+="%8s"; } || max="max=[0-9]+"
-win=$(<<<$columns sed -E "s/[a-z]+,//g" | tr ',' '|')
+win=$(<<<$columns sed -E "s/[a-z]+,?//g" | tr ',' '|')
 format+=$(<<<$win sed -E "s/[0-9]\||[0-9]$/_/g" | tr -d '[:digit:]' | sed "s/_/%8s/g")
 columns=($(<<<$columns sed -E "s/[^a-z0-9]/ /g"))
 
