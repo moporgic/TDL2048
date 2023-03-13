@@ -287,9 +287,10 @@ public:
 	list(clip<type>&& c) noexcept : list() { clip<type>::swap(c); }
 	list(list<type>&& l) noexcept : list() { clip<type>::swap(l); }
 	template<typename iter, typename = enable_if_is_iterator_convertible<iter>>
-	list(iter first, iter last) : list() { insert(clip<type>::cend(), first, last); }
-	list(size_t n, const type& v = {}) : list() { insert(clip<type>::cend(), n, v); }
+	list(iter first, iter last) : list(std::distance(first, last)) { std::copy(first, last, clip<type>::begin()); }
 	list(std::initializer_list<type> init) : list(init.begin(), init.end()) {}
+	list(size_t n, const type& v) : list(n) { std::fill(clip<type>::begin(), clip<type>::end(), v); }
+	list(size_t n): clip<type>(allocate(n)) {}
 	~list() { clear(); }
 public:
 	void clear() { set(nullptr, nullptr); }
@@ -300,36 +301,41 @@ public:
 		else if (n < clip<type>::size()) erase(clip<type>::cbegin() + n, clip<type>::cend());
 	}
 	type* insert(const type* p, size_t n, const type& v) {
-		if (!n) return const_cast<type*>(p);
-		type* buf = alloc().allocate(clip<type>::size() + n);
-		new (buf) type[clip<type>::size() + n]();
-		type* pos = std::copy(clip<type>::cbegin(), p, buf);
+		list<type> buf(clip<type>::size() + n);
+		type* pos = std::move(clip<type>::cbegin(), p, buf.begin());
 		std::fill(pos, pos + n, v);
-		std::copy(p, clip<type>::cend(), pos + n);
-		set(buf, buf + clip<type>::size() + n);
-		return pos;
+		std::move(p, clip<type>::cend(), pos + n);
+		return clip<type>::swap(buf), pos;
 	}
+	type* insert(const type* p, const type& v) { return insert(p, 1, v); }
+	type* insert(const type* p, type&& v) { return &(*insert(p, 1, type()) = std::move(v)); }
 	template<typename iter, typename = enable_if_is_iterator_convertible<iter>>
 	type* insert(const type* p, iter i, iter j) {
-		type* pos = insert(p, std::distance(i, j), type());
-		std::copy(i, j, pos);
-		return pos;
+		list<type> buf(clip<type>::size() + std::distance(i, j));
+		type* pos = std::move(clip<type>::cbegin(), p, buf.begin());
+		std::move(p, clip<type>::cend(), std::copy(i, j, pos));
+		return clip<type>::swap(buf), pos;
 	}
-	type* insert(const type* p, const type& v) { return insert(p, &v, &v + 1); }
 	type* erase(const type* i, const type* j) {
-		list<type> tmp(clip<type>::size() - std::distance(i, j));
-		std::copy(j, clip<type>::cend(), std::copy(clip<type>::cbegin(), i, tmp.begin()));
-		clip<type>::swap(tmp);
-		return clip<type>::begin() + (i - tmp.begin());
+		list<type> buf(clip<type>::size() - std::distance(i, j));
+		type* pos = std::move(clip<type>::cbegin(), i, buf.begin());
+		std::move(j, clip<type>::cend(), pos);
+		return clip<type>::swap(buf), pos;
 	}
 	type* erase(const type* p) { return erase(p, p + 1); }
+	constexpr type* begin() const noexcept { return clip<type>::begin(); }
+	constexpr type* end() const noexcept { return clip<type>::end(); }
+	type* begin(type* it) noexcept { type* bt = clip<type>::begin(); erase(bt, it); return bt; }
+	type* end(type* it) noexcept { type* et = clip<type>::end(); erase(it, et); return et; }
 	void push_front(const type& v) { insert(clip<type>::cbegin(), v); }
+	void push_front(type&& v) { insert(clip<type>::cbegin(), std::move(v)); }
 	void push_back(const type& v) { insert(clip<type>::cend(), v); }
+	void push_back(type&& v) { insert(clip<type>::cend(), std::move(v)); }
 	void pop_front() { erase(clip<type>::cbegin()); }
 	void pop_back() { erase(clip<type>::cend() - 1); }
-	template<typename... args> /* fake emplace */
-	type* emplace(const type* p, args&&... a) { return insert(p, type(std::forward<args>(a)...)); }
-	template<typename... args> /* fake emplace */
+	template<typename... args>
+	type* emplace(const type* p, args&&... a) { return new (insert(p, 1, type())) type(std::forward<args>(a)...); }
+	template<typename... args>
 	type& emplace_back(args&&... a) { return *emplace(clip<type>::cend(), std::forward<args>(a)...); }
 	void assign(size_t n, const type& v) { operator=(list<type>(n, v)); }
 	template<typename iter, typename = enable_if_is_iterator_convertible<iter>>
@@ -343,9 +349,18 @@ public:
 	static constexpr const list<type>& as(const clip<type>& c) noexcept { return raw_cast<list<type>>(c); }
 protected:
 	void set(type* first, type* last) {
-		for (type* it = clip<type>::begin(); it != clip<type>::end(); it++) it->~type();
-		if (clip<type>::size()) alloc().deallocate(clip<type>::begin(), clip<type>::size());
+		if (clip<type>::size()) deallocate(*this);
 		clip<type>::operator=(clip<type>(first, last));
+	}
+	static clip<type> allocate(size_t n) {
+		if (!n) return {};
+		type* buf = alloc().allocate(n);
+		return {new (buf) type[n](), buf + n};
+	}
+	static void deallocate(clip<type>& c) {
+		if (c.empty()) return;
+		for (type& v : c) v.~type();
+		alloc().deallocate(c.data(), c.size());
 	}
 };
 
