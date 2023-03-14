@@ -1171,7 +1171,7 @@ public:
 	friend class board;
 	public:
 		inline static constexpr u32 itov(u32 i) { return (1u << i) & 0xfffffffeu; }
-		inline static constexpr u32 vtoi(u32 v) { return math::log2(v); }
+		inline static constexpr u32 vtoi(u32 v) { return math::log2(v | 1u); }
 	public:
 		inline constexpr tile(const tile& t) = default;
 		inline constexpr tile() = delete;
