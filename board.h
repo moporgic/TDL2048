@@ -264,6 +264,20 @@ public:
 		ext = (ext & ~(1 << i)) | (t >> 4 << i);
 	}
 
+	inline constexpr u32 exact(u32 i) const { return exact4(i); }
+	inline constexpr u32 exact4(u32 i) const { return (1u << at4(i)) & 0xfffffffeu; }
+	inline constexpr u32 exact5(u32 i) const { return (1u << at5(i)) & 0xfffffffeu; }
+	inline constexpr void exact(u32 i, u32 t) { exact4(i, t); }
+	inline constexpr void exact4(u32 i, u32 t) { at4(i, math::log2(t | 1u)); }
+	inline constexpr void exact5(u32 i, u32 t) { at5(i, math::log2(t | 1u)); }
+
+	inline constexpr u32 fat(u32 i) const { return opts(style::extend) ? fat5(i) : fat4(i); }
+	inline constexpr u32 fat4(u32 i) const { return opts(style::exact) ? exact4(i) : at4(i); }
+	inline constexpr u32 fat5(u32 i) const { return opts(style::exact) ? exact5(i) : at5(i); }
+	inline constexpr void fat(u32 i, u32 t) { return opts(style::extend) ? fat5(i, t) : fat4(i, t); }
+	inline constexpr void fat4(u32 i, u32 t) { return opts(style::exact) ? exact4(i, t) : at4(i, t); }
+	inline constexpr void fat5(u32 i, u32 t) { return opts(style::exact) ? exact5(i, t) : at5(i, t); }
+
 	inline constexpr void put(u64 where, u32 t) { return put64(where, t); }
 	inline constexpr void put64(u64 where, u32 t) {
 		raw = (raw & ~(where * 0x0full)) | (where * t);
@@ -1179,15 +1193,8 @@ public:
 		inline constexpr board& source() { return b; }
 		inline constexpr u32 index() const { return i; }
 	public:
-		inline constexpr operator u32() const {
-			u32 t = (b.opts(style::extend)) ? b.at5(i) : b.at4(i);
-			return  (b.opts(style::exact))  ? tile::itov(t) : t;
-		}
-		inline constexpr tile& operator =(u32 t) {
-			if (b.opts(style::exact))  t = tile::itov(t);
-			if (b.opts(style::extend)) b.at5(i, t); else b.at4(i, t);
-			return *this;
-		}
+		inline constexpr operator u32() const { return b.fat(i); }
+		inline constexpr tile& operator =(u32 t) { b.fat(i, t); return *this; }
 		friend std::ostream& operator <<(std::ostream& out, const tile& t) {
 			return (out << u32(t));
 		}
@@ -1229,9 +1236,12 @@ public:
 	protected:
 		inline constexpr iter(const board& b, u32 i) : tile(b, i) {};
 	};
-	inline constexpr tile operator [](u32 i) const { return tile(*this, i); }
-	inline constexpr iter begin() const { return iter(*this, 0); }
-	inline constexpr iter end() const { return iter(*this, 16); }
+	inline constexpr const tile operator [](u32 i) const { return tile(*this, i); }
+	inline constexpr const iter begin() const { return iter(*this, 0); }
+	inline constexpr const iter end() const { return iter(*this, 16); }
+	inline constexpr tile operator [](u32 i) { return tile(*this, i); }
+	inline constexpr iter begin() { return iter(*this, 0); }
+	inline constexpr iter end() { return iter(*this, 16); }
 
 	class style {
 	public:
@@ -1276,7 +1286,7 @@ public:
 			u32 n = 0, w = (b.opts(style::exact)) ? 6 : 4;
 			n += snprintf(buf + n, sizeof(buf) - n, "+%.*s+" "\n", (w * 4), "------------------------");
 			for (u32 i = 0; i < 16; i += 4) {
-				u32 t[4] = { b[i + 0], b[i + 1], b[i + 2], b[i + 3] };
+				u32 t[4] = { b.fat(i + 0), b.fat(i + 1), b.fat(i + 2), b.fat(i + 3) };
 				n += snprintf(buf + n, sizeof(buf) - n, "|%*u%*u%*u%*u|" "\n", w, t[0], w, t[1], w, t[2], w, t[3]);
 			}
 			n += snprintf(buf + n, sizeof(buf) - n, "+%.*s+" "\n", (w * 4), "------------------------");
@@ -1299,7 +1309,7 @@ public:
 		} else {
 			for (u32 k, i = 0; i < 16; i++) {
 				for (k = 0; !(in >> k) && !in.eof(); in.clear(), in.ignore(1));
-				b[i] = k;
+				b.fat(i, k);
 			}
 		}
 		return in;

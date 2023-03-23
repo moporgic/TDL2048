@@ -739,7 +739,7 @@ struct make {
 		indexpt(bool iso = true) { isomorphic<0>(iso); }
 		template<u32 i> static typename std::enable_if<(i != 8), void>::type isomorphic(bool iso) {
 			constexpr board x = isoindex(i);
-			make(vtos({x[patt]...}), index::indexpt<x[patt]...>);
+			make(vtos({x.at(patt)...}), index::indexpt<x.at(patt)...>);
 			if (iso) isomorphic<i + 1>(iso);
 		}
 		template<u32 i> static typename std::enable_if<(i == 8), void>::type isomorphic(bool iso) {}
