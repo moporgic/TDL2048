@@ -75,5 +75,5 @@ dump: # build and dump the disassembly
 	$(OBJDUMP) $(OUTPUT) > $(OUTPUT:%$(SUFFIX)=%).dump
 
 clean: # cleanup
-	$(eval FILES ?= $(shell file $(wildcard $(OUTPUT:%$(SUFFIX)=%)* .) | grep -E "executable|gcda" | grep -v script | cut -d: -f1))
+	$(eval FILES ?= $(shell file -0 $(wildcard $(OUTPUT:%$(SUFFIX)=%)* .) | grep -Ea $'\0'": +(ELF|PE32|GCC gcda)" | cut -d '' -f1))
 	$(if $(FILES), $(RM) $(FILES))
