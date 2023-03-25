@@ -123,7 +123,6 @@ benchmark() (
 
 # output the correct executable for command line
 runas() (
-	2048() { return 1; }
 	run="$@"
 	for run in "$run" "./$run" ""; do
 		$run -\| -n none -e 0 && break
