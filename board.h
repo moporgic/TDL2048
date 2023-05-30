@@ -24,7 +24,9 @@ public:
 	inline constexpr board(u64 raw, u16 ext, u16 opt, u32 inf) : raw(raw), ext(ext), opt(opt), inf(inf) {}
 	inline constexpr board(const u128& x) : board(u64(x), u16(x >> 64), u16(x >> 80), u32(x >> 96)) {}
 	inline constexpr board(const board& b) = default;
-	template<typename type, typename = enable_if_is_convertible<type, u64>>
+	template<typename type, typename = enable_if_is_base_of<board, type>>
+	inline constexpr board(const type& x) : board(raw_cast<board>(x)) {}
+	template<typename type, typename = enable_if_not_is_base_of<board, type>, typename = enable_if_is_convertible<type, u64>>
 	inline constexpr board(const type& x) : board(u64(x)) {}
 
 	inline constexpr operator u64&() { return raw; }
@@ -34,14 +36,18 @@ public:
 	inline constexpr board& operator =(u64 x) { raw = x; ext = 0; return *this; }
 	inline constexpr board& operator =(const u128& x) { raw = u64(x); ext = u16(x >> 64); opt = u16(x >> 80); inf = u32(x >> 96); return *this; }
 	inline constexpr board& operator =(const board& b) = default;
-	template<typename type, typename = enable_if_is_convertible<type, u64>>
+	template<typename type, typename = enable_if_is_base_of<board, type>>
+	inline constexpr board& operator =(const type& x) { return operator =(raw_cast<board>(x)); }
+	template<typename type, typename = enable_if_not_is_base_of<board, type>, typename = enable_if_is_convertible<type, u64>>
 	inline constexpr board& operator =(const type& x) { return operator =(u64(x)); }
 	declare_comparators(const board&, operator u128(), inline constexpr)
 
 	inline constexpr void set(u64 x, u16 e = 0) { raw = x; ext = e; }
 	inline constexpr void set(const u128& x) { set(u64(x), u16(x >> 64)); }
 	inline constexpr void set(const board& b) { set(b.raw, b.ext); }
-	template<typename type, typename = enable_if_is_convertible<type, u64>>
+	template<typename type, typename = enable_if_is_base_of<board, type>>
+	inline constexpr void set(const type& x) { set(raw_cast<board>(x)); }
+	template<typename type, typename = enable_if_not_is_base_of<board, type>, typename = enable_if_is_convertible<type, u64>>
 	inline constexpr void set(const type& x) { set(u64(x), 0); }
 
 public:
