@@ -456,7 +456,7 @@ public:
 		u32 e = math::popcnt64(x);
 		u32 u = moporgic::rand();
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_NEXT)
-		u64 t = math::nthset64(x, (u >> 16) % e);
+		u64 t = math::lsb64(x, (u >> 16) % e);
 #else
 		u32 k = (u >> 16) % e;
 		while (k--) x &= x - 1;
@@ -469,7 +469,7 @@ public:
 		u32 e = math::popcnt64(x);
 		u32 u = moporgic::rand();
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_NEXT)
-		u64 t = math::nthset64(x, (u >> 16) % e);
+		u64 t = math::lsb64(x, (u >> 16) % e);
 #else
 		u32 k = (u >> 16) % e;
 		while (k--) x &= x - 1;
@@ -831,7 +831,7 @@ public:
 		u32 hole = ~rank & mask;
 		u32 hcnt = std::max(math::popcnt(hole), n);
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_SHIFT)
-		hole &= ~(math::nthset(hole, hcnt - n) - 1);
+		hole &= ~(math::lsb(hole, hcnt - n) - 1);
 #else
 		while (hcnt-- > n) hole &= (hole - 1);
 #endif
@@ -850,7 +850,7 @@ public:
 		u32 hole = ~rank & mask;
 		u32 hcnt = std::max(math::popcnt(hole), n);
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_SHIFT)
-		hole &= ~(math::nthset(hole, hcnt - n) - 1);
+		hole &= ~(math::lsb(hole, hcnt - n) - 1);
 #else
 		while (hcnt-- > n) hole &= (hole - 1);
 #endif

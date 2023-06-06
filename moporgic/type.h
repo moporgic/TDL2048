@@ -506,12 +506,12 @@ protected:
 };
 
 namespace math { // only declare necessary functions at here, math.h should also be included
-static inline constexpr uint32_t lsb(uint32_t x) noexcept;
 static inline constexpr uint64_t lsb(uint64_t x) noexcept;
+static inline constexpr uint32_t lsb(uint32_t x) noexcept;
+static inline constexpr uint64_t lsb(uint64_t x, uint32_t n) noexcept;
+static inline constexpr uint32_t lsb(uint32_t x, uint32_t n) noexcept;
 static inline constexpr uint32_t tzcnt(uint64_t x) noexcept;
 static inline constexpr uint32_t tzcnt(uint32_t x) noexcept;
-static inline constexpr uint64_t nthset(uint64_t x, uint32_t n) noexcept;
-static inline constexpr uint32_t nthset(uint32_t x, uint32_t n) noexcept;
 static inline constexpr uint32_t popcnt(uint64_t x) noexcept;
 static inline constexpr uint32_t popcnt(uint32_t x) noexcept;
 }
@@ -526,7 +526,7 @@ public:
 	constexpr operator raw_t&() noexcept { return x; }
 	constexpr operator raw_t() const noexcept { return x; }
 public:
-	constexpr raw_t  operator [](u32 i) const noexcept { return extract(math::nthset(x, i)); }
+	constexpr raw_t  operator [](u32 i) const noexcept { return extract(math::lsb(x, i)); }
 	constexpr raw_t  at(u32 i) const noexcept { return operator [](i); }
 	constexpr raw_t  front() const noexcept { return at(0); }
 	constexpr raw_t  back() const noexcept { return at(size() - 1); }
@@ -540,7 +540,7 @@ public:
 	constexpr bool  operator !=(const bitset_iterator& it) const noexcept { return x != it.x; }
 	constexpr bool  operator < (const bitset_iterator& it) const noexcept { return extract(x) < extract(it.x); }
 	constexpr bitset_iterator  operator + (u32 n) const noexcept { bitset_iterator it(x); return it += n; }
-	constexpr bitset_iterator& operator +=(u32 n) noexcept { while (n--) x &= (x - 1);; return *this; }
+	constexpr bitset_iterator& operator +=(u32 n) noexcept { x &= ~(math::lsb(x, n) - 1); return *this; }
 	constexpr bitset_iterator& operator ++() noexcept { x &= (x - 1); return *this; }
 	constexpr bitset_iterator  operator ++(int) noexcept { return std::exchange(x, x & (x - 1)); }
 protected:

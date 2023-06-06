@@ -624,10 +624,28 @@ static inline constexpr uint32_t pext(uint32_t a, uint32_t mask) noexcept { retu
  * to use these functions, compile flag -mbmi2 is necessary
  * https://stackoverflow.com/questions/7669057/find-nth-set-bit-in-an-int/27453505#27453505
  */
-static inline constexpr uint64_t nthset64(uint64_t x, uint32_t n) noexcept { return pdep64(1ULL << n, x); }
-static inline constexpr uint32_t nthset32(uint32_t x, uint32_t n) noexcept { return pdep32(1U << n, x); }
+static inline constexpr uint64_t nthset64(uint64_t x, uint32_t n) noexcept { return pdep64(n < 64 ? 1ULL << n : 0, x); }
+static inline constexpr uint32_t nthset32(uint32_t x, uint32_t n) noexcept { return pdep32(n < 32 ? 1U << n : 0, x); }
 static inline constexpr uint64_t nthset(uint64_t x, uint32_t n) noexcept { return nthset64(x, n); }
 static inline constexpr uint32_t nthset(uint32_t x, uint32_t n) noexcept { return nthset32(x, n); }
+
+/**
+ * return the lowest nth set bit (n starting from 0)
+ * to use these functions, compile flag -mbmi2 is necessary
+ */
+static inline constexpr uint64_t lsb64(uint64_t x, uint32_t n) noexcept { return pdep64(n < 64 ? 1ULL << n : 0, x); }
+static inline constexpr uint32_t lsb32(uint32_t x, uint32_t n) noexcept { return pdep32(n < 32 ? 1U << n : 0, x); }
+static inline constexpr uint64_t lsb(uint64_t x, uint32_t n) noexcept { return lsb64(x, n); }
+static inline constexpr uint32_t lsb(uint32_t x, uint32_t n) noexcept { return lsb32(x, n); }
+
+/**
+ * return the highest nth set bit (n starting from 0)
+ * to use these functions, compile flag -mbmi2 is necessary
+ */
+static inline constexpr uint64_t msb64(uint64_t x, uint32_t n) noexcept { return lsb64(x, popcnt64(x) - 1 - n); }
+static inline constexpr uint32_t msb32(uint32_t x, uint32_t n) noexcept { return lsb32(x, popcnt32(x) - 1 - n); }
+static inline constexpr uint64_t msb(uint64_t x, uint32_t n) noexcept { return msb64(x, n); }
+static inline constexpr uint32_t msb(uint32_t x, uint32_t n) noexcept { return msb32(x, n); }
 
 /**
  * Bit rotation
