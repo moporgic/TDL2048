@@ -1,6 +1,5 @@
 #!/bin/bash
-# Program: Fetch the results from summary blocks
-# History: 2022/04/11 Hung Guei
+# 2048-fetch.sh: Fetch the results from summary blocks
 
 # This tool fetches the results from summary blocks of log files and display them.
 # The typical scenarios of using this tool are,
@@ -8,8 +7,8 @@
 # (2) monitor different testing results for different settings such as networks or depths.
 
 # Usage:
-# (1) pipe raw logs as stdin: (raw log) | ./2048-fetch.sh [OPTS]
-# (2) specify log name/label: ./2048-fetch.sh [OPTS] NAME|LABEL
+# (1) pipe raw logs as stdin: (raw log) | ./2048-fetch.sh [OPT]...
+# (2) specify log name/label: ./2048-fetch.sh [OPT]... [LOG]...
 
 while [[ $1 == -* ]]; do
 	case "$1" in
@@ -48,7 +47,7 @@ while (( $# )); do # fetch from file labels...
 	[[ $1 == *.x ]] && name="${1##*/}" || name="${1##*/}*.x"
 	for x in $(find $(dirname ${1:-.}) -maxdepth 1 -name "$name" | sort); do
 		label="$(basename $x):  "
-		[[ $1 ]] && label=$(<<<${label#${1##*/}} sed -E "s/^[:. -]+//g")
+		[[ $1 && $1 != *.x ]] && label=$(<<<${label#${1##*/}} sed -E "s/^[:. -]+//g")
 		len=$((${#label} > len ? ${#label} : len))
 		src+=("${label}|${x}")
 	done
