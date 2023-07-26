@@ -760,18 +760,18 @@ numeric mean(iter first, iter last, numeric init = 0) noexcept {
  * standard deviation
  */
 template<typename numeric, typename iter> static inline constexpr
-numeric deviation(iter first, iter last, numeric mean) noexcept {
+numeric deviation(iter first, iter last, numeric mean, bool entire = true) noexcept {
 	numeric sumofsqr = 0;
 	for (iter it = first; it != last; std::advance(it, 1)) sumofsqr += std::pow(*it - mean, 2);
-	return std::sqrt(sumofsqr / std::distance(first, last));
+	return std::sqrt(sumofsqr / (std::distance(first, last) - (entire ? 0 : 1)));
 }
 
 /**
  * standard deviation
  */
 template<typename numeric, typename iter> static inline constexpr
-numeric deviation(iter first, iter last) noexcept {
-	return deviation<numeric>(first, last, mean<numeric>(first, last));
+numeric deviation(iter first, iter last, bool entire = true) noexcept {
+	return deviation<numeric>(first, last, mean<numeric>(first, last), entire);
 }
 
 // reference: https://github.com/aappleby/smhasher/wiki/MurmurHash3
