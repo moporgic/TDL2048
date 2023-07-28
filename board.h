@@ -34,7 +34,7 @@ public:
 	inline constexpr explicit operator u128() const { return u128(raw) | (u128(ext) << 64) | (u128(opt) << 80) | (u128(inf) << 96); }
 
 	inline constexpr board& operator =(u64 x) { raw = x; ext = 0; return *this; }
-	inline constexpr board& operator =(const u128& x) { raw = u64(x); ext = u16(x >> 64); opt = u16(x >> 80); inf = u32(x >> 96); return *this; }
+	inline constexpr board& operator =(const u128& x) { return operator =(board(x)); }
 	inline constexpr board& operator =(const board& b) = default;
 	template<typename type, typename = enable_if_is_base_of<board, type>>
 	inline constexpr board& operator =(const type& x) { return operator =(raw_cast<board>(x)); }
