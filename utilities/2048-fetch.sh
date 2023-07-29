@@ -65,20 +65,21 @@ for (( i=0; i<${#src[@]}; i++ )); do
 	width=$(($(<<<$result wc -l) - 1))
 	fmt=$format
 	[ "${index}${filter}" == cat ] && idx=$width || idx=$index
-	if (( ${idx:-0} )); then
+	if (( ${idx:-0} )); then # print results with index
 		width=$((${#width} > index ? ${#width} : index))
 		result="$(<<<$result nl -v0 -w$width -s': ' -nrz)"
 		fmt="%-$((width + 3))s$format"
 	fi
 	fmt=%-${len}s${fmt}
 	<<<$result $filter | while IFS= read -r res; do
+		res=$(echo $res)
 		if [[ $res ]]; then
 			chk=($res)
-			if (( ${#chk[@]} < ${#columns[@]} )); then
-				present=$(<<< "$res" sed -E "s/[0-9]+ //g" | sed -E "s/\|[0-9.]+%//g" | sed -E "s/ [0-9 ]+ / /")
+			if (( ${#chk[@]} < ${#columns[@]}+(${idx:-0}?1:0) )); then # fix missing win rates
+				bound=$(<<< "$res" sed -E "s/[0-9]+:? |\|[0-9.]+%//g" | sed -E "s/ [0-9 ]+ / /")
 				for tile in ${win//|/ }; do
-					(( $tile < ${present% *} )) && res=${res/100.00% /100.00% 100.00% }
-					(( $tile > ${present#* } )) && res=${res/%/ 0%}
+					(( $tile < ${bound% *} )) && res=${res/100.00% /100.00% 100.00% }
+					(( $tile > ${bound#* } )) && res=${res/%/ 0%}
 				done
 			fi
 			res=$(<<<$res sed -E "s/[0-9]+\|//g")
