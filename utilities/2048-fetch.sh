@@ -18,6 +18,7 @@ while [[ $1 == -* ]]; do
 		-1|-L) filter="tail -n1"; ;; # always print only the last summary blocks
 		-i)    index=1; ;; # always show index numbers
 		-i*)   index=$(<<<${1:2} tr -d '='); ;; # set index minimal display digits (0 to disable)
+		-H)    headings=yes; ;; # print headings
 	esac
 	shift
 done
@@ -32,6 +33,9 @@ for n in ${!repl[@]}; do
 done
 columns=${columns:1}; columns=${columns::-1}
 columns=${columns:-"avg,max,16384,32768"}
+chk=${columns},; chk=${chk#avg,}; chk=${chk#max,}
+[[ $chk != *avg* && $chk != *max* ]] || exit $?
+[[ $chk == $(sort -n <<< ${chk//,/$'\n'} | xargs | tr ' ' ,), ]] || exit $?
 
 # generate formats
 format=
@@ -55,6 +59,7 @@ while (( $# )); do # fetch from file labels...
 done
 
 # fetch results and print
+[[ $headings ]] && printf "%-${len}s${format}\n" "" ${columns[@]^^}
 (( ${#src[@]} == 1 )) && filter=${filter:-cat} || filter=${filter:-tail -n1}
 for (( i=0; i<${#src[@]}; i++ )); do
 	label=${src[$i]%|*}
