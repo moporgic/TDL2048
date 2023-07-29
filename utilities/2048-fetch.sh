@@ -59,7 +59,7 @@ done
 for (( i=0; i<${#src[@]}; i++ )); do
 	label=${src[$i]%|*}
 	result=$(grep summary -A20 "${src[$i]#*|}" | \
-		grep -E "^(total${win:+|}$win)" | sed -E "s/^[0-9].+% +/ /g" | \
+		grep -E "^(total${win:+|}$win)" | sed -E "s/ [0-9. ]+% +/|/g" | \
 		sed -E "s/$avg/+/g" | sed -E "s/($max)|( tile=.+)//g" | \
 		xargs | sed -e "s/^\+//g" | tr '+' '\n' | sed -e "s/^ //g")
 	width=$(($(<<<$result wc -l) - 1))
@@ -74,10 +74,15 @@ for (( i=0; i<${#src[@]}; i++ )); do
 	<<<$result $filter | while IFS= read -r res; do
 		if [[ $res ]]; then
 			chk=($res)
-			for (( i=${#chk[@]}; i<${#columns[@]}; i++ )); do
-				res=${res/ 100.00%/ 100.00% 100.00%}
-			done
-			printf "${fmt}\n" "$label" $res
+			if (( ${#chk[@]} < ${#columns[@]} )); then
+				present=$(<<< "$res" sed -E "s/[0-9]+ //g" | sed -E "s/\|[0-9.]+%//g" | sed -E "s/ [0-9 ]+ / /")
+				for tile in ${win//|/ }; do
+					(( $tile < ${present% *} )) && res=${res/100.00% /100.00% 100.00% }
+					(( $tile > ${present#* } )) && res=${res/%/ 0%}
+				done
+			fi
+			res=$(<<<$res sed -E "s/[0-9]+\|//g")
+			printf "${fmt}\n" "${label}" ${res}
 		fi
 		label=
 	done
