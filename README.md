@@ -79,7 +79,7 @@ If the build tools are not properly installed, follow the steps below to install
 
 <details><summary>For Arch Linux</summary>
 
-Install the [`base-devel`](https://archlinux.org/groups/x86_64/base-devel/) package.
+Install the [`base-devel`](https://archlinux.org/packages/core/any/base-devel/) package.
 ```bash
 sudo pacman -Sy --needed base-devel
 ```
@@ -87,7 +87,7 @@ sudo pacman -Sy --needed base-devel
 
 <details><summary>For Ubuntu or Debian</summary>
 
-Install the [`build-essential`](https://packages.ubuntu.com/xenial/build-essential) package.
+Install the [`build-essential`](https://packages.ubuntu.com/kinetic/build-essential) package.
 ```bash
 sudo apt update
 sudo apt install build-essential
@@ -276,7 +276,7 @@ make FLAGS="-Wall -fmessage-length=0" # build with specified flags
 
 For simplicity, BMI2 and AVX2 can be disabled with `BMI2=no` and `AVX2=no` respectively.
 
-On some machines, such as the AMD Ryzen 3000 series, you may want to explicitly disable BMI2 because of their [slow implementation](http://www.talkchess.com/forum3/viewtopic.php?f=7&t=72538). This can be done as follows.
+On some machines, such as the AMD Ryzen 3000 series, you may want to explicitly disable BMI2 because of their [slow implementation](https://www.talkchess.com/forum3/viewtopic.php?f=7&t=72538). This can be done as follows.
 ```bash
 make BMI2="no" # build with default settings but disable the BMI2 optimization
 ```
@@ -1227,14 +1227,14 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## References
 
+* H. Guei, “On Reinforcement Learning for the Game of 2048,” Ph.D. dissertation, Inst. Comput. Sci. Eng., Nat. Yang Ming Chiao Tung Univ., Hsinchu, Taiwan, 2023. [Online]. Available: [arXiv:2212.11087](https://arxiv.org/abs/2212.11087).
+* H. Guei, L.-P. Chen and I-C. Wu, “Optimistic Temporal Difference Learning for 2048,” in IEEE Trans. Games, vol. 14, no. 3, pp. 478–487, Sep. 2022, doi: [10.1109/TG.2021.3109887](https://doi.org/10.1109/TG.2021.3109887). [Online]. Available: [arXiv:2111.11090](https://arxiv.org/abs/2111.11090).
 * M. Szubert and W. Jaśkowski, “Temporal difference learning of N tuple networks for the game 2048,” in Proc. 2014 IEEE Conf. Comput. Intell. Games, Dortmund, Germany, 2014, pp. 1–8, doi: [10.1109/CIG.2014.6932907](https://doi.org/10.1109/CIG.2014.6932907).
 * K.-H. Yeh, I-C. Wu, C.-H. Hsueh, C.-C. Chang, C.-C. Liang, and H. Chiang, “Multistage temporal difference learning for 2048-like games,” IEEE Trans. Comput. Intell. AI Games, vol. 9, no. 4, pp. 369–380, Dec. 2017, doi: [10.1109/TCIAIG.2016.2593710](https://doi.org/10.1109/TCIAIG.2016.2593710).
 * W. Jaśkowski, “Mastering 2048 with delayed temporal coherence learning, multistage weight promotion, redundant encoding and carousel shaping,” IEEE Trans. Games, vol. 10, no. 1, pp. 3–14, Mar. 2018, doi: [10.1109/TCIAIG.2017.2651887](https://doi.org/10.1109/TCIAIG.2017.2651887).
 * K. Matsuzaki, “Systematic selection of N tuple networks with consideration of interinfluence for game 2048,” in Proc. 21st Int. Conf. Technol. Appl. Artif. Intell., Hsinchu, Taiwan, 2016, pp. 186–193, doi: [10.1109/TAAI.2016.7880154](https://doi.org/10.1109/TAAI.2016.7880154).
 * H. Guei, T.-H. Wei, and I-C. Wu, “2048-like games for teaching reinforcement learning,” ICGA J., vol. 42, no. 1, pp. 14–37, May 28, 2020, doi: [10.3233/ICG-200144](https://doi.org/10.3233/ICG-200144).
 * K. Matsuzaki, “Developing a 2048 player with backward temporal coherence learning and restart,” in Proc. 15th Int. Conf. Adv. Comput. Games, Leiden, The Netherlands, 2017, pp. 176–187, doi: [10.1007/978-3-319-71649-7_15](https://doi.org/10.1007/978-3-319-71649-7_15).
-* H. Guei, L.-P. Chen and I-C. Wu, “Optimistic Temporal Difference Learning for 2048,” in IEEE Trans. Games, vol. 14, no. 3, pp. 478–487, Sep. 2022, doi: [10.1109/TG.2021.3109887](https://doi.org/10.1109/TG.2021.3109887). [Online]. Available: [arXiv:2111.11090](https://arxiv.org/abs/2111.11090).
-* H. Guei, “On Reinforcement Learning for the Game of 2048,” Ph.D. dissertation, Inst. Comput. Sci. Eng., Nat. Yang Ming Chiao Tung Univ., Hsinchu, Taiwan, 2023. [Online]. Available: [arXiv:2212.11087](https://arxiv.org/abs/2212.11087).
+* H. Guei. “moporgic/TDL2048+.” [Online]. Available: https://github.com/moporgic/TDL2048.
 * K.-H. Yeh. “2048 AI.” [Online]. Available: https://github.com/tnmichael309/2048AI.
 * K.-C. Wu. “2048-c.” [Online]. Available: https://github.com/kcwu/2048-c.
-* H. Guei. “moporgic/TDL2048+.” [Online]. Available: https://github.com/moporgic/TDL2048.
