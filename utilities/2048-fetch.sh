@@ -59,37 +59,36 @@ while (( $# )); do # fetch from file labels...
 done
 
 # fetch results and print
-[[ $headings ]] && printf "%-${len}s${format}\n" "" ${columns[@]^^}
+[[ $headings ]] && printf "%-$((len+(index?index+3:0)))s${format}\n" "" ${columns[@]^^}
 (( ${#src[@]} == 1 )) && filter=${filter:-cat} || filter=${filter:-tail -n1}
 for (( i=0; i<${#src[@]}; i++ )); do
 	label=${src[$i]%|*}
-	result=$(grep summary -A20 "${src[$i]#*|}" | \
+	res=$(grep summary -A20 "${src[$i]#*|}" | \
 		grep -E "^(total${win:+|}$win)" | sed -E "s/ [0-9. ]+% +/|/g" | \
 		sed -E "s/$avg/+/g" | sed -E "s/($max)|( tile=.+)//g" | \
 		xargs | sed -e "s/^\+//g" | tr '+' '\n' | sed -e "s/^ //g")
-	width=$(($(<<<$result wc -l) - 1))
+	width=$(($(<<<$res wc -l) - 1))
 	fmt=$format
-	[ "${index}${filter}" == cat ] && idx=$width || idx=$index
-	if (( ${idx:-0} )); then # print results with index
+	[[ ${index}${filter} == cat ]] && idx=$width || idx=$index
+	if (( ${idx:-0} )); then # prefix res with index
 		width=$((${#width} > index ? ${#width} : index))
-		result="$(<<<$result nl -v0 -w$width -s': ' -nrz)"
-		fmt="%-$((width + 3))s$format"
+		res=$(<<<$res nl -v0 -w$width -s': ' -nrz)
+		fmt=%-$((width + 3))s$format
 	fi
 	fmt=%-${len}s${fmt}
-	<<<$result $filter | while IFS= read -r res; do
+	<<<$res $filter | while IFS= read -r res; do
 		res=$(echo $res)
-		if [[ $res ]]; then
-			chk=($res)
-			if (( ${#chk[@]} < ${#columns[@]}+(${idx:-0}?1:0) )); then # fix missing win rates
-				bound=$(<<< "$res" sed -E "s/[0-9]+:? |\|[0-9.]+%//g" | sed -E "s/ [0-9 ]+ / /")
-				for tile in ${win//|/ }; do
-					(( $tile < ${bound% *} )) && res=${res/100.00% /100.00% 100.00% }
-					(( $tile > ${bound#* } )) && res=${res/%/ 0%}
-				done
-			fi
-			res=$(<<<$res sed -E "s/[0-9]+\|//g")
-			printf "${fmt}\n" "${label}" ${res}
+		[[ $res ]] || continue
+		chk=($res)
+		if (( ${#chk[@]} < ${#columns[@]}+(${idx:-0}?1:0) )); then # fix missing win rates
+			[[ $res == *%* ]] && bound=$(<<< "$res" sed -E "s/[0-9]+:? |\|[0-9.]+%//g" | sed -E "s/ [0-9 ]+ / /") || bound=0
+			for tile in ${win//|/ }; do
+				(( $tile < ${bound% *} )) && res=${res/100.00% /100.00% 100.00% }
+				(( $tile > ${bound#* } )) && res=${res/%/ 0%}
+			done
 		fi
+		res=$(<<<$res sed -E "s/[0-9]+\|//g")
+		printf "${fmt}\n" "${label}" ${res}
 		label=
 	done
 done
