@@ -19,6 +19,7 @@ while [[ $1 == -* ]]; do
 		-i)    index=1; ;; # always show index numbers
 		-i*)   index=$(<<<${1:2} tr -d '='); ;; # set index minimal display digits (0 to disable)
 		-H)    headings=yes; ;; # print headings
+		-t)    output="sed -E s/\\s+/\\t/g"; ;; # use tabs instead of spaces
 	esac
 	shift
 done
@@ -44,6 +45,7 @@ format=
 win=$(<<<$columns sed -E "s/[a-z]+,?//g" | tr ',' '|')
 format+=$(<<<$win sed -E "s/[0-9]\||[0-9]$/_/g" | tr -d '[:digit:]' | sed "s/_/%8s/g")
 columns=($(<<<$columns sed -E "s/[^a-z0-9]/ /g"))
+output=${output:-cat}
 
 # fetch labels
 (( $# )) && src=() || src=("|-") # fetch from stdin if no args
@@ -59,7 +61,13 @@ while (( $# )); do # fetch from file labels...
 done
 
 # fetch results and print
-[[ $headings ]] && printf "%-$((len+(index?index+3:0)))s${format}\n" "" ${columns[@]^^}
+if [[ $headings ]]; then
+	if [[ $output != cat && \
+		! $(printf "%s\n" "${src[@]}" | sed -E "s/\|.+$//" | xargs) && $index == 0 ]]; then
+		output="sed -E s/^\\s+//;s/\\s+/\\t/g" # also trim beginning spaces
+	fi
+	printf "%-$((len+(index?index+3:0)))s${format}\n" "" ${columns[@]^^} | $output
+fi
 (( ${#src[@]} == 1 )) && filter=${filter:-cat} || filter=${filter:-tail -n1}
 for (( i=0; i<${#src[@]}; i++ )); do
 	label=${src[$i]%|*}
@@ -81,7 +89,7 @@ for (( i=0; i<${#src[@]}; i++ )); do
 		[[ $res ]] || continue
 		chk=($res)
 		if (( ${#chk[@]} < ${#columns[@]}+(${idx:-0}?1:0) )); then # fix missing win rates
-			[[ $res == *%* ]] && bound=$(<<< "$res" sed -E "s/[0-9]+:? |\|[0-9.]+%//g" | sed -E "s/ [0-9 ]+ / /") || bound=0
+			[[ $res == *%* ]] && bound=$(<<< "$res" sed -E "s/[0-9]+:? |\|[0-9.]+%//g;s/ [0-9 ]+ / /") || bound=0
 			for tile in ${win//|/ }; do
 				(( $tile < ${bound% *} )) && res=${res/100.00% /100.00% 100.00% }
 				(( $tile > ${bound#* } )) && res=${res/%/ 0%}
@@ -91,4 +99,4 @@ for (( i=0; i<${#src[@]}; i++ )); do
 		printf "${fmt}\n" "${label}" ${res}
 		label=
 	done
-done
+done | stdbuf -o0 $output
