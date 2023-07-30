@@ -843,15 +843,15 @@ Take ```2048-tile``` as an example, there are ```3650``` games that end with it,
 
 Some utilities written in Bash script are provided for benching the program or parsing the log.
 
-<details><summary>2048-bench.sh - benchmark related functions</summary>
+<details><summary>2048-bench.sh - benchmark program speed</summary>
 
 A full benchmark routine is provided in this script, for example:
 ```bash
-./2048-bench.sh -D # bench default build on 4x6patt and 8x6patt
-./2048-bench.sh -P # bench profiled build on 4x6patt and 8x6patt
+utilities/2048-bench.sh -D # bench default build on 4x6patt and 8x6patt
+utilities/2048-bench.sh -P # bench profiled build on 4x6patt and 8x6patt
 ```
 
-In addition, you may use ```source 2048-bench.sh``` to initialize some functions.
+In addition, you may use ```source utilities/2048-bench.sh``` to import functions.
 The following are examples of provided functions, check the script for more details.
 ```bash
 test ./2048 # test the training/testing speed
@@ -867,25 +867,18 @@ benchmark # perform a full benchmark
 
 <details><summary>2048-parse.sh - log parser for statistic block</summary>
 
-Extract AVG, MAX, TILE, and WIN from a log, which is useful for exporting statistics.
+Extract AVG, MAX, TILE, and WIN from every blocks in a log, which is useful for exporting statistics.
 ```bash
-grep local 2048.x | ./2048-parse.sh # extract AVG, MAX, TILE, and WIN from each block
-```
-</details>
-
-<details><summary>2048-winrate.sh - log parser for summary block</summary>
-
-Extract win rates of large tiles from the summary block. Check the script for more details.
-```bash
-./2048-winrate.sh < 2048.x # extract win rates and print them
+grep local 2048.x | utilities/2048-parse.sh
 ```
 </details>
 
 <details><summary>2048-compact.sh - log concentrator for statistic block</summary>
 
-Compact the statistics by joining the blocks. To join every 10 statistic blocks and print the new statistics, do
+Compact the statistics by joining the blocks.
+    For example, to join (average) every 10 statistic blocks and print the new statistics, run
 ```bash
-grep local 2048.x | ./2048-parse.sh | ./2048-compact.sh 10 # average every 10 blocks
+grep local 2048.x | utilities/2048-parse.sh | utilities/2048-compact.sh 10
 ```
 </details>
 
@@ -894,16 +887,17 @@ grep local 2048.x | ./2048-parse.sh | ./2048-compact.sh 10 # average every 10 bl
 Extract all results from summary blocks of log files and display them.
 This is useful for monitoring the progress of a long-term training, as well as monitoring the progress of multiple evaluations.
 ```bash
-./2048-fetch.sh 2048.x # extract results from 2048.x and display
-./2048-fetch.sh 4x6patt # extract results from all 4x6patt*.x log files and display
+utilities/2048-fetch.sh 2048.x # extract from 2048.x
+utilities/2048-fetch.sh 4x6patt- # extract from all 4x6patt-*.x
+utilities/2048-fetch.sh -H -o avg,max,2k,4k,8k,16k,32k *.x
 ```
 </details>
 
-<details><summary>2048-safe.sh - check for network corruption</summary>
+<details><summary>2048-safe.sh - check for n-tuple network model corruption</summary>
 
-Check the latest log and verify whether the network is corrupted. This may be useful for performing parallel training.
+Check the latest log and verify whether the network model is corrupted. This may be useful for performing parallel training.
 ```bash
-./2048-safe.sh < 2048.x || echo the network seems to be corrupted
+utilities/2048-safe.sh 2048.x || echo "the model seems to be corrupted"
 ```
 </details>
 
@@ -911,7 +905,7 @@ Check the latest log and verify whether the network is corrupted. This may be us
 
 As TDL2048+ is highly optimized, it can be used as a tool for system stability testing, by stressing CPU, cache, and memory.
 ```bash
-./2048-stress.sh $(nproc) # stress all available threads
+utilities/2048-stress.sh $(nproc) # stress all available threads
 ```
 </details>
 
