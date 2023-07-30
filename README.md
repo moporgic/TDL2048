@@ -79,7 +79,7 @@ If the build tools are not properly installed, follow the steps below to install
 
 <details><summary>For Arch Linux</summary>
 
-Install the [```base-devel```](https://archlinux.org/groups/x86_64/base-devel/) package.
+Install the [`base-devel`](https://archlinux.org/groups/x86_64/base-devel/) package.
 ```bash
 sudo pacman -Sy --needed base-devel
 ```
@@ -87,7 +87,7 @@ sudo pacman -Sy --needed base-devel
 
 <details><summary>For Ubuntu or Debian</summary>
 
-Install the [```build-essential```](https://packages.ubuntu.com/xenial/build-essential) package.
+Install the [`build-essential`](https://packages.ubuntu.com/xenial/build-essential) package.
 ```bash
 sudo apt update
 sudo apt install build-essential
@@ -151,25 +151,25 @@ The provided makefile is designed for the most common use, which is covered in t
 
 ### Building
 
-By default, TDL2048+ is built with ```-O3 -mtune=native```.
+By default, TDL2048+ is built with `-O3 -mtune=native`.
 ```bash
 make # build TDL2048+ with default settings
 ```
-After a successful build, a binary file ```./2048``` should be generated.
+After a successful build, a binary file `./2048` should be generated.
 
 <details><summary>Show advanced options</summary><br>
 
-To use another output file name instead of ```./2048```, set the ```OUTPUT``` as follows.
+To use another output file name instead of `./2048`, set the `OUTPUT` as follows.
 ```bash
 make OUTPUT="run" # the output binary will be ./run instead of ./2048
 ```
 
-Also, to build with another source file instead of ```2048.cpp```, set the ```SOURCE``` as follows.
+Also, to build with another source file instead of `2048.cpp`, set the `SOURCE` as follows.
 ```bash
 make SOURCE="2048-test.cpp" # compile 2048-test.cpp and generate ./2048-test
 ```
 
-If another optimization level is needed, set the ```OLEVEL``` as follows.
+If another optimization level is needed, set the `OLEVEL` as follows.
 ```bash
 make OLEVEL="g" # build with -Og -mtune=native
 ```
@@ -179,37 +179,37 @@ For deployment, a statically linked binary can be built with
 make static # build with -O3 -mtune=generic -static
 ```
 
-Building with ```-march=native``` is not recommended since it is observed to be less efficient; however, make with target ```native``` if you insist.
+Building with `-march=native` is not recommended since it is observed to be less efficient; however, make with target `native` if you insist.
 ```bash
 make native # build with -O3 -march=native
 ```
 
-For debugging, a target ```dump``` enables ```-g``` flag and invokes [```objdump```](https://en.wikipedia.org/wiki/Objdump) to dump the assembly code.
+For debugging, a target `dump` enables `-g` flag and invokes [`objdump`](https://en.wikipedia.org/wiki/Objdump) to dump the assembly code.
 ```bash
 make dump # build with -O3 -mtune=native -g, then dump the binary with objdump -S
 ```
-After building with ```dump```, the assembly code should be saved as a ```.dump``` text file.
+After building with `dump`, the assembly code should be saved as a `.dump` text file.
 </details>
 
 ### Profiling
 
-GCC built-in [profile-guided optimization (PGO)](https://en.wikipedia.org/wiki/Profile-guided_optimization) (```-fprofile-use```) is also included in the makefile.
+GCC built-in [profile-guided optimization (PGO)](https://en.wikipedia.org/wiki/Profile-guided_optimization) (`-fprofile-use`) is also included in the makefile.
 Building with PGO may significantly improve the program speed of certain scenarios, at the expense of overall speed. However, it is still worth especially if long-term training is required.
 
-To profile the 4x6-tuple network, prepare a pre-trained network  ```4x6patt.w``` and build with
+To profile the 4x6-tuple network, prepare a pre-trained network  `4x6patt.w` and build with
 ```bash
 make 4x6patt # make and profile with default settings on the 4x6-tuple
 ```
 
-Five pre-defined targets support profiling: ```4x6patt```, ```5x6patt```, ```6x6patt```, ```7x6patt```, and ```8x6patt```.
+Five pre-defined targets support profiling: `4x6patt`, `5x6patt`, `6x6patt`, `7x6patt`, and `8x6patt`.
 Note that if the pre-trained network is not found, it will be automatically downloaded.
 <details><summary>Show download links</summary>
 
-```4x6patt```: https://moporgic.info/data/2048/4x6patt.w.xz
-```5x6patt```: https://moporgic.info/data/2048/5x6patt.w.xz
-```6x6patt```: https://moporgic.info/data/2048/6x6patt.w.xz
-```7x6patt```: https://moporgic.info/data/2048/7x6patt.w.xz
-```8x6patt```: https://moporgic.info/data/2048/8x6patt.w.xz
+`4x6patt`: https://moporgic.info/data/2048/4x6patt.w.xz
+`5x6patt`: https://moporgic.info/data/2048/5x6patt.w.xz
+`6x6patt`: https://moporgic.info/data/2048/6x6patt.w.xz
+`7x6patt`: https://moporgic.info/data/2048/7x6patt.w.xz
+`8x6patt`: https://moporgic.info/data/2048/8x6patt.w.xz
 </details>
 
 
@@ -217,44 +217,44 @@ Note that if the pre-trained network is not found, it will be automatically down
 
 The pre-defined profiling recipes are designed to balance training and testing performance.
 
-To maximize the training speed (however, with poor testing speed), set the ```PGO_EVAL``` as follows.
+To maximize the training speed (however, with poor testing speed), set the `PGO_EVAL` as follows.
 ```bash
 make 4x6patt PGO_EVAL="0" # profile with only the training routine
 ```
 
-Similarly, to maximize the testing speed, set the ```PGO_OPTI``` as follows.
+Similarly, to maximize the testing speed, set the `PGO_OPTI` as follows.
 ```bash
 make 4x6patt PGO_OPTI="0" # profile with only testing routine
 ```
 
-The above profiling examples are all with TD. To profile with TC, set the ```PGO_ALPHA``` as follows.
+The above profiling examples are all with TD. To profile with TC, set the `PGO_ALPHA` as follows.
 ```bash
 make 4x6patt PGO_ALPHA="0 coherence" # profile with TC learning
 ```
 
-To profile the expectimax search, disable the training with ```PGO_OPTI``` and set the depth with ```PGO_FLAGS``` as follows.
+To profile the expectimax search, disable the training with `PGO_OPTI` and set the depth with `PGO_FLAGS` as follows.
 ```bash
 make 4x6patt PGO_OPTI="0" PGO_FLAGS="-d 2p" # profile with 2-ply search
 ```
 
 #### Profiling with Custom Recipes
 
-If the pre-defined profiling recipes do not meet your requirements, a script ```make-profile.sh``` can be used for customized profiling. First, define your profiling recipe in ```make-profile.sh``` like
+If the pre-defined profiling recipes do not meet your requirements, a script `make-profile.sh` can be used for customized profiling. First, define your profiling recipe in `make-profile.sh` like
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -a 0 fixed -t 1x10000 -e 1x10000 -% none -s
 ```
 
-Then, make with target ```profile``` as follows.
+Then, make with target `profile` as follows.
 ```bash
 make profile # profile with make-profile.sh
 ```
 
-To profile with multithreading (```-p```), set ```-fprofile-update=atomic``` explicitly as follows.
+To profile with multithreading (`-p`), set `-fprofile-update=atomic` explicitly as follows.
 ```bash
 make profile FLAGS="-fprofile-update=atomic" # profile with multithreading
 ```
 
-Note that pre-defined profiling recipes (e.g., ```4x6patt```) will overwrite the ```make-profile.sh```.
+Note that pre-defined profiling recipes (e.g., `4x6patt`) will overwrite the `make-profile.sh`.
 </details>
 
 ### Miscellaneous
@@ -274,7 +274,7 @@ make FLAGS="-Wall -fmessage-length=0" # build with specified flags
 ```
 </details><br>
 
-For simplicity, BMI2 and AVX2 can be disabled with ```BMI2=no``` and ```AVX2=no``` respectively.
+For simplicity, BMI2 and AVX2 can be disabled with `BMI2=no` and `AVX2=no` respectively.
 
 On some machines, such as the AMD Ryzen 3000 series, you may want to explicitly disable BMI2 because of their [slow implementation](http://www.talkchess.com/forum3/viewtopic.php?f=7&t=72538). This can be done as follows.
 ```bash
@@ -283,8 +283,8 @@ make BMI2="no" # build with default settings but disable the BMI2 optimization
 
 #### Specify Default Target
 
-Note that target ```default``` is used when making ```dump```, ```profile```, ```4x6patt```, ..., and ```8x6patt```.
-To specify another target, such as ```static```, set ```TARGET="static"``` as follows.
+Note that target `default` is used when making `dump`, `profile`, `4x6patt`, ..., and `8x6patt`.
+To specify another target, such as `static`, set `TARGET="static"` as follows.
 
 <details><summary>Show advanced options</summary>
 
@@ -302,12 +302,12 @@ This subsection briefly introduces the CLI options, log format, and the provided
 
 ### CLI Options
 
-Below is an example of training, in which a new network is initialized as the pre-defined ```4x6patt``` structure, then it is trained with 1000k episodes, and finally, the result is saved as ```4x6patt.w```.
+Below is an example of training, in which a new network is initialized as the pre-defined `4x6patt` structure, then it is trained with 1000k episodes, and finally, the result is saved as `4x6patt.w`.
 ```bash
 ./2048 -n 4x6patt -t 1000 -o 4x6patt.w
 ```
 
-Similarly, below is an example of testing, in which a pre-trained network ```4x6patt.w``` is loaded and tested with 1000k episodes, and the log is written to ```4x6patt.x```.
+Similarly, below is an example of testing, in which a pre-trained network `4x6patt.w` is loaded and tested with 1000k episodes, and the log is written to `4x6patt.x`.
 ```bash
 ./2048 -n 4x6patt -e 1000 -i 4x6patt.w -o 4x6patt.x
 ```
@@ -316,16 +316,16 @@ More CLI options will be introduced in the following subsection.
 
 #### N-Tuple Network
 
-Use ```-n``` to specify the target network structure as follows. TDL2048+ supports any pattern-based structures with no more than 8-tuple, in which common pattern-based designs are per-defined for simplicity, such as ```4x6patt```, ```5x6patt```, ```6x6patt```, ```7x6patt```, ```8x6patt```, and so on.
+Use `-n` to specify the target network structure as follows. TDL2048+ supports any pattern-based structures with no more than 8-tuple, in which common pattern-based designs are per-defined for simplicity, such as `4x6patt`, `5x6patt`, `6x6patt`, `7x6patt`, `8x6patt`, and so on.
 ```bash
 ./2048 -n 8x6patt -t 1000 # use the 8x6patt network
 ```
 
 <details><summary>Show advanced options</summary><br>
 
-Pattern-based structures are defined with cell locations, by using hexadecimal characters from ```0```, ```1```, ..., ```f``` to indicate the upper-left cell to the lower-right cell, respectively. Also, isomorphisms including rotations and reflections are enabled by default, e.g., a declared pattern ```012345``` actually involves ```012345 37bf26 fedcba c840d9 cdef89 fb73ea 321076 048c15```.
+Pattern-based structures are defined with cell locations, by using hexadecimal characters from `0`, `1`, ..., `f` to indicate the upper-left cell to the lower-right cell, respectively. Also, isomorphisms including rotations and reflections are enabled by default, e.g., a declared pattern `012345` actually involves `012345 37bf26 fedcba c840d9 cdef89 fb73ea 321076 048c15`.
 
-For simplicity, aliases (e.g., ```4x6patt```) are defined for commonly used structures. The definitions of commonly used built-in aliases are listed below. Check the source for a detailed list.
+For simplicity, aliases (e.g., `4x6patt`) are defined for commonly used structures. The definitions of commonly used built-in aliases are listed below. Check the source for a detailed list.
 ```
 4x6patt = 012345 456789 012456 45689a
 5x6patt = 012345 456789 89abcd 012456 45689a
@@ -341,13 +341,13 @@ For simplicity, aliases (e.g., ```4x6patt```) are defined for commonly used stru
 5x4patt = 0123 4567 0145 1256 569a
 ```
 
-To define a structure with custom patterns, specify the patterns in the ```-n``` command as follows. Note that custom patterns may be less efficient than built-in patterns.
+To define a structure with custom patterns, specify the patterns in the `-n` command as follows. Note that custom patterns may be less efficient than built-in patterns.
 ```bash
 ./2048 -n 012345 456789 012456 45689a -t 1000
 ```
 </details><br>
 
-In addition, some statistic-based designs are also supported, such as the monotonicity (```mono```), and the number of tiles of each type (```num```). You may use them with pattern-based designs.
+In addition, some statistic-based designs are also supported, such as the monotonicity (`mono`), and the number of tiles of each type (`num`). You may use them with pattern-based designs.
 ```bash
 ./2048 -n 4x6patt mono num -t 1000 # use 4x6patt, mono, and number of tiles
 ```
@@ -368,24 +368,24 @@ num@st    = the number of small tiles
 
 #### Learning Rate and TC
 
-The learning rate is 0.1 by default, but you may want to manually modulate the value especially when the network is saturated. This can be done by using ```-a``` as follows.
+The learning rate is 0.1 by default, but you may want to manually modulate the value especially when the network is saturated. This can be done by using `-a` as follows.
 ```bash
 ./2048 -n 4x6patt -t 1000 -a 0.01 # use 0.01 as the base learning rate
 ```
 
-Note that setting ```-a 1.0``` enables TC, in which the learning rate is automatically modulated.
+Note that setting `-a 1.0` enables TC, in which the learning rate is automatically modulated.
 
 <details><summary>Show advanced options</summary><br>
 
-To explicitly specify TD or TC, use option ```fixed``` or ```coherence``` together with ```-a``` as follows.
+To explicitly specify TD or TC, use option `fixed` or `coherence` together with `-a` as follows.
 ```bash
 ./2048 -n 4x6patt -t 1000 -a 1.0 fixed # force using TD with alpha=1.0
 ./2048 -n 4x6patt -t 1000 -a 0.1 coherence # force using TC with alpha=0.1
 ```
 
-The learning rate is distributed to each n-tuple feature weight. For example, the ```4x6patt``` network has 32 feature weights, so a weight is adjusted with a rate of 0.01 when ```-a 0.32``` is set.
+The learning rate is distributed to each n-tuple feature weight. For example, the `4x6patt` network has 32 feature weights, so a weight is adjusted with a rate of 0.01 when `-a 0.32` is set.
 
-However, you may use ```norm``` together with ```-a``` to override the default behavior as
+However, you may use `norm` together with `-a` to override the default behavior as
 ```bash
 ./2048 -n 4x6patt -t 1000 -a 0.0025 norm=1 # adjust each weight with a rate of 0.0025/1
 ```
@@ -395,12 +395,12 @@ However, you may use ```norm``` together with ```-a``` to override the default b
 
 The default training method is 1-step TD(0). Follow the instructions below for other methods.
 
-To enable n-step TD training, use ```-N``` to specify a step size.
+To enable n-step TD training, use `-N` to specify a step size.
 ```bash
 ./2048 -n 4x6patt -t 1000 -N 10 # use 10-step TD training
 ```
 
-To enable TD(λ) training, use ```-l``` to specify a lambda value.
+To enable TD(λ) training, use `-l` to specify a lambda value.
 ```bash
 ./2048 -n 4x6patt -t 1000 -l 0.5 # use TD(0.5) training
 ```
@@ -409,7 +409,7 @@ To enable TD(λ) training, use ```-l``` to specify a lambda value.
 
 Multistage TD is a kind of hierarchical TD learning that divides the entire episode into multiple stages, in which each stage has an independent value function. This technique significantly improves the performance at the cost of additional storage for stages.
 
-To enable multistage TD(0), use ```-@``` to specify the stage thresholds.
+To enable multistage TD(0), use `-@` to specify the stage thresholds.
 ```bash
 ./2048 -n 4x6patt@2 -@ 0,16384 -t 1000 -o 4x6patt@2.w # use 2-stage TD(0) training
 ./2048 -n 4x6patt@2 -@ 0,16384 -e 1000 -i 4x6patt@2.w # testing the above network
@@ -418,7 +418,7 @@ To enable multistage TD(0), use ```-@``` to specify the stage thresholds.
 
 <details><summary>Show advanced options</summary><br>
 
-If the base network has an alias, its multistage form can be declared with ```@N```, where ```N``` is the number of stages. However, if the base network does not have an alias, use ```|``` operator to separate network stages. For example, if the base network is ```"01234 45678 01245 45689"```, its 2-stage form can be declared as follows.
+If the base network has an alias, its multistage form can be declared with `@N`, where `N` is the number of stages. However, if the base network does not have an alias, use `|` operator to separate network stages. For example, if the base network is `"01234 45678 01245 45689"`, its 2-stage form can be declared as follows.
 ```bash
 # the 2-stage form of "01234 45678 01245 45689"
 ./2048 -n "01234|00000000 45678|00000000 01245|00000000 45689|00000000"
@@ -432,7 +432,7 @@ Note that due to a current limitation, each stage must have the same structure.
 
 Carousel shaping is a technique that prevents the network from overfitting at the beginning of the episodes, by starting with non-initial states.
 
-To enable TD(0) training with carousel shaping, use ```-b``` to specify the block size. Note that this implementation is different from the originally proposed one, it will evenly train each block and can also be applied to a single stage.
+To enable TD(0) training with carousel shaping, use `-b` to specify the block size. Note that this implementation is different from the originally proposed one, it will evenly train each block and can also be applied to a single stage.
 ```bash
 ./2048 -n 4x6patt -b 2048 -t 1000 # block size is 2048
 ./2048 -n 4x6patt@2 -@ 0,32768 -b 16384 -t 1000 # also works together with multistage
@@ -440,21 +440,21 @@ To enable TD(0) training with carousel shaping, use ```-b``` to specify the bloc
 
 Similar to the carousel shaping, restart is a technique that uses the states recorded in the previous episode to restart the game, to focus on the later game stages.
 
-To enable TD(0) training with restart, set the training mode as ```restart```.
+To enable TD(0) training with restart, set the training mode as `restart`.
 ```bash
 ./2048 -n 4x6patt -t 1000 -tt restart # use restart strategy
 ```
 
 <details><summary>Show advanced options</summary><br>
 
-When using carousel shaping ```-b```, each episode will run until a 65536-tile is reached by default. More specifically, when an episode ends at 16384-tile+8192-tile, a new episode with 16384-tile+8192-tile+2048-tile will start. This process continues until it reaches the upper bound of shaping, i.e., 65536-tile by default.
+When using carousel shaping `-b`, each episode will run until a 65536-tile is reached by default. More specifically, when an episode ends at 16384-tile+8192-tile, a new episode with 16384-tile+8192-tile+2048-tile will start. This process continues until it reaches the upper bound of shaping, i.e., 65536-tile by default.
 
 To change the upper bound of shaping, specify the tiles as follows.
 ```bash
 ./2048 -n 4x6patt -b 2048 49152 -t 1000 # block size 2048, shape up to 32768+16384
 ```
 
-When using restart, options ```L``` and ```at``` can be specified to control its behavior, as shown below.
+When using restart, options `L` and `at` can be specified to control its behavior, as shown below.
 ```bash
 # restart when episode length >= 10, at 50% of the recorded states (default)
 ./2048 -t 1000 mode=restart L=10 at=0.5
@@ -471,7 +471,7 @@ To enable optimistic initialization, set the initial value when declaring networ
 ./2048 -n 8x6patt=5000 -t 1000 # initial V is 320000 (weight is initialized to 5000)
 ```
 
-The above examples are optimistic TD (OTD) learning. Note that OI can be enabled together with any training mode, e.g., specify both ```-a 1.0``` and OI to use optimistic TC (OTC) learning.
+The above examples are optimistic TD (OTD) learning. Note that OI can be enabled together with any training mode, e.g., specify both `-a 1.0` and OI to use optimistic TC (OTC) learning.
 
 To use optimistic TD+TC (OTD+TC) learning, train a network with OTD then follow by TC as follows.
 ```bash
@@ -481,9 +481,9 @@ To use optimistic TD+TC (OTD+TC) learning, train a network with OTD then follow 
 
 <details><summary>Show advanced options</summary><br>
 
-Note that when using ```/norm```, the value will be evenly distributed to weights. For example, a ```4x6patt``` has 32 features, setting ```320000/norm``` will initialize each weight as ```10000```.
+Note that when using `/norm`, the value will be evenly distributed to weights. For example, a `4x6patt` has 32 features, setting `320000/norm` will initialize each weight as `10000`.
 
-Due to a framework limitation, the ```/norm``` will use the total number of features of all stages when combining OI with the multistage network. To prevent the network from being unexpectedly initialized, please declare the weight value explicitly for multistage networks, e.g., ```4x6patt@2=10000```.
+Due to a framework limitation, the `/norm` will use the total number of features of all stages when combining OI with the multistage network. To prevent the network from being unexpectedly initialized, please declare the weight value explicitly for multistage networks, e.g., `4x6patt@2=10000`.
 </details>
 
 #### Ensemble Learning
@@ -501,20 +501,20 @@ Training modes (TD, n-step TD, TD(λ), MSTD, and restart) are implemented with b
 
 Compared with forward training, backward training for TD and n-step is slightly inefficient in terms of speed, but it achieves a higher average score with the same learned episodes.
 
-Option ```-tt``` specifies an advanced training mode as follows.
+Option `-tt` specifies an advanced training mode as follows.
 ```bash
 ./2048 -n 4x6patt -t 1000 -tt backward # backward TD(0)
 ./2048 -n 4x6patt -t 1000 -tt step-backward -N 5 # backward 5-step TD(0)
 ```
 
-You may enable the forward TD(λ) with ```-tt lambda-forward``` with a step size with ```-N``` as follows.
+You may enable the forward TD(λ) with `-tt lambda-forward` with a step size with `-N` as follows.
 ```bash
 ./2048 -n 4x6patt -t 1000 -tt lambda-forward -l 0.5 -N 5 # forward 5-step TD(0.5)
 ```
 
 #### Expectimax Search
 
-An additional search usually improves the program strength, which can be enabled with ```-d``` flag.
+An additional search usually improves the program strength, which can be enabled with `-d` flag.
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -e 10 -d 3p # enable a 3-ply search
 ```
@@ -527,16 +527,16 @@ You may want to log each episode when running a deep search, which can be done b
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -e 10000x1 -d 3p # 10000 episodes
 ```
-Note that the number of tested episodes is the same as ```-e 10```, but with a more detailed log.
+Note that the number of tested episodes is the same as `-e 10`, but with a more detailed log.
 
-To prevent the search tree from becoming too large, it is best to limit the search depth when there are many empty cells on the puzzle. This can be set by using ```limit``` with ```-d``` as follows.
+To prevent the search tree from becoming too large, it is best to limit the search depth when there are many empty cells on the puzzle. This can be set by using `limit` with `-d` as follows.
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -e 10 -d 5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p
 ```
-In the above example, the search starts with 5-ply at root, in which the depth is limited to 5-ply if there are 0 to 3 empty cells; 4-ply if there are 4 to 7 empty cells; and 3-ply if there are 8 or more empty cells. Note that ```limit=``` accepts at most 16 values, corresponding to 0 to 15 empty cells.
+In the above example, the search starts with 5-ply at root, in which the depth is limited to 5-ply if there are 0 to 3 empty cells; 4-ply if there are 4 to 7 empty cells; and 3-ply if there are 8 or more empty cells. Note that `limit=` accepts at most 16 values, corresponding to 0 to 15 empty cells.
 </details><br>
 
-To speed up the search, a transposition table (TT) can be enabled with ```-c``` as
+To speed up the search, a transposition table (TT) can be enabled with `-c` as
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -e 10 -d 3p -c 8G # 3-ply search with 8G TT
 ```
@@ -546,19 +546,19 @@ Note that the size of TT must be the power of 2, e.g., 4G, 8G, 16G, 64G, etc.
 
 Be sure to decide the size of TT carefully. The use of TT involves a lot of memory access, which may result in worse search speed especially when the search depth is less than 3-ply.
 
-In addition, it is possible to allow the search to use a deeper TT cache when available. This may improve the strength, especially for deep searches. Use ```peek``` together with ```-c``` to enable this.
+In addition, it is possible to allow the search to use a deeper TT cache when available. This may improve the strength, especially for deep searches. Use `peek` together with `-c` to enable this.
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -e 10 -d 5p -c 64G peek # peeking the deeper TT cache
 ```
 
-More specifically, if the search requires the 3-ply result of a puzzle, while TT only caches the 5-ply result, setting ```peek``` allows the search to directly obtain the 5-ply result for current use.
+More specifically, if the search requires the 3-ply result of a puzzle, while TT only caches the 5-ply result, setting `peek` allows the search to directly obtain the 5-ply result for current use.
 </details>
 
 #### Tile-Downgrading
 
 Tile-downgrading is a technique that searches states by translating them into downgraded states, which can improve the performance when reaching large tiles.
 
-To enable testing with tile-downgrading, use ```-h``` the declare the threshold.
+To enable testing with tile-downgrading, use `-h` the declare the threshold.
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -e 10 -h 32768 # activate once 32768-tile is reached
 ./2048 -n 4x6patt -i 4x6patt.w -e 10 -h 49152 # threshold is 32768-tile + 16384-tile
@@ -569,16 +569,16 @@ Note that this is necessary for 65536-tiles since n-tuple networks do not recogn
 
 #### Saving/Loading and Logging
 
-The program uses ```-i``` for loading, ```-o``` for saving and logging.
-For simplicity, ```-io``` toggles both ```-i``` and ```-o```, which is useful during long-term training.
+The program uses `-i` for loading, `-o` for saving and logging.
+For simplicity, `-io` toggles both `-i` and `-o`, which is useful during long-term training.
 
-Three types of files are currently supported: the n-tuple network (```.w```), the TT cache (```.c```), and the log file (```.x```). The file must be named with the correct extension.
+Three types of files are currently supported: the n-tuple network (`.w`), the TT cache (`.c`), and the log file (`.x`). The file must be named with the correct extension.
 
 Note that no error message will appear when an IO failure occurs.
 
 <details><summary>Show some examples</summary><br>
 
-To save the trained network as ```4x6patt.w``` and log to ```4x6patt-training.x```:
+To save the trained network as `4x6patt.w` and log to `4x6patt-training.x`:
 ```bash
 ./2048 -n 4x6patt -t 1000 -o 4x6patt.w 4x6patt-training.x
 ```
@@ -599,7 +599,7 @@ done
 
 <details><summary>Show advanced options</summary><br>
 
-To select specific weights of a file when loading or saving, use ```[IDX]|``` prefix with file path as
+To select specific weights of a file when loading or saving, use `[IDX]|` prefix with file path as
 ```bash
 ./2048 -n 4x6patt -t 1000 -o '[0]|4x6patt-part.w' # save the first n-tuple
 ./2048 -n 8x6patt -t 1000 -o '[0-3]|8x6patt-part.w' # save the first 4 n-tuples
@@ -609,7 +609,7 @@ To select specific weights of a file when loading or saving, use ```[IDX]|``` pr
 
 TDL2048+ supports ensemble learning by averaging n-tuple weights. To perform this, specify multiple weight files as input, weights with the same signature are automatically averaged.
 
-In the following example of ensemble learning, two networks (```4x6patt-0.w``` and ```4x6patt-1.w```) are averaged, their ensemble result is then evaluated and stored as ```4x6patt.w```.
+In the following example of ensemble learning, two networks (`4x6patt-0.w` and `4x6patt-1.w`) are averaged, their ensemble result is then evaluated and stored as `4x6patt.w`.
 ```bash
 ./2048 -n 4x6patt -e 1000 -i 4x6patt-0.w 4x6patt-1.w -o 4x6patt.x 4x6patt.w
 ```
@@ -619,7 +619,7 @@ In the following example of ensemble learning, two networks (```4x6patt-0.w``` a
 #### Random Seed
 
 The pseudo-random number generator is randomly initialized by default.
-To specify a fixed seed, use ```-s``` with a custom string as follows.
+To specify a fixed seed, use `-s` with a custom string as follows.
 ```bash
 ./2048 -n 4x6patt -t 1000 -s Hello # use "Hello" to seed the PRNG
 ```
@@ -627,7 +627,7 @@ To specify a fixed seed, use ```-s``` with a custom string as follows.
 #### Parallel Execution
 
 The program executes with only a single thread by default.
-To enable parallel execution, use ```-p``` with the number of threads as follows.
+To enable parallel execution, use `-p` with the number of threads as follows.
 ```bash
 ./2048 -n 4x6patt -t 1000 -p 10 # use 10 threads for execution
 ```
@@ -635,7 +635,7 @@ If the number of threads is not provided, the program will use all available thr
 
 <details><summary>Show advanced options</summary><br>
 
-Make sure that the number in ```-t``` or ```-e``` is larger than the parallelism.
+Make sure that the number in `-t` or `-e` is larger than the parallelism.
 In the following example, only thread #1 to thread #10 will work, while other threads will be idle.
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -d 5p -c 64G -e 10 -p 20
@@ -648,14 +648,14 @@ To prevent this from happening, set the unit instead of using the default (1000)
 
 Due to lock-free parallelism, when there are too many agents (threads) asynchronously updating the n-tuple weights of a newly initialized network, the network is likely to be corrupted by lock-free writes. Therefore, it is recommended to turn off the parallelism at the beginning of training.
 
-In addition, the program will automatically toggle the use of [shared memory (SHM)](https://en.wikipedia.org/wiki/Shared_memory) on Linux platforms, since using ```fork``` with SHM performs better than using ```std::thread``` in speed.
+In addition, the program will automatically toggle the use of [shared memory (SHM)](https://en.wikipedia.org/wiki/Shared_memory) on Linux platforms, since using `fork` with SHM performs better than using `std::thread` in speed.
 
-To explicitly disable the SHM, add ```noshm``` with ```-p``` to tell the program to use ```std::thread```.
+To explicitly disable the SHM, add `noshm` with `-p` to tell the program to use `std::thread`.
 ```bash
 ./2048 -n 4x6patt -i 4x6patt.w -d 5p -c 64G -e 20x500 -p 20 noshm
 ```
 
-Note that on Linux platforms with SHM enabled, issuing both training and testing (```-t``` and ```-e```) in a single command with parallelism may lead to a slightly worse testing speed.
+Note that on Linux platforms with SHM enabled, issuing both training and testing (`-t` and `-e`) in a single command with parallelism may lead to a slightly worse testing speed.
 ```bash
 # issue training and testing in a single command
 ./2048 -n 4x6patt -t 1000 -e 1000 -p 10 -o 4x6patt.w # training, then testing
@@ -664,13 +664,13 @@ Note that on Linux platforms with SHM enabled, issuing both training and testing
 ./2048 -n 4x6patt -e 1000 -p 10 -i 4x6patt.w # then testing
 ```
 
-Due to a current limitation, the speed of testing in the former may be slightly slower than that in the latter. However, should still be faster than using ```std::thread```.
+Due to a current limitation, the speed of testing in the former may be slightly slower than that in the latter. However, should still be faster than using `std::thread`.
 
 Finally, TDL2048+ has not been optimized to support [multiprocessing](https://en.wikipedia.org/wiki/Multiprocessing) with [non-uniform memory access (NUMA)](https://en.wikipedia.org/wiki/Non-uniform_memory_access) (i.e., multiple CPUs), [multi-die](https://www.hardwaretimes.com/amd-ccd-and-ccx-in-ryzen-processors-explained) (e.g., an AMD Ryzen 9 5950X processor has two CCDs), and similar [multi-chip](https://en.wikipedia.org/wiki/Multi-chip_module) architectures.
 
-On such platforms, parallel execution may result in a significant loss of training speed. Therefore, it is recommended to use [```taskset```](https://man7.org/linux/man-pages/man1/taskset.1.html) to limit the execution on only a single processor (core die) for parallel training.
+On such platforms, parallel execution may result in a significant loss of training speed. Therefore, it is recommended to use [`taskset`](https://man7.org/linux/man-pages/man1/taskset.1.html) to limit the execution on only a single processor (core die) for parallel training.
 
-For examples, on a machine with two Intel E5-2698 v4, and on a machine with an AMD Ryzen 9 5950X, the parallel training speeds without and with ```taskset``` are as follows.
+For examples, on a machine with two Intel E5-2698 v4, and on a machine with an AMD Ryzen 9 5950X, the parallel training speeds without and with `taskset` are as follows.
 ```bash
 # Intel E5-2698 v4 x2 (20C/40T x2, 2 CPUs)
 ./2048 -n 4x6patt -t 400 -p 80 # execute across CPUs, 14M ops (slow!)
@@ -696,24 +696,24 @@ taskset -c 0-7,16-23 ./2048 -n 4x6patt -t 160 -p 16 # execute on CCD0 only, 34M 
 
 <details><summary>Summary</summary>
 
-By default, the summary is only printed for testing (```-e```).
-Use ```-%``` to display it also for training; use ```-% none``` to hide it for both training and testing.
+By default, the summary is only printed for testing (`-e`).
+Use `-%` to display it also for training; use `-% none` to hide it for both training and testing.
 </details>
 
 <details><summary>Winning Tile</summary>
 
-To change the winning tile of statistics, specify ```-w``` with a tile value, e.g., ```-w 32768```.
+To change the winning tile of statistics, specify `-w` with a tile value, e.g., `-w 32768`.
 </details>
 
 <details><summary>Help Message</summary>
 
-Use ```-?``` to print a brief CLI usage.
-Use ```-v``` to print the program version.
+Use `-?` to print a brief CLI usage.
+Use `-v` to print the program version.
 </details>
 
 ### Log Format
 
-The log of executing ```./2048 -n 4x6patt -t 10 -e 10``` is used as an example.
+The log of executing `./2048 -n 4x6patt -t 10 -e 10` is used as an example.
 
 A log may contain version info, CLI arguments, parameters, statistic blocks, and summary blocks.
 
@@ -745,7 +745,7 @@ The current n-tuple network structure appears next.
 45689a[16M] : 45689a 26a159 ba9765 d95ea6 89a456 ea6d95 765ba9 15926a
 ```
 
-Then, the training part comes with a ```optimize``` label, in which the details will be introduced later.
+Then, the training part comes with a `optimize` label, in which the details will be introduced later.
 ```
 optimize: 10
 
@@ -768,7 +768,7 @@ local:  avg=21814 max=62996 tile=4096 win=39.60%
 total:  avg=15530 max=62996 tile=4096 win=16.75%
 ```
 
-Finally, the testing part comes with a ```evaluate``` label and ends with a summary block.
+Finally, the testing part comes with a `evaluate` label and ends with a summary block.
 ```
 evaluate: 10 info
 
@@ -811,16 +811,16 @@ local:  avg=21870 max=72104 tile=4096 win=37.80%
 total:  avg=21946 max=72104 tile=4096 win=37.40%
 ```
 
-The first line shows the index number (```002/010```, current/total), the time used for this block (```175ms```), and the measured speed in moves/s (```6940114.29ops```).
-When using parallel execution, there is an additional ```[#]``` to display the executor id of this block.
+The first line shows the index number (`002/010`, current/total), the time used for this block (`175ms`), and the measured speed in moves/s (`6940114.29ops`).
+When using parallel execution, there is an additional `[#]` to display the executor id of this block.
 
-The second line, ```local```, shows the statistic of this block, including the average score (```avg=21870```), the maximum score (```max=72104```), the maximum tile (```tile=4096```), and the win rate (```win=37.80%```).
+The second line, `local`, shows the statistic of this block, including the average score (`avg=21870`), the maximum score (`max=72104`), the maximum tile (`tile=4096`), and the win rate (`win=37.80%`).
 
-The third line, ```total```, has the same format as the second line, but shows the statistics starting from the first index (```001/xxx```) of this session. Note that ```-t 10 -e 10``` are two separate sessions.
+The third line, `total`, has the same format as the second line, but shows the statistics starting from the first index (`001/xxx`) of this session. Note that `-t 10 -e 10` are two separate sessions.
 
 #### Summary Block
 
-A summary block is only attached at the end of a testing session (```-e```) by default.
+A summary block is only attached at the end of a testing session (`-e`) by default.
 ```
 summary 1764ms 6902075.96ops
 total:  avg=21948 max=72104 tile=4096 win=38.24%
@@ -833,11 +833,11 @@ tile     count   score    move     rate      win
 4096       174   55087    2539    1.74%    1.74%
 ```
 
-The first line shows the total time usage (```1764ms```) and the measured speed (```6902075.96ops```) of this session. The second line is the same as the ```total``` of the last statistic block.
+The first line shows the total time usage (`1764ms`) and the measured speed (`6902075.96ops`) of this session. The second line is the same as the `total` of the last statistic block.
 
-The tile-specific statistic is printed starting from the third line, in which ```count``` shows how many episodes end with only ```tile```; ```score``` and ```move``` show the average score and average moves of such episodes; ```rate``` shows the percentage of such episodes; and ```win``` shows the reaching rate.
+The tile-specific statistic is printed starting from the third line, in which `count` shows how many episodes end with only `tile`; `score` and `move` show the average score and average moves of such episodes; `rate` shows the percentage of such episodes; and `win` shows the reaching rate.
 
-Take ```2048-tile``` as an example, there are ```3650``` games that end with it, their average score and average moves are ```31352``` and ```1635```, respectively. Since this session has 10k games, the percentage of games ending with it is ```36.50%```; and the reaching rate is ```38.24%```, calculated from ```100% - (0.06% + 0.93% + 12.99% + 47.78%)```.
+Take `2048-tile` as an example, there are `3650` games that end with it, their average score and average moves are `31352` and `1635`, respectively. Since this session has 10k games, the percentage of games ending with it is `36.50%`; and the reaching rate is `38.24%`, calculated from `100% - (0.06% + 0.93% + 12.99% + 47.78%)`.
 
 ### Utilities
 
@@ -851,7 +851,7 @@ utilities/2048-bench.sh -D # bench default build on 4x6patt and 8x6patt
 utilities/2048-bench.sh -P # bench profiled build on 4x6patt and 8x6patt
 ```
 
-In addition, you may use ```source utilities/2048-bench.sh``` to import functions.
+In addition, you may use `source utilities/2048-bench.sh` to import functions.
 The following are examples of provided functions, check the script for more details.
 ```bash
 test ./2048 # test the training/testing speed
