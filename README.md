@@ -202,14 +202,14 @@ make 4x6patt # make and profile with default settings on the 4x6-tuple
 ```
 
 Five pre-defined targets support profiling: `4x6patt`, `5x6patt`, `6x6patt`, `7x6patt`, and `8x6patt`.
-Note that if the pre-trained network is not found, it will be automatically downloaded.
+Note that if a pre-trained network is not found, it will be automatically downloaded.
 <details><summary>Show download links</summary>
 
-`4x6patt`: https://moporgic.info/data/2048/4x6patt.w.xz
-`5x6patt`: https://moporgic.info/data/2048/5x6patt.w.xz
-`6x6patt`: https://moporgic.info/data/2048/6x6patt.w.xz
-`7x6patt`: https://moporgic.info/data/2048/7x6patt.w.xz
-`8x6patt`: https://moporgic.info/data/2048/8x6patt.w.xz
+`4x6patt`: https://moporgic.info/2048/model/4x6patt.w.xz
+`5x6patt`: https://moporgic.info/2048/model/5x6patt.w.xz
+`6x6patt`: https://moporgic.info/2048/model/6x6patt.w.xz
+`7x6patt`: https://moporgic.info/2048/model/7x6patt.w.xz
+`8x6patt`: https://moporgic.info/2048/model/8x6patt.w.xz
 </details>
 
 
