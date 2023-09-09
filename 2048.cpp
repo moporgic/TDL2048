@@ -984,17 +984,17 @@ struct stage {
 };
 
 void init_logging(utils::options::option files) {
-	static std::ofstream logout;
+	static std::ofstream logofs;
 	for (std::string file : files) {
 		std::string path = file.substr(file.find('|') + 1);
 //		std::string opt = path != file ? file.substr(0, file.find('|')) : "";
 		char type = path[path.find_last_of(".") + 1];
-		if (logout.is_open() || (type != 'x' && type != 'l')) continue; // .x and .log are suffix for log files
-		logout.open(path, std::ios::out | std::ios::app);
+		if (logofs.is_open() || (type != 'x' && type != 'l')) continue; // .x and .log are suffix for log files
+		logofs.open(path, std::ios::out | std::ios::app);
 	}
-	if (!logout.is_open()) return;
-	static moporgic::teestream tee(std::cout, logout);
-	static moporgic::redirector redirect(tee, std::cout);
+	if (!logofs.is_open()) return;
+	static moporgic::teestream tee(std::cout, logofs);
+	static moporgic::redirector redirect(std::cout, tee);
 }
 
 void init_cache(utils::options::option opt) {

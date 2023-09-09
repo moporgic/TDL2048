@@ -328,7 +328,7 @@ namespace moporgic { // reference://wordaligned.org/articles/cpp-streambufs
 
 class redirector {
 public:
-	redirector(std::ostream& dst, std::ostream& src) : src(src), sbuf(src.rdbuf(dst.rdbuf())) {}
+	redirector(std::ostream& src, std::ostream& dst) : src(src), sbuf(src.rdbuf(dst.rdbuf())) {}
 	~redirector() { src.rdbuf(sbuf); }
 private:
 	std::ostream& src;
