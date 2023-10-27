@@ -36,7 +36,7 @@ columns=${columns:1}; columns=${columns::-1}
 columns=${columns:-"avg,max,16384,32768"}
 chk=${columns},; chk=${chk#avg,}; chk=${chk#max,}
 [[ $chk != *avg* && $chk != *max* ]] || exit $?
-[[ $chk == $(sort -n <<< ${chk//,/$'\n'} | xargs | tr ' ' ,), ]] || exit $?
+[[ $chk == $(sort -n <<< ${chk//,/$'\n'} | xargs | tr ' ' ,), || ! $chk ]] || exit $?
 
 # generate formats
 format=
