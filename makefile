@@ -1,7 +1,7 @@
 # TDL2048+ makefile
 
 # C++ compiler options
-STD ?= c++14
+STD ?= c++20
 OLEVEL ?= 3
 ARCH ?= tune=native
 INSTS ?= abm bmi bmi2 avx avx2

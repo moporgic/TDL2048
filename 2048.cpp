@@ -945,7 +945,7 @@ private:
 
 	static std::string vtos(const list& vec) {
 		std::string str = std::accumulate(vec.cbegin(), vec.cend(), std::string(),
-		    [](std::string& r, const std::string& v){ return std::move(r) + v + " "; });
+		    [](const std::string& r, const std::string& v){ return r + v + " "; });
 		if (str.size()) str.pop_back();
 		return str;
 	}
