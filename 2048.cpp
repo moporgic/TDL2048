@@ -642,7 +642,7 @@ u64 indexmerge(const board& b) { // 16-bit
 }
 
 u64 indexnum(const board& b) { // 24-bit
-	auto num = b.numof();
+	hex num = b.numof();
 	u64 index = 0;
 	index |= (num[0] + num[1] + num[2] + num[3]) << 0; // 0+2+4+8, 4-bit
 	index |= (num[4] + num[5] + num[6]) << 4; // 16+32+64, 4-bit
@@ -657,7 +657,7 @@ u64 indexnum(const board& b) { // 24-bit
 }
 
 u64 indexnumlt(const board& b) { // 24-bit
-	auto num = b.numof();
+	hex num = b.numof();
 	u64 index = 0;
 	index |= std::min(u32(num[8]),  7u) <<  0; // 256, 3-bit
 	index |= std::min(u32(num[9]),  7u) <<  3; // 512, 3-bit
@@ -671,7 +671,7 @@ u64 indexnumlt(const board& b) { // 24-bit
 }
 
 u64 indexnumst(const board& b) { // 24-bit
-	auto num = b.numof();
+	hex num = b.numof();
 	u64 index = 0;
 	index |= std::min(u32(num[0]), 7u) <<  0; // 0, 3-bit
 	index |= std::min(u32(num[1]), 7u) <<  3; // 2, 3-bit
@@ -706,8 +706,10 @@ u64 indexmax(const board& b) { // 16-bit
 }
 
 struct adapter {
-	static inline auto& wlist() { static moporgic::list<indexer::mapper> w; return w; }
-	static inline auto& hlist() { static moporgic::list<std::function<u64(const board&)>> h; return h; }
+	typedef moporgic::list<indexer::mapper> adapter_list;
+	typedef moporgic::list<std::function<u64(const board&)>> indexer_list;
+	static inline adapter_list& wlist() { static adapter_list w; return w; }
+	static inline indexer_list& hlist() { static indexer_list h; return h; }
 
 	inline operator indexer::mapper() const { return wlist().front(); }
 	inline adapter(std::function<u64(const board&)> hdr) { hlist().push_back(hdr); }
@@ -1178,7 +1180,7 @@ void make_network(utils::options::option opt) {
 		for (std::string val; lbuf >> val; lvals.push_back(val));
 		for (std::string val; rbuf >> val; rvals.push_back(val));
 		token.clear();
-		for (auto lval : lvals) for (auto rval : rvals) {
+		for (std::string lval : lvals) for (std::string rval : rvals) {
 			token += (lval + ':' + rval + ' ');
 			lval = lval.substr(0, lval.find('='));
 		}
@@ -1492,13 +1494,13 @@ struct method {
 
 		constexpr static inline_always numeric invoke(const board& iso, clip<feature> f) {
 			numeric esti = 0;
-			for (auto feat = f.begin(); feat != f.end(); feat += 8)
+			for (feature* feat = f.begin(); feat != f.end(); feat += 8)
 				esti += feat->at<mode>(iso);
 			return esti;
 		}
 		constexpr static inline_always numeric invoke(const board& iso, numeric updv, clip<feature> f) {
 			numeric esti = 0;
-			for (auto feat = f.begin(); feat != f.end(); feat += 8)
+			for (feature* feat = f.begin(); feat != f.end(); feat += 8)
 				esti += (feat->at<mode>(iso) += updv);
 			return esti;
 		}
@@ -1953,17 +1955,17 @@ struct statistic {
 		        "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
 		        "tile", "count", "score", "move", "rate", "win");
 		buf[size++] = '\n';
-		const auto& count = accum.count;
-		const auto& score = accum.score;
-		const auto& opers = accum.opers;
-		auto total = std::accumulate(count.begin(), count.end(), 0);
-		for (auto left = total, i = 0; left; left -= count[i++]) {
-			if (count[i] == 0) continue;
+		u32 total = std::accumulate(accum.count.begin(), accum.count.end(), 0);
+		for (u32 remain = total, i = 0; remain; remain -= accum.count[i++]) {
+			if (accum.count[i] == 0) continue;
 			size += snprintf(buf + size, sizeof(buf) - size,
 					"%-6d" "%8d" "%8d" "%8d" "%8.2f%%" "%8.2f%%",
-					board::tile::itov(i), u32(count[i]),
-					u32(score[i] / count[i]), u32(opers[i] / count[i]),
-					count[i] * 100.0 / total, left * 100.0 / total);
+					board::tile::itov(i),
+					u32(accum.count[i]),
+					u32(accum.score[i] / accum.count[i]),
+					u32(accum.opers[i] / accum.count[i]),
+					accum.count[i] * 100.0 / total,
+					remain * 100.0 / total);
 			buf[size++] = '\n';
 		}
 		buf[size++] = '\n';
