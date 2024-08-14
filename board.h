@@ -747,6 +747,33 @@ public:
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
 	inline void moves80(btype move[]) const { moves80(move[0], move[1], move[2], move[3]); }
 
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline nthit moves(btype move[], bool compact) const   { return moves64(move, compact); }
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline nthit moves64(btype move[], bool compact) const {
+		moves64(move[0], move[1], move[2], move[3]);
+		nthit ops = actions(move), o = ops;
+		if (compact) {
+			move[0] = move[(*o++) & 0b11];
+			move[1] = move[(*o++) & 0b11];
+			move[2] = move[(*o++) & 0b11];
+			move[3] = move[(*o++) & 0b11];
+		}
+		return ops;
+	}
+	template<typename btype, typename = enable_if_is_base_of<board, btype>>
+	inline nthit moves80(btype move[], bool compact) const {
+		moves80(move[0], move[1], move[2], move[3]);
+		nthit ops = actions(move), o = ops;
+		if (compact) {
+			move[0] = move[(*o++) & 0b11];
+			move[1] = move[(*o++) & 0b11];
+			move[2] = move[(*o++) & 0b11];
+			move[3] = move[(*o++) & 0b11];
+		}
+		return ops;
+	}
+
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
 	inline std::array<btype, 4> moves() const   { std::array<btype, 4> move; moves(move.data()); return move; }
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
@@ -754,35 +781,12 @@ public:
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
 	inline std::array<btype, 4> moves80() const { std::array<btype, 4> move; moves80(move.data()); return move; }
 
-	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline u32 movals(btype move[]) const { return movals64(move); }
-	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline u32 movals64(btype move[]) const {
-		moves64(move);
-		u32 i = 0;
-		move[i] = move[0]; i += ~move[0].inf >> 31;
-		move[i] = move[1]; i += ~move[1].inf >> 31;
-		move[i] = move[2]; i += ~move[2].inf >> 31;
-		move[i] = move[3]; i += ~move[3].inf >> 31;
-		return i;
-	}
-	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline u32 movals80(btype move[]) const {
-		moves80(move);
-		u32 i = 0;
-		move[i] = move[0]; i += ~move[0].inf >> 31;
-		move[i] = move[1]; i += ~move[1].inf >> 31;
-		move[i] = move[2]; i += ~move[2].inf >> 31;
-		move[i] = move[3]; i += ~move[3].inf >> 31;
-		return i;
-	}
-
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline std::vector<btype> movals() const   { std::vector<btype> move(4); move.resize(movals(move.data())); return move; }
+	inline std::vector<btype> moves(bool compact) const   { return moves64(compact); }
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline std::vector<btype> movals64() const { std::vector<btype> move(4); move.resize(movals64(move.data())); return move; }
+	inline std::vector<btype> moves64(bool compact) const { btype move[4]; return {move, move + moves64(move, compact).size()}; }
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline std::vector<btype> movals80() const { std::vector<btype> move(4); move.resize(movals80(move.data())); return move; }
+	inline std::vector<btype> moves80(bool compact) const { btype move[4]; return {move, move + moves80(move, compact).size()}; }
 
 	class action {
 	public:
