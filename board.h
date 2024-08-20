@@ -483,34 +483,42 @@ public:
 	inline bool popup80() { return empty80() ? next80(), true : false; }
 
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr u32 popups(btype popup[]) const { return popups64(popup); }
+	inline constexpr nthit popups(btype popup[]) const { return popups64(popup); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr u32 popups64(btype popup[]) const {
+	inline constexpr nthit popups64(btype popup[]) const {
 		u32 i = 0;
-		u64 x = where64(0);
-		for (u64 t = 0; (t = x & -x) != 0; x ^= t) {
+		u64 e = where64(0);
+		for (u64 x = e, t; (t = x & -x) != 0; x ^= t) {
 			popup[i++] = board(raw | (t << 0), ext);
 			popup[i++] = board(raw | (t << 1), ext);
 		}
-		return i;
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_MASK)
+		return math::pext64(e, 0x1111111111111111ull);
+#else
+		return find64(0);
+#endif
 	}
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr u32 popups80(btype popup[]) const {
+	inline constexpr nthit popups80(btype popup[]) const {
 		u32 i = 0;
-		u64 x = where80(0);
-		for (u64 t = 0; (t = x & -x) != 0; x ^= t) {
+		u64 e = where80(0);
+		for (u64 x = e, t; (t = x & -x) != 0; x ^= t) {
 			popup[i++] = board(raw | (t << 0), ext);
 			popup[i++] = board(raw | (t << 1), ext);
 		}
-		return i;
+#if defined(__BMI2__) && !defined(PREFER_LEGACY_MASK)
+		return math::pext64(e, 0x1111111111111111ull);
+#else
+		return find80(0);
+#endif
 	}
 
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr std::vector<btype> popups() const   { std::vector<btype> popup(empty() * 2); popups(popup.data()); return popup; }
+	inline constexpr std::vector<btype> popups() const   { return popups64(); }
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr std::vector<btype> popups64() const { std::vector<btype> popup(empty64() * 2); popups64(popup.data()); return popup; }
+	inline constexpr std::vector<btype> popups64() const { btype popup[32]; return {popup, popup + popups64(popup).size() * 2}; }
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr std::vector<btype> popups80() const { std::vector<btype> popup(empty80() * 2); popups80(popup.data()); return popup; }
+	inline constexpr std::vector<btype> popups80() const { btype popup[32]; return {popup, popup + popups80(popup).size() * 2}; }
 
 	inline i32 left()  { return left64(); }
 	inline i32 right() { return right64(); }
