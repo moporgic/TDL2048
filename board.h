@@ -599,13 +599,7 @@ public:
 		return operator =(move).inf;
 	}
 
-	inline i32 move(u32 op)   {
-		switch (op & 0xf0u) {
-		default:            return move64(op);
-		case action::x64:   return move64(op & 0x0fu);
-		case action::x80:   return move80(op & 0x0fu);
-		}
-	}
+	inline i32 move(u32 op) { return move64(op); }
 	inline i32 move64(u32 op) {
 		switch (op) {
 		case action::up:    return up64();
@@ -800,39 +794,41 @@ public:
 	public:
 		action() = delete;
 		enum opcode : u32 {
-			up    = 0x00u,
-			right = 0x01u,
-			down  = 0x02u,
-			left  = 0x03u,
-			next  = 0x0eu,
-			init  = 0x0cu,
-			nop   = 0x0fu,
-
-			x64   = 0x40u,
-			x80   = 0x80u,
-			ext   = x80,
+			up    = 0x00u, // move up
+			right = 0x01u, // move right
+			down  = 0x02u, // move down
+			left  = 0x03u, // move left
+			next  = 0x04u, // add next tile randomly
+			clear = 0x08u, // clear the board
+			init  = 0x0cu, // reset the board (with tiles)
+			pop1  = 0x10u, // 4-bit type, 4-bit position
+			pop2  = 0x20u, // 4-bit type, 4-bit position
 		};
 	};
 
-	inline i32 operate(u32 op) {
-		switch (op & 0xf0u) {
-		default:           return operate64(op);
-		case action::x64:  return operate64(op & 0x0fu);
-		case action::x80:  return operate80(op & 0x0fu);
-		}
-	}
+	inline i32 operate(u32 op) { return operate64(op); }
 	inline i32 operate64(u32 op) {
 		switch (op) {
-		default:           return move64(op);
-		case action::next: return popup64() ? 0 : -1;
-		case action::init: return init(), 0;
+		case action::up:    return up64();
+		case action::right: return right64();
+		case action::down:  return down64();
+		case action::left:  return left64();
+		case action::next:  return popup64() ? 0 : -1;
+		case action::clear: return set(0ull, 0), 0;
+		case action::init:  return init(), 0;
+		default: /* pop */  return at4(op & 0x0f) == 0 && (op >> 4) != 0 ? (at4(op & 0x0f, op >> 4), 0) : -1;
 		}
 	}
 	inline i32 operate80(u32 op) {
 		switch (op) {
-		default:           return move80(op);
-		case action::next: return popup80() ? 0 : -1;
-		case action::init: return init(), 0;
+		case action::up:    return up80();
+		case action::right: return right80();
+		case action::down:  return down80();
+		case action::left:  return left80();
+		case action::next:  return popup80() ? 0 : -1;
+		case action::clear: return set(0ull, 0), 0;
+		case action::init:  return init(), 0;
+		default: /* pop */  return at5(op & 0x0f) == 0 && (op >> 4) != 0 ? (at5(op & 0x0f, op >> 4), 0) : -1;
 		}
 	}
 
