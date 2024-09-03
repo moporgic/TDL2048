@@ -49,6 +49,7 @@ public:
 	inline constexpr void set(const type& x) { set(raw_cast<board>(x)); }
 	template<typename type, typename = enable_if_not_is_base_of<board, type>, typename = enable_if_is_convertible<type, u64>>
 	inline constexpr void set(const type& x) { set(u64(x), 0); }
+	inline constexpr int  cmp(const board& b) const { return (ext > b.ext) - (ext < b.ext) ?: (raw > b.raw) - (raw < b.raw); }
 
 public:
 	class cache {
