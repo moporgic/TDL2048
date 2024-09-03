@@ -1,7 +1,7 @@
 //============================================================================
 // Name        : moporgic/TDL2048+ - board.h
 // Author      : Hung Guei @ moporgic
-// Version     : 6.6
+// Version     : 6.8
 // Description : The Most Effective Bitboard Implementation for 2048
 //============================================================================
 
@@ -478,47 +478,51 @@ public:
 		raw |= (t << (u % 10 ? 0 : 1));
 	}
 
-	inline bool popup() { return popup64(); }
-	inline bool popup64() { return empty64() ? next64(), true : false; }
-	inline bool popup80() { return empty80() ? next80(), true : false; }
+	inline i32 popup() { return popup64(); }
+	inline i32 popup64() { return empty64() ? next64(), 0 : -1; }
+	inline i32 popup80() { return empty80() ? next80(), 0 : -1; }
+
+	inline i32 popup(u32 op) { return popup64(op); }
+	inline i32 popup64(u32 op) { action::pop p(op); return p.type() && !at4(p.pos()) ? at4(p.pos(), p.type()), 0 : -1; }
+	inline i32 popup80(u32 op) { action::pop p(op); return p.type() && !at5(p.pos()) ? at5(p.pos(), p.type()), 0 : -1; }
 
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr nthit popups(btype popup[]) const { return popups64(popup); }
+	inline constexpr xthit popups(btype popup[]) const { return popups64(popup); }
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr nthit popups64(btype popup[]) const {
-		u32 i = 0;
-		u64 e = where64(0);
-		for (u64 x = e, t; (t = x & -x) != 0; x ^= t) {
-			popup[i++] = board(raw | (t << 0), ext);
-			popup[i++] = board(raw | (t << 1), ext);
+	inline constexpr xthit popups64(btype popup[]) const {
+		u64 ops = 0, x = where64(0);
+		u32 n = math::popcnt(x);
+		u32 f1 = ({f32 f = 0.9 / n; raw_cast<u32>(f);});
+		u32 f2 = ({f32 f = 0.1 / n; raw_cast<u32>(f);});
+		btype *pop1 = popup, *pop2 = popup + n;
+		for (u64 t : u64it(x)) {
+			u32 p = math::tzcnt(t) >> 2;
+			*(pop1++) = board(raw | (t << 0), ext, f1); ops |= (1ull << action::pop(1, p));
+			*(pop2++) = board(raw | (t << 1), ext, f2); ops |= (1ull << action::pop(2, p));
 		}
-#if defined(__BMI2__) && !defined(PREFER_LEGACY_MASK)
-		return math::pext64(e, 0x1111111111111111ull);
-#else
-		return find64(0);
-#endif
+		return ops;
 	}
 	template<typename btype, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr nthit popups80(btype popup[]) const {
-		u32 i = 0;
-		u64 e = where80(0);
-		for (u64 x = e, t; (t = x & -x) != 0; x ^= t) {
-			popup[i++] = board(raw | (t << 0), ext);
-			popup[i++] = board(raw | (t << 1), ext);
+	inline constexpr xthit popups80(btype popup[]) const {
+		u64 ops = 0, x = where80(0);
+		u32 n = math::popcnt(x);
+		u32 f1 = ({f32 f = 0.9 / n; raw_cast<u32>(f);});
+		u32 f2 = ({f32 f = 0.1 / n; raw_cast<u32>(f);});
+		btype *pop1 = popup, *pop2 = popup + n;
+		for (u64 t : u64it(x)) {
+			u32 p = math::tzcnt(t) >> 2;
+			*(pop1++) = board(raw | (t << 0), ext, f1); ops |= (1ull << action::pop(1, p));
+			*(pop2++) = board(raw | (t << 1), ext, f2); ops |= (1ull << action::pop(2, p));
 		}
-#if defined(__BMI2__) && !defined(PREFER_LEGACY_MASK)
-		return math::pext64(e, 0x1111111111111111ull);
-#else
-		return find80(0);
-#endif
+		return ops;
 	}
 
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
 	inline constexpr std::vector<btype> popups() const   { return popups64(); }
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr std::vector<btype> popups64() const { btype popup[32]; return {popup, popup + popups64(popup).size() * 2}; }
+	inline constexpr std::vector<btype> popups64() const { btype popup[32]; return {popup, popup + popups64(popup).size()}; }
 	template<typename btype = board, typename = enable_if_is_base_of<board, btype>>
-	inline constexpr std::vector<btype> popups80() const { btype popup[32]; return {popup, popup + popups80(popup).size() * 2}; }
+	inline constexpr std::vector<btype> popups80() const { btype popup[32]; return {popup, popup + popups80(popup).size()}; }
 
 	inline i32 left()  { return left64(); }
 	inline i32 right() { return right64(); }
@@ -801,8 +805,16 @@ public:
 			next  = 0x04u, // add next tile randomly
 			clear = 0x08u, // clear the board
 			init  = 0x0cu, // reset the board (with tiles)
-			pop1  = 0x10u, // 4-bit type, 4-bit position
-			pop2  = 0x20u, // 4-bit type, 4-bit position
+		};
+		class pop { // add new tile: 4-bit type, 4-bit position
+		public:
+			inline constexpr pop(u32 t, u32 p) : pop((t << 4) | p) {}
+			inline constexpr pop(u32 code) : code(code) {}
+			inline constexpr operator u32() const { return code; }
+			inline constexpr u32 type() const { return code >> 4; }
+			inline constexpr u32 pos() const { return code & 0xf; }
+		private:
+			const u32 code;
 		};
 	};
 
@@ -813,10 +825,10 @@ public:
 		case action::right: return right64();
 		case action::down:  return down64();
 		case action::left:  return left64();
-		case action::next:  return popup64() ? 0 : -1;
+		case action::next:  return popup64();
 		case action::clear: return set(0ull, 0), 0;
 		case action::init:  return init(), 0;
-		default: /* pop */  return at4(op & 0x0f) == 0 && (op >> 4) != 0 ? (at4(op & 0x0f, op >> 4), 0) : -1;
+		default: /* pop */  return popup64(op);
 		}
 	}
 	inline i32 operate80(u32 op) {
@@ -825,10 +837,10 @@ public:
 		case action::right: return right80();
 		case action::down:  return down80();
 		case action::left:  return left80();
-		case action::next:  return popup80() ? 0 : -1;
+		case action::next:  return popup80();
 		case action::clear: return set(0ull, 0), 0;
 		case action::init:  return init(), 0;
-		default: /* pop */  return at5(op & 0x0f) == 0 && (op >> 4) != 0 ? (at5(op & 0x0f, op >> 4), 0) : -1;
+		default: /* pop */  return popup80(op);
 		}
 	}
 
