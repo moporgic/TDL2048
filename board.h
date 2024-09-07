@@ -326,12 +326,12 @@ public:
 	inline constexpr void mirror() { mirror64(); }
 	inline constexpr void mirror64() {
 		raw = ((raw & 0x000f000f000f000full) << 12) | ((raw & 0x00f000f000f000f0ull) << 4)
-			| ((raw & 0x0f000f000f000f00ull) >> 4) | ((raw & 0xf000f000f000f000ull) >> 12);
+		    | ((raw & 0x0f000f000f000f00ull) >> 4) | ((raw & 0xf000f000f000f000ull) >> 12);
 	}
 	inline constexpr void mirror80() {
 		mirror64();
 		ext = ((ext & 0x1111) << 3) | ((ext & 0x2222) << 1)
-			| ((ext & 0x4444) >> 1) | ((ext & 0x8888) >> 3);
+		    | ((ext & 0x4444) >> 1) | ((ext & 0x8888) >> 3);
 	}
 
 	inline constexpr void flip() { flip64(); }
@@ -362,7 +362,7 @@ public:
 		transpose64();
 #if defined(__BMI2__) && !defined(PREFER_LEGACY_TRANSPOSE)
 		ext = (math::pext32(ext, 0x1111u) <<  0) | (math::pext32(ext, 0x2222u) <<  4)
-			| (math::pext32(ext, 0x4444u) <<  8) | (math::pext32(ext, 0x8888u) << 12);
+		    | (math::pext32(ext, 0x4444u) <<  8) | (math::pext32(ext, 0x8888u) << 12);
 #else
 		u16 buf = 0;
 		buf = (ext ^ (ext >> 3)) & 0x0a0a;
@@ -940,8 +940,7 @@ public:
 				rank = (rank ^ (n > 1 ? 0 : t)) | u;
 			} else { // if u is unexpected but present
 				u64 w = where64(math::tzcnt(u));
-				u32 t = math::msb((scale | ~mask) & (u - 1)) ?:
-				       (math::lsb(rank ^ u) ?: 1);
+				u32 t = math::msb((scale | ~mask) & (u - 1)) ?: (math::lsb(rank ^ u) ?: 1);
 				put64(w, math::tzcnt(t));
 				rank = (rank ^ u) | t;
 			}

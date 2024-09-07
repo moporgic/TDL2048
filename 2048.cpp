@@ -471,7 +471,7 @@ public:
 		return (math::fmix64(x) ^ nmap[n >> 1]) & mask;
 	}
 
-    friend std::ostream& operator <<(std::ostream& out, const cache& c) {
+	friend std::ostream& operator <<(std::ostream& out, const cache& c) {
 		u32 code = 4;
 		write_cast<byte>(out, code);
 		switch (code) {
@@ -947,7 +947,7 @@ private:
 
 	static std::string vtos(const list& vec) {
 		std::string str = std::accumulate(vec.cbegin(), vec.cend(), std::string(),
-		    [](const std::string& r, const std::string& v){ return r + v + " "; });
+				[](const std::string& r, const std::string& v) { return r + v + " "; });
 		if (str.size()) str.pop_back();
 		return str;
 	}
@@ -972,12 +972,11 @@ struct stage {
 	declare_extern_comparators_with(const stage&, u32, lv.thres, rv, constexpr inline friend);
 	declare_extern_comparators_with(u32, const stage&, lv, rv.thres, constexpr inline friend);
 
-	static list<stage> parse(std::string res) { // e.g., 4 stages: 0,16384,32768,49152
+	static list<stage> parse(std::string res, clip<feature> feats = feature::feats()) { // e.g., 4 stages: 0,16384,32768,49152
 		res.append(res.empty() ? "0," : ",");
 		size_t N = std::count(res.begin(), res.end(), ',');
 		list<stage> multi(N + 1);
-		clip<feature> feats = feature::feats();
-		for (size_t i = 0, n = feats.size() / N, z; i < N; res.erase(0, z + 1), i++){
+		for (size_t i = 0, n = feats.size() / N, z; i < N; res.erase(0, z + 1), i++) {
 			multi[i] = { feats.subc(n * i, n), u32(std::stoul(res, &z, 10)) };
 		}
 		multi[N].thres = 65536;
@@ -989,7 +988,6 @@ void init_logging(utils::options::option files) {
 	static std::ofstream logofs;
 	for (std::string file : files) {
 		std::string path = file.substr(file.find('|') + 1);
-//		std::string opt = path != file ? file.substr(0, file.find('|')) : "";
 		char type = path[path.find_last_of(".") + 1];
 		if (logofs.is_open() || (type != 'x' && type != 'l')) continue; // .x and .log are suffix for log files
 		logofs.open(path, std::ios::out | std::ios::app);
@@ -1952,8 +1950,8 @@ struct statistic {
 				total.win * 100.0 / info.limit);
 		buf[size++] = '\n';
 		size += snprintf(buf + size, sizeof(buf) - size,
-		        "%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
-		        "tile", "count", "score", "move", "rate", "win");
+				"%-6s"  "%8s"    "%8s"    "%8s"   "%9s"   "%9s",
+				"tile", "count", "score", "move", "rate", "win");
 		buf[size++] = '\n';
 		u32 total = std::accumulate(accum.count.begin(), accum.count.end(), 0);
 		for (u32 remain = total, i = 0; remain; remain -= accum.count[i++]) {
