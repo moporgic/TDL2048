@@ -9,40 +9,21 @@
 /.cproject
 /.pydevproject
 /.issues
+/.vscode
 
-# Executables
-*.exe
-*.out
-*.app
+# Executables and compiler related files
+2048
+2048.exe
+2048.o
+2048.obj
+2048.gcda
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+# Model files
+*.w
 
-# Prerequisites
-*.d
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# System caches
+# Log files and caches
+*.log
+*.x
+make-profile.sh
 *.DS_Store
 [Tt]humbs.db
