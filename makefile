@@ -66,7 +66,7 @@ profile: # build with profiling by using a custom script
 	@+$(MAKE) $(TARGET) FLAGS="$(filter-out -fprofile-update=%, $(FLAGS)) -fprofile-use"
 
 4x6patt 5x6patt 6x6patt 7x6patt 8x6patt: # build with profiling by using predefined settings
-	$(if $(wildcard $@.w),, [ -e $@.w.xz ] || curl -OJRf moporgic.info/data/2048/$@.w.xz && xz -vd $@.w.xz)
+	$(if $(wildcard $@.w),, [ -e $@.w.xz ] || curl -OJRf moporgic.info/2048/model/$@.w.xz && xz -vd $@.w.xz)
 	@echo \$$"(OUTPUT) -n $@ -i $@.w -a $(PGO_ALPHA) -t $(PGO_OPTI) -e $(PGO_EVAL) -% none $(PGO_FLAGS)" > $(SCRIPT)
 	@+$(MAKE) profile FLAGS="$(FLAGS) -fprofile-update=single"
 

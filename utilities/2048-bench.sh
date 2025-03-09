@@ -210,7 +210,7 @@ if (( $# + ${#recipes} )) && [ "$0" == "$BASH_SOURCE" ]; then ( # execute benchm
 	for network in ${networks:-4x6patt 8x6patt}; do
 		[ -e $network.w ] && continue
 		echo "Retrieving \"$network.w\" from moporgic.info..."
-		curl -OJRfs "moporgic.info/data/2048/$network.w.xz" && xz -d $network.w.xz || \
+		curl -OJRfs "moporgic.info/2048/model/$network.w.xz" && xz -d $network.w.xz || \
 			echo "Error: \"$network.w\" is unavailable"
 	done
 
