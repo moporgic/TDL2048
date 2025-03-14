@@ -867,7 +867,7 @@ public:
 		opinion(const opinion& i) = default;
 		opinion(std::string& token) : token(token) {}
 		operator std::string() const { return value(); }
-		operator numeric() const { return std::stod(value()); }
+		explicit operator numeric() const { return std::stod(value()); }
 		std::string label() const { return token.substr(0, token.find('=')); }
 		std::string value() const { return token.find('=') != std::string::npos ? token.substr(token.find('=') + 1) : ""; }
 		std::string value(const std::string& def) const { auto val = value(); return val.size() ? val : def; }
@@ -895,7 +895,7 @@ public:
 	public:
 		option(const list& opt = {}) : list(opt) {}
 		operator std::string() const { return value(); }
-		operator numeric() const { return std::stod(value()); }
+		explicit operator numeric() const { return std::stod(value()); }
 		std::string value() const { return vtos(*this); }
 		std::string value(const std::string& def) const { auto val = value(); return val.size() ? val : def; }
 		numeric value(numeric def) const { try { return numeric(*this); } catch (std::invalid_argument&) {} return def; }
@@ -1023,14 +1023,12 @@ void config_memory(utils::options::option opt) {
 }
 
 void config_weight(utils::options::option opt) {
-	using wght_s = weight::structure;
-	using wght_c = weight::coherence;
 	u32 code = weight::type(), last = code;
 	opt += ("alpha=" + opt);
-	if (opt["alpha"].value(0.0 / 0.0) <  1.0) code = wght_s::code;
-	if (opt["alpha"].value(0.0 / 0.0) >= 1.0) code = wght_c::code;
-	if (opt["alpha"]("fix")) code = wght_s::code;
-	if (opt["alpha"]("coh")) code = wght_c::code;
+	if (opt["alpha"].value(0.0 / 0.0) <  1.0) code = weight::structure::code;
+	if (opt["alpha"].value(0.0 / 0.0) >= 1.0) code = weight::coherence::code;
+	if (opt["alpha"]("fix")) code = weight::structure::code;
+	if (opt["alpha"]("coh")) code = weight::coherence::code;
 	if (weight::type(code) == last || weight::wghts().empty()) return;
 
 	weight::container wbuf(std::move(weight::wghts()));
@@ -1038,8 +1036,8 @@ void config_weight(utils::options::option opt) {
 		u = wbuf.front();
 		w = weight::make(u.sign(), u.size());
 		switch (code) {
-		case wght_s::code: std::copy_n(u.data<wght_c::unit<0>>(), u.size(), w.data<wght_s>()); break;
-		case wght_c::code: std::copy_n(u.data<wght_s>(), u.size(), w.data<wght_c::unit<0>>()); break;
+		case weight::structure::code: std::copy_n(u.data<weight::coherence::unit<0>>(), u.size(), w.data<weight::structure>()); break;
+		case weight::coherence::code: std::copy_n(u.data<weight::structure>(), u.size(), w.data<weight::coherence::unit<0>>()); break;
 		}
 	}
 	for (feature f : feature::container(std::move(feature::feats()))) { // bind features and weights
@@ -1072,56 +1070,52 @@ statistic invoke(statistic(*run)(option), option opt) {
 }
 
 std::string resolve(const std::string& token) {
-	std::map<std::string, std::string> alias;
-
-	alias["4x6patt/khyeh"]       = "012345 456789 012456 45689a ";
-	alias["5x6patt/42-33"]       = "012345 456789 89abcd 012456 45689a ";
-	alias["4x5patt/41-32"]       = "01234 45678 01245 45689 ";
-	alias["2x4patt/4"]           = "0123 4567 ";
-	alias["5x4patt/4-22"]        = alias["2x4patt/4"] + "0145 1256 569a ";
-	alias["8x4patt/legacy"]      = "0123:0123 4567:4567 89ab:89ab cdef:cdef 048c:048c 159d:159d 26ae:26ae 37bf:37bf ";
-	alias["9x4patt/legacy"]      = "0145:0145 1256:1256 2367:2367 4589:4589 569a:569a 67ab:67ab 89cd:89cd 9ade:9ade abef:abef ";
-	alias["1x8patt/44"]          = "01234567 ";
-	alias["2x8patt/44"]          = "01234567 456789ab ";
-	alias["3x8patt/44-332"]      = alias["2x8patt/44"] + "01245689 ";
-	alias["3x8patt/44-4211"]     = alias["2x8patt/44"] + "0123458c ";
-	alias["4x8patt/44-332-4211"] = alias["3x8patt/44-332"] + "0123458c ";
-	alias["2x7patt/43"]          = "0123456 456789a ";
-	alias["3x7patt/43"]          = alias["2x7patt/43"] + "89abcde ";
-	alias["4x6patt/k.matsuzaki"] = "012456 456789 012345 234569 ";
-	alias["5x6patt/k.matsuzaki"] = alias["4x6patt/k.matsuzaki"] + "01259a ";
-	alias["6x6patt/k.matsuzaki"] = alias["5x6patt/k.matsuzaki"] + "345678 ";
-	alias["7x6patt/k.matsuzaki"] = alias["6x6patt/k.matsuzaki"] + "134567 ";
-	alias["8x6patt/k.matsuzaki"] = alias["7x6patt/k.matsuzaki"] + "01489a ";
-
-	alias["4x6patt"]   = alias["4x6patt/khyeh"];
-	alias["5x6patt"]   = alias["5x6patt/42-33"];
-	alias["4x5patt"]   = alias["4x5patt/41-32"];
-	alias["2x4patt"]   = alias["2x4patt/4"];
-	alias["5x4patt"]   = alias["5x4patt/4-22"];
-	alias["8x4patt"]   = alias["8x4patt/legacy"];
-	alias["9x4patt"]   = alias["9x4patt/legacy"];
-	alias["1x8patt"]   = alias["1x8patt/44"];
-	alias["2x8patt"]   = alias["2x8patt/44"];
-	alias["3x8patt"]   = alias["3x8patt/44-4211"];
-	alias["4x8patt"]   = alias["4x8patt/44-332-4211"];
-	alias["2x7patt"]   = alias["2x7patt/43"];
-	alias["3x7patt"]   = alias["3x7patt/43"];
-	alias["6x6patt"]   = alias["6x6patt/k.matsuzaki"];
-	alias["7x6patt"]   = alias["7x6patt/k.matsuzaki"];
-	alias["8x6patt"]   = alias["8x6patt/k.matsuzaki"];
-
-	alias["mono/0123"] = "m@0123[^24]:m@0123,m@37bf,m@fedc,m@c840,m@3210,m@fb73,m@cdef,m@048c ";
-	alias["mono/4567"] = "m@4567[^24]:m@4567,m@26ae,m@ba98,m@d951,m@7654,m@ea62,m@89ab,m@159d ";
-	alias["mono"]      = alias["mono/0123"] + alias["mono/4567"];
-	alias["num@lt"]    = "num@lt[^24]:num@lt ";
-	alias["num@st"]    = "num@st[^24]:num@st ";
-	alias["num"]       = alias["num@lt"] + alias["num@st"];
-	alias["default"]   = alias["4x6patt"];
-	alias["none"]      = "";
-
-	try { return alias.at(token);
-	} catch (std::out_of_range&) { return token; }
+	switch (to_hash(token)) {
+	case to_hash("default"):
+	case to_hash("4x6patt"):             return resolve("4x6patt/khyeh");
+	case to_hash("5x6patt"):             return resolve("5x6patt/42-33");
+	case to_hash("4x5patt"):             return resolve("4x5patt/41-32");
+	case to_hash("2x4patt"):             return resolve("2x4patt/4");
+	case to_hash("5x4patt"):             return resolve("5x4patt/4-22");
+	case to_hash("8x4patt"):             return resolve("8x4patt/legacy");
+	case to_hash("9x4patt"):             return resolve("9x4patt/legacy");
+	case to_hash("1x8patt"):             return resolve("1x8patt/44");
+	case to_hash("2x8patt"):             return resolve("2x8patt/44");
+	case to_hash("3x8patt"):             return resolve("3x8patt/44-4211");
+	case to_hash("4x8patt"):             return resolve("4x8patt/44-332-4211");
+	case to_hash("2x7patt"):             return resolve("2x7patt/43");
+	case to_hash("3x7patt"):             return resolve("3x7patt/43");
+	case to_hash("6x6patt"):             return resolve("6x6patt/k.matsuzaki");
+	case to_hash("7x6patt"):             return resolve("7x6patt/k.matsuzaki");
+	case to_hash("8x6patt"):             return resolve("8x6patt/k.matsuzaki");
+	case to_hash("4x6patt/khyeh"):       return "012345 456789 012456 45689a ";
+	case to_hash("5x6patt/42-33"):       return "012345 456789 89abcd 012456 45689a ";
+	case to_hash("4x5patt/41-32"):       return "01234 45678 01245 45689 ";
+	case to_hash("2x4patt/4"):           return "0123 4567 ";
+	case to_hash("5x4patt/4-22"):        return resolve("2x4patt/4") + "0145 1256 569a ";
+	case to_hash("8x4patt/legacy"):      return "0123:0123 4567:4567 89ab:89ab cdef:cdef 048c:048c 159d:159d 26ae:26ae 37bf:37bf ";
+	case to_hash("9x4patt/legacy"):      return "0145:0145 1256:1256 2367:2367 4589:4589 569a:569a 67ab:67ab 89cd:89cd 9ade:9ade abef:abef ";
+	case to_hash("1x8patt/44"):          return "01234567 ";
+	case to_hash("2x8patt/44"):          return "01234567 456789ab ";
+	case to_hash("3x8patt/44-332"):      return resolve("2x8patt/44") + "01245689 ";
+	case to_hash("3x8patt/44-4211"):     return resolve("2x8patt/44") + "0123458c ";
+	case to_hash("4x8patt/44-332-4211"): return resolve("3x8patt/44-332") + "0123458c ";
+	case to_hash("2x7patt/43"):          return "0123456 456789a ";
+	case to_hash("3x7patt/43"):          return resolve("2x7patt/43") + "89abcde ";
+	case to_hash("4x6patt/k.matsuzaki"): return "012456 456789 012345 234569 ";
+	case to_hash("5x6patt/k.matsuzaki"): return resolve("4x6patt/k.matsuzaki") + "01259a ";
+	case to_hash("6x6patt/k.matsuzaki"): return resolve("5x6patt/k.matsuzaki") + "345678 ";
+	case to_hash("7x6patt/k.matsuzaki"): return resolve("6x6patt/k.matsuzaki") + "134567 ";
+	case to_hash("8x6patt/k.matsuzaki"): return resolve("7x6patt/k.matsuzaki") + "01489a ";
+	case to_hash("mono/0123"):           return "m@0123[^24]:m@0123,m@37bf,m@fedc,m@c840,m@3210,m@fb73,m@cdef,m@048c ";
+	case to_hash("mono/4567"):           return "m@4567[^24]:m@4567,m@26ae,m@ba98,m@d951,m@7654,m@ea62,m@89ab,m@159d ";
+	case to_hash("mono"):                return resolve("mono/0123") + resolve("mono/4567");
+	case to_hash("num@lt"):              return "num@lt[^24]:num@lt ";
+	case to_hash("num@st"):              return "num@st[^24]:num@st ";
+	case to_hash("num"):                 return resolve("num@lt") + resolve("num@st");
+	case to_hash("none"):                return "";
+	default:                             return token;
+	}
 }
 
 void make_network(utils::options::option opt) {
@@ -1136,7 +1130,7 @@ void make_network(utils::options::option opt) {
 
 	std::stringstream unstage(tokens); tokens.clear();
 	for (std::string token; unstage >> token; tokens += (token + ' ')) {
-		if (token.find("patt@") == npos) continue;
+		if (token.find('@') == npos || token.find("patt") == npos) continue;
 		std::string name = token.substr(0, token.find('@'));
 		std::string info = token.substr((token + '#').find_first_not_of("@0123456789", name.size()));
 		u32 stage = std::stoul(token.substr(name.size() + 1));
@@ -1275,23 +1269,21 @@ void make_network(utils::options::option opt) {
 				while (!test && (test.sign() + ' ')[0] == '0') test = weight(test.sign().substr(1));
 				if (test.size() == size) raw_cast<std::string>(weight::wghts().at(test.sign())) = sign; // unsafe!
 			}
-			using wght_s = weight::structure;
-			using wght_c = weight::coherence;
 			if (!weight(sign) && size) { // create new weight table
 				weight dst = weight::make(sign, size);
 				if (init.find_first_of("{}") != npos && init != "{}") { // copy from existing table
 					weight src(init.substr(0, init.find('}')).substr(init.find('{') + 1));
 					switch (weight::type()) {
 					default:
-					case wght_s::code: std::copy_n(src.data<wght_s>(), src.size(), dst.data<wght_s>()); break;
-					case wght_c::code: std::copy_n(src.data<wght_c>(), src.size(), dst.data<wght_c>()); break;
+					case weight::structure::code: std::copy_n(src.data<weight::structure>(), src.size(), dst.data<weight::structure>()); break;
+					case weight::coherence::code: std::copy_n(src.data<weight::coherence>(), src.size(), dst.data<weight::coherence>()); break;
 					}
 				} else if (init.find_first_of("0123456789.+-") == 0) { // initialize with specific value
 					numeric val = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
 					switch (weight::type()) {
 					default:
-					case wght_s::code: std::fill_n(dst.data<wght_s>(), dst.size(), val); break;
-					case wght_c::code: std::fill_n(dst.data<wght_c>(), dst.size(), val); break;
+					case weight::structure::code: std::fill_n(dst.data<weight::structure>(), dst.size(), val); break;
+					case weight::coherence::code: std::fill_n(dst.data<weight::coherence>(), dst.size(), val); break;
 					}
 				}
 			} else if (weight(sign) && size) { // table already exists
@@ -1300,8 +1292,8 @@ void make_network(utils::options::option opt) {
 					numeric off = std::stod(init) * (init.find("norm") != npos ? std::pow(num, -1) : 1);
 					switch (weight::type()) {
 					default:
-					case wght_s::code: for (numeric& val : dst.value<wght_s>()) val += off; break;
-					case wght_c::code: for (numeric& val : dst.value<wght_c>()) val += off; break;
+					case weight::structure::code: for (numeric& val : dst.value<weight::structure>()) val += off; break;
+					case weight::coherence::code: for (numeric& val : dst.value<weight::coherence>()) val += off; break;
 					}
 				}
 			}
@@ -1355,8 +1347,6 @@ void load_network(utils::options::option files) {
 	weight::container& wghts = weight::wghts();
 	weight::container final, merge;
 	std::map<std::string, size_t> numof;
-	using wght_s = weight::structure;
-	using wght_c = weight::coherence;
 	while (wghts.size()) { // try ensemble weights with same sign
 		weight w(wghts.front()), m(w.sign(), merge);
 		if (std::find(fixed.begin(), fixed.end(), w.data()) != fixed.end()) { // if w is fixed, never merge
@@ -1370,15 +1360,15 @@ void load_network(utils::options::option files) {
 		} else { // if w is with a duplicated sign, merge it with the existing base
 			switch (weight::type()) {
 			default:
-			case wght_s::code:
+			case weight::structure::code:
 				for (size_t i = 0; i < m.size(); i++)
-					m.at<wght_s>(i).value += w.at<wght_s>(i).value; // will be divided later
+					m.at<weight::structure>(i).value += w.at<weight::structure>(i).value; // will be divided later
 				break;
-			case wght_c::code:
+			case weight::coherence::code:
 				for (size_t i = 0; i < m.size(); i++) {
-					m.at<wght_c>(i).value += w.at<wght_c>(i).value; // will be divided later
-					m.at<wght_c>(i).accum += w.at<wght_c>(i).accum;
-					m.at<wght_c>(i).updvu += w.at<wght_c>(i).updvu;
+					m.at<weight::coherence>(i).value += w.at<weight::coherence>(i).value; // will be divided later
+					m.at<weight::coherence>(i).accum += w.at<weight::coherence>(i).accum;
+					m.at<weight::coherence>(i).updvu += w.at<weight::coherence>(i).updvu;
 				}
 				break;
 			}
@@ -1391,8 +1381,8 @@ void load_network(utils::options::option files) {
 		if (n == 1) continue;
 		switch (weight::type()) {
 		default:
-		case wght_s::code: for (wght_s& s : m.value<wght_s>()) s.value /= n; break;
-		case wght_c::code: for (wght_c& c : m.value<wght_c>()) c.value /= n; break;
+		case weight::structure::code: for (weight::structure& s : m.value<weight::structure>()) s.value /= n; break;
+		case weight::coherence::code: for (weight::coherence& c : m.value<weight::coherence>()) c.value /= n; break;
 		}
 	}
 	wghts.swap(final);
