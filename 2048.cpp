@@ -984,6 +984,20 @@ struct stage {
 	}
 };
 
+void handle_routine(utils::options::option run) {
+	switch (to_hash(run["mode"])) {
+	case to_hash("version"):
+		std::cout << format("TDL2048+ Rev.%s (GCC %s C++%d @ %s %s)",
+			__COMMIT_ID__, __VERSION__, __cplusplus, __DATE_ISO__, __TIME__) << std::endl;
+		std::exit(0);
+		break;
+	case to_hash("help"):
+		std::cout << "Usage: " << run["args"] << " [OPTION]..." << moporgic::what;
+		std::exit(0);
+		break;
+	}
+}
+
 void init_logging(utils::options::option files) {
 	static std::ofstream logofs;
 	for (std::string file : files) {
@@ -2483,6 +2497,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-h"): case to_hash("--shift"):
 			opts["shift"] = next_opt("32768");
 			if ((opts[""] = next_opts()).size()) opts["options"]["stint"] = opts[""];
+			if (!opts("recipes")) opts["run"]["mode"] = "help", opts["run"]["args"] = argv[0];
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
@@ -2545,13 +2560,10 @@ utils::options parse(int argc, const char* argv[]) {
 			opts = {};
 			break;
 		case to_hash("-v"): case to_hash("--version"):
-			std::cout << format("TDL2048+ Rev.%s (GCC %s C++%d @ %s %s)",
-				__COMMIT_ID__, __VERSION__, __cplusplus, __DATE_ISO__, __TIME__) << std::endl;
-			std::exit(0);
+			opts["run"]["mode"] = "version";
 			break;
 		case to_hash("-?"): case to_hash("--help"):
-			std::cout << "Usage: " << argv[0] << " [OPTION]..." << moporgic::what;
-			std::exit(0);
+			opts["run"]["mode"] = "help", opts["run"]["args"] = argv[0];
 			break;
 		default:
 			if (label.find('-') == 0) label += ('=' + next_opt());
@@ -2613,6 +2625,7 @@ utils::options parse(int argc, const char* argv[]) {
 
 int main(int argc, const char* argv[]) {
 	utils::options opts = parse(argc, argv);
+	utils::handle_routine(opts["run"]);
 	utils::init_logging(opts["save"]);
 
 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
