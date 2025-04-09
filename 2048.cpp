@@ -2497,7 +2497,7 @@ utils::options parse(int argc, const char* argv[]) {
 		case to_hash("-h"): case to_hash("--shift"):
 			opts["shift"] = next_opt("32768");
 			if ((opts[""] = next_opts()).size()) opts["options"]["stint"] = opts[""];
-			if (!opts("recipes")) opts["run"]["mode"] = "help", opts["run"]["args"] = argv[0];
+			if (argc == 2) opts["run"]["mode"] = "help", opts["run"]["args"] = argv[0];
 			break;
 		case to_hash("-s"): case to_hash("--seed"):
 			opts["seed"] = next_opt("moporgic");
