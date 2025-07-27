@@ -16,9 +16,9 @@ while [[ $1 == -* ]]; do
 		-o=*)  columns=${1#*=}; ;;
 		-a|-A) filter="cat"; ;; # always print all summary blocks
 		-1|-L) filter="tail -n1"; ;; # always print only the last summary blocks
-		-i)    index=1; ;; # always show index numbers
+		-i)    index=2; ;; # always show index numbers
 		-i*)   index=$(<<<${1:2} tr -d '='); ;; # set index minimal display digits (0 to disable)
-		-H)    headings=yes; ;; # print headings
+		-H)    index=${index:-2}; headings=yes; ;; # print headings
 		-t)    output="sed -E s/\\s+/\\t/g"; ;; # use tabs instead of spaces
 	esac
 	shift
@@ -79,7 +79,7 @@ for (( i=0; i<${#src[@]}; i++ )); do
 	fmt=$format
 	[[ ${index}${filter} == cat ]] && idx=$width || idx=$index
 	if (( ${idx:-0} )); then # prefix res with index
-		width=$((${#width} > index ? ${#width} : index))
+		width=$((${#width} > ${index:-2} ? ${#width} : ${index:-2}))
 		res=$(<<<$res nl -v0 -w$width -s': ' -nrz)
 		fmt=%-$((width + 3))s$format
 	fi
