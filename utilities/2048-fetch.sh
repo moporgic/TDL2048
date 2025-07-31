@@ -71,9 +71,27 @@ fi
 (( ${#src[@]} == 1 )) && filter=${filter:-cat} || filter=${filter:-tail -n1}
 for (( i=0; i<${#src[@]}; i++ )); do
 	label=${src[$i]%|*}
-	res=$(grep summary -A20 "${src[$i]#*|}" | \
-		grep -E "^(total${win:+|}$win)" | sed -E "s/ [0-9. ]+% +/|/g" | \
-		sed -E "s/$avg/+/g" | sed -E "s/($max)|( tile=.+)//g" | \
+	res=$(grep summary -A20 "${src[$i]#*|}" |
+		while IFS= read -r stat; do # fix missing win rates
+			if [[ $prev ]]; then
+				if [[ $stat =~ ^([0-9]+)\ .+\ [0-9.]+%$ ]]; then
+					for (( tile=${prev%% *}<<1; tile<${BASH_REMATCH[1]}; tile<<=1 )); do
+						echo $tile 0 0 0 0% ${prev##* }
+					done
+					prev=$stat
+				elif [[ ! $stat ]]; then
+					for (( tile=${prev%% *}<<1; tile<=65536; tile<<=1 )); do
+						echo $tile 0 0 0 0% 0%
+					done
+					prev=$stat
+				fi
+				echo $stat
+			elif [[ $stat == summary* ]]; then
+				prev="1 0 0 0 0% 100.00%"
+			fi
+		done |
+		grep -E "^(total${win:+|}$win)" | sed -E "s/ [0-9. ]+% +/|/g" |
+		sed -E "s/$avg/+/g" | sed -E "s/($max)|( tile=.+)//g" |
 		xargs | sed -e "s/^\+//g" | tr '+' '\n' | sed -e "s/^ //g")
 	width=$(($(<<<$res wc -l) - 1))
 	fmt=$format
@@ -85,16 +103,7 @@ for (( i=0; i<${#src[@]}; i++ )); do
 	fi
 	fmt=%-${len}s${fmt}
 	<<<$res $filter | while IFS= read -r res; do
-		res=$(echo $res)
 		[[ $res ]] || continue
-		chk=($res)
-		if (( ${#chk[@]} < ${#columns[@]}+(${idx:-0}?1:0) )); then # fix missing win rates
-			[[ $res == *%* ]] && bound=$(<<< "$res" sed -E "s/[0-9]+:? |\|[0-9.]+%//g;s/ [0-9 ]+ / /") || bound=0
-			for tile in ${win//|/ }; do
-				(( $tile < ${bound% *} )) && res=${res/100.00% /100.00% 100.00% }
-				(( $tile > ${bound#* } )) && res=${res/%/ 0%}
-			done
-		fi
 		res=$(<<<$res sed -E "s/[0-9]+\|//g")
 		printf "${fmt}\n" "${label}" ${res}
 		label=
