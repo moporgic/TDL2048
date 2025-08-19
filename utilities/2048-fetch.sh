@@ -26,9 +26,10 @@ done
 
 # parse output columns
 columns=,${columns,,},
-declare -A repl=([a]=avg [av]=avg [m]=max [x]=max [mx]=max \
-	[1k]=1024 [2k]=2048 [4k]=4096 [8k]=8192 [16k]=16384 [32k]=32768 [64k]=65536 \
-	[1]=1024 [2]=2048 [4]=4096 [8]=8192 [16]=16384 [32]=32768 [64]=65536)
+declare -A repl=([a]=avg [av]=avg [m]=max [x]=max [mx]=max
+	[1k]=1024 [2k]=2048 [4k]=4096 [8k]=8192 [16k]=16384 [32k]=32768 [64k]=65536
+	[1]=1024 [2]=2048 [4]=4096 [8]=8192 [16]=16384 [32]=32768 [64]=65536
+	[full]=avg,max,2048,4096,8192,16384,32768,65536)
 for n in ${!repl[@]}; do
 	columns=${columns/,$n,/,${repl[$n]},}
 done
@@ -62,7 +63,7 @@ done
 
 # fetch results and print
 if [[ $headings ]]; then
-	if [[ $output != cat && \
+	if [[ $output != cat &&
 		! $(printf "%s\n" "${src[@]}" | sed -E "s/\|.+$//" | xargs) && $index == 0 ]]; then
 		output="sed -E s/^\\s+//;s/\\s+/\\t/g" # also trim beginning spaces
 	fi
